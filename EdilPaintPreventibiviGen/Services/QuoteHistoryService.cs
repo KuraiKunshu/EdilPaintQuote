@@ -48,12 +48,6 @@ public sealed class QuoteHistoryService
         await _dataService.DeleteQuoteAsync(quoteNumber);
     }
 
-    public async Task SaveAsync(IEnumerable<QuoteHistoryEntry> history)
-    {
-        foreach (var entry in history)
-            await _dataService.SaveQuoteAsync(entry);
-    }
-
     public string GetExpectedPdfPath(QuoteHistoryEntry entry)
     {
         return _storagePathService.BuildQuotePdfPath(
@@ -61,25 +55,6 @@ public sealed class QuoteHistoryService
             entry.QuoteNumber,
             entry.Date,
             string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
-    }
-
-    public string EnsurePdfExists(QuoteHistoryEntry entry)
-    {
-        byte[]? pdfBytes = entry.PdfFile?.Content;
-
-        string expectedPath = GetExpectedPdfPath(entry);
-        string ensuredPath = _storagePathService.EnsurePdfExists(
-            entry.CustomerName,
-            entry.QuoteNumber,
-            entry.Date,
-            pdfBytes,
-            string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName,
-            currentPath: null);
-
-        if (!string.IsNullOrWhiteSpace(ensuredPath))
-            entry.PdfPath = expectedPath;
-
-        return expectedPath;
     }
 
     public async Task<string> EnsureOfficialPdfExistsAsync(QuoteHistoryEntry entry)

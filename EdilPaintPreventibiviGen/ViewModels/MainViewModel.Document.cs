@@ -125,38 +125,6 @@ public partial class MainViewModel
         Debug.WriteLine($"[STARTUP][HISTORY] Analisi completa in {watch.Elapsed}");
     }
 
-    private void GeneratePdfFromContext(PdfGenerationContext ctx, string targetPath)
-    {
-        try
-        {
-            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
-            Directory.CreateDirectory(tempRoot);
-            string tempPath = Path.Combine(tempRoot, Path.GetFileName(targetPath));
-
-            _pdfService.GenerateQuoteFromContext(ctx, _companyData, tempPath);
-
-            string? targetFolder = Path.GetDirectoryName(targetPath);
-            if (!string.IsNullOrWhiteSpace(targetFolder))
-                Directory.CreateDirectory(targetFolder);
-
-            File.Copy(tempPath, targetPath, overwrite: true);
-            File.Delete(tempPath);
-
-            Debug.WriteLine($"[PDF] Generato: {targetPath}");
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[PDF] Errore generazione {targetPath}: {ex.Message}");
-        }
-    }
-
-    public List<QuoteHistoryEntry> GetHistoryEntriesWithoutMatchingCustomer(IEnumerable<QuoteHistoryEntry> historyEntries)
-    {
-        return historyEntries
-            .Where(entry => !HasMatchingCustomer(entry.CustomerName))
-            .ToList();
-    }
-
     private bool HasMatchingCustomer(string? customerName)
     {
         if (string.IsNullOrWhiteSpace(customerName))
@@ -351,8 +319,6 @@ public partial class MainViewModel
         UpdateItemSortOrders();
         CalculateTotals();
     }
-
-    public string EnsurePdfExists(QuoteHistoryEntry entry) => _quoteHistoryService.EnsurePdfExists(entry);
 
     public void GenerateCostsPdf()
     {

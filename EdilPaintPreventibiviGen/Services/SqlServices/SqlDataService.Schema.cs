@@ -166,41 +166,6 @@ public partial class SqlDataService
                                                  ALTER TABLE [dbo].[Quotes] ADD [CostAllocationsJson] NVARCHAR(MAX) NOT NULL DEFAULT '';
                                              END
                                              """);
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'IsJointVenture'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] 
-                                                 ADD [IsJointVenture] BIT NOT NULL DEFAULT 0;
-                                             END
-                                             """);
-
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'PartnerCompanyName'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] 
-                                                 ADD [PartnerCompanyName] NVARCHAR(500) NOT NULL DEFAULT '';
-                                             END
-                                             """);
-
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'CostAllocationsJson'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] 
-                                                 ADD [CostAllocationsJson] NVARCHAR(MAX) NOT NULL DEFAULT '';
-                                             END
-                                             """);
     }
 
     public async Task<bool> IsDatabaseEmptyAsync()

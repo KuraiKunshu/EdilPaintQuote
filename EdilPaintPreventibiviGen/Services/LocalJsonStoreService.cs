@@ -88,33 +88,6 @@ public class LocalJsonStoreService
         }
     }
     
-    public async Task SaveHistoryAsync(IEnumerable<QuoteHistoryEntry> entries)
-    {
-        await _historySemaphore.WaitAsync();
-        try
-        {
-            // Backup prima di sovrascrivere
-            if (File.Exists(_historyPath))
-            {
-                string backupPath = _historyPath + ".backup";
-                File.Copy(_historyPath, backupPath, overwrite: true);
-            }
-
-            var localEntries = entries.Select(CreateLocalQuoteEntry).ToList();
-            var json = JsonSerializer.Serialize(localEntries, JsonOptions);
-            await File.WriteAllTextAsync(_historyPath, json);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[LocalJsonStore] Error saving history: {ex.Message}");
-            throw;
-        }
-        finally
-        {
-            _historySemaphore.Release();
-        }
-    }
-
     public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber)
     {
         var history = await LoadHistoryAsync();

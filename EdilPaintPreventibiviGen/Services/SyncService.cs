@@ -309,23 +309,6 @@ public class SyncService
 
         return (synced, conflicts);
     }
-    
-    private async Task<ConflictResolution> ResolveCustomerConflictAsync(
-        Customer dbCustomer, Customer jsonCustomer)
-    {
-        if (dbCustomer.LastModifiedUtc > jsonCustomer.LastModifiedUtc)
-        {
-            await _localStore.SaveOrUpdateCustomerAsync(dbCustomer);
-            return ConflictResolution.Updated;
-        }
-        else if (jsonCustomer.LastModifiedUtc > dbCustomer.LastModifiedUtc)
-        {
-            await _dataService.AddCustomerAsync(jsonCustomer);
-            return ConflictResolution.Updated;
-        }
-
-        return ConflictResolution.NoChange;
-    }
 }
 
 public class SyncResult
@@ -347,9 +330,3 @@ public class SyncResult
     public bool IsSuccess => string.IsNullOrEmpty(Error) && !AlreadyRunning;
 }
 
-internal enum ConflictResolution
-{
-    NoChange,
-    Updated,
-    Conflict
-}

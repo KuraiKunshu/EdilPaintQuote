@@ -209,15 +209,6 @@ public partial class MainViewModel
         }
     }
 
-    public void IncrementCounter() => _ = IncrementCounterAsync();
-
-    private async Task IncrementCounterAsync()
-    {
-        int nextQuoteNumber = await _dataService.GetNextQuoteNumberAsync();
-        _companyData.Counter = nextQuoteNumber;
-        QuoteNumber = nextQuoteNumber.ToString();
-        OnPropertyChanged(nameof(QuoteNumber));
-    }
     #endregion
 }
 

@@ -53,7 +53,6 @@ public partial class MainViewModel : INotifyPropertyChanged
     private bool _isJointVenture;
     private bool _isSecondCustomerEnabled;
     private bool _isSavingQuoteHistory;
-    private bool _isSavingHistory;
     private bool _isEditingExistingQuote;
     #endregion
 

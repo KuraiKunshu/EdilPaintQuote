@@ -339,11 +339,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnSignificantCheckboxClick(object sender, RoutedEventArgs e)
-    {
-        (DataContext as MainViewModel)?.CalculateTotals();
-    }
-
     private void OnAddOurCostClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

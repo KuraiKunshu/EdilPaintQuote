@@ -20,10 +20,6 @@ namespace EdilPaintPreventibiviGen.ViewModels;
 public partial class MainViewModel
 {
     #region History
-    public void LoadHistory() => _ = LoadHistoryAsync();
-    public void SaveHistory() => _ = SaveHistoryAsync();
-    public void LoadHistory(int takeCount) => _ = LoadHistoryAsync(takeCount);
-
     public async Task LoadHistorySummariesAsync(int count, CancellationToken cancellationToken = default)
     {
         try
@@ -63,28 +59,6 @@ public partial class MainViewModel
         {
             Debug.WriteLine($"[SearchHistorySummaries] Error: {ex.Message}");
             return new List<QuoteHistorySummary>();
-        }
-    }
-
-    private async Task LoadHistoryAsync(int? takeCount = null)
-    {
-        try
-        {
-            List<QuoteHistoryEntry> data;
-
-            if (takeCount.HasValue && takeCount.Value > 0)
-                data = await _quoteHistoryService.LoadTopAsync(takeCount.Value);
-            else
-                data = await _quoteHistoryService.LoadAsync();
-
-            History.Clear();
-            foreach (var entry in data)
-                History.Add(entry);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Errore durante il caricamento dello storico.\n\n{ex.Message}",
-                "Errore caricamento storico", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -307,27 +281,6 @@ public partial class MainViewModel
         };
     }
 
-    private async Task SaveHistoryAsync()
-    {
-        if (_isSavingHistory)
-            return;
-
-        try
-        {
-            _isSavingHistory = true;
-            var snapshot = History.ToList();
-            await _quoteHistoryService.SaveAsync(snapshot);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Errore durante il salvataggio dello storico.\n\n{ex.Message}",
-                "Errore salvataggio storico", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            _isSavingHistory = false;
-        }
-    }
     #endregion
 }
 
