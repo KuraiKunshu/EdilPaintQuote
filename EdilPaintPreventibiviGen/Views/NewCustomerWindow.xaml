@@ -1,0 +1,299 @@
+<Window x:Class="EdilPaintPreventibiviGen.Views.NewCustomerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        RenderOptions.BitmapScalingMode="HighQuality"
+        Icon="pack://application:,,,/Assets/Windowsicon/contatti.png"
+        Title="Anagrafica Cliente"
+        Width="560"
+        Height="610"
+        MinWidth="560"
+        MinHeight="610"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent">
+
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#D0D7DE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="FooterButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="120"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="SectionLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="Transparent" Margin="18">
+        <Border Background="{StaticResource RowBackgroundBrush}"
+                CornerRadius="16"
+                BorderBrush="#22000000"
+                BorderThickness="1"
+                SnapsToDevicePixels="True">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="22"
+                                  ShadowDepth="0"
+                                  Opacity="0.22"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="56"/>
+                    <RowDefinition Height="1"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- HEADER -->
+                <Grid Grid.Row="0"
+                      Margin="18,0,10,0"
+                      MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtWindowTitle"
+                                   Text="Nuovo cliente"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource DefaultTextBrush}"/>
+                        <TextBlock Text="Compila l’anagrafica e gli eventuali sconti personalizzati"
+                                   Margin="0,2,0,0"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedTextBrush}"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Click="CloseButton_Click"
+                            ToolTip="Chiudi"
+                            Content="✕"/>
+                </Grid>
+
+                <!-- DIVIDER -->
+                <Border Grid.Row="1" Background="#18000000"/>
+
+                <!-- CONTENT -->
+                <ScrollViewer Grid.Row="2"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="22,20,22,18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="14"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="14"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="14"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="20"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Ragione Sociale -->
+                        <Grid Grid.Row="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Text="Ragione sociale"/>
+
+                            <TextBox x:Name="TxtBusiness"
+                                     Grid.Row="2"/>
+                        </Grid>
+
+                        <!-- Indirizzo -->
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Text="Indirizzo"/>
+
+                            <TextBox x:Name="TxtAddress"
+                                     Grid.Row="2"/>
+                        </Grid>
+
+                        <!-- Email + Telefono -->
+                        <Grid Grid.Row="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Style="{StaticResource SectionLabelStyle}"
+                                           Text="Email"/>
+
+                                <TextBox x:Name="TxtEmail"
+                                         Grid.Row="2"/>
+                            </Grid>
+
+                            <Grid Grid.Column="2">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Style="{StaticResource SectionLabelStyle}"
+                                           Text="Telefono"/>
+
+                                <TextBox x:Name="TxtPhone"
+                                         Grid.Row="2"/>
+                            </Grid>
+                        </Grid>
+
+                        <!-- Sconti -->
+                        <Border Grid.Row="6"
+                                Padding="16"
+                                CornerRadius="12"
+                                Background="#F6F8FA"
+                                BorderBrush="#12000000"
+                                BorderThickness="1">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="14"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0">
+                                    <TextBlock Text="Sconti cliente"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource DefaultTextBrush}"/>
+                                    <TextBlock Text="Inserisci eventuali percentuali di sconto da applicare automaticamente."
+                                               Margin="0,4,0,0"
+                                               FontSize="12"
+                                               Foreground="{StaticResource MutedTextBrush}"/>
+                                </StackPanel>
+
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Grid Grid.Column="0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="8"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Style="{StaticResource SectionLabelStyle}"
+                                                   Text="Sconto materiali (%)"/>
+
+                                        <TextBox x:Name="TxtDiscountMat"
+                                                 Grid.Row="2"
+                                                 Text="0"/>
+                                    </Grid>
+
+                                    <Grid Grid.Column="2">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="8"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Style="{StaticResource SectionLabelStyle}"
+                                                   Text="Sconto manodopera (%)"/>
+
+                                        <TextBox x:Name="TxtDiscountLab"
+                                                 Grid.Row="2"
+                                                 Text="0"/>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <!-- Nota -->
+                        <TextBlock Grid.Row="8"
+                                   Text="La ragione sociale è obbligatoria per il salvataggio."
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedTextBrush}"/>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- FOOTER -->
+                <Grid Grid.Row="3" Margin="22,0,22,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource FooterButtonStyle}"
+                            Content="Annulla"
+                            Click="OnCancelClick"
+                            Background="{StaticResource MutedTextBrush}"/>
+
+                    <Button x:Name="BtnSave"
+                            Grid.Column="3"
+                            Style="{StaticResource FooterButtonStyle}"
+                            Content="Salva cliente"
+                            Click="OnSaveClick"
+                            Background="{StaticResource SuccessGreenBrush}"
+                            FontWeight="Bold"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

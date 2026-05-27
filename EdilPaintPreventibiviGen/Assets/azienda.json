@@ -1,0 +1,14 @@
+{
+  "Nome": "Edil Paint Srl",
+  "Indirizzo": "Via Giacomo Matteotti 276, Gardone Val Trompia",
+  "Piva": "IT01234567890",
+  "Email": "edilpaint2015@libero.it",
+  "Logo": [
+    "Assets/Edilpaint.png",
+    "Assets/roto.png",
+    "Assets/velux.png"
+  ],
+  "Logo_index": 0,
+  "Counter": 180000,
+  "Termini_pagamento": "Anticipo 50% - Saldo fine lavori"
+}

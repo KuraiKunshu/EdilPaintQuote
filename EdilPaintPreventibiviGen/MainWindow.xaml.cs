@@ -1,0 +1,373 @@
+﻿using System;
+using System.Collections;
+using System.Windows;
+using System.Windows.Controls;
+using System.Linq;
+using EdilPaintPreventibiviGen.ViewModels;
+using EdilPaintPreventibiviGen.Views;
+using EdilPaintPreventibiviGen.Models;
+using EdilPaintPreventibiviGen.Services;
+using Microsoft.Win32;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace EdilPaintPreventibiviGen;
+
+public partial class MainWindow : Window
+{
+    private CancellationTokenSource? _materialSearchCts;
+    
+    #region Constructor
+    public MainWindow()
+    {
+        InitializeComponent();
+        DataContext = new MainViewModel();
+    }
+    public MainWindow(MainViewModel vm)
+    {
+        InitializeComponent();
+        DataContext = vm;
+    }
+    #endregion
+    
+    #region Window events
+    private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+        var result = MessageBox.Show(
+            "Sei sicuro di voler chiudere l'applicazione?",
+            "Conferma chiusura",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.No)
+        {
+            e.Cancel = true;
+        }
+    }
+    #endregion
+    
+    #region On drag & drop
+    private Point _dragStartPoint;
+
+    private void DataGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStartPoint = e.GetPosition(null);
+    }
+
+    private void DataGrid_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed)
+            return;
+
+        Point currentPosition = e.GetPosition(null);
+        Vector diff = _dragStartPoint - currentPosition;
+
+        if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+
+        if (sender is not DataGrid)
+            return;
+
+        if (FindVisualParent<DataGridRow>((DependencyObject)e.OriginalSource) is not DataGridRow row)
+            return;
+
+        if (row.Item is not Item draggedItem)
+            return;
+
+        DragDrop.DoDragDrop(row, draggedItem, DragDropEffects.Move);
+    }
+
+    private void DataGrid_Drop(object sender, DragEventArgs e)
+    {
+        if (sender is not DataGrid dataGrid)
+            return;
+
+        if (e.Data.GetDataPresent(typeof(Item)) is false)
+            return;
+
+        if (e.Data.GetData(typeof(Item)) is not Item draggedItem)
+            return;
+
+        if (DataContext is not MainViewModel vm)
+            return;
+
+        bool isMaterialsGrid = ReferenceEquals(dataGrid.ItemsSource, vm.Materials);
+        bool isLaborsGrid = ReferenceEquals(dataGrid.ItemsSource, vm.Labors);
+
+        if (!isMaterialsGrid && !isLaborsGrid)
+            return;
+
+        var items = isMaterialsGrid ? vm.Materials : vm.Labors;
+
+        Point dropPosition = e.GetPosition(dataGrid);
+        var target = GetItemFromPoint(dataGrid, dropPosition);
+
+        if (target == null || ReferenceEquals(draggedItem, target))
+            return;
+
+        int oldIndex = items.IndexOf(draggedItem);
+        int newIndex = items.IndexOf(target);
+
+        if (oldIndex < 0 || newIndex < 0 || oldIndex == newIndex)
+            return;
+
+        items.Move(oldIndex, newIndex);
+        vm.UpdateItemSortOrders();
+        vm.CalculateTotals();
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+    {
+        while (child != null)
+        {
+            if (child is T parent)
+                return parent;
+
+            child = VisualTreeHelper.GetParent(child);
+        }
+
+        return null;
+    }
+
+    private static Item? GetItemFromPoint(DataGrid dataGrid, Point point)
+    {
+        var element = dataGrid.InputHitTest(point) as DependencyObject;
+        var row = FindVisualParent<DataGridRow>(element);
+        return row?.Item as Item;
+    }
+
+    #endregion
+    
+    
+    #region Image Handlers
+    private void OnAddImageClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Multiselect = true,
+            Filter = "Tutti i file (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                foreach (string file in dialog.FileNames)
+                {
+                    vm.AddAttachmentFromPath(file);
+                }
+            }
+        }
+    }
+
+    private void OnRemoveImageClick(object sender, RoutedEventArgs e)
+    {
+        if (LstImages.SelectedItem is SelectedAttachment selectedAttachment)
+        {
+            (DataContext as MainViewModel)?.RemoveAttachment(selectedAttachment);
+        }
+    }
+
+    private void OnImageDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            if (e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length > 0)
+            {
+                if (DataContext is MainViewModel vm)
+                {
+                    foreach (string file in files)
+                    {
+                        if (!string.IsNullOrWhiteSpace(file))
+                            vm.AddAttachmentFromPath(file);
+                    }
+                }
+            }
+        }
+    }
+
+    private void OnImagePaste(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.V && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control)
+        {
+            if (Clipboard.ContainsFileDropList())
+            {
+                var files = Clipboard.GetFileDropList();
+                if (DataContext is MainViewModel vm && files != null)
+                {
+                    foreach (string? file in files)
+                    {
+                        if (!string.IsNullOrWhiteSpace(file))
+                            vm.AddAttachmentFromPath(file);
+                    }
+                }
+            }
+        }
+    }
+    #endregion
+
+    #region General Handlers
+    private void OnSelectCustomerClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Cliente" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedCustomer = win.SelectedResult; } }
+    private void OnSelectReferenceClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Riferimento" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedSecondCustomer = win.SelectedResult; } }
+    private void OnNewQuoteClick(object sender, RoutedEventArgs e) { if (MessageBox.Show("Sicuro?", "Conferma", MessageBoxButton.YesNo) == MessageBoxResult.Yes) (DataContext as MainViewModel)?.ResetQuote(); }
+    private void OnGeneratePdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GeneratePdf();
+    private void OnGenerateCostsPdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GenerateCostsPdf();
+    private void OnOpenHistoryClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            var win = new HistoryWindow(vm) { Owner = this }; 
+            win.ShowDialog();
+        }
+    }
+    private void OnNewCustomerClick(object sender, RoutedEventArgs e){
+        var win = new NewCustomerWindow { Owner = this }; 
+        if (win.ShowDialog() == true && win.NewCustomer != null) 
+            (DataContext as MainViewModel)?.AddNewCustomer(win.NewCustomer);
+    }
+    private void OnEditCustomerClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || vm.SelectedCustomer == null) return;
+
+        var win = new NewCustomerWindow(vm.SelectedCustomer) { Owner = this };
+        if (win.ShowDialog() == true && win.NewCustomer != null)
+            vm.UpdateCustomer(win.NewCustomer);
+    }
+
+    private void OnEditReferenceClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || vm.SelectedSecondCustomer == null) return;
+
+        var win = new NewCustomerWindow(vm.SelectedSecondCustomer) { Owner = this };
+        if (win.ShowDialog() == true && win.NewCustomer != null)
+            vm.UpdateCustomer(win.NewCustomer);
+    }
+    private void OnOpenLaborListClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            var win = new SelectLaborWindow(vm) { Owner = this };
+            win.ShowDialog();
+        }
+    }
+    private void OnOpenMaterialListClick(object sender, RoutedEventArgs e){
+        if (DataContext is MainViewModel vm)
+        {
+            var win = new SelectMaterialWindow(vm) { Owner = this };
+            win.ShowDialog();
+        }
+    }
+    private void OnEditRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item) { var win = new EditItemWindow(item) { Owner = this }; if (win.ShowDialog() == true) (DataContext as MainViewModel)?.CalculateTotals(); } }
+    private void OnDeleteRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item && DataContext is MainViewModel vm) { if (vm.Materials.Contains(item)) vm.Materials.Remove(item); else if (vm.Labors.Contains(item)) vm.Labors.Remove(item); vm.UpdateItemSortOrders(); vm.CalculateTotals(); } }
+    private void OnLaborSearchChanged(object sender, TextChangedEventArgs e) 
+    { 
+        if (DataContext is MainViewModel vm && sender is ComboBox cb) 
+        { 
+            if (cb.SelectedItem is Item s && s.Name == cb.Text) return; 
+            vm.ApplyLaborFilter(cb.Text); 
+            cb.SelectedIndex = -1;
+            cb.IsDropDownOpen = !string.IsNullOrWhiteSpace(cb.Text) && cb.HasItems; 
+            FixComboBoxSelection(cb); 
+        } 
+    }
+
+    private void OnMaterialSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || sender is not ComboBox cb)
+            return;
+
+        // Evita loop quando viene selezionato un elemento
+        if (cb.SelectedItem is VeluxResult selected && selected.Label == cb.Text)
+            return;
+
+        string text = cb.Text;
+
+        _materialSearchCts?.Cancel();
+        _materialSearchCts = new CancellationTokenSource();
+        var token = _materialSearchCts.Token;
+
+        _ = RunMaterialSearchAsync(vm, cb, text, token);
+    }
+
+    private async Task RunMaterialSearchAsync(MainViewModel vm, ComboBox cb, string text, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(150, token);
+            if (token.IsCancellationRequested) return;
+
+            await vm.ApplyMaterialFilterAsync(text);
+            if (token.IsCancellationRequested) return;
+
+            cb.SelectedIndex = -1;
+            cb.IsDropDownOpen = vm.AllCatalogMaterials.Count > 0;
+        }
+        catch (TaskCanceledException) { }
+    }    
+    private void FixComboBoxSelection(ComboBox cb) 
+    { 
+        if (cb.Template.FindName("PART_EditableTextBox", cb) is TextBox tb) 
+        {
+            cb.Dispatcher.BeginInvoke(new Action(() => 
+            { 
+                tb.SelectionLength = 0; 
+                tb.CaretIndex = tb.Text.Length; 
+            }), System.Windows.Threading.DispatcherPriority.Input); 
+        }
+    }
+    private void OnOpenCustomerFolderClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.OpenCustomerFolder();
+    private void OnOpenReferenceFolderClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.OpenReferenceFolder();
+    private void OnAddMaterialClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.AddMaterial();
+    private void OnAddLaborClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.AddLabor();
+    private void OnComboDropDownOpened(object sender, EventArgs e)
+    {
+        if (sender is ComboBox cb)
+        {
+            // Trova la TextBox interna e rimuovi la selezione
+            var tb = cb.Template.FindName("PART_EditableTextBox", cb) as TextBox;
+            if (tb != null)
+            {
+                tb.SelectionLength = 0;
+                tb.CaretIndex = tb.Text.Length; // cursore alla fine
+            }
+        }
+    }
+
+    private void OnSignificantCheckboxClick(object sender, RoutedEventArgs e)
+    {
+        (DataContext as MainViewModel)?.CalculateTotals();
+    }
+
+    private void OnAddOurCostClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        vm.OurCosts.Add(new CostAllocationItem { Description = "Nuova voce", Amount = 0 });
+        GridOurCosts.ScrollIntoView(vm.OurCosts.Last());
+    }
+
+    private void OnAddPartnerCostClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        vm.PartnerCosts.Add(new CostAllocationItem { Description = "Nuova voce", Amount = 0 });
+        GridPartnerCosts.ScrollIntoView(vm.PartnerCosts.Last());
+    }
+
+    private void OnAddAdditionalCostClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        vm.AdditionalCosts.Add(new CostAllocationItem { Description = "Nuova voce", Amount = 0 });
+        GridAdditionalCosts.ScrollIntoView(vm.AdditionalCosts.Last());
+    }
+
+    private void OnDeleteCostRowClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.DataContext is not CostAllocationItem item) return;
+        if (DataContext is not MainViewModel vm) return;
+
+        if (vm.OurCosts.Contains(item)) vm.OurCosts.Remove(item);
+        else if (vm.PartnerCosts.Contains(item)) vm.PartnerCosts.Remove(item);
+        else if (vm.AdditionalCosts.Contains(item)) vm.AdditionalCosts.Remove(item);
+    }
+    #endregion
+}

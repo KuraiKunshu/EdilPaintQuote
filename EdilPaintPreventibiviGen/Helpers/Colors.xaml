@@ -1,0 +1,43 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Palette Colori Principale -->
+    <Color x:Key="PrimaryBlueColor">#3498db</Color>
+    <Color x:Key="SecondaryBlueColor">#2980b9</Color>
+    <Color x:Key="DarkNavyColor">#2c3e50</Color>
+    <Color x:Key="SuccessGreenColor">#27ae60</Color>
+    <Color x:Key="DangerRedColor">#e74c3c</Color>
+    <Color x:Key="Purple">#8b2dc7</Color>
+    <Color x:Key="WarningYellowColor">#f1c40f</Color>
+    <Color x:Key="AccentOrangeColor">#e67e22</Color>
+    <Color x:Key="Black">Black </Color>
+    
+    <!-- Pennelli (Brushes) -->
+    <SolidColorBrush x:Key="PrimaryBlueBrush" Color="{StaticResource PrimaryBlueColor}"/>
+    <SolidColorBrush x:Key="SecondaryBlueBrush" Color="{StaticResource SecondaryBlueColor}"/>
+    <SolidColorBrush x:Key="DarkNavyBrush" Color="{StaticResource DarkNavyColor}"/>
+    <SolidColorBrush x:Key="SuccessGreenBrush" Color="{StaticResource SuccessGreenColor}"/>
+    <SolidColorBrush x:Key="DangerRedBrush" Color="{StaticResource DangerRedColor}"/>
+    <SolidColorBrush x:Key="PurpleBrush" Color="{StaticResource Purple}"/>
+    <SolidColorBrush x:Key="WarningYellowBrush" Color="{StaticResource WarningYellowColor}"/>
+    <SolidColorBrush x:Key="AccentOrangeBrush" Color="{StaticResource AccentOrangeColor}"/>
+    <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+
+    <!-- Colori Testo -->
+    <SolidColorBrush x:Key="DefaultTextBrush" Color="#2c3e50"/>
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#7f8c8d"/>
+    <SolidColorBrush x:Key="LightTextBrush" Color="#FFFFFF"/>
+
+    <!-- Sfondi Liste e DataGrid -->
+    <SolidColorBrush x:Key="RowBackgroundBrush" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="RowSelectedBrush" Color="#FFF9C4"/>
+    <SolidColorBrush x:Key="GridLinesBrush" Color="#CCCCCC"/>
+
+    <!-- Colori Stati Storico -->
+    <SolidColorBrush x:Key="StatusFinalizzatoBrush" Color="#7cc2dc"/>
+    <SolidColorBrush x:Key="StatusSpeditoBrush" Color="#fdf282"/>
+    <SolidColorBrush x:Key="StatusConfermatoBrush" Color="#ddacf3"/>
+    <SolidColorBrush x:Key="StatusFinitoBrush" Color="#b7f3ac"/>
+    <SolidColorBrush x:Key="StatusRifiutatoBrush" Color="#f3acac"/>
+
+</ResourceDictionary>

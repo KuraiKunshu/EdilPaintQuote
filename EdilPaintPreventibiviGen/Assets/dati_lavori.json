@@ -1,0 +1,254 @@
+{
+  "lavori": [
+    {
+      "nome": "Trasferta",
+      "descrizione": "",
+      "valore": 110
+    },
+    {
+      "nome": "Fornitura e posa SOLO motore INTEGRA V21 senza k",
+      "descrizione": "",
+      "valore": 200
+    },
+    {
+      "nome": "Fornitura e posa SOLO Trasformatore INTEGRA V21 senza k",
+      "descrizione": "",
+      "valore": 240
+    },
+    {
+      "nome": "Memorizzazione Telecomando",
+      "descrizione": "Memorizzazione di un singolo prodotto su un radiocomando VELUX",
+      "valore": 15
+    },
+    {
+      "nome": "Costo Manodopera",
+      "descrizione": "Costo di 1 uomo moltiplicato per le ore di lavoro (es. 2U x 10H = 20H)",
+      "valore": 40
+    },
+    {
+      "nome": "Adeguamento cavo",
+      "descrizione": "Adeguamento per portare la corrente 220V alla finestra",
+      "valore": 60
+    },
+    {
+      "nome": "Rimozione vecchio Serramento",
+      "descrizione": "Rimozione manto di copertura, raccordi, serramento.",
+      "valore": 80
+    },
+    {
+      "nome": "Sigillatura e Isolamento di un Camino",
+      "descrizione": "",
+      "valore": 25
+    },
+    {
+      "nome": "Fornitura e posa di Bilancino Strutturale",
+      "descrizione": "Trave per Supporto strutturale finestra",
+      "valore": 380
+    },
+    {
+      "nome": "Creazione Supporto per corretta Posa",
+      "descrizione": "Supporto per corretta Quota e Altezza rispetto al tetto presente",
+      "valore": 190
+    },
+    {
+      "nome": "Creazione Foro",
+      "descrizione": "Creazione del foro sul tetto",
+      "valore": 170
+    },
+    {
+      "nome": "Tariffa per gestione detrazione fiscale",
+      "descrizione": "",
+      "valore": 130
+    },
+    {
+      "nome": "Diritto fisso di uscita",
+      "descrizione": "",
+      "valore": 60
+    },
+    {
+      "nome": "Installazioni tende manuali esterne",
+      "descrizione": "",
+      "valore": 40
+    },
+    {
+      "nome": "Installazioni tende manuali interne",
+      "descrizione": "",
+      "valore": 40
+    },
+    {
+      "nome": "Installazioni tende solari interne",
+      "descrizione": "",
+      "valore": 40
+    },
+    {
+      "nome": "Installazioni tende Elettriche o Solari esterne",
+      "descrizione": "",
+      "valore": 80
+    },
+    {
+      "nome": "Installazioni Zanzariera",
+      "descrizione": "",
+      "valore": 80
+    },
+    {
+      "nome": "Installazione tenda interna elettrica per finestre per tetti piani",
+      "descrizione": "",
+      "valore": 60
+    },
+    {
+      "nome": "Installazione tenda interna solare per finestre per tetti piani",
+      "descrizione": "",
+      "valore": 60
+    },
+    {
+      "nome": "Installazione tenda esterna solare per finestre per tetti piani",
+      "descrizione": "",
+      "valore": 60
+    },
+    {
+      "nome": "Installazione Accesso tetto GVT",
+      "descrizione": "",
+      "valore": 170
+    },
+    {
+      "nome": "Linea Vita Temporanea",
+      "descrizione": "",
+      "valore": 70
+    },
+    {
+      "nome": "Parapetti al metro lineare",
+      "descrizione": "",
+      "valore": 30
+    },
+    {
+      "nome": "Trabattello",
+      "descrizione": "il prezzo varia a seconda dei giorni di utilizzo",
+      "valore": 110
+    },
+    {
+      "nome": "Montacarichi",
+      "descrizione": "il prezzo varia a seconda dei giorni di utilizzo",
+      "valore": 550
+    },
+    {
+      "nome": "Sostituzione Vetrata",
+      "descrizione": "",
+      "valore": 240
+    },
+    {
+      "nome": "Sollevamento Manto di Copertura al MQ",
+      "descrizione": "",
+      "valore": 15
+    },
+    {
+      "nome": "Riposizionamento Manto di Copertura al MQ",
+      "descrizione": "",
+      "valore": 15
+    },
+    {
+      "nome": "Reintrego coppi al MQ",
+      "descrizione": "",
+      "valore": 37
+    },
+    {
+      "nome": "Reintrego Tegole al MQ",
+      "descrizione": "",
+      "valore": 24
+    },
+    {
+      "nome": "Lattonerie in Opera",
+      "descrizione": "",
+      "valore": 500
+    },
+    {
+      "nome": "Sistemazioni Embice Camino",
+      "descrizione": "",
+      "valore": 385
+    },
+    {
+      "nome": "Installazione kit motorizzazione VELUX",
+      "descrizione": "",
+      "valore": 60
+    },
+    {
+      "nome": "Consegna e ritiro Merlo",
+      "descrizione": "",
+      "valore": 500
+    },
+    {
+      "nome": "Noleggio Merlo",
+      "descrizione": "",
+      "valore": 385
+    },
+    {
+      "nome": "Smaltimento Onduline/Coppi al MQ",
+      "descrizione": "",
+      "valore": 14
+    },
+    {
+      "nome": "Fornitura e posa Pannelli OSB da 1,8cm al MQ",
+      "descrizione": "",
+      "valore": 22
+    },
+    {
+      "nome": "Fornitura e posa Guaina al MQ",
+      "descrizione": "",
+      "valore": 18
+    },
+    {
+      "nome": "Fornitura e posa Bandella sotto colmo al MQ",
+      "descrizione": "",
+      "valore": 25
+    },
+    {
+      "nome": "Fornitura e posa Listone con sopra Bandella sotto colmo al MQ",
+      "descrizione": "",
+      "valore": 35
+    },
+    {
+      "nome": "Installazioni Tapparelle Elettriche o Solari",
+      "descrizione": "",
+      "valore": 80
+    },
+    {
+      "nome": "Manutenzione",
+      "descrizione": "Sigillatura vetro tramite sostituzione stucco o siliconatura profilo fermavetro; controllo ed eventuale sostituzione della viteria; sostituzione filtro aria e spugna maniglione, controllo e lubrificazione parti meccaniche, pulizia del vetro, pulizia raccordi esterni",
+      "valore": 80
+    },
+    {
+      "nome": "Adeguamento Foro",
+      "descrizione": "Adattamento del foro pre-esistente",
+      "valore": 60
+    },
+    {
+      "nome": "Installazione finestra Velux",
+      "descrizione": "Fissaggio del serramento al solaio; Isolamento termico del telaio tramite cornice isolante VELUX BDX o equivalenti; Posa del tessuto impermeabilizzante VELUX BFX o equivalenti; Installazione del raccordo sagomato; Collaudo eventuali funzioni elettriche, se presenti sulla finestra",
+      "valore": 290
+    },
+    {
+      "nome": "Installazione finestra per tetti piani",
+      "descrizione": "posa rialzo VELUX dove previsto, posa finestra per tetti piani, impermeabilizzazione, installazione profili bloccaguaina, installazione cupola, eventuale cablaggio e configurazione",
+      "valore": 290
+    },
+    {
+      "nome": "Finiture legno o cartongesso",
+      "descrizione": "la finitura interna prevede legno naturale NON tinteggiato o gesso NON tinteggiato.",
+      "valore": 140
+    },
+    {
+      "nome": "Finiture Esterne",
+      "descrizione": "Riposizionamento del manto di copertura e eventuale lavorazioni di isolamento tra il manto e serramenti",
+      "valore": 140
+    },
+    {
+      "nome": "Copertura dei Locali",
+      "descrizione": "isolamento dei locali con apposito celofan e stuoia, al fine di non sporcare l'immobile",
+      "valore": 55
+    },
+    {
+      "nome": "smaltimento del vecchio serramento",
+      "descrizione": "Ritiro e smaltimento in discarica secondo norma vigente del vecchio serramento e dei materiali di risulta della lavorazione.",
+      "valore": 80
+    }
+  ]
+}

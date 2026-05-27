@@ -67,3 +67,49 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+b/
+Bin/
+obj/
+bin/
+Release/
+Publish/
+TestResults/
+[Pp]ublish/
+[Pp]ublished/
+
+# Mono
+mono_crash.mem.*
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.csproj.user
+
+# NuGet packages
+**/packages/
+*.nupkg
+
+# Eseguibili e librerie
+*.dll
+*.exe
+*.pdb
+
+# File di configurazione locali e log
+*.rsuser
+*.v12.suo
+*.pyproj.user
+*.trx
+*.log

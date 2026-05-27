@@ -1,0 +1,156 @@
+<Window x:Class="EdilPaintPreventibiviGen.Views.NotesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Appunti Interni"
+        Width="620"
+        Height="500"
+        MinWidth="620"
+        MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Icon="pack://application:,,,/Assets/Windowsicon/main.png">
+
+    <Window.Resources>
+        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="FooterButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="120"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#D0D7DE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="12,10"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="Transparent" Margin="18">
+        <Border Background="{StaticResource RowBackgroundBrush}"
+                CornerRadius="16"
+                BorderBrush="#22000000"
+                BorderThickness="1"
+                SnapsToDevicePixels="True">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="22"
+                                  ShadowDepth="0"
+                                  Opacity="0.22"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="56"/>
+                    <RowDefinition Height="1"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- HEADER -->
+                <Grid Grid.Row="0"
+                      Margin="18,0,10,0"
+                      MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Appunti interni"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource DefaultTextBrush}"/>
+                        <TextBlock Text="Questi appunti restano visibili solo all'interno del software"
+                                   Margin="0,2,0,0"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedTextBrush}"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Click="CloseButton_Click"
+                            ToolTip="Chiudi"
+                            Content="✕"/>
+                </Grid>
+
+                <!-- DIVIDER -->
+                <Border Grid.Row="1" Background="#18000000"/>
+
+                <!-- CONTENT -->
+                <Grid Grid.Row="2" Margin="22,20,22,18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="Note"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource DefaultTextBrush}"/>
+
+                    <TextBox x:Name="TxtNotes"
+                             Grid.Row="2"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             VerticalContentAlignment="Top"
+                             HorizontalContentAlignment="Left"/>
+
+                    <TextBlock Grid.Row="4"
+                               Text="Suggerimento: usa queste note per promemoria interni, dettagli cliente o informazioni non da stampare."
+                               FontSize="12"
+                               Foreground="{StaticResource MutedTextBrush}"/>
+                </Grid>
+
+                <!-- FOOTER -->
+                <Grid Grid.Row="3" Margin="22,0,22,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource FooterButtonStyle}"
+                            Content="Annulla"
+                            Click="OnCancelClick"
+                            Background="{StaticResource MutedTextBrush}"/>
+
+                    <Button Grid.Column="3"
+                            Style="{StaticResource FooterButtonStyle}"
+                            Content="Salva appunti"
+                            Click="OnSaveClick"
+                            Background="{StaticResource SuccessGreenBrush}"
+                            FontWeight="Bold"
+                            Width="140"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
