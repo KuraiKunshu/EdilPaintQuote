@@ -63,8 +63,18 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     public string Notes
     {
         get => _notes;
-        set { _notes = value; OnPropertyChanged(); }
+        set
+        {
+            if (_notes == value)
+                return;
+
+            _notes = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasNotes));
+        }
     }
+
+    public bool HasNotes => !string.IsNullOrWhiteSpace(Notes);
     
     public bool IsJointVenture
     {

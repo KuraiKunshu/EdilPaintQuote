@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -104,7 +104,7 @@ public partial class HistoryWindow : Window
         // Previeni ricerche multiple simultanee
         if (_isLoadingHistory)
         {
-            Debug.WriteLine("[ExecuteSearch] Ricerca già in corso, ignorata");
+            Debug.WriteLine("[ExecuteSearch] Ricerca giÃ  in corso, ignorata");
             return;
         }
 
@@ -225,7 +225,7 @@ public partial class HistoryWindow : Window
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[RunSearch] Task cancellato o timeout");
-            MessageBox.Show("La ricerca è stata annullata o ha superato il tempo limite (30 secondi).",
+            MessageBox.Show("La ricerca Ã¨ stata annullata o ha superato il tempo limite (30 secondi).",
                 "Ricerca Interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -348,7 +348,7 @@ public partial class HistoryWindow : Window
             fullEntry.Status = newStatus;
             summary.Status = newStatus;
 
-            // Salva SOLO i metadati — svuota i byte per evitare crash JSON su file grandi
+            // Salva SOLO i metadati â€” svuota i byte per evitare crash JSON su file grandi
             if (fullEntry.PdfFile != null)
                 fullEntry.PdfFile.Content = [];
             foreach (var att in fullEntry.Attachments)
@@ -377,7 +377,7 @@ public partial class HistoryWindow : Window
         var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
         if (fullEntry == null) return;
 
-        if (MessageBox.Show($"Sei sicuro di voler eliminare definitivamente il preventivo n. {entry.QuoteNumber}?\n\nQuesta operazione cancellerà anche il file PDF.", 
+        if (MessageBox.Show($"Sei sicuro di voler eliminare definitivamente il preventivo n. {entry.QuoteNumber}?\n\nQuesta operazione cancellerÃ  anche il file PDF.", 
                 "Conferma Eliminazione", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -401,26 +401,32 @@ public partial class HistoryWindow : Window
         {
             Mouse.OverrideCursor = Cursors.Wait;
 
-            // 1️⃣ Recupera i dati completi dal DB
             var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
             if (fullEntry == null) return;
 
-            // 2️⃣ Controlla il percorso salvato nel DB
+            string expectedPath = _historyService.GetExpectedPdfPath(fullEntry);
+
+            // Prima fonte: PDF ufficiale salvato nel DB. Se il file locale e' diverso, viene riscritto.
+            var officialPath = await _historyService.EnsureOfficialPdfExistsAsync(fullEntry);
+            if (!string.IsNullOrWhiteSpace(officialPath) && File.Exists(officialPath))
+            {
+                Process.Start(new ProcessStartInfo { FileName = officialPath, UseShellExecute = true });
+                return;
+            }
+
+            // Fallback: usa eventuali file locali solo se il DB non contiene ancora il PDF ufficiale.
             if (!string.IsNullOrWhiteSpace(fullEntry.PdfPath) && File.Exists(fullEntry.PdfPath))
             {
                 Process.Start(new ProcessStartInfo { FileName = fullEntry.PdfPath, UseShellExecute = true });
                 return;
             }
 
-            // 3️⃣ Prova col percorso atteso (basato su dati storici)
-            var expectedPath = _historyService.GetExpectedPdfPath(fullEntry);
             if (File.Exists(expectedPath))
             {
                 Process.Start(new ProcessStartInfo { FileName = expectedPath, UseShellExecute = true });
                 return;
             }
 
-            // 4️⃣ Cerca il file per numero preventivo nella cartella del cliente (ricerca fuzzy)
             var foundPath = _historyService.FindPdfByQuoteNumber(fullEntry);
             if (!string.IsNullOrWhiteSpace(foundPath) && File.Exists(foundPath))
             {
@@ -428,36 +434,29 @@ public partial class HistoryWindow : Window
                 return;
             }
 
-            // 5️⃣ Prova a scrivere il PDF dal binario salvato nel DB
-            var pathFromDb = _historyService.EnsurePdfExists(fullEntry);
-            if (!string.IsNullOrWhiteSpace(pathFromDb) && File.Exists(pathFromDb))
-            {
-                Process.Start(new ProcessStartInfo { FileName = pathFromDb, UseShellExecute = true });
-                return;
-            }
-
-            // 6️⃣ Nessun binario disponibile: rigenera il PDF con i dati ORIGINALI (data e numero storici)
             if (MessageBox.Show(
-                    $"Il file PDF del preventivo n. {entry.QuoteNumber} non è stato trovato.\nVuoi rigenerarlo con i dati originali?",
+                    $"Il file PDF del preventivo n. {entry.QuoteNumber} non e' stato trovato nel DB ne' nella cartella condivisa.\nVuoi rigenerarlo con i dati originali?",
                     "File non trovato", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 
             _vm.LoadQuoteFromHistory(fullEntry, isEdit: true);
 
-            // Genera con data e numero originali, SENZA incrementare il contatore e SENZA aprire explorer
             await _vm.GeneratePdfAsync(
                 incrementCounter: false,
                 openAfterGeneration: false,
                 specificDate: fullEntry.Date,
                 forceTargetPath: expectedPath);
 
-            if (File.Exists(expectedPath))
+            var regeneratedOfficialPath = await _historyService.EnsureOfficialPdfExistsAsync(fullEntry);
+            var pathToOpen = !string.IsNullOrWhiteSpace(regeneratedOfficialPath) ? regeneratedOfficialPath : expectedPath;
+
+            if (File.Exists(pathToOpen))
             {
-                Process.Start(new ProcessStartInfo { FileName = expectedPath, UseShellExecute = true });
+                Process.Start(new ProcessStartInfo { FileName = pathToOpen, UseShellExecute = true });
             }
             else
             {
-                MessageBox.Show("Il PDF è stato rigenerato ma non è stato possibile aprirlo automaticamente.",
+                MessageBox.Show("Il PDF e' stato rigenerato ma non e' stato possibile aprirlo automaticamente.",
                     "Avviso", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }

@@ -113,3 +113,5 @@ mono_crash.mem.*
 *.pyproj.user
 *.trx
 *.log
+**/appsettings.json
+**/*_wpftmp.csproj

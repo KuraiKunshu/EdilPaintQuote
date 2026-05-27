@@ -367,6 +367,11 @@ public class FallbackDataService : IDataService
             Status = entry.Status,
             LastModifiedUtc = entry.LastModifiedUtc,
             SyncHash = entry.SyncHash,
+            IsJointVenture = entry.IsJointVenture,
+            PartnerCompanyName = entry.PartnerCompanyName,
+            OurCosts = entry.OurCosts,
+            PartnerCosts = entry.PartnerCosts,
+            AdditionalCosts = entry.AdditionalCosts,
             Materials = entry.Materials,
             Labors = entry.Labors,
             PdfFile = entry.PdfFile == null ? null : new StoredFile
@@ -390,6 +395,9 @@ public class FallbackDataService : IDataService
         quote.LastModifiedUtc = DateTime.UtcNow;
         
         var lightEntry = CreateLightEntry(quote);
+        lightEntry.SyncHash = QuoteSyncHashService.Compute(lightEntry);
+        quote.SyncHash = lightEntry.SyncHash;
+
         await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
 
         if (IsDatabaseAvailable())
@@ -485,10 +493,27 @@ public class FallbackDataService : IDataService
         _sqlService.SavePersonalMaterialsAsync(materials);
     public Task<int> GetNextQuoteNumberAsync() => _sqlService.GetNextQuoteNumberAsync();
     public Task<bool> IsDatabaseEmptyAsync() => _sqlService.IsDatabaseEmptyAsync();
-    public Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber) =>
-        _sqlService.GetQuotePdfContentAsync(quoteNumber);
-    public Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber) =>
-        _sqlService.GetQuoteAttachmentsAsync(quoteNumber);
+    public async Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber)
+    {
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.GetQuotePdfContentAsync(quoteNumber); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return null;
+    }
+
+    public async Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber)
+    {
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.GetQuoteAttachmentsAsync(quoteNumber); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return [];
+    }
 
     public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync()
     {

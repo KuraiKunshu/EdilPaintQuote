@@ -42,7 +42,12 @@ public partial class MainWindow : Window
         if (result == MessageBoxResult.No)
         {
             e.Cancel = true;
+            return;
         }
+
+        _materialSearchCts?.Cancel();
+        _materialSearchCts?.Dispose();
+        _materialSearchCts = null;
     }
     #endregion
     

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -68,15 +68,15 @@ public class LocalJsonStoreService
 
             foreach (var entry in entriesToAddOrUpdate)
             {
-                // NON aggiornare LastModifiedUtc se l'entry viene dal DB — preserva il timestamp originale
-                if (entry.LastModifiedUtc == default)
-                    entry.LastModifiedUtc = DateTime.UtcNow;
+                var localEntry = CreateLocalQuoteEntry(entry);
+                // NON aggiornare LastModifiedUtc se l'entry viene dal DB â€” preserva il timestamp originale
+                if (localEntry.LastModifiedUtc == default)
+                    localEntry.LastModifiedUtc = DateTime.UtcNow;
 
-                // Ricalcola l'hash solo se non è già presente (il DB lo porta già aggiornato)
-                if (string.IsNullOrEmpty(entry.SyncHash))
-                    entry.SyncHash = ComputeQuoteHash(entry);
+                // Ricalcola l'hash solo se non Ã¨ giÃ  presente (il DB lo porta giÃ  aggiornato)
+                localEntry.SyncHash = ComputeQuoteHash(localEntry);
 
-                historyDict[entry.QuoteNumber] = entry;
+                historyDict[localEntry.QuoteNumber] = localEntry;
             }
 
             await SaveHistoryInternalAsync(historyDict.Values);
@@ -100,7 +100,8 @@ public class LocalJsonStoreService
                 File.Copy(_historyPath, backupPath, overwrite: true);
             }
 
-            var json = JsonSerializer.Serialize(entries, JsonOptions);
+            var localEntries = entries.Select(CreateLocalQuoteEntry).ToList();
+            var json = JsonSerializer.Serialize(localEntries, JsonOptions);
             await File.WriteAllTextAsync(_historyPath, json);
         }
         catch (Exception ex)
@@ -127,16 +128,17 @@ public class LocalJsonStoreService
         try
         {
             var history = await LoadHistoryInternalAsync();
+            var localEntry = CreateLocalQuoteEntry(entry);
             var existing = history.FirstOrDefault(q =>
-                q.QuoteNumber.Equals(entry.QuoteNumber, StringComparison.OrdinalIgnoreCase));
+                q.QuoteNumber.Equals(localEntry.QuoteNumber, StringComparison.OrdinalIgnoreCase));
 
-            entry.LastModifiedUtc = DateTime.UtcNow;
-            entry.SyncHash = ComputeQuoteHash(entry);
+            localEntry.LastModifiedUtc = DateTime.UtcNow;
+            localEntry.SyncHash = ComputeQuoteHash(localEntry);
 
             if (existing != null)
                 history.Remove(existing);
 
-            history.Add(entry);
+            history.Add(localEntry);
             await SaveHistoryInternalAsync(history);
         }
         finally
@@ -176,7 +178,8 @@ public class LocalJsonStoreService
         if (File.Exists(_historyPath))
             File.Copy(_historyPath, _historyPath + ".backup", overwrite: true);
 
-        var json = JsonSerializer.Serialize(entries, JsonOptions);
+        var localEntries = entries.Select(CreateLocalQuoteEntry).ToList();
+        var json = JsonSerializer.Serialize(localEntries, JsonOptions);
         await File.WriteAllTextAsync(_historyPath, json);
     }
     #endregion
@@ -345,39 +348,54 @@ public class LocalJsonStoreService
 
     #region Utilities
 
+    private static QuoteHistoryEntry CreateLocalQuoteEntry(QuoteHistoryEntry entry)
+    {
+        return new QuoteHistoryEntry
+        {
+            QuoteNumber = entry.QuoteNumber,
+            Date = entry.Date,
+            CustomerName = entry.CustomerName,
+            ReferenceName = entry.ReferenceName,
+            PdfPath = entry.PdfPath,
+            PaymentTerms = entry.PaymentTerms,
+            IvaType = entry.IvaType,
+            Notes = entry.Notes,
+            Materials = entry.Materials,
+            Labors = entry.Labors,
+            Imponibile = entry.Imponibile,
+            MaterialDiscount = entry.MaterialDiscount,
+            LaborDiscount = entry.LaborDiscount,
+            Total = entry.Total,
+            Status = entry.Status,
+            IsJointVenture = entry.IsJointVenture,
+            PartnerCompanyName = entry.PartnerCompanyName,
+            OurCosts = entry.OurCosts,
+            PartnerCosts = entry.PartnerCosts,
+            AdditionalCosts = entry.AdditionalCosts,
+            LastModifiedUtc = entry.LastModifiedUtc,
+            SyncHash = entry.SyncHash,
+            PdfFile = entry.PdfFile == null ? null : new StoredFile
+            {
+                FileName = entry.PdfFile.FileName,
+                ContentType = entry.PdfFile.ContentType,
+                Content = [],
+                ImportedAt = entry.PdfFile.ImportedAt
+            },
+            Attachments = entry.Attachments.Select(a => new StoredFile
+            {
+                FileName = a.FileName,
+                ContentType = a.ContentType,
+                Content = [],
+                ImportedAt = a.ImportedAt
+            }).ToList()
+        };
+    }
+
     private static string ComputeQuoteHash(QuoteHistoryEntry entry)
     {
-        var materialsHash = string.Join("|", entry.Materials
-            .OrderBy(m => m.Name)
-            .Select(m => $"{m.Name}:{m.UnitPrice}:{m.Quantity}:{m.Discount}"));
-    
-        var laborsHash = string.Join("|", entry.Labors
-            .OrderBy(l => l.Name)
-            .Select(l => $"{l.Name}:{l.UnitPrice}:{l.Quantity}:{l.Discount}"));
-
-        var costsHash = $"{entry.IsJointVenture}|{entry.PartnerCompanyName}|" +
-            string.Join("|", entry.OurCosts.Select(c => $"{c.Description}:{c.Amount}")) + "|" +
-            string.Join("|", entry.PartnerCosts.Select(c => $"{c.Description}:{c.Amount}")) + "|" +
-            string.Join("|", entry.AdditionalCosts.Select(c => $"{c.Description}:{c.Amount}"));
-
-        // AGGIUNTO: include la dimensione del PDF nell'hash.
-        // Se il PDF cambia, l'hash cambia, e il sync lo rileva.
-        var pdfHash = entry.PdfFile != null
-            ? (entry.PdfFile.Content.Length > 0
-                ? entry.PdfFile.Content.Length.ToString()
-                : "has-pdf")   // ← ha il PDF ma senza bytes (lightEntry)
-            : "no-pdf";
-
-        var data = $"{entry.QuoteNumber}|{entry.Date:O}|{entry.CustomerName}|" +
-            $"{entry.Total}|{entry.Status}|{entry.IvaType}|" +
-            $"{entry.MaterialDiscount}|{entry.LaborDiscount}|" +
-            $"{materialsHash}|{laborsHash}|{costsHash}|{pdfHash}"; // ← aggiunto |{pdfHash}
-
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        var bytes = System.Text.Encoding.UTF8.GetBytes(data);
-        var hash = sha.ComputeHash(bytes);
-        return Convert.ToBase64String(hash);
+        return QuoteSyncHashService.Compute(entry);
     }
 
     #endregion
 }
+
