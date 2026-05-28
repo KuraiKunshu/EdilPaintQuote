@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -14,8 +15,13 @@ public class LocalJsonStoreService
 {
     private readonly string _historyPath;
     private readonly string _customersPath;
+    private readonly string _companyPath;
+    private readonly string _laborCatalogPath;
+    private readonly string _personalMaterialsPath;
     private readonly SemaphoreSlim _historySemaphore = new(1, 1);
     private readonly SemaphoreSlim _customersSemaphore = new(1, 1);
+    private readonly SemaphoreSlim _companySemaphore = new(1, 1);
+    private readonly SemaphoreSlim _catalogSemaphore = new(1, 1);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -27,9 +33,160 @@ public class LocalJsonStoreService
     {
         _historyPath = Path.Combine(assetsPath, "history.json");
         _customersPath = Path.Combine(assetsPath, "clienti.json");
+        _companyPath = Path.Combine(assetsPath, "azienda.json");
+        _laborCatalogPath = Path.Combine(assetsPath, "dati_lavori.json");
+        _personalMaterialsPath = Path.Combine(assetsPath, "materiali_personali.json");
 
         Directory.CreateDirectory(assetsPath);
     }
+
+    #region Company and Catalogs
+
+    public async Task<Company?> LoadCompanyAsync()
+    {
+        await _companySemaphore.WaitAsync();
+        try
+        {
+            if (!File.Exists(_companyPath))
+                return null;
+
+            var json = await File.ReadAllTextAsync(_companyPath);
+            return JsonSerializer.Deserialize<Company>(json, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[LocalJsonStore] Error loading company: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            _companySemaphore.Release();
+        }
+    }
+
+    public async Task SaveCompanyAsync(Company company, string selectedLogo)
+    {
+        await _companySemaphore.WaitAsync();
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(selectedLogo))
+            {
+                int selectedIndex = company.Logo.FindIndex(logo =>
+                    Path.GetFileName(logo).Equals(selectedLogo, StringComparison.OrdinalIgnoreCase));
+
+                if (selectedIndex >= 0)
+                    company.Logo_index = selectedIndex;
+            }
+
+            await WriteJsonWithBackupAsync(_companyPath, company);
+        }
+        finally
+        {
+            _companySemaphore.Release();
+        }
+    }
+
+    public async Task<List<Item>> LoadLaborCatalogAsync()
+    {
+        await _catalogSemaphore.WaitAsync();
+        try
+        {
+            if (!File.Exists(_laborCatalogPath))
+                return new List<Item>();
+
+            var json = await File.ReadAllTextAsync(_laborCatalogPath);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                return JsonSerializer.Deserialize<List<Item>>(json, JsonOptions) ?? new List<Item>();
+
+            if (!doc.RootElement.TryGetProperty("lavori", out var lavoriArray))
+                return new List<Item>();
+
+            var labors = new List<Item>();
+            foreach (var e in lavoriArray.EnumerateArray())
+            {
+                labors.Add(new Item
+                {
+                    Name = GetJsonString(e, "nome", "Nome", "name", "Name"),
+                    Description = GetJsonString(e, "descrizione", "Descrizione", "description", "Description"),
+                    UnitPrice = GetJsonDouble(e, "valore", "Valore", "unitPrice", "UnitPrice"),
+                    Quantity = 1
+                });
+            }
+
+            return labors;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[LocalJsonStore] Error loading labor catalog: {ex.Message}");
+            return new List<Item>();
+        }
+        finally
+        {
+            _catalogSemaphore.Release();
+        }
+    }
+
+    public async Task SaveLaborCatalogAsync(IEnumerable<Item> labors)
+    {
+        await _catalogSemaphore.WaitAsync();
+        try
+        {
+            var wrapper = new
+            {
+                lavori = labors.Select(l => new
+                {
+                    nome = l.Name,
+                    descrizione = l.Description,
+                    valore = l.UnitPrice
+                }).ToList()
+            };
+
+            await WriteJsonWithBackupAsync(_laborCatalogPath, wrapper);
+        }
+        finally
+        {
+            _catalogSemaphore.Release();
+        }
+    }
+
+    public async Task<List<Item>> LoadPersonalMaterialsAsync()
+    {
+        await _catalogSemaphore.WaitAsync();
+        try
+        {
+            if (!File.Exists(_personalMaterialsPath))
+                return new List<Item>();
+
+            var json = await File.ReadAllTextAsync(_personalMaterialsPath);
+            return JsonSerializer.Deserialize<List<Item>>(json, JsonOptions) ?? new List<Item>();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[LocalJsonStore] Error loading personal materials: {ex.Message}");
+            return new List<Item>();
+        }
+        finally
+        {
+            _catalogSemaphore.Release();
+        }
+    }
+
+    public async Task SavePersonalMaterialsAsync(IEnumerable<Item> materials)
+    {
+        await _catalogSemaphore.WaitAsync();
+        try
+        {
+            await WriteJsonWithBackupAsync(_personalMaterialsPath, materials.ToList());
+        }
+        finally
+        {
+            _catalogSemaphore.Release();
+        }
+    }
+
+    #endregion
 
     #region History (Storico Preventivi)
 
@@ -270,6 +427,26 @@ public class LocalJsonStoreService
             _customersSemaphore.Release();
         }
     }
+
+    public async Task UpdateCustomerAsync(string originalBusinessName, Customer customer)
+    {
+        await _customersSemaphore.WaitAsync();
+        try
+        {
+            var customers = await LoadCustomersInternalAsync();
+            customers.RemoveAll(c =>
+                c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase) ||
+                c.BusinessName.Equals(customer.BusinessName, StringComparison.OrdinalIgnoreCase));
+
+            customer.LastModifiedUtc = DateTime.UtcNow;
+            customers.Add(customer);
+            await SaveCustomersInternalAsync(customers);
+        }
+        finally
+        {
+            _customersSemaphore.Release();
+        }
+    }
     
     public async Task BulkUpdateCustomersAsync(IEnumerable<Customer> customersToAddOrUpdate)
     {
@@ -320,6 +497,44 @@ public class LocalJsonStoreService
     #endregion
 
     #region Utilities
+
+    private static async Task WriteJsonWithBackupAsync<T>(string path, T value)
+    {
+        if (File.Exists(path))
+            File.Copy(path, path + ".backup", overwrite: true);
+
+        var json = JsonSerializer.Serialize(value, JsonOptions);
+        await File.WriteAllTextAsync(path, json);
+    }
+
+    private static string GetJsonString(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var name in propertyNames)
+        {
+            if (element.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.String)
+                return prop.GetString() ?? string.Empty;
+        }
+
+        return string.Empty;
+    }
+
+    private static double GetJsonDouble(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var name in propertyNames)
+        {
+            if (!element.TryGetProperty(name, out var prop))
+                continue;
+
+            if (prop.ValueKind == JsonValueKind.Number && prop.TryGetDouble(out var value))
+                return value;
+
+            if (prop.ValueKind == JsonValueKind.String &&
+                double.TryParse(prop.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+                return value;
+        }
+
+        return 0;
+    }
 
     private static QuoteHistoryEntry CreateLocalQuoteEntry(QuoteHistoryEntry entry)
     {

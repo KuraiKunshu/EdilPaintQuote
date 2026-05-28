@@ -163,79 +163,99 @@ public partial class MainViewModel
             return;
         }
 
-        if (incrementCounter && !_isEditingExistingQuote)
+        if (_isGeneratingPdf)
         {
-            try
+            Debug.WriteLine("[GENERATEPDF] Generazione gia' in corso, richiesta ignorata.");
+            return;
+        }
+
+        _isGeneratingPdf = true;
+
+        try
+        {
+            if (incrementCounter && !_isEditingExistingQuote)
             {
-                int nextNumber = await _dataService.GetNextQuoteNumberAsync();
-                _companyData.Counter = nextNumber;
-                QuoteNumber = nextNumber.ToString();
-                OnPropertyChanged(nameof(QuoteNumber));
+                try
+                {
+                    int nextNumber = await _dataService.GetNextQuoteNumberAsync();
+                    _companyData.Counter = nextNumber;
+                    QuoteNumber = nextNumber.ToString();
+                    OnPropertyChanged(nameof(QuoteNumber));
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Impossibile ottenere il prossimo numero preventivo dal database.\n\n{ex.Message}",
+                        "Errore numerazione", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
             }
-            catch (Exception ex)
+
+            DateTime effectiveDate = specificDate ?? DateTime.Now;
+
+            string targetPath = !string.IsNullOrWhiteSpace(forceTargetPath)
+                ? forceTargetPath
+                : _storagePathService.BuildQuotePdfPath(
+                    SelectedCustomer.BusinessName,
+                    QuoteNumber,
+                    effectiveDate,
+                    IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
+
+            string pathToGenerate = targetPath;
+
+            if (generateViaTempFile)
             {
-                MessageBox.Show($"Impossibile ottenere il prossimo numero preventivo dal database.\n\n{ex.Message}",
-                    "Errore numerazione", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
+                Directory.CreateDirectory(tempRoot);
+                string tempFileName = Path.GetFileName(targetPath);
+                pathToGenerate = Path.Combine(tempRoot, tempFileName);
+                Debug.WriteLine($"Generazione temporanea PDF: {pathToGenerate}");
             }
-        }
-
-        DateTime effectiveDate = specificDate ?? DateTime.Now;
-
-        string targetPath = !string.IsNullOrWhiteSpace(forceTargetPath)
-            ? forceTargetPath
-            : _storagePathService.BuildQuotePdfPath(
-                SelectedCustomer.BusinessName,
-                QuoteNumber,
-                effectiveDate,
-                IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
-
-        string pathToGenerate = targetPath;
-
-        if (generateViaTempFile)
-        {
-            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
-            Directory.CreateDirectory(tempRoot);
-            string tempFileName = Path.GetFileName(targetPath);
-            pathToGenerate = Path.Combine(tempRoot, tempFileName);
-            Debug.WriteLine($"Generazione temporanea PDF: {pathToGenerate}");
-        }
-        else
-        {
-            string? targetFolder = Path.GetDirectoryName(targetPath);
-            if (!string.IsNullOrWhiteSpace(targetFolder))
-                Directory.CreateDirectory(targetFolder);
-        }
-
-        _pdfService.GenerateQuote(this, _companyData, pathToGenerate);
-
-        if (generateViaTempFile)
-        {
-            try
+            else
             {
                 string? targetFolder = Path.GetDirectoryName(targetPath);
                 if (!string.IsNullOrWhiteSpace(targetFolder))
                     Directory.CreateDirectory(targetFolder);
-
-                File.Copy(pathToGenerate, targetPath, overwrite: true);
-                Debug.WriteLine($"PDF copiato su destinazione: {targetPath}");
             }
-            catch (Exception ex)
+
+            _pdfService.GenerateQuote(this, _companyData, pathToGenerate, effectiveDate);
+
+            if (generateViaTempFile)
             {
-                Debug.WriteLine($"ERRORE copia PDF su share: {targetPath} -> {ex.Message}");
+                try
+                {
+                    string? targetFolder = Path.GetDirectoryName(targetPath);
+                    if (!string.IsNullOrWhiteSpace(targetFolder))
+                        Directory.CreateDirectory(targetFolder);
+
+                    File.Copy(pathToGenerate, targetPath, overwrite: true);
+                    Debug.WriteLine($"PDF copiato su destinazione: {targetPath}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"ERRORE copia PDF su share: {targetPath} -> {ex.Message}");
+                }
+
+                try { File.Delete(pathToGenerate); }
+                catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error: {ex.Message}"); }
             }
 
-            try { File.Delete(pathToGenerate); }
-            catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error: {ex.Message}"); }
+            if (!await SaveToHistoryAsync(targetPath, incrementCounter, effectiveDate))
+                return;
+
+            if (!openAfterGeneration) return;
+
+            try { Process.Start("explorer.exe", $"/select,\"{targetPath}\""); }
+            catch { Process.Start("explorer.exe", targetPath); }
         }
-
-        if (!await SaveToHistoryAsync(targetPath, incrementCounter))
-            return;
-
-        if (!openAfterGeneration) return;
-
-        try { Process.Start("explorer.exe", $"/select,\"{targetPath}\""); }
-        catch { Process.Start("explorer.exe", targetPath); }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore durante la generazione del PDF.\n\n{ex.Message}",
+                "Errore PDF", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _isGeneratingPdf = false;
+        }
     }
 
     public void LoadQuoteFromHistory(QuoteHistoryEntry entry, bool isEdit = false)

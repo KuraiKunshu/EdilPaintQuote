@@ -37,6 +37,7 @@ public partial class SqlDataService
             existing.Phone = customer.Phone;
             existing.MaterialDiscount = customer.MaterialDiscount;
             existing.LaborDiscount = customer.LaborDiscount;
+            existing.LastModifiedUtc = customer.LastModifiedUtc;
             await db.SaveChangesAsync();
             return existing.ToModel();
         }
@@ -44,6 +45,34 @@ public partial class SqlDataService
         // Nuovo cliente
         var entity = customer.ToEntity();
         db.Customers.Add(entity);
+        await db.SaveChangesAsync();
+        return entity.ToModel();
+    }
+
+    public async Task<Customer> UpdateCustomerAsync(string originalBusinessName, Customer customer)
+    {
+        await using var db = AppDbContextFactory.Create();
+
+        var entity = await db.Customers
+            .FirstOrDefaultAsync(x => x.BusinessName == originalBusinessName)
+            ?? await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName);
+
+        if (entity == null)
+        {
+            entity = customer.ToEntity();
+            db.Customers.Add(entity);
+        }
+        else
+        {
+            entity.BusinessName = customer.BusinessName;
+            entity.Address = customer.Address;
+            entity.Email = customer.Email;
+            entity.Phone = customer.Phone;
+            entity.MaterialDiscount = customer.MaterialDiscount;
+            entity.LaborDiscount = customer.LaborDiscount;
+            entity.LastModifiedUtc = customer.LastModifiedUtc;
+        }
+
         await db.SaveChangesAsync();
         return entity.ToModel();
     }

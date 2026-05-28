@@ -100,6 +100,7 @@ public partial class SelectCustomerWindow : Window
     {
         if (sender is Button btn && btn.DataContext is Customer customerToEdit)
         {
+            string originalBusinessName = customerToEdit.BusinessName;
             var editWin = new NewCustomerWindow(customerToEdit)
             {
                 Owner = this
@@ -107,7 +108,8 @@ public partial class SelectCustomerWindow : Window
 
             if (editWin.ShowDialog() == true)
             {
-                _vm.SaveCustomersJson();
+                if (editWin.NewCustomer != null)
+                    _vm.UpdateCustomer(originalBusinessName, editWin.NewCustomer);
                 _vm.ApplyCustomerFilter(TxtSearch.Text);
             }
         }

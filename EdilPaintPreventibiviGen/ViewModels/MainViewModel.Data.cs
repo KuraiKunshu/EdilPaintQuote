@@ -20,6 +20,8 @@ namespace EdilPaintPreventibiviGen.ViewModels;
 public partial class MainViewModel
 {
     #region Data Loading & Saving
+    public Task InitializeAsync() => LoadDataAsync();
+
     private async Task LoadDataAsync()
     {
         try
@@ -78,26 +80,7 @@ public partial class MainViewModel
         }
     }
 
-    public async void SaveCustomersJson()
-    {
-        try { await SaveCustomersAsync(); }
-        catch (Exception ex) { Debug.WriteLine($"[SaveCustomersJson] Error: {ex.Message}"); }
-    }
-
     public void SaveLaborsJson() => _ = SaveLaborsAsync();
-
-    private async Task SaveCustomersAsync()
-    {
-        try
-        {
-            _allCustomers = AllCustomers.ToList();
-            ApplySecondCustomerFilter(_secondCustomerSearchText);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[SaveCustomersAsync] Error: {ex.Message}");
-        }
-    }
 
     private async Task SaveLaborsAsync()
     {
@@ -164,9 +147,13 @@ public partial class MainViewModel
         }
     }
 
-    public void UpdateCustomer(Customer updated)
+    public void UpdateCustomer(Customer updated) => UpdateCustomer(updated.BusinessName, updated);
+
+    public void UpdateCustomer(string originalBusinessName, Customer updated)
     {
         var existing = AllCustomers.FirstOrDefault(c => ReferenceEquals(c, updated))
+            ?? AllCustomers.FirstOrDefault(c =>
+                c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase))
             ?? AllCustomers.FirstOrDefault(c =>
                 c.BusinessName.Equals(updated.BusinessName, StringComparison.OrdinalIgnoreCase));
 
@@ -182,6 +169,8 @@ public partial class MainViewModel
 
         var existingInAll = _allCustomers.FirstOrDefault(c => ReferenceEquals(c, updated))
             ?? _allCustomers.FirstOrDefault(c =>
+                c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase))
+            ?? _allCustomers.FirstOrDefault(c =>
                 c.BusinessName.Equals(updated.BusinessName, StringComparison.OrdinalIgnoreCase));
 
         if (existingInAll != null)
@@ -196,12 +185,14 @@ public partial class MainViewModel
 
         OnPropertyChanged(nameof(SelectedCustomer));
         OnPropertyChanged(nameof(SelectedSecondCustomer));
-        _ = UpdateCustomerSafeAsync(updated);
+        ApplyCustomerFilter(_customerSearchText);
+        ApplySecondCustomerFilter(_secondCustomerSearchText);
+        _ = UpdateCustomerSafeAsync(originalBusinessName, updated);
     }
 
-    private async Task UpdateCustomerSafeAsync(Customer updated)
+    private async Task UpdateCustomerSafeAsync(string originalBusinessName, Customer updated)
     {
-        try { await _dataService.AddCustomerAsync(updated); }
+        try { await _dataService.UpdateCustomerAsync(originalBusinessName, updated); }
         catch (Exception ex)
         {
             MessageBox.Show($"Errore durante il salvataggio del cliente.\n\n{ex.Message}",

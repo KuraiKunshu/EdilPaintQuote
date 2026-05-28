@@ -153,13 +153,20 @@ public class SyncService
                     continue;
 
                 var timeDiff = (jsonQuote.LastModifiedUtc - dbMeta.LastModifiedUtc).TotalSeconds;
+                if (Math.Abs(timeDiff) <= 60)
+                {
+                    conflicts++;
+                    Debug.WriteLine($"[Sync] Quote {key}: hash diverso con timestamp ravvicinati ({timeDiff:F1}s). Uso la versione piu' recente.");
+                }
 
-                if (dbMeta.LastModifiedUtc > jsonQuote.LastModifiedUtc && dbMeta.LastModifiedUtc != DateTime.MinValue)
-                    keysNeedingDbLoad.Add(key);
-                else if (timeDiff > 60) // ← tolleranza 60 secondi: evita sync inutili per piccole differenze
+                if (dbMeta.LastModifiedUtc == DateTime.MinValue || jsonQuote.LastModifiedUtc > dbMeta.LastModifiedUtc)
                 {
                     quotesPendingDbUpdate.Add(jsonQuote);
                     synced++;
+                }
+                else
+                {
+                    keysNeedingDbLoad.Add(key);
                 }
             }
 

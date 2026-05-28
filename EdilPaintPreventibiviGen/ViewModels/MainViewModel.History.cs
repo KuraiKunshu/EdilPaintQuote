@@ -62,14 +62,14 @@ public partial class MainViewModel
         }
     }
 
-    private static byte[] ReadPdfBytesWithRetry(string pdfPath, int maxAttempts = 3, int delayMs = 200)
+    private static async Task<byte[]> ReadPdfBytesWithRetryAsync(string pdfPath, int maxAttempts = 3, int delayMs = 200)
     {
         for (int i = 0; i < maxAttempts; i++)
         {
             try
             {
                 if (File.Exists(pdfPath))
-                    return File.ReadAllBytes(pdfPath);
+                    return await File.ReadAllBytesAsync(pdfPath);
             }
             catch (IOException)
             {
@@ -77,20 +77,20 @@ public partial class MainViewModel
             }
 
             if (i < maxAttempts - 1)
-                System.Threading.Thread.Sleep(delayMs);
+                await Task.Delay(delayMs);
         }
 
         return [];
     }
 
-    private async Task<bool> SaveToHistoryAsync(string pdfPath, bool isNewEntry = false)
+    private async Task<bool> SaveToHistoryAsync(string pdfPath, bool isNewEntry = false, DateTime? quoteDate = null)
     {
-        byte[] pdfBytes = ReadPdfBytesWithRetry(pdfPath);
+        byte[] pdfBytes = await ReadPdfBytesWithRetryAsync(pdfPath);
 
         var entry = new QuoteHistoryEntry
         {
             QuoteNumber = QuoteNumber,
-            Date = DateTime.Now,
+            Date = quoteDate ?? DateTime.Now,
             CustomerName = SelectedCustomer?.BusinessName ?? "Sconosciuto",
             ReferenceName = IsSecondCustomerEnabled ? (SelectedSecondCustomer?.BusinessName ?? "") : "",
             PdfPath = pdfPath,

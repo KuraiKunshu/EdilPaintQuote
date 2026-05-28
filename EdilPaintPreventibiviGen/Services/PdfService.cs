@@ -16,12 +16,12 @@ public class PdfService
     /// Punto di ingresso per la generazione da UI (MainViewModel).
     /// Converte il ViewModel in PdfGenerationContext e delega.
     /// </summary>
-    public void GenerateQuote(MainViewModel vm, Company company, string filePath)
+    public void GenerateQuote(MainViewModel vm, Company company, string filePath, DateTime? quoteDate = null)
     {
         var ctx = new PdfGenerationContext
         {
             QuoteNumber = vm.QuoteNumber,
-            Date = DateTime.Now,
+            Date = quoteDate ?? DateTime.Now,
             PaymentTerms = vm.PaymentTerms,
             IvaType = vm.IvaType,
             CustomerName = vm.SelectedCustomer?.BusinessName ?? string.Empty,

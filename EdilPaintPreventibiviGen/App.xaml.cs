@@ -83,7 +83,7 @@ public partial class App : Application
                 {
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Import dati legacy...");
                     var importer = new JsonImportService(sqlService);
-                    await Task.Run(async () => await importer.ImportAllAsync(assetsPath));
+                    await Task.Run(() => importer.ImportAllAsync(assetsPath));
                 }
                 else
                 {
@@ -94,7 +94,8 @@ public partial class App : Application
                 _startupSyncTask = RunStartupSyncAsync(shutdownToken);
 
                 await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
-                MainVm = await Task.Run(() => new MainViewModel());
+                MainVm = new MainViewModel();
+                await MainVm.InitializeAsync();
 
                 await SetLoadingStatusAsync(loadingWindow, "5/5 - Apertura finestra principale...");
                 await ForceUiRefreshAsync(loadingWindow);

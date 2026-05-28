@@ -54,6 +54,7 @@ public partial class MainViewModel : INotifyPropertyChanged
     private bool _isSecondCustomerEnabled;
     private bool _isSavingQuoteHistory;
     private bool _isEditingExistingQuote;
+    private bool _isGeneratingPdf;
     #endregion
 
     #region Quote Info
@@ -114,7 +115,6 @@ public partial class MainViewModel : INotifyPropertyChanged
         _quoteHistoryService = new QuoteHistoryService(_dataService, _storagePathService);
 
         _veluxService.OnLoginRequired += HandleVeluxLogin;
-        _ = LoadDataAsync();
 
         Materials.CollectionChanged += OnItemsCollectionChanged;
         Labors.CollectionChanged += OnItemsCollectionChanged;

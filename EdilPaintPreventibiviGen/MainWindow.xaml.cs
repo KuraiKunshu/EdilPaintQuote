@@ -21,7 +21,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new MainViewModel();
+        var vm = new MainViewModel();
+        DataContext = vm;
+        Loaded += async (_, _) => await vm.InitializeAsync();
     }
     public MainWindow(MainViewModel vm)
     {
@@ -235,18 +237,20 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainViewModel vm || vm.SelectedCustomer == null) return;
 
+        string originalBusinessName = vm.SelectedCustomer.BusinessName;
         var win = new NewCustomerWindow(vm.SelectedCustomer) { Owner = this };
         if (win.ShowDialog() == true && win.NewCustomer != null)
-            vm.UpdateCustomer(win.NewCustomer);
+            vm.UpdateCustomer(originalBusinessName, win.NewCustomer);
     }
 
     private void OnEditReferenceClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm || vm.SelectedSecondCustomer == null) return;
 
+        string originalBusinessName = vm.SelectedSecondCustomer.BusinessName;
         var win = new NewCustomerWindow(vm.SelectedSecondCustomer) { Owner = this };
         if (win.ShowDialog() == true && win.NewCustomer != null)
-            vm.UpdateCustomer(win.NewCustomer);
+            vm.UpdateCustomer(originalBusinessName, win.NewCustomer);
     }
     private void OnOpenLaborListClick(object sender, RoutedEventArgs e)
     {
