@@ -114,30 +114,6 @@ public class StoragePathService
         });
     }
 
-    public string EnsurePdfExists(
-        string customerName,
-        string quoteNumber,
-        DateTime date,
-        byte[]? pdfContent,
-        string? referenceName = null,
-        string? currentPath = null)
-    {
-        string fullPath = BuildQuotePdfPath(customerName, quoteNumber, date, referenceName);
-        string? folder = Path.GetDirectoryName(fullPath);
-
-        if (!string.IsNullOrWhiteSpace(folder))
-            EnsureFolderExists(folder);
-
-        if (!File.Exists(fullPath))
-        {
-            if (pdfContent is { Length: > 0 })
-                File.WriteAllBytes(fullPath, pdfContent);
-            else
-                return string.Empty;
-        }
-
-        return fullPath;
-    }
     #endregion
 
     #region Helpers

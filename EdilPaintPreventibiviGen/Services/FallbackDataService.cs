@@ -367,6 +367,11 @@ public class FallbackDataService : IDataService
             Status = entry.Status,
             LastModifiedUtc = entry.LastModifiedUtc,
             SyncHash = entry.SyncHash,
+            IsJointVenture = entry.IsJointVenture,
+            PartnerCompanyName = entry.PartnerCompanyName,
+            OurCosts = entry.OurCosts,
+            PartnerCosts = entry.PartnerCosts,
+            AdditionalCosts = entry.AdditionalCosts,
             Materials = entry.Materials,
             Labors = entry.Labors,
             PdfFile = entry.PdfFile == null ? null : new StoredFile
@@ -390,6 +395,9 @@ public class FallbackDataService : IDataService
         quote.LastModifiedUtc = DateTime.UtcNow;
         
         var lightEntry = CreateLightEntry(quote);
+        lightEntry.SyncHash = QuoteSyncHashService.Compute(lightEntry);
+        quote.SyncHash = lightEntry.SyncHash;
+
         await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
 
         if (IsDatabaseAvailable())
@@ -420,7 +428,16 @@ public class FallbackDataService : IDataService
         InvalidateQuoteNumbersCaches();
     }
 
-    public Task<HashSet<string>> GetAllQuoteNumbersAsync() => _sqlService.GetAllQuoteNumbersAsync();
+    public async Task<HashSet<string>> GetAllQuoteNumbersAsync()
+    {
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.GetAllQuoteNumbersAsync(); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return await GetLocalQuoteNumbersCachedAsync();
+    }
 
     #endregion
 
@@ -458,6 +475,27 @@ public class FallbackDataService : IDataService
 
         return customer;
     }
+
+    public async Task<Customer> UpdateCustomerAsync(string originalBusinessName, Customer customer)
+    {
+        customer.LastModifiedUtc = DateTime.UtcNow;
+        await _localStore.UpdateCustomerAsync(originalBusinessName, customer);
+
+        if (IsDatabaseAvailable())
+        {
+            try
+            {
+                return await _sqlService.UpdateCustomerAsync(originalBusinessName, customer);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FallbackDataService] UpdateCustomerAsync DB FAILED: {ex.Message}");
+                SetDatabaseUnavailable(ex.Message);
+            }
+        }
+
+        return customer;
+    }
     
     public async Task DeleteCustomerAsync(string businessName)
     {
@@ -472,23 +510,143 @@ public class FallbackDataService : IDataService
 
     #endregion
 
-    #region Other methods - delegate to SQL
+    #region Other methods - SQL with local fallback
 
-    public Task<Company?> GetCompanyAsync() => _sqlService.GetCompanyAsync();
-    public Task SaveCompanyAsync(Company company, string selectedLogo) =>
-        _sqlService.SaveCompanyAsync(company, selectedLogo);
-    public Task<List<Item>> GetLaborCatalogAsync() => _sqlService.GetLaborCatalogAsync();
-    public Task SaveLaborCatalogAsync(IEnumerable<Item> labors) =>
-        _sqlService.SaveLaborCatalogAsync(labors);
-    public Task<List<Item>> GetPersonalMaterialsAsync() => _sqlService.GetPersonalMaterialsAsync();
-    public Task SavePersonalMaterialsAsync(IEnumerable<Item> materials) =>
-        _sqlService.SavePersonalMaterialsAsync(materials);
-    public Task<int> GetNextQuoteNumberAsync() => _sqlService.GetNextQuoteNumberAsync();
-    public Task<bool> IsDatabaseEmptyAsync() => _sqlService.IsDatabaseEmptyAsync();
-    public Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber) =>
-        _sqlService.GetQuotePdfContentAsync(quoteNumber);
-    public Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber) =>
-        _sqlService.GetQuoteAttachmentsAsync(quoteNumber);
+    public async Task<Company?> GetCompanyAsync()
+    {
+        if (IsDatabaseAvailable())
+        {
+            try
+            {
+                var company = await _sqlService.GetCompanyAsync();
+                if (company != null)
+                {
+                    string selectedLogo = company.Logo_index >= 0 && company.Logo_index < company.Logo.Count
+                        ? System.IO.Path.GetFileName(company.Logo[company.Logo_index])
+                        : string.Empty;
+
+                    await _localStore.SaveCompanyAsync(company, selectedLogo);
+                }
+
+                return company;
+            }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return await _localStore.LoadCompanyAsync();
+    }
+
+    public async Task SaveCompanyAsync(Company company, string selectedLogo)
+    {
+        await _localStore.SaveCompanyAsync(company, selectedLogo);
+
+        if (IsDatabaseAvailable())
+        {
+            try { await _sqlService.SaveCompanyAsync(company, selectedLogo); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+    }
+
+    public async Task<List<Item>> GetLaborCatalogAsync()
+    {
+        if (IsDatabaseAvailable())
+        {
+            try
+            {
+                var labors = await _sqlService.GetLaborCatalogAsync();
+                await _localStore.SaveLaborCatalogAsync(labors);
+                return labors;
+            }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return await _localStore.LoadLaborCatalogAsync();
+    }
+
+    public async Task SaveLaborCatalogAsync(IEnumerable<Item> labors)
+    {
+        var laborList = labors.ToList();
+        await _localStore.SaveLaborCatalogAsync(laborList);
+
+        if (IsDatabaseAvailable())
+        {
+            try { await _sqlService.SaveLaborCatalogAsync(laborList); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+    }
+
+    public async Task<List<Item>> GetPersonalMaterialsAsync()
+    {
+        if (IsDatabaseAvailable())
+        {
+            try
+            {
+                var materials = await _sqlService.GetPersonalMaterialsAsync();
+                await _localStore.SavePersonalMaterialsAsync(materials);
+                return materials;
+            }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return await _localStore.LoadPersonalMaterialsAsync();
+    }
+
+    public async Task SavePersonalMaterialsAsync(IEnumerable<Item> materials)
+    {
+        var materialList = materials.ToList();
+        await _localStore.SavePersonalMaterialsAsync(materialList);
+
+        if (IsDatabaseAvailable())
+        {
+            try { await _sqlService.SavePersonalMaterialsAsync(materialList); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+    }
+
+    public async Task<int> GetNextQuoteNumberAsync()
+    {
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.GetNextQuoteNumberAsync(); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        throw new InvalidOperationException("Database non disponibile: impossibile assegnare un numero preventivo ufficiale. Riprova quando la connessione e' disponibile.");
+    }
+
+    public async Task<bool> IsDatabaseEmptyAsync()
+    {
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.IsDatabaseEmptyAsync(); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        var localHistory = await _localStore.LoadHistoryAsync();
+        var localCustomers = await _localStore.LoadCustomersAsync();
+        return localHistory.Count == 0 && localCustomers.Count == 0;
+    }
+    public async Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber)
+    {
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.GetQuotePdfContentAsync(quoteNumber); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return null;
+    }
+
+    public async Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber)
+    {
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.GetQuoteAttachmentsAsync(quoteNumber); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return [];
+    }
 
     public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync()
     {

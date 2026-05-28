@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
@@ -47,12 +48,6 @@ public sealed class QuoteHistoryService
         await _dataService.DeleteQuoteAsync(quoteNumber);
     }
 
-    public async Task SaveAsync(IEnumerable<QuoteHistoryEntry> history)
-    {
-        foreach (var entry in history)
-            await _dataService.SaveQuoteAsync(entry);
-    }
-
     public string GetExpectedPdfPath(QuoteHistoryEntry entry)
     {
         return _storagePathService.BuildQuotePdfPath(
@@ -62,22 +57,33 @@ public sealed class QuoteHistoryService
             string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
     }
 
-    public string EnsurePdfExists(QuoteHistoryEntry entry)
+    public async Task<string> EnsureOfficialPdfExistsAsync(QuoteHistoryEntry entry)
     {
-        byte[]? pdfBytes = entry.PdfFile?.Content;
-
         string expectedPath = GetExpectedPdfPath(entry);
-        string ensuredPath = _storagePathService.EnsurePdfExists(
-            entry.CustomerName,
-            entry.QuoteNumber,
-            entry.Date,
-            pdfBytes,
-            string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName,
-            currentPath: null);
+        byte[]? officialPdf = null;
+        try
+        {
+            officialPdf = await _dataService.GetQuotePdfContentAsync(entry.QuoteNumber);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[EnsureOfficialPdfExists] DB PDF non disponibile per {entry.QuoteNumber}: {ex.Message}");
+        }
 
-        if (!string.IsNullOrWhiteSpace(ensuredPath))
-            entry.PdfPath = expectedPath;
+        if (officialPdf is not { Length: > 0 })
+            officialPdf = entry.PdfFile?.Content is { Length: > 0 } ? entry.PdfFile.Content : null;
 
+        if (officialPdf is not { Length: > 0 })
+            return string.Empty;
+
+        string? folder = Path.GetDirectoryName(expectedPath);
+        if (!string.IsNullOrWhiteSpace(folder))
+            Directory.CreateDirectory(folder);
+
+        if (!File.Exists(expectedPath) || !FileMatchesBytes(expectedPath, officialPdf))
+            await File.WriteAllBytesAsync(expectedPath, officialPdf);
+
+        entry.PdfPath = expectedPath;
         return expectedPath;
     }
 
@@ -128,6 +134,26 @@ public sealed class QuoteHistoryService
         {
             System.Diagnostics.Debug.WriteLine($"[FindPdfByQuoteNumber] Errore: {ex.Message}");
             return null;
+        }
+    }
+
+    private static bool FileMatchesBytes(string path, byte[] content)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length != content.Length)
+                return false;
+
+            using var fileStream = File.OpenRead(path);
+            using var sha = SHA256.Create();
+            byte[] fileHash = sha.ComputeHash(fileStream);
+            byte[] contentHash = SHA256.HashData(content);
+            return fileHash.SequenceEqual(contentHash);
+        }
+        catch
+        {
+            return false;
         }
     }
 }

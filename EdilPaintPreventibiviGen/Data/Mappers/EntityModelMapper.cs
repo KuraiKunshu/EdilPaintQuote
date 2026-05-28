@@ -16,7 +16,8 @@ public static class EntityModelMapper
             Email = entity.Email,
             Phone = entity.Phone,
             MaterialDiscount = entity.MaterialDiscount,
-            LaborDiscount = entity.LaborDiscount
+            LaborDiscount = entity.LaborDiscount,
+            LastModifiedUtc = entity.LastModifiedUtc
         };
     }
 
@@ -29,7 +30,8 @@ public static class EntityModelMapper
             Email = model.Email,
             Phone = model.Phone,
             MaterialDiscount = model.MaterialDiscount,
-            LaborDiscount = model.LaborDiscount
+            LaborDiscount = model.LaborDiscount,
+            LastModifiedUtc = model.LastModifiedUtc
         };
     }
 

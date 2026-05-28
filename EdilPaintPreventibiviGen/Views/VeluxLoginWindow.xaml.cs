@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -12,6 +13,20 @@ public partial class VeluxLoginWindow : Window
     public VeluxLoginWindow()
     {
         InitializeComponent();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        try
+        {
+            WebView.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[VELUX] WebView dispose error: {ex.Message}");
+        }
+
+        base.OnClosed(e);
     }
 
     private async void OnConfirmLoginClick(object sender, RoutedEventArgs e)

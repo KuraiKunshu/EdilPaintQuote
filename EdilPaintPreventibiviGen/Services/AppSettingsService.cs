@@ -12,10 +12,6 @@ public sealed class AppSettingsService
 	{
 		App = configuration.GetSection("App").Get<AppSettingsServiceModel>() ?? new AppSettingsServiceModel();
 		PdfStorage = configuration.GetSection("PdfStorage").Get<PdfStorageSettingsModel>() ?? new PdfStorageSettingsModel();
-
-		// Popola RootPath dalla sezione "Storage:PdfRootPath" se non già valorizzato
-		if (string.IsNullOrWhiteSpace(PdfStorage.RootPath))
-			PdfStorage.RootPath = configuration["Storage:PdfRootPath"] ?? string.Empty;
 	}
 }
 
@@ -38,7 +34,6 @@ public sealed class AppSettingsServiceModel
 			try
 			{
 				Directory.CreateDirectory(TempPath);
-				// Verifica che sia effettivamente scrivibile
 				string testFile = Path.Combine(TempPath, ".writetest");
 				File.WriteAllText(testFile, "test");
 				File.Delete(testFile);
@@ -46,7 +41,7 @@ public sealed class AppSettingsServiceModel
 			}
 			catch
 			{
-				// Fallback automatico se il percorso configurato non è accessibile
+				// Usa il fallback locale se il percorso configurato non e' scrivibile.
 			}
 		}
 

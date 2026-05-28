@@ -22,7 +22,6 @@
     <Window.Resources>
         <converters:SyncStatusToColorConverter x:Key="SyncStatusToColorConverter"/>
         <converters:SyncStatusToTooltipConverter x:Key="SyncStatusToTooltipConverter"/>
-        <converters:StringNotEmptyToVisibilityConverter x:Key="NotesVisConverter"/>
         <Style x:Key="HeaderButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="34"/>
@@ -490,7 +489,7 @@
                                                 <Button.ContentTemplate>
                                                     <DataTemplate DataType="{x:Type models:QuoteHistorySummary}">
                                                         <Grid Width="20" Height="20">
-                                                            <TextBlock Text=""
+                                                            <TextBlock Text="📝"
                                                                        HorizontalAlignment="Center"
                                                                        VerticalAlignment="Center"
                                                                        FontSize="14"/>

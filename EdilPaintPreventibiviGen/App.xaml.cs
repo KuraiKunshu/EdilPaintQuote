@@ -2,12 +2,12 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using EdilPaintPreventibiviGen.Data;
 using EdilPaintPreventibiviGen.Services;
 using EdilPaintPreventibiviGen.ViewModels;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
 namespace EdilPaintPreventibiviGen;
@@ -20,7 +20,12 @@ public partial class App : Application
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
 
+    private const int ShutdownSyncTimeoutSeconds = 5;
     private static System.Timers.Timer? _syncTimer;
+    private static CancellationTokenSource? _shutdownCts;
+    private static Task? _startupSyncTask;
+    private static Task? _startupPdfTask;
+    private static bool _isShuttingDown;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -28,6 +33,10 @@ public partial class App : Application
 
         try
         {
+            _isShuttingDown = false;
+            _shutdownCts = new CancellationTokenSource();
+            var shutdownToken = _shutdownCts.Token;
+
             var startupWatch = Stopwatch.StartNew();
 
             var configuration = new ConfigurationBuilder()
@@ -39,10 +48,9 @@ public partial class App : Application
             IsSilentStartup = AppSettings.App.IsSilentStartup;
 
             StoragePathService.Initialize(AppSettings);
-            
-            // Inizializza servizi di storage
+
             var sqlService = new SqlDataService(AppSettings);
-            
+
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string[] candidates =
             [
@@ -54,7 +62,6 @@ public partial class App : Application
             string assetsPath = candidates.FirstOrDefault(Directory.Exists) ?? candidates[0];
             var localStore = new LocalJsonStoreService(assetsPath);
 
-            // Usa il FallbackDataService come servizio principale
             DataService = new FallbackDataService(sqlService, localStore);
             SyncService = new SyncService(DataService, sqlService, localStore);
 
@@ -76,66 +83,31 @@ public partial class App : Application
                 {
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Import dati legacy...");
                     var importer = new JsonImportService(sqlService);
-                    await Task.Run(async () => await importer.ImportAllAsync(assetsPath));
+                    await Task.Run(() => importer.ImportAllAsync(assetsPath));
                 }
                 else
                 {
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Database pronto");
                 }
 
-                // Sincronizzazione iniziale — completamente in background, NON bloccare l'avvio
-                    await SetLoadingStatusAsync(loadingWindow, "3/5 - Sincronizzazione dati...");
-                    // NON aspettiamo il sync — parte in background e l'app si apre subito
-                    _ = Task.Run(() => SyncService.SyncAllAsync(force: true)).ContinueWith(t =>
-                    {
-                        if (t.Exception != null)
-                            Debug.WriteLine($"[STARTUP] Sync error: {t.Exception.Message}");
-                        else
-                            Debug.WriteLine($"[STARTUP] Sync completed: Quotes={t.Result.QuotesSynced}, Customers={t.Result.CustomersSynced}");
-                    });
+                await SetLoadingStatusAsync(loadingWindow, "3/5 - Sincronizzazione dati...");
+                _startupSyncTask = RunStartupSyncAsync(shutdownToken);
 
-                    await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
-                    MainVm = await Task.Run(() => new MainViewModel());
+                await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
+                MainVm = new MainViewModel();
+                await MainVm.InitializeAsync();
 
-                    await SetLoadingStatusAsync(loadingWindow, "5/5 - Apertura finestra principale...");
-                    await ForceUiRefreshAsync(loadingWindow);
+                await SetLoadingStatusAsync(loadingWindow, "5/5 - Apertura finestra principale...");
+                await ForceUiRefreshAsync(loadingWindow);
 
-                    var mainWindow = new MainWindow(MainVm);
-                    MainWindow = mainWindow;
-                    mainWindow.Show();
+                var mainWindow = new MainWindow(MainVm);
+                MainWindow = mainWindow;
+                mainWindow.Show();
 
-                    StartPeriodicSync();
+                StartPeriodicSync();
+                _startupPdfTask = RunStartupPdfGenerationAsync(shutdownToken);
 
-                    // Genera PDF dopo un ritardo, solo dopo che il sync è finito
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            // Aspetta 30 secondi — il sync dei clienti ha bisogno di tempo
-                            await Task.Delay(TimeSpan.FromSeconds(30));
-
-                            if (AppSettings.App.GeneratePDF)
-                            {
-                                bool hasMissing = await MainVm!.HasMissingPdfsAsync();
-                                if (!hasMissing)
-                                {
-                                    Debug.WriteLine("[PDF Generation] Tutti i PDF presenti, skip.");
-                                    return;
-                                }
-
-                                await MainVm.GenerateInitialPdfsAsync(new Progress<string>(text =>
-                                {
-                                    Debug.WriteLine($"[PDF Generation] {text}");
-                                }));
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[STARTUP] PDF error: {ex.Message}");
-                        }
-                    });
-
-                    Debug.WriteLine($"[STARTUP] Startup completato in {startupWatch.Elapsed}");
+                Debug.WriteLine($"[STARTUP] Startup completato in {startupWatch.Elapsed}");
             }
             finally
             {
@@ -160,40 +132,135 @@ public partial class App : Application
         }
     }
 
-    
     protected override void OnExit(ExitEventArgs e)
     {
-        _syncTimer?.Stop();
-        _syncTimer?.Dispose();
-        _syncTimer = null;
+        _isShuttingDown = true;
+        _shutdownCts?.Cancel();
 
-        if (SyncService != null)
+        if (_syncTimer != null)
+        {
+            _syncTimer.Stop();
+            _syncTimer.Elapsed -= OnPeriodicSyncElapsed;
+            _syncTimer.Dispose();
+            _syncTimer = null;
+        }
+
+        RunFinalSyncWithTimeout();
+
+        _shutdownCts?.Dispose();
+        _shutdownCts = null;
+        _startupSyncTask = null;
+        _startupPdfTask = null;
+
+        base.OnExit(e);
+    }
+
+    private static Task RunStartupSyncAsync(CancellationToken token)
+    {
+        return Task.Run(async () =>
         {
             try
             {
-                SyncService.SyncAllAsync(force: true).GetAwaiter().GetResult();
+                if (token.IsCancellationRequested || _isShuttingDown)
+                    return;
+
+                var result = await SyncService.SyncAllAsync(force: true);
+                Debug.WriteLine($"[STARTUP] Sync completed: Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("[STARTUP] Sync cancelled.");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SHUTDOWN] Sync error: {ex.Message}");
+                Debug.WriteLine($"[STARTUP] Sync error: {ex.Message}");
+            }
+        }, token);
+    }
+
+    private static Task RunStartupPdfGenerationAsync(CancellationToken token)
+    {
+        return Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30), token);
+
+                if (token.IsCancellationRequested || _isShuttingDown || MainVm == null)
+                    return;
+
+                if (AppSettings.App.GeneratePDF)
+                {
+                    bool hasMissing = await MainVm.HasMissingPdfsAsync();
+                    if (token.IsCancellationRequested || _isShuttingDown)
+                        return;
+
+                    if (!hasMissing)
+                    {
+                        Debug.WriteLine("[PDF Generation] Tutti i PDF presenti, skip.");
+                        return;
+                    }
+
+                    await MainVm.GenerateInitialPdfsAsync(new Progress<string>(text =>
+                    {
+                        Debug.WriteLine($"[PDF Generation] {text}");
+                    }));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("[STARTUP] PDF generation cancelled.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[STARTUP] PDF error: {ex.Message}");
+            }
+        }, token);
+    }
+
+    private static void RunFinalSyncWithTimeout()
+    {
+        if (SyncService is null)
+            return;
+
+        try
+        {
+            var finalSyncTask = Task.Run(() => SyncService.SyncAllAsync(force: true));
+            if (!finalSyncTask.Wait(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds)))
+            {
+                Debug.WriteLine($"[SHUTDOWN] Final sync skipped after {ShutdownSyncTimeoutSeconds}s timeout.");
             }
         }
-
-        base.OnExit(e);
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Sync error: {ex.Message}");
+        }
     }
 
     private static void StartPeriodicSync()
     {
         _syncTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
-        _syncTimer.Elapsed += async (s, e) =>
-        {
-            Debug.WriteLine("[PeriodicSync] Running scheduled sync...");
-            await SyncService.SyncAllAsync(); // ← rimosso take: AppSettings.App.NumberOfQuote
-        };
+        _syncTimer.Elapsed += OnPeriodicSyncElapsed;
         _syncTimer.AutoReset = true;
         _syncTimer.Start();
 
         Debug.WriteLine("[STARTUP] Periodic sync started (every 5 minutes)");
+    }
+
+    private static async void OnPeriodicSyncElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        if (_isShuttingDown)
+            return;
+
+        try
+        {
+            Debug.WriteLine("[PeriodicSync] Running scheduled sync...");
+            await SyncService.SyncAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PeriodicSync] Sync error: {ex.Message}");
+        }
     }
 
     private static async Task SetLoadingStatusAsync(LoadingWindow window, string message)

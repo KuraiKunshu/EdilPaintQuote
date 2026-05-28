@@ -9,6 +9,7 @@ public interface IDataService
     // Customers
     Task<List<Customer>> GetCustomersAsync();
     Task<Customer> AddCustomerAsync(Customer customer);
+    Task<Customer> UpdateCustomerAsync(string originalBusinessName, Customer customer);
     Task DeleteCustomerAsync(string businessName);
     
     // Company
