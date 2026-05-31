@@ -329,6 +329,10 @@
                         </Grid.ColumnDefinitions>
 
                         <Grid Grid.Column="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="46"/>
+                            </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="8"/>
@@ -340,10 +344,12 @@
                                        Text="Cerca per cliente, numero o riferimento"/>
 
                             <TextBox x:Name="TxtSearchHistory"
+                                     Grid.Column="0"
                                      Grid.Row="2"
                                      KeyDown="OnSearchKeyDown"/>
                             
                             <Button Grid.Column="1"
+                                        Grid.Row="2"
                                         Content="🔍"
                                         Width="38"
                                         Height="38"

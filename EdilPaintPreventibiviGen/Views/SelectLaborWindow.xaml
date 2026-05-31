@@ -306,7 +306,7 @@
                                         Style="{StaticResource FooterButtonStyle}"
                                         Content="Salva in anagrafica"
                                         Click="OnSaveLaborClick"
-                                        Background="{StaticResource SuccessGreenBrush}"
+                                        Background="{StaticResource ModalPrimaryActionBrush}"
                                         FontWeight="Bold"
                                         Width="170"/>
                             </Grid>

@@ -10,7 +10,7 @@
         Title="Gestione Preventivi - EdilPaint"
         Height="900"
         Width="1250"
-        Background="White"
+        Background="{StaticResource ShellBackgroundBrush}"
         MinWidth="1000"
         MinHeight="700"
         WindowState="Maximized"
@@ -161,6 +161,19 @@
             </Style.Triggers>
         </Style>
 
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
         <Style TargetType="DataGridCell">
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -173,9 +186,73 @@
             </Style.Triggers>
         </Style>
 
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="GroupBox">
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
             <Setter Property="Margin" Value="0,8,0,8"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupBox">
+                        <Grid>
+                            <Border Margin="0,10,0,0"
+                                    Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"/>
+                            <Border HorizontalAlignment="Left"
+                                    Margin="12,0,0,0"
+                                    Padding="8,2"
+                                    Background="{StaticResource PanelBackgroundBrush}"
+                                    CornerRadius="5">
+                                <ContentPresenter ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  TextElement.FontWeight="SemiBold"
+                                                  TextElement.Foreground="{StaticResource DefaultTextBrush}"/>
+                            </Border>
+                            <ContentPresenter Margin="12,24,12,12"
+                                              ContentSource="Content"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Stile DataGrid compatto per il pannello collaborazione -->
@@ -213,13 +290,13 @@
 
         <!-- ═══════════════════════════════════════ HEADER ═══════════════════════════════════════ -->
         <Border DockPanel.Dock="Top"
-                Background="#00FDFDFF"
+                Background="{StaticResource MainHeaderBackgroundBrush}"
                 Effect="{DynamicResource ShadowEffect}"
-                BorderBrush="{StaticResource DangerRedBrush}"
+                BorderBrush="{StaticResource MainHeaderBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="8"
-                Padding="15,10"
-                Margin="0,15,0,0">
+                CornerRadius="10"
+                Padding="18,12"
+                Margin="0,12,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="350"/>
@@ -331,20 +408,20 @@
                                   IsChecked="{Binding IsJointVenture}"/>
                         <Button Content="NUOVO CLIENTE"
                                 Width="110" Height="30"
-                                Background="{StaticResource PrimaryBlueBrush}"
+                                Background="{StaticResource NewCustomerButtonBrush}"
                                 Foreground="White" BorderThickness="0"
                                 Click="OnNewCustomerClick"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Content="SEL. RIFERIMENTO"
                                 Width="110" Height="30" Margin="0,0,5,0"
-                                Background="{StaticResource SecondaryBlueBrush}"
+                                Background="{StaticResource SelectReferenceButtonBrush}"
                                 Foreground="White" BorderThickness="0"
                                 Click="OnSelectReferenceClick"
                                 Visibility="{Binding IsSecondCustomerEnabled, Converter={StaticResource BoolToVis}}"/>
                         <Button Content="SEL. CLIENTE"
                                 Width="110" Height="30"
-                                Background="{StaticResource DarkNavyBrush}"
+                                Background="{StaticResource SelectCustomerButtonBrush}"
                                 Foreground="White" BorderThickness="0"
                                 Click="OnSelectCustomerClick"/>
                     </StackPanel>
@@ -355,10 +432,10 @@
         <!-- ═══════════════════════════ PANNELLO COLLABORAZIONE ═══════════════════════════ -->
         <Border DockPanel.Dock="Top"
                 Visibility="{Binding IsJointVenture, Converter={StaticResource BoolToVis}}"
-                Background="#FFF8F0"
-                BorderBrush="#FFCC80"
+                Background="#FFFFFBEB"
+                BorderBrush="#FFF6C453"
                 BorderThickness="1"
-                CornerRadius="8"
+                CornerRadius="10"
                 Padding="12,10"
                 Margin="0,6,0,0">
             <Grid>
@@ -575,11 +652,11 @@
 
         <!-- ═══════════════════════════════════════ FOOTER ═══════════════════════════════════════ -->
         <Border DockPanel.Dock="Bottom"
-                Background="Crimson"
+                Background="{StaticResource ActionBarBackgroundBrush}"
                 BorderThickness="0"
-                CornerRadius="0"
-                Padding="15,10"
-                Margin="-15,15,-15,-15">
+                CornerRadius="10"
+                Padding="16,12"
+                Margin="0,12,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -590,30 +667,30 @@
 
                 <!-- Pulsanti azione principali -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="✨ Nuovo"
+                    <Button Content="Nuovo"
                             Width="100" Height="35" Margin="0,0,8,0"
-                            Background="{StaticResource WarningYellowBrush}"
+                            Background="{StaticResource NewQuoteButtonBrush}"
                             Foreground="White" BorderThickness="0"
                             Click="OnNewQuoteClick"/>
-                    <Button Content="💾 Genera PDF"
+                    <Button Content="Genera PDF"
                             Width="120" Height="35" Margin="0,0,8,0"
-                            Background="{StaticResource SuccessGreenBrush}"
+                            Background="{StaticResource GeneratePdfButtonBrush}"
                             Foreground="White" BorderThickness="0"
                             FontWeight="Bold"
                             Click="OnGeneratePdfClick"/>
-                    <Button Content="📜 Storico"
+                    <Button Content="Storico"
                             Width="110" Height="35" Margin="0,0,8,0"
-                            Background="{StaticResource DarkNavyBrush}"
+                            Background="{StaticResource HistoryButtonBrush}"
                             Foreground="White" BorderThickness="0"
                             Click="OnOpenHistoryClick"/>
-                    <Button Content="🛠️ Lista Lavori"
+                    <Button Content="Lista Lavori"
                             Width="120" Height="35"
-                            Background="{StaticResource PrimaryBlueBrush}"
+                            Background="{StaticResource LaborListButtonBrush}"
                             Foreground="White" BorderThickness="0"
                             Click="OnOpenLaborListClick"/>
-                    <Button Content="📦 Materiali Locali"
+                    <Button Content="Materiali Locali"
                             Width="130" Height="35" Margin="8,0,0,0"
-                            Background="{StaticResource PrimaryBlueBrush}"
+                            Background="{StaticResource LocalMaterialsButtonBrush}"
                             Foreground="White" BorderThickness="0"
                             Click="OnOpenMaterialListClick"/>
                 </StackPanel>
@@ -625,14 +702,16 @@
                             Margin="0,0,24,0">
                     <StackPanel Margin="0,0,14,0">
                         <TextBlock Text="Sconto Mat. %"
-                                   FontSize="10" HorizontalAlignment="Center"/>
+                                   FontSize="10" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBox Width="58" Height="28"
                                  TextAlignment="Center"
                                  Text="{Binding MaterialDiscount, UpdateSourceTrigger=PropertyChanged}"/>
                     </StackPanel>
                     <StackPanel>
                         <TextBlock Text="Sconto Lav. %"
-                                   FontSize="10" HorizontalAlignment="Center"/>
+                                   FontSize="10" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBox Width="58" Height="28"
                                  TextAlignment="Center"
                                  Text="{Binding LaborDiscount, UpdateSourceTrigger=PropertyChanged}"/>
@@ -652,23 +731,25 @@
                             <RowDefinition/>
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Imponibile:"
-                                   Foreground="{StaticResource BlackBrush}" FontSize="12"/>
+                                   Foreground="{StaticResource LightTextBrush}" FontSize="12"/>
                         <TextBlock Grid.Row="0" Grid.Column="1"
                                    Text="{Binding Imponibile, StringFormat='€ {0:N2}'}"
-                                   HorizontalAlignment="Right" FontSize="12"/>
+                                   HorizontalAlignment="Right" FontSize="12"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="IVA:"
-                                   Foreground="{StaticResource BlackBrush}" FontSize="12"/>
+                                   Foreground="{StaticResource LightTextBrush}" FontSize="12"/>
                         <TextBlock Grid.Row="1" Grid.Column="1"
                                    Text="{Binding IvaTotale, StringFormat='€ {0:N2}'}"
-                                   HorizontalAlignment="Right" FontSize="12"/>
+                                   HorizontalAlignment="Right" FontSize="12"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="TOTALE"
                                    FontWeight="Bold" FontSize="18"
-                                   Foreground="{StaticResource DarkNavyBrush}"
+                                   Foreground="{StaticResource LightTextBrush}"
                                    VerticalAlignment="Bottom"/>
                         <TextBlock Grid.Row="2" Grid.Column="1"
                                    Text="{Binding TotaleGenerale, StringFormat='€ {0:N2}'}"
                                    FontWeight="Bold" FontSize="18"
-                                   Foreground="{StaticResource AccentOrangeBrush}"
+                                   Foreground="{StaticResource WarningYellowBrush}"
                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                     </Grid>
                 </StackPanel>

@@ -290,7 +290,7 @@
                             Style="{StaticResource FooterButtonStyle}"
                             Content="Salva cliente"
                             Click="OnSaveClick"
-                            Background="{StaticResource SuccessGreenBrush}"
+                            Background="{StaticResource ModalPrimaryActionBrush}"
                             FontWeight="Bold"/>
                 </Grid>
             </Grid>

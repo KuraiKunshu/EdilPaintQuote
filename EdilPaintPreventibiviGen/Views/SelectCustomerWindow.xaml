@@ -345,7 +345,7 @@
                             Style="{StaticResource FooterButtonStyle}"
                             Content="Seleziona cliente"
                             Click="OnInsertClick"
-                            Background="{StaticResource SuccessGreenBrush}"
+                            Background="{StaticResource ModalPrimaryActionBrush}"
                             FontWeight="Bold"
                             Width="160"/>
                 </Grid>

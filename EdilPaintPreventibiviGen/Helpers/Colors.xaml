@@ -7,6 +7,10 @@
     <Color x:Key="DarkNavyColor">#2c3e50</Color>
     <Color x:Key="SuccessGreenColor">#27ae60</Color>
     <Color x:Key="DangerRedColor">#e74c3c</Color>
+    <Color x:Key="PrimaryRedColor">#e74c3c</Color>
+    <Color x:Key="PrimaryRedDarkColor">#c0392b</Color>
+    <Color x:Key="PrimaryRedLightColor">#FFEBEE</Color>
+    <Color x:Key="RedBorderColor">#FFCDD2</Color>
     <Color x:Key="Purple">#8b2dc7</Color>
     <Color x:Key="WarningYellowColor">#f1c40f</Color>
     <Color x:Key="AccentOrangeColor">#e67e22</Color>
@@ -18,10 +22,19 @@
     <SolidColorBrush x:Key="DarkNavyBrush" Color="{StaticResource DarkNavyColor}"/>
     <SolidColorBrush x:Key="SuccessGreenBrush" Color="{StaticResource SuccessGreenColor}"/>
     <SolidColorBrush x:Key="DangerRedBrush" Color="{StaticResource DangerRedColor}"/>
+    <SolidColorBrush x:Key="PrimaryRedBrush" Color="{StaticResource PrimaryRedColor}"/>
+    <SolidColorBrush x:Key="PrimaryRedDarkBrush" Color="{StaticResource PrimaryRedDarkColor}"/>
+    <SolidColorBrush x:Key="PrimaryRedLightBrush" Color="{StaticResource PrimaryRedLightColor}"/>
+    <SolidColorBrush x:Key="RedBorderBrush" Color="{StaticResource RedBorderColor}"/>
     <SolidColorBrush x:Key="PurpleBrush" Color="{StaticResource Purple}"/>
     <SolidColorBrush x:Key="WarningYellowBrush" Color="{StaticResource WarningYellowColor}"/>
     <SolidColorBrush x:Key="AccentOrangeBrush" Color="{StaticResource AccentOrangeColor}"/>
     <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#F3F6FA"/>
+    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#FAFBFC"/>
+    <SolidColorBrush x:Key="SubtleBorderBrush" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="HoverSurfaceBrush" Color="#F8FAFC"/>
 
     <!-- Colori Testo -->
     <SolidColorBrush x:Key="DefaultTextBrush" Color="#2c3e50"/>
@@ -33,11 +46,31 @@
     <SolidColorBrush x:Key="RowSelectedBrush" Color="#FFF9C4"/>
     <SolidColorBrush x:Key="GridLinesBrush" Color="#CCCCCC"/>
 
+    <!-- Colori semantici UI: modifica questi per personalizzare i controlli principali -->
+    <SolidColorBrush x:Key="MainHeaderBackgroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="MainHeaderBorderBrush" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="ActionBarBackgroundBrush" Color="#2c3e50"/>
+    <SolidColorBrush x:Key="NewQuoteButtonBrush" Color="#f1c40f"/>
+    <SolidColorBrush x:Key="GeneratePdfButtonBrush" Color="#27ae60"/>
+    <SolidColorBrush x:Key="HistoryButtonBrush" Color="#2980b9"/>
+    <SolidColorBrush x:Key="LaborListButtonBrush" Color="#3498db"/>
+    <SolidColorBrush x:Key="LocalMaterialsButtonBrush" Color="#3498db"/>
+    <SolidColorBrush x:Key="NewCustomerButtonBrush" Color="#3498db"/>
+    <SolidColorBrush x:Key="SelectReferenceButtonBrush" Color="#2980b9"/>
+    <SolidColorBrush x:Key="SelectCustomerButtonBrush" Color="#2c3e50"/>
+    <SolidColorBrush x:Key="ModalPrimaryActionBrush" Color="#27ae60"/>
+    <SolidColorBrush x:Key="SectionPanelBackgroundBrush" Color="#F6F8FA"/>
+
     <!-- Colori Stati Storico -->
     <SolidColorBrush x:Key="StatusFinalizzatoBrush" Color="#7cc2dc"/>
     <SolidColorBrush x:Key="StatusSpeditoBrush" Color="#fdf282"/>
     <SolidColorBrush x:Key="StatusConfermatoBrush" Color="#ddacf3"/>
     <SolidColorBrush x:Key="StatusFinitoBrush" Color="#b7f3ac"/>
     <SolidColorBrush x:Key="StatusRifiutatoBrush" Color="#f3acac"/>
+
+    <DropShadowEffect x:Key="ShadowEffect"
+                      BlurRadius="18"
+                      ShadowDepth="0"
+                      Opacity="0.16"/>
 
 </ResourceDictionary>
