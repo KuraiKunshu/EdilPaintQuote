@@ -22,7 +22,7 @@ public sealed class QuoteCalculator
     double iva10 = 0.0;
     double iva22 = 0.0;
 
-    switch (ivaType)
+    switch (NormalizeIvaType(ivaType))
     {
         case "RC 10%+22%":
         {
@@ -82,6 +82,19 @@ public sealed class QuoteCalculator
         Iva22 = iva22,
     };
 }
+
+    public static string NormalizeIvaType(string? ivaType)
+    {
+        string normalized = string.Concat((ivaType ?? string.Empty).Where(c => !char.IsWhiteSpace(c)));
+        return normalized.ToUpperInvariant() switch
+        {
+            "RC10%+22%" or "10%+22%" => "RC 10%+22%",
+            "10%" => "10%",
+            "22%" => "22%",
+            "ESCLUSA" => "esclusa",
+            _ => "esclusa"
+        };
+    }
 }
 
 public sealed class QuoteTotals

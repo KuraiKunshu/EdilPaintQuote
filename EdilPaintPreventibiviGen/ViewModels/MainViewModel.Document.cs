@@ -39,7 +39,7 @@ public partial class MainViewModel
 
         _materialDiscount = 0;
         _laborDiscount = 0;
-        _ivaType = string.Empty;
+        _ivaType = "RC 10%+22%";
 
         PaymentTerms = _companyData.Termini_pagamento;
         QuoteNumber = _companyData.Counter.ToString();
@@ -148,13 +148,12 @@ public partial class MainViewModel
     public async Task GeneratePdfAsync(
         bool incrementCounter = true,
         bool openAfterGeneration = true,
-        bool generateViaTempFile = false,
         DateTime? specificDate = null,
         string? forceTargetPath = null)
     {
         if (!App.AppSettings.App.GeneratePDF)
         {
-            MessageBox.Show("La generazione PDF Ã¨ disabilitata nelle impostazioni.");
+            MessageBox.Show("La generazione PDF e' disabilitata nelle impostazioni.");
             return;
         }
         if (SelectedCustomer == null)
@@ -200,47 +199,45 @@ public partial class MainViewModel
                     effectiveDate,
                     IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
 
-            string pathToGenerate = targetPath;
+            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
+            Directory.CreateDirectory(tempRoot);
+            string tempFileName = Path.GetFileName(targetPath);
+            string pathToGenerate = Path.Combine(tempRoot, tempFileName);
+            Debug.WriteLine($"Generazione temporanea PDF: {pathToGenerate}");
 
-            if (generateViaTempFile)
-            {
-                string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
-                Directory.CreateDirectory(tempRoot);
-                string tempFileName = Path.GetFileName(targetPath);
-                pathToGenerate = Path.Combine(tempRoot, tempFileName);
-                Debug.WriteLine($"Generazione temporanea PDF: {pathToGenerate}");
-            }
-            else
+            _pdfService.GenerateQuote(this, _companyData, pathToGenerate, effectiveDate);
+
+            bool copiedToTarget = false;
+            try
             {
                 string? targetFolder = Path.GetDirectoryName(targetPath);
                 if (!string.IsNullOrWhiteSpace(targetFolder))
                     Directory.CreateDirectory(targetFolder);
+
+                File.Copy(pathToGenerate, targetPath, overwrite: true);
+                copiedToTarget = true;
+                Debug.WriteLine($"PDF copiato su destinazione: {targetPath}");
             }
-
-            _pdfService.GenerateQuote(this, _companyData, pathToGenerate, effectiveDate);
-
-            if (generateViaTempFile)
+            catch (Exception ex)
             {
-                try
-                {
-                    string? targetFolder = Path.GetDirectoryName(targetPath);
-                    if (!string.IsNullOrWhiteSpace(targetFolder))
-                        Directory.CreateDirectory(targetFolder);
-
-                    File.Copy(pathToGenerate, targetPath, overwrite: true);
-                    Debug.WriteLine($"PDF copiato su destinazione: {targetPath}");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"ERRORE copia PDF su share: {targetPath} -> {ex.Message}");
-                }
-
-                try { File.Delete(pathToGenerate); }
-                catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error: {ex.Message}"); }
+                Debug.WriteLine($"ERRORE copia PDF su share: {targetPath} -> {ex.Message}");
             }
 
-            if (!await SaveToHistoryAsync(targetPath, incrementCounter, effectiveDate))
+            if (!await SaveToHistoryAsync(targetPath, incrementCounter, effectiveDate, pathToGenerate))
                 return;
+
+            try { File.Delete(pathToGenerate); }
+            catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error deleting temporary PDF: {ex.Message}"); }
+
+            if (!copiedToTarget)
+            {
+                MessageBox.Show(
+                    "Il PDF e' al sicuro nel database o nella coda locale ed e' in attesa di essere ripristinato nella cartella condivisa.",
+                    "Cartella condivisa non disponibile",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
 
             if (!openAfterGeneration) return;
 
@@ -344,7 +341,7 @@ public partial class MainViewModel
     {
         if (!IsJointVenture)
         {
-            MessageBox.Show("La collaborazione non Ã¨ attiva.", "Avviso", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("La collaborazione non e' attiva.", "Avviso", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         if (SelectedCustomer == null)

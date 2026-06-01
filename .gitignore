@@ -114,4 +114,7 @@ mono_crash.mem.*
 *.trx
 *.log
 **/appsettings.json
+**/velux_storage.json
 **/*_wpftmp.csproj
+.idea/
+*.sln.DotSettings.user

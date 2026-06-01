@@ -82,7 +82,7 @@
         <Content Include="Assets\dati_lavori.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
-        <None Include="appsettings.json">
+        <None Include="appsettings.json" Condition="Exists('appsettings.json')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
 

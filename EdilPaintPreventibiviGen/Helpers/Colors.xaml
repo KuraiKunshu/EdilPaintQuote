@@ -49,12 +49,13 @@
     <!-- Colori semantici UI: modifica questi per personalizzare i controlli principali -->
     <SolidColorBrush x:Key="MainHeaderBackgroundBrush" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="MainHeaderBorderBrush" Color="#E2E8F0"/>
-    <SolidColorBrush x:Key="ActionBarBackgroundBrush" Color="#2c3e50"/>
+    <SolidColorBrush x:Key="ActionBarBackgroundBrush" Color="{StaticResource PrimaryRedDarkColor}"/>
     <SolidColorBrush x:Key="NewQuoteButtonBrush" Color="#f1c40f"/>
     <SolidColorBrush x:Key="GeneratePdfButtonBrush" Color="#27ae60"/>
     <SolidColorBrush x:Key="HistoryButtonBrush" Color="#2980b9"/>
     <SolidColorBrush x:Key="LaborListButtonBrush" Color="#3498db"/>
     <SolidColorBrush x:Key="LocalMaterialsButtonBrush" Color="#3498db"/>
+    <SolidColorBrush x:Key="SettingsButtonBrush" Color="#7f8c8d"/>
     <SolidColorBrush x:Key="NewCustomerButtonBrush" Color="#3498db"/>
     <SolidColorBrush x:Key="SelectReferenceButtonBrush" Color="#2980b9"/>
     <SolidColorBrush x:Key="SelectCustomerButtonBrush" Color="#2c3e50"/>

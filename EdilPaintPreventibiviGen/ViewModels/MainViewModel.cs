@@ -17,7 +17,7 @@ using EdilPaintPreventibiviGen.Views;
 
 namespace EdilPaintPreventibiviGen.ViewModels;
 
-public partial class MainViewModel : INotifyPropertyChanged
+public partial class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     #region Services
     private readonly IDataService _dataService;
@@ -118,6 +118,14 @@ public partial class MainViewModel : INotifyPropertyChanged
 
         Materials.CollectionChanged += OnItemsCollectionChanged;
         Labors.CollectionChanged += OnItemsCollectionChanged;
+    }
+
+    public void Dispose()
+    {
+        Materials.CollectionChanged -= OnItemsCollectionChanged;
+        Labors.CollectionChanged -= OnItemsCollectionChanged;
+        _veluxService.OnLoginRequired -= HandleVeluxLogin;
+        _veluxService.Dispose();
     }
     #endregion
 

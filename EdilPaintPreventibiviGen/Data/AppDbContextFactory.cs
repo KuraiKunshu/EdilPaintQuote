@@ -1,21 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace EdilPaintPreventibiviGen.Data;
 
 public static class AppDbContextFactory
 {
-    private static readonly DbContextOptions<AppDbContext> _options = BuildOptions();
-
     private static DbContextOptions<AppDbContext> BuildOptions()
     {
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
-            .Build();
-
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-                               ?? throw new InvalidOperationException("Connection string 'DefaultConnection' non trovata.");
+        string connectionString = App.AppSettings.Database.BuildConnectionString();
 
         return new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(connectionString, sql =>
@@ -28,5 +19,5 @@ public static class AppDbContextFactory
             .Options;
     }
 
-    public static AppDbContext Create() => new AppDbContext(_options);
+    public static AppDbContext Create() => new AppDbContext(BuildOptions());
 }

@@ -227,7 +227,7 @@ public class PdfService
                         {
                             bool hasDiscount = (ctx.MaterialDiscount + ctx.LaborDiscount) > 0;
 
-                            switch (ctx.IvaType)
+                            switch (QuoteCalculator.NormalizeIvaType(ctx.IvaType))
                             {
                                 case "RC 10%+22%":
                                     if (totals.Imponibile10 > 0)
@@ -258,7 +258,7 @@ public class PdfService
                                     break;
                             }
 
-                            string totaleText = ctx.IvaType == "esclusa"
+                            string totaleText = QuoteCalculator.NormalizeIvaType(ctx.IvaType) == "esclusa"
                                 ? "TOTALE PREVENTIVO (IVA esclusa):"
                                 : "TOTALE PREVENTIVO (IVA inclusa):";
 

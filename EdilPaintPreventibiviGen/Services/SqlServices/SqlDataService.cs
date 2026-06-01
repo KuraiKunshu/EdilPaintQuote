@@ -10,6 +10,8 @@ public partial class SqlDataService : IDataService
     {
         _appSettings = appSettings;
     }
+
+    public bool CanSynchronize => true;
 }
 
 public class CostAllocations

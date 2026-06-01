@@ -6,7 +6,7 @@
         xmlns:helpers="clr-namespace:EdilPaintPreventibiviGen.Helpers"
         mc:Ignorable="d"
         RenderOptions.BitmapScalingMode="HighQuality"
-        Icon="Assets/Windowsicon/main.png"
+        Icon="pack://application:,,,/Assets/Windowsicon/main.ico"
         Title="Gestione Preventivi - EdilPaint"
         Height="900"
         Width="1250"
@@ -314,23 +314,27 @@
                         <TextBlock Text="{Binding QuoteNumber}" FontSize="16" FontWeight="Bold"/>
                     </StackPanel>
                     <StackPanel Visibility="{Binding SelectedCustomer, Converter={StaticResource StringToVis}}">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel>
                             <TextBlock Text="{Binding SelectedCustomer.DisplayName}"
                                        FontSize="14" FontWeight="Bold"
                                        TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding SelectedCustomer.DisplayName}"
                                        Foreground="{StaticResource DarkNavyBrush}"/>
-                            <Button Content="📁 Apri Cartella"
-                                    Margin="10,0,0,0" Padding="5,2"
-                                    Background="Transparent"
-                                    BorderBrush="{StaticResource GridLinesBrush}"
-                                    BorderThickness="1" Cursor="Hand"
-                                    Click="OnOpenCustomerFolderClick"/>
-                            <Button Content="✏️ Modifica"
-                                    Margin="6,0,0,0" Padding="5,2"
-                                    Background="Transparent"
-                                    BorderBrush="{StaticResource GridLinesBrush}"
-                                    BorderThickness="1" Cursor="Hand"
-                                    Click="OnEditCustomerClick"/>
+                            <WrapPanel Margin="0,4,0,0">
+                                <Button Content="📁 Apri Cartella"
+                                        Padding="5,2"
+                                        Background="Transparent"
+                                        BorderBrush="{StaticResource GridLinesBrush}"
+                                        BorderThickness="1" Cursor="Hand"
+                                        Click="OnOpenCustomerFolderClick"/>
+                                <Button Content="✏️ Modifica"
+                                        Margin="6,0,0,0" Padding="5,2"
+                                        Background="Transparent"
+                                        BorderBrush="{StaticResource GridLinesBrush}"
+                                        BorderThickness="1" Cursor="Hand"
+                                        Click="OnEditCustomerClick"/>
+                            </WrapPanel>
                         </StackPanel>
                         <TextBlock Text="{Binding SelectedCustomer.Address}" FontSize="12" Margin="0,2,0,0"/>
                         <TextBlock Text="{Binding SelectedCustomer.Email}" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
@@ -342,23 +346,28 @@
                             Visibility="{Binding IsSecondCustomerEnabled, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="RIFERIMENTO:" FontSize="10" FontWeight="Bold"
                                Foreground="{StaticResource SecondaryBlueBrush}"/>
-                    <StackPanel Orientation="Horizontal">
+                    <StackPanel>
                         <TextBlock Text="{Binding SelectedSecondCustomer.DisplayName}"
-                                   FontSize="12" FontWeight="Bold"/>
-                        <Button Content="📁 Apri Cartella"
-                                Margin="10,0,0,0" Padding="5,2"
-                                Background="Transparent"
-                                BorderBrush="{StaticResource GridLinesBrush}"
-                                BorderThickness="1" Cursor="Hand"
-                                Click="OnOpenReferenceFolderClick"
-                                Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
-                        <Button Content="✏️ Modifica"
-                                Margin="6,0,0,0" Padding="5,2"
-                                Background="Transparent"
-                                BorderBrush="{StaticResource GridLinesBrush}"
-                                BorderThickness="1" Cursor="Hand"
-                                Click="OnEditReferenceClick"
-                                Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
+                                   FontSize="12" FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding SelectedSecondCustomer.DisplayName}"/>
+                        <WrapPanel Margin="0,4,0,0">
+                            <Button Content="📁 Apri Cartella"
+                                    Padding="5,2"
+                                    Background="Transparent"
+                                    BorderBrush="{StaticResource GridLinesBrush}"
+                                    BorderThickness="1" Cursor="Hand"
+                                    Click="OnOpenReferenceFolderClick"
+                                    Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
+                            <Button Content="✏️ Modifica"
+                                    Margin="6,0,0,0" Padding="5,2"
+                                    Background="Transparent"
+                                    BorderBrush="{StaticResource GridLinesBrush}"
+                                    BorderThickness="1" Cursor="Hand"
+                                    Click="OnEditReferenceClick"
+                                    Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
+                        </WrapPanel>
                     </StackPanel>
                     <TextBlock Text="{Binding SelectedSecondCustomer.Address}" FontSize="12" Margin="0,2,0,0"/>
                     <TextBlock Text="{Binding SelectedSecondCustomer.Email}" FontSize="12"
@@ -693,6 +702,11 @@
                             Background="{StaticResource LocalMaterialsButtonBrush}"
                             Foreground="White" BorderThickness="0"
                             Click="OnOpenMaterialListClick"/>
+                    <Button Content="Impostazioni"
+                            Width="120" Height="35" Margin="8,0,0,0"
+                            Background="{StaticResource SettingsButtonBrush}"
+                            Foreground="White" BorderThickness="0"
+                            Click="OnOpenSettingsClick"/>
                 </StackPanel>
 
                 <!-- Sconti -->

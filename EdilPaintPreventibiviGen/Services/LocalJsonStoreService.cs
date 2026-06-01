@@ -53,6 +53,10 @@ public class LocalJsonStoreService
             var json = await File.ReadAllTextAsync(_companyPath);
             return JsonSerializer.Deserialize<Company>(json, JsonOptions);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"[LocalJsonStore] Error loading company: {ex.Message}");
@@ -116,6 +120,10 @@ public class LocalJsonStoreService
             }
 
             return labors;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -190,17 +198,21 @@ public class LocalJsonStoreService
 
     #region History (Storico Preventivi)
 
-    public async Task<List<QuoteHistoryEntry>> LoadHistoryAsync()
+    public async Task<List<QuoteHistoryEntry>> LoadHistoryAsync(CancellationToken cancellationToken = default)
     {
-        await _historySemaphore.WaitAsync();
+        await _historySemaphore.WaitAsync(cancellationToken);
         try
         {
             if (!File.Exists(_historyPath))
                 return new List<QuoteHistoryEntry>();
 
-            var json = await File.ReadAllTextAsync(_historyPath);
+            var json = await File.ReadAllTextAsync(_historyPath, cancellationToken);
             return JsonSerializer.Deserialize<List<QuoteHistoryEntry>>(json, JsonOptions)
                    ?? new List<QuoteHistoryEntry>();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -213,12 +225,14 @@ public class LocalJsonStoreService
         }
     }
 
-    public async Task BulkUpdateQuotesAsync(IEnumerable<QuoteHistoryEntry> entriesToAddOrUpdate)
+    public async Task BulkUpdateQuotesAsync(
+        IEnumerable<QuoteHistoryEntry> entriesToAddOrUpdate,
+        CancellationToken cancellationToken = default)
     {
-        await _historySemaphore.WaitAsync();
+        await _historySemaphore.WaitAsync(cancellationToken);
         try
         {
-            var history = await LoadHistoryInternalAsync();
+            var history = await LoadHistoryInternalAsync(cancellationToken);
             var historyDict = history
                 .GroupBy(q => q.QuoteNumber, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
@@ -226,17 +240,17 @@ public class LocalJsonStoreService
             foreach (var entry in entriesToAddOrUpdate)
             {
                 var localEntry = CreateLocalQuoteEntry(entry);
-                // NON aggiornare LastModifiedUtc se l'entry viene dal DB â€” preserva il timestamp originale
+                // Preserva il timestamp originale quando l'entry arriva dal DB.
                 if (localEntry.LastModifiedUtc == default)
                     localEntry.LastModifiedUtc = DateTime.UtcNow;
 
-                // Ricalcola l'hash solo se non Ã¨ giÃ  presente (il DB lo porta giÃ  aggiornato)
+                // Ricalcola l'hash per riflettere i dati serializzati localmente.
                 localEntry.SyncHash = ComputeQuoteHash(localEntry);
 
                 historyDict[localEntry.QuoteNumber] = localEntry;
             }
 
-            await SaveHistoryInternalAsync(historyDict.Values);
+            await SaveHistoryInternalAsync(historyDict.Values, cancellationToken);
             Debug.WriteLine($"[LocalJsonStore] BulkUpdate: {entriesToAddOrUpdate.Count()} quotes written");
         }
         finally
@@ -293,35 +307,37 @@ public class LocalJsonStoreService
         }
     }
 
-    private async Task<List<QuoteHistoryEntry>> LoadHistoryInternalAsync()
+    private async Task<List<QuoteHistoryEntry>> LoadHistoryInternalAsync(CancellationToken cancellationToken = default)
     {
         if (!File.Exists(_historyPath))
             return new List<QuoteHistoryEntry>();
 
-        var json = await File.ReadAllTextAsync(_historyPath);
+        var json = await File.ReadAllTextAsync(_historyPath, cancellationToken);
         return JsonSerializer.Deserialize<List<QuoteHistoryEntry>>(json, JsonOptions)
                ?? new List<QuoteHistoryEntry>();
     }
 
-    private async Task SaveHistoryInternalAsync(IEnumerable<QuoteHistoryEntry> entries)
+    private async Task SaveHistoryInternalAsync(
+        IEnumerable<QuoteHistoryEntry> entries,
+        CancellationToken cancellationToken = default)
     {
         if (File.Exists(_historyPath))
             File.Copy(_historyPath, _historyPath + ".backup", overwrite: true);
 
         var localEntries = entries.Select(CreateLocalQuoteEntry).ToList();
         var json = JsonSerializer.Serialize(localEntries, JsonOptions);
-        await File.WriteAllTextAsync(_historyPath, json);
+        await File.WriteAllTextAsync(_historyPath, json, cancellationToken);
     }
     #endregion
 
     #region Customers (Clienti)
 
-    private async Task<List<Customer>> LoadCustomersInternalAsync()
+    private async Task<List<Customer>> LoadCustomersInternalAsync(CancellationToken cancellationToken = default)
     {
         if (!File.Exists(_customersPath))
             return new List<Customer>();
 
-        var json = await File.ReadAllTextAsync(_customersPath);
+        var json = await File.ReadAllTextAsync(_customersPath, cancellationToken);
         using var doc = JsonDocument.Parse(json);
 
         if (!doc.RootElement.TryGetProperty("clienti", out var clientiArray))
@@ -334,15 +350,15 @@ public class LocalJsonStoreService
         return customers;
     }
     
-    public async Task<List<Customer>> LoadCustomersAsync()
+    public async Task<List<Customer>> LoadCustomersAsync(CancellationToken cancellationToken = default)
     {
-        await _customersSemaphore.WaitAsync();
+        await _customersSemaphore.WaitAsync(cancellationToken);
         try
         {
             if (!File.Exists(_customersPath))
                 return new List<Customer>();
 
-            var json = await File.ReadAllTextAsync(_customersPath);
+            var json = await File.ReadAllTextAsync(_customersPath, cancellationToken);
             using var doc = JsonDocument.Parse(json);
 
             if (!doc.RootElement.TryGetProperty("clienti", out var clientiArray))
@@ -355,6 +371,10 @@ public class LocalJsonStoreService
             }
 
             return customers;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -394,14 +414,16 @@ public class LocalJsonStoreService
         }
     }
     
-    private async Task SaveCustomersInternalAsync(IEnumerable<Customer> customers)
+    private async Task SaveCustomersInternalAsync(
+        IEnumerable<Customer> customers,
+        CancellationToken cancellationToken = default)
     {
         if (File.Exists(_customersPath))
             File.Copy(_customersPath, _customersPath + ".backup", overwrite: true);
 
         var wrapper = new { clienti = customers };
         var json = JsonSerializer.Serialize(wrapper, JsonOptions);
-        await File.WriteAllTextAsync(_customersPath, json);
+        await File.WriteAllTextAsync(_customersPath, json, cancellationToken);
     }
 
     public async Task SaveOrUpdateCustomerAsync(Customer customer)
@@ -448,12 +470,14 @@ public class LocalJsonStoreService
         }
     }
     
-    public async Task BulkUpdateCustomersAsync(IEnumerable<Customer> customersToAddOrUpdate)
+    public async Task BulkUpdateCustomersAsync(
+        IEnumerable<Customer> customersToAddOrUpdate,
+        CancellationToken cancellationToken = default)
     {
-        await _customersSemaphore.WaitAsync();
+        await _customersSemaphore.WaitAsync(cancellationToken);
         try
         {
-            var existing = await LoadCustomersInternalAsync();
+            var existing = await LoadCustomersInternalAsync(cancellationToken);
             var dict = existing
                 .GroupBy(c => c.BusinessName, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
@@ -464,7 +488,7 @@ public class LocalJsonStoreService
                 dict[c.BusinessName] = c;
             }
 
-            await SaveCustomersInternalAsync(dict.Values);
+            await SaveCustomersInternalAsync(dict.Values, cancellationToken);
             Debug.WriteLine($"[LocalJsonStore] BulkUpdateCustomers: {customersToAddOrUpdate.Count()} customers written");
         }
         finally

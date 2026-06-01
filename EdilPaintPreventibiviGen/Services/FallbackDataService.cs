@@ -14,9 +14,11 @@ public class FallbackDataService : IDataService
 {
     private readonly SqlDataService _sqlService;
     private readonly LocalJsonStoreService _localStore;
+    private readonly LocalPdfOutboxService _pdfOutbox;
     private bool _isDatabaseAvailable = true;
     private DateTime _databaseUnavailableSince = DateTime.MinValue;
     private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan DbInitializationTimeout = TimeSpan.FromSeconds(12);
 
 
     // Cache dei numeri preventivo presenti nel DB (query leggera, una sola volta ogni 10 min)
@@ -29,21 +31,34 @@ public class FallbackDataService : IDataService
 
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
 
-    public FallbackDataService(SqlDataService sqlService, LocalJsonStoreService localStore)
+    public FallbackDataService(
+        SqlDataService sqlService,
+        LocalJsonStoreService localStore,
+        LocalPdfOutboxService pdfOutbox)
     {
         _sqlService = sqlService;
         _localStore = localStore;
+        _pdfOutbox = pdfOutbox;
     }
 
-    public async Task InitializeAsync()
+    public bool CanSynchronize => IsDatabaseAvailable();
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         Debug.WriteLine("[FallbackDataService] InitializeAsync starting...");
+        using var timeoutCts = new CancellationTokenSource(DbInitializationTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
-            await _sqlService.InitializeAsync();
+            await _sqlService.InitializeAsync(linkedCts.Token);
             
             _isDatabaseAvailable = true;
             Debug.WriteLine("[FallbackDataService] ✅ Database initialized successfully");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            SetDatabaseUnavailable($"Timeout connessione SQL dopo {DbInitializationTimeout.TotalSeconds:F0} secondi.");
+            Debug.WriteLine("[FallbackDataService] Database initialization timed out. Using local fallback.");
         }
         catch (Exception ex)
         {
@@ -108,7 +123,7 @@ public class FallbackDataService : IDataService
     /// <summary>
     /// Invalida entrambe le cache (chiamare dopo SaveQuoteAsync / DeleteQuoteAsync).
     /// </summary>
-    private void InvalidateQuoteNumbersCaches()
+    internal void InvalidateQuoteNumbersCaches()
     {
         _dbQuoteNumbersCache = null;
         _localQuoteNumbersCache = null;
@@ -390,9 +405,13 @@ public class FallbackDataService : IDataService
             }).ToList()
         };
     }
-    public async Task SaveQuoteAsync(QuoteHistoryEntry quote)
+    public async Task SaveQuoteAsync(QuoteHistoryEntry quote, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         quote.LastModifiedUtc = DateTime.UtcNow;
+
+        if (quote.PdfFile?.Content is { Length: > 0 } pdfBytes)
+            await _pdfOutbox.StoreAsync(quote.QuoteNumber, pdfBytes, cancellationToken);
         
         var lightEntry = CreateLightEntry(quote);
         lightEntry.SyncHash = QuoteSyncHashService.Compute(lightEntry);
@@ -402,7 +421,15 @@ public class FallbackDataService : IDataService
 
         if (IsDatabaseAvailable())
         {
-            try { await _sqlService.SaveQuoteAsync(quote); }
+            try
+            {
+                await _sqlService.SaveQuoteAsync(quote, cancellationToken);
+                await _pdfOutbox.RemoveAsync(quote.QuoteNumber);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 SetDatabaseUnavailable(ex.Message);
@@ -417,6 +444,7 @@ public class FallbackDataService : IDataService
     public async Task DeleteQuoteAsync(string quoteNumber)
     {
         await _localStore.DeleteQuoteAsync(quoteNumber);
+        await _pdfOutbox.RemoveAsync(quoteNumber);
 
         if (IsDatabaseAvailable())
         {
@@ -443,17 +471,17 @@ public class FallbackDataService : IDataService
 
     #region Customers
 
-    public async Task<List<Customer>> GetCustomersAsync()
+    public async Task<List<Customer>> GetCustomersAsync(CancellationToken cancellationToken = default)
     {
         if (IsDatabaseAvailable())
         {
-            try { return await _sqlService.GetCustomersAsync(); }
+            try { return await _sqlService.GetCustomersAsync(cancellationToken); }
             catch(Exception ex) { SetDatabaseUnavailable(ex.Message); }
         }
-        return await _localStore.LoadCustomersAsync();
+        return await _localStore.LoadCustomersAsync(cancellationToken);
     }
 
-    public async Task<Customer> AddCustomerAsync(Customer customer)
+    public async Task<Customer> AddCustomerAsync(Customer customer, CancellationToken cancellationToken = default)
     {
         customer.LastModifiedUtc = DateTime.UtcNow;
         await _localStore.SaveOrUpdateCustomerAsync(customer);
@@ -462,7 +490,7 @@ public class FallbackDataService : IDataService
         {
             try
             {
-                return await _sqlService.AddCustomerAsync(customer);
+                return await _sqlService.AddCustomerAsync(customer, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -626,11 +654,15 @@ public class FallbackDataService : IDataService
         var localCustomers = await _localStore.LoadCustomersAsync();
         return localHistory.Count == 0 && localCustomers.Count == 0;
     }
-    public async Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber)
+    public async Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber, CancellationToken cancellationToken = default)
     {
+        var pendingPdf = await _pdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
+        if (pendingPdf is { Length: > 0 })
+            return pendingPdf;
+
         if (IsDatabaseAvailable())
         {
-            try { return await _sqlService.GetQuotePdfContentAsync(quoteNumber); }
+            try { return await _sqlService.GetQuotePdfContentAsync(quoteNumber, cancellationToken); }
             catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
         }
 
@@ -648,13 +680,13 @@ public class FallbackDataService : IDataService
         return [];
     }
 
-    public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync()
+    public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default)
     {
         if (IsDatabaseAvailable())
         {
             try
             {
-                return await _sqlService.GetQuoteMetadataAsync();
+                return await _sqlService.GetQuoteMetadataAsync(cancellationToken);
             }
             catch( Exception ex)
             {
@@ -678,13 +710,15 @@ public class FallbackDataService : IDataService
                 StringComparer.OrdinalIgnoreCase);
     }
     
-    public async Task<List<QuoteHistoryEntry>> GetQuotesByNumbersAsync(IEnumerable<string> quoteNumbers)
+    public async Task<List<QuoteHistoryEntry>> GetQuotesByNumbersAsync(
+        IEnumerable<string> quoteNumbers,
+        CancellationToken cancellationToken = default)
     {
         if (IsDatabaseAvailable())
         {
             try
             {
-                return await _sqlService.GetQuotesByNumbersAsync(quoteNumbers);
+                return await _sqlService.GetQuotesByNumbersAsync(quoteNumbers, cancellationToken);
             }
             catch( Exception ex)
             {

@@ -104,7 +104,7 @@ public partial class HistoryWindow : Window
         // Previeni ricerche multiple simultanee
         if (_isLoadingHistory)
         {
-            Debug.WriteLine("[ExecuteSearch] Ricerca giÃ  in corso, ignorata");
+            Debug.WriteLine("[ExecuteSearch] Ricerca gia' in corso, ignorata");
             return;
         }
 
@@ -225,7 +225,7 @@ public partial class HistoryWindow : Window
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[RunSearch] Task cancellato o timeout");
-            MessageBox.Show("La ricerca Ã¨ stata annullata o ha superato il tempo limite (30 secondi).",
+            MessageBox.Show("La ricerca e' stata annullata o ha superato il tempo limite (30 secondi).",
                 "Ricerca Interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -348,7 +348,7 @@ public partial class HistoryWindow : Window
             fullEntry.Status = newStatus;
             summary.Status = newStatus;
 
-            // Salva SOLO i metadati â€” svuota i byte per evitare crash JSON su file grandi
+            // Salva solo i metadati: svuota i byte per evitare crash JSON su file grandi.
             if (fullEntry.PdfFile != null)
                 fullEntry.PdfFile.Content = [];
             foreach (var att in fullEntry.Attachments)
@@ -377,7 +377,7 @@ public partial class HistoryWindow : Window
         var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
         if (fullEntry == null) return;
 
-        if (MessageBox.Show($"Sei sicuro di voler eliminare definitivamente il preventivo n. {entry.QuoteNumber}?\n\nQuesta operazione cancellerÃ  anche il file PDF.", 
+        if (MessageBox.Show($"Sei sicuro di voler eliminare definitivamente il preventivo n. {entry.QuoteNumber}?\n\nQuesta operazione cancellera' anche il file PDF.",
                 "Conferma Eliminazione", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 

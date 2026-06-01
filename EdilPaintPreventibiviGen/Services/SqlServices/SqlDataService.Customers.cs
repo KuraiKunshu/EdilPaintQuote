@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace EdilPaintPreventibiviGen.Services;
 public partial class SqlDataService
 {
-    public async Task<List<Customer>> GetCustomersAsync()
+    public async Task<List<Customer>> GetCustomersAsync(CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -17,17 +17,19 @@ public partial class SqlDataService
             .AsNoTracking()
             .OrderBy(x => x.BusinessName)
             .Select(x => x.ToModel())
-            .ToListAsync()
+            .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
 
-    public async Task<Customer> AddCustomerAsync(Customer customer)
+    public async Task<Customer> AddCustomerAsync(
+        Customer customer,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
-        // Controlla se esiste giÃ  un cliente con lo stesso nome (evita duplicati)
+        // Controlla se esiste gia' un cliente con lo stesso nome.
         var existing = await db.Customers
-            .FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName);
+            .FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName, cancellationToken);
 
         if (existing != null)
         {
@@ -38,14 +40,14 @@ public partial class SqlDataService
             existing.MaterialDiscount = customer.MaterialDiscount;
             existing.LaborDiscount = customer.LaborDiscount;
             existing.LastModifiedUtc = customer.LastModifiedUtc;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
             return existing.ToModel();
         }
 
         // Nuovo cliente
         var entity = customer.ToEntity();
         db.Customers.Add(entity);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return entity.ToModel();
     }
 

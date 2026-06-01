@@ -8,6 +8,7 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
+        Icon="pack://application:,,,/Assets/Windowsicon/main.ico"
         Title="Caricamento">
 
     <Grid Margin="18" Background="Transparent">

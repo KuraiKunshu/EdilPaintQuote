@@ -13,14 +13,12 @@ public class StoragePathService
     public static StoragePathService Instance => _instance
         ?? throw new InvalidOperationException("StoragePathService non è stato ancora inizializzato. Chiama Initialize() prima.");
 
-    private readonly string _pdfRootPath;
     private readonly PdfStorageSettingsModel _pdfStorage;
     #endregion
 
     #region Constructor
     private StoragePathService(AppSettingsService appSettings)
     {
-        _pdfRootPath = appSettings.PdfStorage.RootPath;
         _pdfStorage = appSettings.PdfStorage;
     }
 
@@ -38,10 +36,10 @@ public class StoragePathService
     #region Public Path Methods
     public string GetPdfRootPath()
     {
-        if (string.IsNullOrWhiteSpace(_pdfRootPath))
+        if (string.IsNullOrWhiteSpace(_pdfStorage.RootPath))
             throw new InvalidOperationException("PdfStorage:RootPath non configurato in appsettings.json.");
 
-        return _pdfRootPath;
+        return _pdfStorage.RootPath;
     }
 
     public string GetHistoryFolder()

@@ -83,9 +83,13 @@ public partial class MainViewModel
         return [];
     }
 
-    private async Task<bool> SaveToHistoryAsync(string pdfPath, bool isNewEntry = false, DateTime? quoteDate = null)
+    private async Task<bool> SaveToHistoryAsync(
+        string pdfPath,
+        bool isNewEntry = false,
+        DateTime? quoteDate = null,
+        string? pdfContentPath = null)
     {
-        byte[] pdfBytes = await ReadPdfBytesWithRetryAsync(pdfPath);
+        byte[] pdfBytes = await ReadPdfBytesWithRetryAsync(pdfContentPath ?? pdfPath);
 
         var entry = new QuoteHistoryEntry
         {
@@ -199,7 +203,7 @@ public partial class MainViewModel
 
         if (_isSavingQuoteHistory)
         {
-            Debug.WriteLine("[SAVE HISTORY] Salvataggio giÃ  in corso dopo attesa, skip.");
+            Debug.WriteLine("[SAVE HISTORY] Salvataggio gia' in corso dopo attesa, skip.");
             return false;
         }
 

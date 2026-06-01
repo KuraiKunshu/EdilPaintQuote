@@ -141,6 +141,7 @@ public static class EntityModelMapper
             PartnerCosts = costAlloc?.PartnerCosts ?? new(),
             AdditionalCosts = costAlloc?.AdditionalCosts ?? new(),
             Materials = entity.Materials
+                .OrderBy(m => m.SortOrder)
                 .Select(m => new Item
                 {
                     Name = m.Name,
@@ -148,10 +149,12 @@ public static class EntityModelMapper
                     UnitPrice = m.UnitPrice,
                     Quantity = m.Quantity,
                     Discount = m.Discount,
-                    IsSignificant = m.IsSignificant
+                    IsSignificant = m.IsSignificant,
+                    SortOrder = m.SortOrder
                 })
                 .ToList(),
             Labors = entity.Labors
+                .OrderBy(l => l.SortOrder)
                 .Select(l => new Item
                 {
                     Name = l.Name,
@@ -159,7 +162,8 @@ public static class EntityModelMapper
                     UnitPrice = l.UnitPrice,
                     Quantity = l.Quantity,
                     Discount = l.Discount,
-                    IsSignificant = l.IsSignificant
+                    IsSignificant = l.IsSignificant,
+                    SortOrder = l.SortOrder
                 })
                 .ToList()
         };
