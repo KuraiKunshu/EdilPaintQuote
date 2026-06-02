@@ -34,7 +34,7 @@ public partial class MainViewModel
     {
         try
         {
-            await _dataService.DeleteCustomerAsync(customer.BusinessName);
+            await _dataService.DeleteCustomerAsync(customer);
             AllCustomers.Remove(customer);
             _allCustomers.Remove(customer);
             ApplyCustomerFilter(_customerSearchText);

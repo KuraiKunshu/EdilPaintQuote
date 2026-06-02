@@ -76,6 +76,25 @@ public partial class SqlDataService
     END
     """, cancellationToken);
 
+        await db.Database.ExecuteSqlRawAsync("""
+    IF OBJECT_ID(N'[dbo].[QuoteCostsPdfFiles]', N'U') IS NULL
+    BEGIN
+        CREATE TABLE [dbo].[QuoteCostsPdfFiles]
+        (
+            [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            [QuoteId] INT NOT NULL,
+            [FileName] NVARCHAR(500) NOT NULL,
+            [ContentType] NVARCHAR(200) NOT NULL,
+            [Content] VARBINARY(MAX) NOT NULL,
+            [ImportedAt] DATETIME2 NOT NULL,
+            CONSTRAINT [FK_QuoteCostsPdfFiles_Quotes_QuoteId]
+                FOREIGN KEY ([QuoteId]) REFERENCES [dbo].[Quotes]([Id]) ON DELETE CASCADE,
+            CONSTRAINT [AK_QuoteCostsPdfFiles_QuoteId] UNIQUE ([QuoteId])
+        );
+        CREATE INDEX [IX_QuoteCostsPdfFiles_QuoteId] ON [dbo].[QuoteCostsPdfFiles]([QuoteId]);
+    END
+    """, cancellationToken);
+
         // --- NUOVO: aggiunge LastModifiedUtc alla tabella Quotes se non esiste ---
         await db.Database.ExecuteSqlRawAsync("""
     IF NOT EXISTS (
@@ -110,6 +129,37 @@ public partial class SqlDataService
      BEGIN
          ALTER TABLE [dbo].[Customers] 
          ADD [LastModifiedUtc] DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z';
+     END
+     """, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("""
+     IF NOT EXISTS (
+         SELECT 1 FROM sys.columns
+         WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
+           AND name = 'SyncId'
+     )
+     BEGIN
+         ALTER TABLE [dbo].[Customers] ADD [SyncId] UNIQUEIDENTIFIER NULL;
+         UPDATE [dbo].[Customers] SET [SyncId] = NEWID() WHERE [SyncId] IS NULL;
+         ALTER TABLE [dbo].[Customers] ALTER COLUMN [SyncId] UNIQUEIDENTIFIER NOT NULL;
+     END
+
+     IF NOT EXISTS (
+         SELECT 1 FROM sys.indexes
+         WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
+           AND name = 'IX_Customers_SyncId'
+     )
+     BEGIN
+         CREATE UNIQUE INDEX [IX_Customers_SyncId] ON [dbo].[Customers]([SyncId]);
+     END
+     """, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("""
+     IF NOT EXISTS (
+         SELECT 1 FROM sys.columns
+         WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
+           AND name = 'IsDeleted'
+     )
+     BEGIN
+         ALTER TABLE [dbo].[Customers] ADD [IsDeleted] BIT NOT NULL DEFAULT 0;
      END
      """, cancellationToken);
         await db.Database.ExecuteSqlRawAsync("""
@@ -165,6 +215,16 @@ public partial class SqlDataService
                                              )
                                              BEGIN
                                                  ALTER TABLE [dbo].[Quotes] ADD [CostAllocationsJson] NVARCHAR(MAX) NOT NULL DEFAULT '';
+                                             END
+                                             """, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("""
+                                             IF NOT EXISTS (
+                                                 SELECT 1 FROM sys.columns
+                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]')
+                                                   AND name = 'IsDeleted'
+                                             )
+                                             BEGIN
+                                                 ALTER TABLE [dbo].[Quotes] ADD [IsDeleted] BIT NOT NULL DEFAULT 0;
                                              END
                                              """, cancellationToken);
     }

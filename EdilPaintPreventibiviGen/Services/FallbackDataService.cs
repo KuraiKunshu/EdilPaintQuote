@@ -15,6 +15,10 @@ public class FallbackDataService : IDataService
     private readonly SqlDataService _sqlService;
     private readonly LocalJsonStoreService _localStore;
     private readonly LocalPdfOutboxService _pdfOutbox;
+    private readonly LocalAttachmentOutboxService _attachmentOutbox;
+    private readonly LocalCostsPdfOutboxService _costsPdfOutbox;
+    private readonly LocalQuotePatchOutboxService _quotePatchOutbox;
+    private readonly LocalDeletionOutboxService _deletionOutbox;
     private bool _isDatabaseAvailable = true;
     private DateTime _databaseUnavailableSince = DateTime.MinValue;
     private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromMinutes(2);
@@ -34,11 +38,19 @@ public class FallbackDataService : IDataService
     public FallbackDataService(
         SqlDataService sqlService,
         LocalJsonStoreService localStore,
-        LocalPdfOutboxService pdfOutbox)
+        LocalPdfOutboxService pdfOutbox,
+        LocalAttachmentOutboxService attachmentOutbox,
+        LocalCostsPdfOutboxService costsPdfOutbox,
+        LocalQuotePatchOutboxService quotePatchOutbox,
+        LocalDeletionOutboxService deletionOutbox)
     {
         _sqlService = sqlService;
         _localStore = localStore;
         _pdfOutbox = pdfOutbox;
+        _attachmentOutbox = attachmentOutbox;
+        _costsPdfOutbox = costsPdfOutbox;
+        _quotePatchOutbox = quotePatchOutbox;
+        _deletionOutbox = deletionOutbox;
     }
 
     public bool CanSynchronize => IsDatabaseAvailable();
@@ -355,7 +367,19 @@ public class FallbackDataService : IDataService
             try { return await _sqlService.GetQuoteByNumberAsync(quoteNumber); }
             catch(Exception ex) { SetDatabaseUnavailable(ex.Message); }
         }
-        return await _localStore.GetQuoteByNumberAsync(quoteNumber);
+
+        var localQuote = await _localStore.GetQuoteByNumberAsync(quoteNumber);
+        if (localQuote == null)
+            return null;
+
+        var pendingAttachments = await _attachmentOutbox.TryReadAsync(quoteNumber);
+        if (pendingAttachments != null)
+        {
+            localQuote.Attachments = pendingAttachments;
+            localQuote.HasCompleteAttachmentSnapshot = true;
+        }
+
+        return localQuote;
     }
     
     /// <summary>
@@ -381,6 +405,7 @@ public class FallbackDataService : IDataService
             Total = entry.Total,
             Status = entry.Status,
             LastModifiedUtc = entry.LastModifiedUtc,
+            BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,
@@ -412,6 +437,9 @@ public class FallbackDataService : IDataService
 
         if (quote.PdfFile?.Content is { Length: > 0 } pdfBytes)
             await _pdfOutbox.StoreAsync(quote.QuoteNumber, pdfBytes, cancellationToken);
+
+        if (quote.HasCompleteAttachmentSnapshot)
+            await _attachmentOutbox.StoreAsync(quote.QuoteNumber, quote.Attachments, cancellationToken);
         
         var lightEntry = CreateLightEntry(quote);
         lightEntry.SyncHash = QuoteSyncHashService.Compute(lightEntry);
@@ -424,7 +452,31 @@ public class FallbackDataService : IDataService
             try
             {
                 await _sqlService.SaveQuoteAsync(quote, cancellationToken);
+                await _localStore.SaveOrUpdateQuoteAsync(CreateLightEntry(quote));
                 await _pdfOutbox.RemoveAsync(quote.QuoteNumber);
+                if (quote.HasCompleteAttachmentSnapshot)
+                    await _attachmentOutbox.RemoveAsync(quote.QuoteNumber);
+
+                var pendingCostsPdf = await _costsPdfOutbox.TryReadAsync(quote.QuoteNumber, cancellationToken);
+                if (pendingCostsPdf != null &&
+                    await _sqlService.SaveQuoteCostsPdfAsync(quote.QuoteNumber, pendingCostsPdf, cancellationToken))
+                {
+                    await _costsPdfOutbox.RemoveAsync(quote.QuoteNumber);
+                }
+            }
+            catch (QuoteConflictException)
+            {
+                await _localStore.ArchiveQuoteConflictAsync(
+                    quote,
+                    "Salvataggio completo rifiutato: il database contiene una versione piu' recente.",
+                    cancellationToken);
+                var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quote.QuoteNumber);
+                if (databaseVersion != null)
+                    await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+
+                await _pdfOutbox.RemoveAsync(quote.QuoteNumber);
+                await _attachmentOutbox.RemoveAsync(quote.QuoteNumber);
+                throw;
             }
             catch (OperationCanceledException)
             {
@@ -443,17 +495,74 @@ public class FallbackDataService : IDataService
 
     public async Task DeleteQuoteAsync(string quoteNumber)
     {
+        await _deletionOutbox.AddQuoteAsync(quoteNumber);
         await _localStore.DeleteQuoteAsync(quoteNumber);
         await _pdfOutbox.RemoveAsync(quoteNumber);
+        await _attachmentOutbox.RemoveAsync(quoteNumber);
+        await _costsPdfOutbox.RemoveAsync(quoteNumber);
 
         if (IsDatabaseAvailable())
         {
-            try { await _sqlService.DeleteQuoteAsync(quoteNumber); }
+            try
+            {
+                await _sqlService.DeleteQuoteAsync(quoteNumber);
+                await _deletionOutbox.RemoveQuoteAsync(quoteNumber);
+            }
             catch(Exception ex) { SetDatabaseUnavailable(ex.Message); }
         }
 
         // Invalida le cache dopo ogni eliminazione
         InvalidateQuoteNumbersCaches();
+    }
+
+    public async Task UpdateQuoteNotesAsync(
+        string quoteNumber,
+        string notes,
+        CancellationToken cancellationToken = default)
+    {
+        await _quotePatchOutbox.StoreNotesAsync(quoteNumber, notes, cancellationToken);
+        await _localStore.UpdateQuoteNotesAsync(quoteNumber, notes);
+
+        if (!IsDatabaseAvailable())
+            return;
+
+        try
+        {
+            await _sqlService.UpdateQuoteNotesAsync(quoteNumber, notes, cancellationToken);
+            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
+            if (databaseVersion != null)
+                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+            await _quotePatchOutbox.RemoveAsync(quoteNumber);
+        }
+        catch (Exception ex)
+        {
+            SetDatabaseUnavailable(ex.Message);
+        }
+    }
+
+    public async Task UpdateQuoteStatusAsync(
+        string quoteNumber,
+        QuoteStatus status,
+        CancellationToken cancellationToken = default)
+    {
+        await _quotePatchOutbox.StoreStatusAsync(quoteNumber, status, cancellationToken);
+        await _localStore.UpdateQuoteStatusAsync(quoteNumber, status);
+
+        if (!IsDatabaseAvailable())
+            return;
+
+        try
+        {
+            await _sqlService.UpdateQuoteStatusAsync(quoteNumber, status, cancellationToken);
+            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
+            if (databaseVersion != null)
+                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+            await _quotePatchOutbox.RemoveAsync(quoteNumber);
+        }
+        catch (Exception ex)
+        {
+            SetDatabaseUnavailable(ex.Message);
+        }
     }
 
     public async Task<HashSet<string>> GetAllQuoteNumbersAsync()
@@ -483,6 +592,9 @@ public class FallbackDataService : IDataService
 
     public async Task<Customer> AddCustomerAsync(Customer customer, CancellationToken cancellationToken = default)
     {
+        if (customer.SyncId == Guid.Empty)
+            customer.SyncId = Guid.NewGuid();
+
         customer.LastModifiedUtc = DateTime.UtcNow;
         await _localStore.SaveOrUpdateCustomerAsync(customer);
 
@@ -525,13 +637,18 @@ public class FallbackDataService : IDataService
         return customer;
     }
     
-    public async Task DeleteCustomerAsync(string businessName)
+    public async Task DeleteCustomerAsync(Customer customer)
     {
-        await _localStore.DeleteCustomerAsync(businessName);
+        await _deletionOutbox.AddCustomerAsync(customer.SyncId, customer.BusinessName);
+        await _localStore.DeleteCustomerAsync(customer);
 
         if (IsDatabaseAvailable())
         {
-            try { await _sqlService.DeleteCustomerAsync(businessName); }
+            try
+            {
+                await _sqlService.DeleteCustomerAsync(customer.SyncId, customer.BusinessName);
+                await _deletionOutbox.RemoveCustomerAsync(customer.SyncId, customer.BusinessName);
+            }
             catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
         }
     }
@@ -671,6 +788,10 @@ public class FallbackDataService : IDataService
 
     public async Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber)
     {
+        var pendingAttachments = await _attachmentOutbox.TryReadAsync(quoteNumber);
+        if (pendingAttachments != null)
+            return pendingAttachments;
+
         if (IsDatabaseAvailable())
         {
             try { return await _sqlService.GetQuoteAttachmentsAsync(quoteNumber); }
@@ -678,6 +799,52 @@ public class FallbackDataService : IDataService
         }
 
         return [];
+    }
+
+    public async Task<bool> SaveQuoteCostsPdfAsync(
+        string quoteNumber,
+        StoredFile file,
+        CancellationToken cancellationToken = default)
+    {
+        await _costsPdfOutbox.StoreAsync(quoteNumber, file, cancellationToken);
+
+        if (!IsDatabaseAvailable())
+            return false;
+
+        try
+        {
+            bool saved = await _sqlService.SaveQuoteCostsPdfAsync(quoteNumber, file, cancellationToken);
+            if (saved)
+                await _costsPdfOutbox.RemoveAsync(quoteNumber);
+
+            return saved;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            SetDatabaseUnavailable(ex.Message);
+            return false;
+        }
+    }
+
+    public async Task<byte[]?> GetQuoteCostsPdfContentAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var pendingFile = await _costsPdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
+        if (pendingFile?.Content is { Length: > 0 })
+            return pendingFile.Content;
+
+        if (IsDatabaseAvailable())
+        {
+            try { return await _sqlService.GetQuoteCostsPdfContentAsync(quoteNumber, cancellationToken); }
+            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+        }
+
+        return null;
     }
 
     public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default)

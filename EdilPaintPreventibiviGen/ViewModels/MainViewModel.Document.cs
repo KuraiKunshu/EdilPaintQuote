@@ -11,7 +11,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
-using System.Windows.Media;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 using EdilPaintPreventibiviGen.Views;
@@ -36,6 +35,9 @@ public partial class MainViewModel
         _partnerCompanyName = string.Empty;
 
         _isEditingExistingQuote = false;
+        _hasPersistedCurrentQuote = false;
+        _loadedQuoteDate = null;
+        _loadedQuoteBaseVersionUtc = default;
 
         _materialDiscount = 0;
         _laborDiscount = 0;
@@ -63,7 +65,33 @@ public partial class MainViewModel
         {
             // Carica solo i summary (leggeri) invece dell'intero storico
             var summaries = await _dataService.GetQuoteSummariesAsync(int.MaxValue);
-            return summaries.Any(e => !string.IsNullOrWhiteSpace(e.PdfPath) && !File.Exists(e.PdfPath));
+            foreach (var entry in summaries)
+            {
+                bool isOfficialPdfMissing = !File.Exists(_storagePathService.BuildQuotePdfPath(
+                    entry.CustomerName,
+                    entry.QuoteNumber,
+                    entry.Date.DateTime,
+                    string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName));
+
+                if (isOfficialPdfMissing)
+                    return true;
+
+                bool isCostsPdfMissing =
+                    entry.IsJointVenture &&
+                    !File.Exists(_storagePathService.BuildQuoteCostsPdfPath(
+                        entry.CustomerName,
+                        entry.QuoteNumber,
+                        entry.Date.DateTime,
+                        string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName));
+
+                if (isCostsPdfMissing &&
+                    await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber) is { Length: > 0 })
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch (Exception ex)
         {
@@ -93,7 +121,7 @@ public partial class MainViewModel
         }
 
         progress?.Report("Analisi storico: caricamento elenco preventivi...");
-        var historyEntries = await _quoteHistoryService.LoadAsync();
+        var historyEntries = await _dataService.GetQuoteSummariesAsync(int.MaxValue);
 
         int total = historyEntries.Count;
         int current = 0;
@@ -108,7 +136,27 @@ public partial class MainViewModel
                 if (string.IsNullOrWhiteSpace(entry.CustomerName) || !HasMatchingCustomer(entry.CustomerName))
                     continue;
 
-                string restoredPath = await _quoteHistoryService.EnsureOfficialPdfExistsAsync(entry);
+                var lightweightEntry = new QuoteHistoryEntry
+                {
+                    QuoteNumber = entry.QuoteNumber,
+                    Date = entry.Date.DateTime,
+                    CustomerName = entry.CustomerName,
+                    ReferenceName = entry.ReferenceName,
+                    PdfPath = entry.PdfPath,
+                    IsJointVenture = entry.IsJointVenture
+                };
+
+                string expectedPath = _quoteHistoryService.GetExpectedPdfPath(lightweightEntry);
+                string restoredPath = File.Exists(expectedPath)
+                    ? expectedPath
+                    : await _quoteHistoryService.EnsureOfficialPdfExistsAsync(lightweightEntry);
+                if (entry.IsJointVenture)
+                {
+                    string expectedCostsPath = _quoteHistoryService.GetExpectedCostsPdfPath(lightweightEntry);
+                    if (!File.Exists(expectedCostsPath))
+                        await _quoteHistoryService.EnsureCostsPdfExistsAsync(lightweightEntry);
+                }
+
                 if (!string.IsNullOrWhiteSpace(restoredPath) && File.Exists(restoredPath))
                     continue;
 
@@ -189,7 +237,9 @@ public partial class MainViewModel
                 }
             }
 
-            DateTime effectiveDate = specificDate ?? DateTime.Now;
+            DateTime effectiveDate = specificDate
+                ?? (_isEditingExistingQuote ? _loadedQuoteDate : null)
+                ?? DateTime.Now;
 
             string targetPath = !string.IsNullOrWhiteSpace(forceTargetPath)
                 ? forceTargetPath
@@ -225,6 +275,7 @@ public partial class MainViewModel
 
             if (!await SaveToHistoryAsync(targetPath, incrementCounter, effectiveDate, pathToGenerate))
                 return;
+            _hasPersistedCurrentQuote = true;
 
             try { File.Delete(pathToGenerate); }
             catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error deleting temporary PDF: {ex.Message}"); }
@@ -260,7 +311,7 @@ public partial class MainViewModel
         ResetQuote();
 
         SelectedCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.CustomerName);
-        CustomerBorderBrush = _selectedCustomer != null ? Brushes.Green : Brushes.Red;
+        CustomerBorderBrush = GetCustomerSelectionBrush(_selectedCustomer != null);
         OnPropertyChanged(nameof(SelectedCustomer));
 
         if (!string.IsNullOrWhiteSpace(entry.ReferenceName))
@@ -278,6 +329,9 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(LaborDiscount));
 
         _isEditingExistingQuote = isEdit;
+        _hasPersistedCurrentQuote = isEdit;
+        _loadedQuoteDate = entry.Date;
+        _loadedQuoteBaseVersionUtc = entry.BaseVersionUtc;
         if (isEdit)
             QuoteNumber = entry.QuoteNumber;
 
@@ -337,7 +391,9 @@ public partial class MainViewModel
         CalculateTotals();
     }
 
-    public void GenerateCostsPdf()
+    public void GenerateCostsPdf() => _ = GenerateCostsPdfAsync();
+
+    private async Task GenerateCostsPdfAsync()
     {
         if (!IsJointVenture)
         {
@@ -349,27 +405,40 @@ public partial class MainViewModel
             MessageBox.Show("Seleziona un cliente prima di generare il PDF dei costi.", "Avviso", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        if (!_hasPersistedCurrentQuote)
+        {
+            MessageBox.Show(
+                "Genera prima il preventivo ufficiale, cosi' il PDF dei costi viene associato al numero definitivo.",
+                "Preventivo non ancora salvato",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (_isGeneratingCostsPdf)
+            return;
+
+        _isGeneratingCostsPdf = true;
 
         try
         {
-            string basePath = _storagePathService.BuildQuotePdfPath(
+            DateTime effectiveDate = _loadedQuoteDate ?? DateTime.Now;
+            string costsPath = _storagePathService.BuildQuoteCostsPdfPath(
                 SelectedCustomer.BusinessName,
                 QuoteNumber,
-                DateTime.Now,
+                effectiveDate,
                 IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
 
-            string costsPath = Path.Combine(
-                Path.GetDirectoryName(basePath) ?? string.Empty,
-                Path.GetFileNameWithoutExtension(basePath) + "_COSTI.pdf");
-
-            string? folder = Path.GetDirectoryName(costsPath);
-            if (!string.IsNullOrWhiteSpace(folder))
-                Directory.CreateDirectory(folder);
+            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
+            Directory.CreateDirectory(tempRoot);
+            string temporaryPath = Path.Combine(
+                tempRoot,
+                $"{Guid.NewGuid():N}_{Path.GetFileName(costsPath)}");
 
             _pdfService.GenerateCostsPdf(new CostsPdfContext
             {
                 QuoteNumber = QuoteNumber,
-                Date = DateTime.Now,
+                Date = effectiveDate,
                 CustomerName = SelectedCustomer.BusinessName,
                 PartnerCompanyName = PartnerCompanyName,
                 OurCosts = OurCosts.ToList(),
@@ -377,13 +446,54 @@ public partial class MainViewModel
                 AdditionalCosts = AdditionalCosts.ToList(),
                 Imponibile = Imponibile,
                 Total = TotaleGenerale
-            }, _companyData, costsPath);
+            }, _companyData, temporaryPath);
+
+            byte[] pdfBytes = await File.ReadAllBytesAsync(temporaryPath);
+            await _dataService.SaveQuoteCostsPdfAsync(QuoteNumber, new StoredFile
+            {
+                FileName = Path.GetFileName(costsPath),
+                ContentType = "application/pdf",
+                Content = pdfBytes,
+                ImportedAt = DateTime.UtcNow
+            });
+
+            bool copiedToTarget = false;
+            try
+            {
+                string? folder = Path.GetDirectoryName(costsPath);
+                if (!string.IsNullOrWhiteSpace(folder))
+                    Directory.CreateDirectory(folder);
+
+                File.Copy(temporaryPath, costsPath, overwrite: true);
+                copiedToTarget = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GenerateCostsPdf] Copia nella cartella condivisa non riuscita: {ex.Message}");
+            }
+
+            try { File.Delete(temporaryPath); }
+            catch (Exception ex) { Debug.WriteLine($"[GenerateCostsPdf] Eliminazione file temporaneo non riuscita: {ex.Message}"); }
+
+            if (!copiedToTarget)
+            {
+                MessageBox.Show(
+                    "Il PDF dei costi e' al sicuro nel database o nella coda locale. Verra' ripristinato quando la cartella condivisa sara' disponibile.",
+                    "Cartella condivisa non disponibile",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
 
             Process.Start("explorer.exe", $"/select,\"{costsPath}\"");
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Errore generazione PDF costi:\n{ex.Message}", "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _isGeneratingCostsPdf = false;
         }
     }
     #endregion

@@ -13,6 +13,9 @@ public class Customer : INotifyPropertyChanged
 	private double _materialDiscount;
 	private double _laborDiscount;
 
+	[JsonPropertyName("syncId")]
+	public Guid SyncId { get; set; }
+
 	[JsonPropertyName("Ragione Sociale")] 
 	public string BusinessName { get => _businessName; set { _businessName = value; OnPropertyChanged(); OnPropertyChanged(nameof(DisplayName)); } }
 

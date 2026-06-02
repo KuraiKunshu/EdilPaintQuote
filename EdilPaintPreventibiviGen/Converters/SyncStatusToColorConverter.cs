@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 using System.Windows.Data;
-using System.Windows.Media;
+using EdilPaintPreventibiviGen.Helpers;
 using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Converters;
@@ -14,14 +14,14 @@ public class SyncStatusToColorConverter : IValueConverter
 		{
 			return status switch
 			{
-				SyncStatus.LocalOnly => new SolidColorBrush(Colors.Red),
-				SyncStatus.OnlineOnly => new SolidColorBrush(Colors.Orange),
-				SyncStatus.Synced => new SolidColorBrush(Colors.LimeGreen),
-				_ => new SolidColorBrush(Colors.Gray)
+				SyncStatus.LocalOnly => ThemeResources.GetBrush("SyncLocalOnlyBrush"),
+				SyncStatus.OnlineOnly => ThemeResources.GetBrush("SyncOnlineOnlyBrush"),
+				SyncStatus.Synced => ThemeResources.GetBrush("SyncSyncedBrush"),
+				_ => ThemeResources.GetBrush("SyncUnknownBrush")
 			};
 		}
 
-		return new SolidColorBrush(Colors.Gray);
+		return ThemeResources.GetBrush("SyncUnknownBrush");
 	}
 
 	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

@@ -60,6 +60,7 @@ public partial class SqlDataService
                 x.LaborDiscount,
                 x.Total,
                 x.Status,
+                x.LastModifiedUtc,
                 x.IsJointVenture,
                 x.PartnerCompanyName,
                 x.CostAllocationsJson,
@@ -131,6 +132,8 @@ public partial class SqlDataService
                 OurCosts = costs?.OurCosts ?? [],
                 PartnerCosts = costs?.PartnerCosts ?? [],
                 AdditionalCosts = costs?.AdditionalCosts ?? [],
+                LastModifiedUtc = x.LastModifiedUtc,
+                BaseVersionUtc = x.LastModifiedUtc,
                 PdfFile = x.PdfFile,
                 Materials = x.Materials,
                 Labors = x.Labors,
@@ -198,6 +201,7 @@ public partial class SqlDataService
             Total = x.Total,
             Status = x.Status,
             LastModifiedUtc = x.LastModifiedUtc,
+            BaseVersionUtc = x.LastModifiedUtc,
             SyncHash = x.SyncHash,
             IsJointVenture = x.IsJointVenture,
             PartnerCompanyName = x.PartnerCompanyName,
@@ -237,7 +241,8 @@ public partial class SqlDataService
                 ContentType = a.ContentType,
                 Content = a.Content,
                 ImportedAt = a.ImportedAt
-            }).ToList()
+            }).ToList(),
+            HasCompleteAttachmentSnapshot = true
         }).ToList();
     }
 
@@ -288,6 +293,7 @@ public partial class SqlDataService
             PartnerCosts = DeserializeCostAllocations(x.CostAllocationsJson)?.PartnerCosts ?? new(),
             AdditionalCosts = DeserializeCostAllocations(x.CostAllocationsJson)?.AdditionalCosts ?? new(),
             LastModifiedUtc = x.LastModifiedUtc,
+            BaseVersionUtc = x.LastModifiedUtc,
             Total = x.Total,
             Status = x.Status,
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
@@ -323,7 +329,8 @@ public partial class SqlDataService
                 ContentType = a.ContentType,
                 Content = a.Content,
                 ImportedAt = a.ImportedAt
-            }).ToList()
+            }).ToList(),
+            HasCompleteAttachmentSnapshot = true
         }).ToList();
     }
 
@@ -523,6 +530,7 @@ public partial class SqlDataService
             Total = q.Total,
             Status = q.Status,
             LastModifiedUtc = q.LastModifiedUtc,
+            BaseVersionUtc = q.LastModifiedUtc,
             SyncHash = q.SyncHash,
             IsJointVenture = q.IsJointVenture,
             PartnerCompanyName = q.PartnerCompanyName,
@@ -550,7 +558,8 @@ public partial class SqlDataService
             {
                 FileName = a.FileName, ContentType = a.ContentType,
                 Content = a.Content, ImportedAt = a.ImportedAt
-            }).ToList()
+            }).ToList(),
+            HasCompleteAttachmentSnapshot = true
         };
     }
 
@@ -564,10 +573,13 @@ public partial class SqlDataService
             await using var transaction = await db.Database.BeginTransactionAsync();
             try
             {
-                var existing = await db.Quotes.FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber);
+                var existing = await db.Quotes
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber);
                 if (existing != null)
                 {
-                    db.Quotes.Remove(existing);
+                    existing.IsDeleted = true;
+                    existing.LastModifiedUtc = DateTime.UtcNow;
                     await db.SaveChangesAsync();
                 }
                 await transaction.CommitAsync();
@@ -578,6 +590,49 @@ public partial class SqlDataService
                 throw;
             }
         });
+    }
+
+    public async Task<List<string>> GetDeletedQuoteNumbersAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+        return await db.Quotes
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x => x.IsDeleted)
+            .Select(x => x.QuoteNumber)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task UpdateQuoteNotesAsync(
+        string quoteNumber,
+        string notes,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Notes = notes, cancellationToken);
+
+    public Task UpdateQuoteStatusAsync(
+        string quoteNumber,
+        QuoteStatus status,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Status = status, cancellationToken);
+
+    private async Task UpdateQuoteMetadataAsync(
+        string quoteNumber,
+        Action<QuoteEntity> update,
+        CancellationToken cancellationToken)
+    {
+        await using var db = AppDbContextFactory.Create();
+        var quote = await db.Quotes
+            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
+        if (quote == null)
+            throw new InvalidOperationException($"Preventivo {quoteNumber} non trovato.");
+
+        update(quote);
+        quote.LastModifiedUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        var snapshot = (await GetQuoteSyncSnapshotsAsync([quoteNumber], cancellationToken)).Single();
+        quote.SyncHash = QuoteSyncHashService.Compute(snapshot);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static QuoteHistoryEntry CreateLightEntry(QuoteHistoryEntry entry)
@@ -598,6 +653,7 @@ public partial class SqlDataService
             Total = entry.Total,
             Status = entry.Status,
             LastModifiedUtc = entry.LastModifiedUtc,
+            BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,
@@ -655,6 +711,7 @@ public partial class SqlDataService
                 }
 
                 var existing = await db.Quotes
+                    .IgnoreQueryFilters()
                     .Include(x => x.Materials)
                     .Include(x => x.Labors)
                     .Include(x => x.PdfFile)
@@ -663,6 +720,16 @@ public partial class SqlDataService
 
                 if (existing != null)
                 {
+                    if (existing.IsDeleted)
+                        throw new QuoteConflictException(quote.QuoteNumber);
+
+                    if (quote.BaseVersionUtc != default &&
+                        existing.LastModifiedUtc > quote.BaseVersionUtc.AddMilliseconds(1))
+                    {
+                        throw new QuoteConflictException(quote.QuoteNumber);
+                    }
+
+                    DateTime savedAtUtc = DateTime.UtcNow;
                     existing.Date = quote.Date;
                     existing.CustomerId = customer?.Id;
                     existing.ReferenceCustomerId = referenceCustomer?.Id;
@@ -675,7 +742,7 @@ public partial class SqlDataService
                     existing.LaborDiscount = quote.LaborDiscount;
                     existing.Total = quote.Total;
                     existing.Status = quote.Status;
-                    existing.LastModifiedUtc = quote.LastModifiedUtc;
+                    existing.LastModifiedUtc = savedAtUtc;
                     existing.SyncHash = quote.SyncHash;
                     
                     existing.IsJointVenture = quote.IsJointVenture;
@@ -739,23 +806,28 @@ public partial class SqlDataService
                         }
                     }
 
-                    bool isFullDocumentSave = hasOfficialPdfPayload;
                     bool hasAttachmentPayload = quote.Attachments.Any(a => a.Content.Length > 0);
 
-                    if (isFullDocumentSave || hasAttachmentPayload)
+                    if (quote.HasCompleteAttachmentSnapshot || hasAttachmentPayload)
                     {
                         db.QuoteAttachments.RemoveRange(existing.Attachments);
-                        existing.Attachments = quote.Attachments.Select(a => new QuoteAttachmentEntity
-                        {
-                            FileName = a.FileName,
-                            ContentType = a.ContentType,
-                            Content = a.Content,
-                            ImportedAt = a.ImportedAt
-                        }).ToList();
+                        existing.Attachments = quote.Attachments
+                            .Where(a => a.Content.Length > 0)
+                            .Select(a => new QuoteAttachmentEntity
+                            {
+                                FileName = a.FileName,
+                                ContentType = a.ContentType,
+                                Content = a.Content,
+                                ImportedAt = a.ImportedAt
+                            }).ToList();
                     }
+
+                    quote.LastModifiedUtc = savedAtUtc;
+                    quote.BaseVersionUtc = savedAtUtc;
                 }
                 else
                 {
+                    DateTime savedAtUtc = DateTime.UtcNow;
                     // Nuovo record
                     var entity = new QuoteEntity
                     {
@@ -772,7 +844,7 @@ public partial class SqlDataService
                         MaterialDiscount = quote.MaterialDiscount,
                         LaborDiscount = quote.LaborDiscount,
                         Status = quote.Status,
-                        LastModifiedUtc = quote.LastModifiedUtc,
+                        LastModifiedUtc = savedAtUtc,
                         SyncHash = quote.SyncHash,
                         IsJointVenture = quote.IsJointVenture,
                         PartnerCompanyName = quote.PartnerCompanyName,
@@ -825,6 +897,8 @@ public partial class SqlDataService
                     };
 
                     db.Quotes.Add(entity);
+                    quote.LastModifiedUtc = savedAtUtc;
+                    quote.BaseVersionUtc = savedAtUtc;
                 }
 
                 await db.SaveChangesAsync(cancellationToken);
@@ -867,6 +941,77 @@ public partial class SqlDataService
                 ImportedAt = x.ImportedAt
             })
             .ToListAsync();
+    }
+
+    public async Task<bool> SaveQuoteAttachmentsAsync(
+        string quoteNumber,
+        IEnumerable<StoredFile> attachments,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+        var quote = await db.Quotes
+            .Include(x => x.Attachments)
+            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
+
+        if (quote == null)
+            return false;
+
+        db.QuoteAttachments.RemoveRange(quote.Attachments);
+        quote.Attachments = attachments
+            .Where(file => file.Content.Length > 0)
+            .Select(file => new QuoteAttachmentEntity
+            {
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Content = file.Content,
+                ImportedAt = file.ImportedAt
+            }).ToList();
+
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> SaveQuoteCostsPdfAsync(
+        string quoteNumber,
+        StoredFile file,
+        CancellationToken cancellationToken = default)
+    {
+        if (file.Content.Length == 0)
+            return false;
+
+        await using var db = AppDbContextFactory.Create();
+        var quote = await db.Quotes
+            .Include(x => x.CostsPdfFile)
+            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
+
+        if (quote == null)
+            return false;
+
+        if (quote.CostsPdfFile == null)
+        {
+            quote.CostsPdfFile = new QuoteCostsPdfFileEntity();
+        }
+
+        quote.CostsPdfFile.FileName = file.FileName;
+        quote.CostsPdfFile.ContentType = file.ContentType;
+        quote.CostsPdfFile.Content = file.Content;
+        quote.CostsPdfFile.ImportedAt = file.ImportedAt;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<byte[]?> GetQuoteCostsPdfContentAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+
+        return await db.QuoteCostsPdfFiles
+            .AsNoTracking()
+            .Where(x => x.Quote.QuoteNumber == quoteNumber)
+            .Select(x => x.Content)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static CostAllocations? DeserializeCostAllocations(string? json)

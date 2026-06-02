@@ -115,6 +115,9 @@ mono_crash.mem.*
 *.log
 **/appsettings.json
 **/velux_storage.json
+**/*.pfx
+**/Assets/clienti.json
+**/Assets/history.json
 **/*_wpftmp.csproj
 .idea/
 *.sln.DotSettings.user

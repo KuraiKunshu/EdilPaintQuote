@@ -59,9 +59,15 @@ public partial class App : Application
             string localDataPath = LocalApplicationDataService.EnsureDataDirectory(assetsPath);
             var localStore = new LocalJsonStoreService(localDataPath);
             var pdfOutbox = new LocalPdfOutboxService(localDataPath);
+            var attachmentOutbox = new LocalAttachmentOutboxService(localDataPath);
+            var costsPdfOutbox = new LocalCostsPdfOutboxService(localDataPath);
+            var quotePatchOutbox = new LocalQuotePatchOutboxService(localDataPath);
+            var deletionOutbox = new LocalDeletionOutboxService(localDataPath);
 
-            DataService = new FallbackDataService(sqlService, localStore, pdfOutbox);
-            SyncService = new SyncService(DataService, sqlService, localStore, pdfOutbox);
+            DataService = new FallbackDataService(
+                sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
+            SyncService = new SyncService(
+                DataService, sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
 
             var loadingWindow = new LoadingWindow
             {

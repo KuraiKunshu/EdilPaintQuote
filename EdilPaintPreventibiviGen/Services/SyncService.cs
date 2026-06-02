@@ -16,6 +16,10 @@ public class SyncService
     private readonly LocalJsonStoreService _localStore;
     private readonly SqlDataService _sqlService;
     private readonly LocalPdfOutboxService _pdfOutbox;
+    private readonly LocalAttachmentOutboxService _attachmentOutbox;
+    private readonly LocalCostsPdfOutboxService _costsPdfOutbox;
+    private readonly LocalQuotePatchOutboxService _quotePatchOutbox;
+    private readonly LocalDeletionOutboxService _deletionOutbox;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
     private DateTime _lastSyncTime = DateTime.MinValue;
 
@@ -23,12 +27,20 @@ public class SyncService
         IDataService dataService,
         SqlDataService sqlService,
         LocalJsonStoreService localStore,
-        LocalPdfOutboxService pdfOutbox)
+        LocalPdfOutboxService pdfOutbox,
+        LocalAttachmentOutboxService attachmentOutbox,
+        LocalCostsPdfOutboxService costsPdfOutbox,
+        LocalQuotePatchOutboxService quotePatchOutbox,
+        LocalDeletionOutboxService deletionOutbox)
     {
         _dataService = dataService;
         _sqlService = sqlService;
         _localStore = localStore;
         _pdfOutbox = pdfOutbox;
+        _attachmentOutbox = attachmentOutbox;
+        _costsPdfOutbox = costsPdfOutbox;
+        _quotePatchOutbox = quotePatchOutbox;
+        _deletionOutbox = deletionOutbox;
     }
     
     public async Task<SyncResult> SyncAllAsync(
@@ -63,9 +75,15 @@ public class SyncService
             Debug.WriteLine($"║  SYNC SERVICE - STARTING SYNC (take={take})");
             Debug.WriteLine($"╚══════════════════════════════════════════════════╝");
 
+            await FlushPendingDeletesAsync(cancellationToken);
+            await PropagateDeletedQuotesAsync(cancellationToken);
+            await FlushPendingQuotePatchesAsync(cancellationToken);
+
             var quotesResult = await SyncQuotesAsync(take, cancellationToken);
             result.QuotesSynced = quotesResult.synced;
             result.QuotesConflicts = quotesResult.conflicts;
+
+            await FlushPendingQuoteFilesAsync(cancellationToken);
 
             var customersResult = await SyncCustomersAsync(cancellationToken);
             result.CustomersSynced = customersResult.synced;
@@ -200,6 +218,24 @@ public class SyncService
                         Debug.WriteLine($"[Sync] Quote {key}: contenuto diverso con timestamp ravvicinati ({timeDiff:F1}s). Uso la versione piu' recente.");
 
                     loggedConflicts++;
+
+                    if (jsonQuote.LastModifiedUtc > dbMeta.LastModifiedUtc)
+                    {
+                        var dbVersion = (await _sqlService.GetQuotesByNumbersAsync([key], cancellationToken))
+                            .FirstOrDefault();
+                        if (dbVersion != null)
+                            await _localStore.ArchiveQuoteConflictAsync(
+                                dbVersion,
+                                "Versione SQL archiviata prima di applicare una modifica locale ravvicinata.",
+                                cancellationToken);
+                    }
+                    else
+                    {
+                        await _localStore.ArchiveQuoteConflictAsync(
+                            jsonQuote,
+                            "Versione locale archiviata prima di applicare la versione SQL ravvicinata.",
+                            cancellationToken);
+                    }
                 }
 
                 if (dbMeta.LastModifiedUtc == DateTime.MinValue || jsonQuote.LastModifiedUtc > dbMeta.LastModifiedUtc)
@@ -251,8 +287,16 @@ public class SyncService
                         }
 
                         await _sqlService.SaveQuoteAsync(q, cancellationToken);
+                        await _localStore.BulkUpdateQuotesAsync([q], cancellationToken);
                         if (hasPendingPdf)
                             await _pdfOutbox.RemoveAsync(q.QuoteNumber);
+                    }
+                    catch (QuoteConflictException ex)
+                    {
+                        await _localStore.ArchiveQuoteConflictAsync(q, ex.Message, cancellationToken);
+                        var databaseVersion = await _sqlService.GetQuoteByNumberAsync(q.QuoteNumber);
+                        if (databaseVersion != null)
+                            await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -343,6 +387,110 @@ public class SyncService
         return normalizedKeys;
     }
 
+    private async Task FlushPendingDeletesAsync(CancellationToken cancellationToken)
+    {
+        var pending = await _deletionOutbox.LoadAsync(cancellationToken);
+
+        foreach (var quote in pending.Quotes.ToList())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await _sqlService.DeleteQuoteAsync(quote.QuoteNumber);
+                await _deletionOutbox.RemoveQuoteAsync(quote.QuoteNumber, cancellationToken);
+                Debug.WriteLine($"[Sync] Eliminazione preventivo sincronizzata: {quote.QuoteNumber}.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Sync] Eliminazione preventivo pendente {quote.QuoteNumber}: {ex.Message}");
+            }
+        }
+
+        foreach (var customer in pending.Customers.ToList())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await _sqlService.DeleteCustomerAsync(customer.SyncId, customer.BusinessName);
+                await _deletionOutbox.RemoveCustomerAsync(customer.SyncId, customer.BusinessName, cancellationToken);
+                Debug.WriteLine($"[Sync] Eliminazione cliente sincronizzata: {customer.BusinessName}.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Sync] Eliminazione cliente pendente {customer.BusinessName}: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task FlushPendingQuotePatchesAsync(CancellationToken cancellationToken)
+    {
+        foreach (var patch in await _quotePatchOutbox.LoadAllAsync(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (patch.Notes != null)
+                    await _sqlService.UpdateQuoteNotesAsync(patch.QuoteNumber, patch.Notes, cancellationToken);
+                if (patch.Status.HasValue)
+                    await _sqlService.UpdateQuoteStatusAsync(patch.QuoteNumber, patch.Status.Value, cancellationToken);
+
+                var databaseVersion = await _sqlService.GetQuoteByNumberAsync(patch.QuoteNumber);
+                if (databaseVersion != null)
+                    await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+
+                await _quotePatchOutbox.RemoveAsync(patch.QuoteNumber);
+                Debug.WriteLine($"[Sync] Metadati pendenti sincronizzati per {patch.QuoteNumber}.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Sync] Metadati pendenti non sincronizzati per {patch.QuoteNumber}: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task PropagateDeletedQuotesAsync(CancellationToken cancellationToken)
+    {
+        var deletedQuoteNumbers = await _sqlService.GetDeletedQuoteNumbersAsync(cancellationToken);
+        if (deletedQuoteNumbers.Count == 0)
+            return;
+
+        await _localStore.DeleteQuotesAsync(deletedQuoteNumbers, cancellationToken);
+        foreach (string quoteNumber in deletedQuoteNumbers)
+        {
+            await _pdfOutbox.RemoveAsync(quoteNumber);
+            await _attachmentOutbox.RemoveAsync(quoteNumber);
+            await _costsPdfOutbox.RemoveAsync(quoteNumber);
+            await _quotePatchOutbox.RemoveAsync(quoteNumber);
+        }
+    }
+
+    private async Task FlushPendingQuoteFilesAsync(CancellationToken cancellationToken)
+    {
+        foreach (string quoteNumber in await _attachmentOutbox.GetPendingQuoteNumbersAsync(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var attachments = await _attachmentOutbox.TryReadAsync(quoteNumber, cancellationToken);
+            if (attachments != null &&
+                await _sqlService.SaveQuoteAttachmentsAsync(quoteNumber, attachments, cancellationToken))
+            {
+                await _attachmentOutbox.RemoveAsync(quoteNumber);
+                Debug.WriteLine($"[Sync] Allegati pendenti sincronizzati per {quoteNumber}.");
+            }
+        }
+
+        foreach (string quoteNumber in await _costsPdfOutbox.GetPendingQuoteNumbersAsync(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var costsPdf = await _costsPdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
+            if (costsPdf != null &&
+                await _sqlService.SaveQuoteCostsPdfAsync(quoteNumber, costsPdf, cancellationToken))
+            {
+                await _costsPdfOutbox.RemoveAsync(quoteNumber);
+                Debug.WriteLine($"[Sync] PDF costi pendente sincronizzato per {quoteNumber}.");
+            }
+        }
+    }
+
     private async Task<(int synced, int conflicts)> SyncCustomersAsync(CancellationToken cancellationToken)
     {
         int synced = 0;
@@ -354,18 +502,43 @@ public class SyncService
             Debug.WriteLine("\n[Sync] ═══ CUSTOMERS SYNC START ═══");
 
             var dbCustomers = await _sqlService.GetCustomersAsync(cancellationToken);
+            var deletedDbCustomers = await _sqlService.GetDeletedCustomersAsync(cancellationToken);
             var jsonCustomers = await _localStore.LoadCustomersAsync(cancellationToken);
 
             Debug.WriteLine($"[Sync] 🗄️ DB customers: {dbCustomers.Count}");
             Debug.WriteLine($"[Sync] 📂 JSON customers: {jsonCustomers.Count}");
 
+            var locallyStaleDeletedCustomers = jsonCustomers
+                .Where(local => deletedDbCustomers.Any(deleted =>
+                    (local.SyncId != Guid.Empty && deleted.SyncId == local.SyncId) ||
+                    deleted.BusinessName.Equals(local.BusinessName, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            if (locallyStaleDeletedCustomers.Count > 0)
+            {
+                await _localStore.DeleteCustomersAsync(locallyStaleDeletedCustomers, cancellationToken);
+                jsonCustomers.RemoveAll(local => locallyStaleDeletedCustomers.Any(deleted =>
+                    (local.SyncId != Guid.Empty && local.SyncId == deleted.SyncId) ||
+                    local.BusinessName.Equals(deleted.BusinessName, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            var normalizedCustomers = new List<Customer>();
+            foreach (var local in jsonCustomers.Where(x => x.SyncId == Guid.Empty))
+            {
+                local.SyncId = dbCustomers
+                    .FirstOrDefault(db => db.BusinessName.Equals(local.BusinessName, StringComparison.OrdinalIgnoreCase))
+                    ?.SyncId ?? Guid.NewGuid();
+                normalizedCustomers.Add(local);
+            }
+            if (normalizedCustomers.Count > 0)
+                await _localStore.BulkUpdateCustomersAsync(normalizedCustomers, cancellationToken);
+
             var dbDict = dbCustomers
-                .GroupBy(c => c.BusinessName, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                .GroupBy(c => c.SyncId)
+                .ToDictionary(g => g.Key, g => g.First());
 
             var jsonDict = jsonCustomers
-                .GroupBy(c => c.BusinessName, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                .GroupBy(c => c.SyncId)
+                .ToDictionary(g => g.Key, g => g.First());
 
             var allKeys = dbDict.Keys.Union(jsonDict.Keys).ToList();
 

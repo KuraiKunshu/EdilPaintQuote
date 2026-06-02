@@ -42,6 +42,8 @@ public class QuoteHistoryEntry
 	//------------------
 	public StoredFile? PdfFile { get; set; }
 	public List<StoredFile> Attachments { get; set; } = new();
+	[JsonIgnore]
+	public bool HasCompleteAttachmentSnapshot { get; set; }
 
 	// Metadati di sincronizzazione
 	[JsonPropertyName("lastModifiedUtc")]
@@ -49,4 +51,7 @@ public class QuoteHistoryEntry
 	
 	[JsonPropertyName("syncHash")]
 	public string SyncHash { get; set; } = string.Empty;
+
+	[JsonPropertyName("baseVersionUtc")]
+	public DateTime BaseVersionUtc { get; set; }
 }

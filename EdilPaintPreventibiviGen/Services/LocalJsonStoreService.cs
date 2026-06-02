@@ -18,6 +18,7 @@ public class LocalJsonStoreService
     private readonly string _companyPath;
     private readonly string _laborCatalogPath;
     private readonly string _personalMaterialsPath;
+    private readonly string _conflictsPath;
     private readonly SemaphoreSlim _historySemaphore = new(1, 1);
     private readonly SemaphoreSlim _customersSemaphore = new(1, 1);
     private readonly SemaphoreSlim _companySemaphore = new(1, 1);
@@ -36,8 +37,10 @@ public class LocalJsonStoreService
         _companyPath = Path.Combine(assetsPath, "azienda.json");
         _laborCatalogPath = Path.Combine(assetsPath, "dati_lavori.json");
         _personalMaterialsPath = Path.Combine(assetsPath, "materiali_personali.json");
+        _conflictsPath = Path.Combine(assetsPath, "Conflicts");
 
         Directory.CreateDirectory(assetsPath);
+        Directory.CreateDirectory(_conflictsPath);
     }
 
     #region Company and Catalogs
@@ -50,7 +53,7 @@ public class LocalJsonStoreService
             if (!File.Exists(_companyPath))
                 return null;
 
-            var json = await File.ReadAllTextAsync(_companyPath);
+            var json = await ReadTextWithBackupAsync(_companyPath);
             return JsonSerializer.Deserialize<Company>(json, JsonOptions);
         }
         catch (OperationCanceledException)
@@ -98,7 +101,7 @@ public class LocalJsonStoreService
             if (!File.Exists(_laborCatalogPath))
                 return new List<Item>();
 
-            var json = await File.ReadAllTextAsync(_laborCatalogPath);
+            var json = await ReadTextWithBackupAsync(_laborCatalogPath);
             using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.ValueKind == JsonValueKind.Array)
@@ -167,7 +170,7 @@ public class LocalJsonStoreService
             if (!File.Exists(_personalMaterialsPath))
                 return new List<Item>();
 
-            var json = await File.ReadAllTextAsync(_personalMaterialsPath);
+            var json = await ReadTextWithBackupAsync(_personalMaterialsPath);
             return JsonSerializer.Deserialize<List<Item>>(json, JsonOptions) ?? new List<Item>();
         }
         catch (Exception ex)
@@ -206,7 +209,7 @@ public class LocalJsonStoreService
             if (!File.Exists(_historyPath))
                 return new List<QuoteHistoryEntry>();
 
-            var json = await File.ReadAllTextAsync(_historyPath, cancellationToken);
+            var json = await ReadTextWithBackupAsync(_historyPath, cancellationToken);
             return JsonSerializer.Deserialize<List<QuoteHistoryEntry>>(json, JsonOptions)
                    ?? new List<QuoteHistoryEntry>();
         }
@@ -307,12 +310,77 @@ public class LocalJsonStoreService
         }
     }
 
+    public async Task DeleteQuotesAsync(
+        IEnumerable<string> quoteNumbers,
+        CancellationToken cancellationToken = default)
+    {
+        var numberSet = new HashSet<string>(quoteNumbers, StringComparer.OrdinalIgnoreCase);
+        if (numberSet.Count == 0)
+            return;
+
+        await _historySemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            var history = await LoadHistoryInternalAsync(cancellationToken);
+            if (history.RemoveAll(q => numberSet.Contains(q.QuoteNumber)) > 0)
+                await SaveHistoryInternalAsync(history, cancellationToken);
+        }
+        finally
+        {
+            _historySemaphore.Release();
+        }
+    }
+
+    public Task<QuoteHistoryEntry?> UpdateQuoteNotesAsync(string quoteNumber, string notes) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Notes = notes);
+
+    public Task<QuoteHistoryEntry?> UpdateQuoteStatusAsync(string quoteNumber, QuoteStatus status) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Status = status);
+
+    public async Task ArchiveQuoteConflictAsync(
+        QuoteHistoryEntry entry,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        string safeQuoteNumber = string.Concat(entry.QuoteNumber.Select(c =>
+            Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        string path = Path.Combine(
+            _conflictsPath,
+            $"{DateTime.UtcNow:yyyyMMdd_HHmmssfff}_{safeQuoteNumber}.json");
+        await WriteJsonWithBackupAsync(path, new { Reason = reason, Quote = CreateLocalQuoteEntry(entry) }, cancellationToken);
+    }
+
+    private async Task<QuoteHistoryEntry?> UpdateQuoteMetadataAsync(
+        string quoteNumber,
+        Action<QuoteHistoryEntry> update)
+    {
+        await _historySemaphore.WaitAsync();
+        try
+        {
+            var history = await LoadHistoryInternalAsync();
+            var entry = history.FirstOrDefault(q =>
+                q.QuoteNumber.Equals(quoteNumber, StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+                return null;
+
+            update(entry);
+            entry.LastModifiedUtc = DateTime.UtcNow;
+            entry.SyncHash = ComputeQuoteHash(entry);
+            await SaveHistoryInternalAsync(history);
+            return entry;
+        }
+        finally
+        {
+            _historySemaphore.Release();
+        }
+    }
+
     private async Task<List<QuoteHistoryEntry>> LoadHistoryInternalAsync(CancellationToken cancellationToken = default)
     {
         if (!File.Exists(_historyPath))
             return new List<QuoteHistoryEntry>();
 
-        var json = await File.ReadAllTextAsync(_historyPath, cancellationToken);
+        var json = await ReadTextWithBackupAsync(_historyPath, cancellationToken);
         return JsonSerializer.Deserialize<List<QuoteHistoryEntry>>(json, JsonOptions)
                ?? new List<QuoteHistoryEntry>();
     }
@@ -321,12 +389,8 @@ public class LocalJsonStoreService
         IEnumerable<QuoteHistoryEntry> entries,
         CancellationToken cancellationToken = default)
     {
-        if (File.Exists(_historyPath))
-            File.Copy(_historyPath, _historyPath + ".backup", overwrite: true);
-
         var localEntries = entries.Select(CreateLocalQuoteEntry).ToList();
-        var json = JsonSerializer.Serialize(localEntries, JsonOptions);
-        await File.WriteAllTextAsync(_historyPath, json, cancellationToken);
+        await WriteJsonWithBackupAsync(_historyPath, localEntries, cancellationToken);
     }
     #endregion
 
@@ -337,7 +401,7 @@ public class LocalJsonStoreService
         if (!File.Exists(_customersPath))
             return new List<Customer>();
 
-        var json = await File.ReadAllTextAsync(_customersPath, cancellationToken);
+        var json = await ReadTextWithBackupAsync(_customersPath, cancellationToken);
         using var doc = JsonDocument.Parse(json);
 
         if (!doc.RootElement.TryGetProperty("clienti", out var clientiArray))
@@ -358,7 +422,7 @@ public class LocalJsonStoreService
             if (!File.Exists(_customersPath))
                 return new List<Customer>();
 
-            var json = await File.ReadAllTextAsync(_customersPath, cancellationToken);
+            var json = await ReadTextWithBackupAsync(_customersPath, cancellationToken);
             using var doc = JsonDocument.Parse(json);
 
             if (!doc.RootElement.TryGetProperty("clienti", out var clientiArray))
@@ -392,16 +456,8 @@ public class LocalJsonStoreService
         await _customersSemaphore.WaitAsync();
         try
         {
-            // Backup
-            if (File.Exists(_customersPath))
-            {
-                string backupPath = _customersPath + ".backup";
-                File.Copy(_customersPath, backupPath, overwrite: true);
-            }
-
             var wrapper = new { clienti = customers };
-            var json = JsonSerializer.Serialize(wrapper, JsonOptions);
-            await File.WriteAllTextAsync(_customersPath, json);
+            await WriteJsonWithBackupAsync(_customersPath, wrapper);
         }
         catch (Exception ex)
         {
@@ -418,12 +474,8 @@ public class LocalJsonStoreService
         IEnumerable<Customer> customers,
         CancellationToken cancellationToken = default)
     {
-        if (File.Exists(_customersPath))
-            File.Copy(_customersPath, _customersPath + ".backup", overwrite: true);
-
         var wrapper = new { clienti = customers };
-        var json = JsonSerializer.Serialize(wrapper, JsonOptions);
-        await File.WriteAllTextAsync(_customersPath, json, cancellationToken);
+        await WriteJsonWithBackupAsync(_customersPath, wrapper, cancellationToken);
     }
 
     public async Task SaveOrUpdateCustomerAsync(Customer customer)
@@ -433,8 +485,8 @@ public class LocalJsonStoreService
         {
             // FIX: Usa il metodo INTERNAL che non acquisisce il semaforo
             var customers = await LoadCustomersInternalAsync();
-            var existing = customers.FirstOrDefault(c =>
-                c.BusinessName.Equals(customer.BusinessName, StringComparison.OrdinalIgnoreCase));
+            EnsureCustomerSyncId(customer);
+            var existing = customers.FirstOrDefault(c => SameCustomer(c, customer));
 
             customer.LastModifiedUtc = DateTime.UtcNow;
 
@@ -456,9 +508,10 @@ public class LocalJsonStoreService
         try
         {
             var customers = await LoadCustomersInternalAsync();
+            EnsureCustomerSyncId(customer);
             customers.RemoveAll(c =>
-                c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase) ||
-                c.BusinessName.Equals(customer.BusinessName, StringComparison.OrdinalIgnoreCase));
+                SameCustomer(c, customer) ||
+                c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase));
 
             customer.LastModifiedUtc = DateTime.UtcNow;
             customers.Add(customer);
@@ -479,13 +532,14 @@ public class LocalJsonStoreService
         {
             var existing = await LoadCustomersInternalAsync(cancellationToken);
             var dict = existing
-                .GroupBy(c => c.BusinessName, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(CustomerKey, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
             foreach (var c in customersToAddOrUpdate)
             {
+                EnsureCustomerSyncId(c);
                 c.LastModifiedUtc = c.LastModifiedUtc == default ? DateTime.UtcNow : c.LastModifiedUtc;
-                dict[c.BusinessName] = c;
+                dict[CustomerKey(c)] = c;
             }
 
             await SaveCustomersInternalAsync(dict.Values, cancellationToken);
@@ -497,14 +551,13 @@ public class LocalJsonStoreService
         }
     }
     
-    public async Task DeleteCustomerAsync(string businessName)
+    public async Task DeleteCustomerAsync(Customer customer)
     {
         await _customersSemaphore.WaitAsync();
         try
         {
             var customers = await LoadCustomersInternalAsync();
-            customers.RemoveAll(c =>
-                c.BusinessName.Equals(businessName, StringComparison.OrdinalIgnoreCase));
+            customers.RemoveAll(c => SameCustomer(c, customer));
             await SaveCustomersInternalAsync(customers);
         }
         catch (Exception ex)
@@ -522,14 +575,74 @@ public class LocalJsonStoreService
 
     #region Utilities
 
-    private static async Task WriteJsonWithBackupAsync<T>(string path, T value)
+    private static async Task WriteJsonWithBackupAsync<T>(
+        string path,
+        T value,
+        CancellationToken cancellationToken = default)
     {
+        var json = JsonSerializer.Serialize(value, JsonOptions);
+        string temporaryPath = path + ".tmp";
+        await File.WriteAllTextAsync(temporaryPath, json, cancellationToken);
+
         if (File.Exists(path))
             File.Copy(path, path + ".backup", overwrite: true);
 
-        var json = JsonSerializer.Serialize(value, JsonOptions);
-        await File.WriteAllTextAsync(path, json);
+        File.Move(temporaryPath, path, overwrite: true);
     }
+
+    public async Task DeleteCustomersAsync(
+        IEnumerable<Customer> customersToDelete,
+        CancellationToken cancellationToken = default)
+    {
+        var targets = customersToDelete.ToList();
+        if (targets.Count == 0)
+            return;
+
+        await _customersSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            var customers = await LoadCustomersInternalAsync(cancellationToken);
+            customers.RemoveAll(customer => targets.Any(target => SameCustomer(customer, target)));
+            await SaveCustomersInternalAsync(customers, cancellationToken);
+        }
+        finally
+        {
+            _customersSemaphore.Release();
+        }
+    }
+
+    private static async Task<string> ReadTextWithBackupAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            string json = await File.ReadAllTextAsync(path, cancellationToken);
+            JsonDocument.Parse(json).Dispose();
+            return json;
+        }
+        catch (JsonException) when (File.Exists(path + ".backup"))
+        {
+            string backup = await File.ReadAllTextAsync(path + ".backup", cancellationToken);
+            JsonDocument.Parse(backup).Dispose();
+            File.Copy(path + ".backup", path, overwrite: true);
+            Debug.WriteLine($"[LocalJsonStore] Recuperato backup valido per {Path.GetFileName(path)}.");
+            return backup;
+        }
+    }
+
+    private static void EnsureCustomerSyncId(Customer customer)
+    {
+        if (customer.SyncId == Guid.Empty)
+            customer.SyncId = Guid.NewGuid();
+    }
+
+    private static bool SameCustomer(Customer left, Customer right) =>
+        (left.SyncId != Guid.Empty && right.SyncId != Guid.Empty && left.SyncId == right.SyncId) ||
+        left.BusinessName.Equals(right.BusinessName, StringComparison.OrdinalIgnoreCase);
+
+    private static string CustomerKey(Customer customer) =>
+        customer.SyncId == Guid.Empty ? "name:" + customer.BusinessName : "id:" + customer.SyncId.ToString("N");
 
     private static string GetJsonString(JsonElement element, params string[] propertyNames)
     {
@@ -585,6 +698,7 @@ public class LocalJsonStoreService
             PartnerCosts = entry.PartnerCosts,
             AdditionalCosts = entry.AdditionalCosts,
             LastModifiedUtc = entry.LastModifiedUtc,
+            BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,
             PdfFile = entry.PdfFile == null ? null : new StoredFile
             {

@@ -15,15 +15,15 @@
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
-        Background="Transparent">
+        Background="{StaticResource TransparentBrush}">
 
     <Window.Resources>
         <Style TargetType="TextBox">
             <Setter Property="Height" Value="38"/>
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D0D7DE"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
@@ -31,7 +31,7 @@
         <Style x:Key="HeaderButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="34"/>
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
@@ -46,7 +46,7 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
@@ -61,10 +61,10 @@
             <Setter Property="Margin" Value="3,0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#FFF3F4F6"/>
-            <Setter Property="BorderBrush" Value="#FFD1D5DB"/>
+            <Setter Property="Background" Value="{StaticResource NeutralButtonBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource NeutralButtonBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="#FF1F2937"/>
+            <Setter Property="Foreground" Value="{StaticResource NeutralButtonTextBrush}"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -80,11 +80,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFE5E7EB"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FF9CA3AF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource NeutralButtonHoverBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource NeutralButtonHoverBorderBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFD1D5DB"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource NeutralButtonBorderBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
@@ -96,12 +96,12 @@
         </Style>
 
         <Style x:Key="ModernCustomerGridStyle" TargetType="DataGrid">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D9DEE5"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DataGridBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="#EEF2F6"/>
-            <Setter Property="VerticalGridLinesBrush" Value="Transparent"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource DataGridLineBrush}"/>
+            <Setter Property="VerticalGridLinesBrush" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="RowHeight" Value="46"/>
             <Setter Property="ColumnHeaderHeight" Value="42"/>
@@ -113,18 +113,18 @@
             <Setter Property="SelectionUnit" Value="FullRow"/>
             <Setter Property="IsReadOnly" Value="True"/>
             <Setter Property="RowHeaderWidth" Value="0"/>
-            <Setter Property="AlternatingRowBackground" Value="#FAFBFC"/>
-            <Setter Property="RowBackground" Value="White"/>
+            <Setter Property="AlternatingRowBackground" Value="{StaticResource PanelBackgroundBrush}"/>
+            <Setter Property="RowBackground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#F6F8FA"/>
+            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -133,16 +133,16 @@
         <Style TargetType="DataGridRow">
             <Setter Property="Height" Value="46"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F8FBFF"/>
+                    <Setter Property="Background" Value="{StaticResource SearchResultHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="{StaticResource RowSelectedBrush}"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                    <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -155,17 +155,17 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                    <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
     </Window.Resources>
 
-    <Grid Background="Transparent" Margin="18">
+    <Grid Background="{StaticResource TransparentBrush}" Margin="18">
         <Border Background="{StaticResource RowBackgroundBrush}"
                 CornerRadius="16"
-                BorderBrush="#22000000"
+                BorderBrush="{StaticResource WindowShadowBorderBrush}"
                 BorderThickness="1"
                 SnapsToDevicePixels="True">
             <Border.Effect>
@@ -211,15 +211,15 @@
                 </Grid>
 
                 <!-- DIVIDER -->
-                <Border Grid.Row="1" Background="#18000000"/>
+                <Border Grid.Row="1" Background="{StaticResource WindowDividerShadowBrush}"/>
 
                 <!-- SEARCH -->
                 <Border Grid.Row="2"
                         Margin="22,20,22,14"
-                        Background="#F6F8FA"
+                        Background="{StaticResource SectionPanelBackgroundBrush}"
                         CornerRadius="12"
                         Padding="16"
-                        BorderBrush="#12000000"
+                        BorderBrush="{StaticResource SectionPanelBorderBrush}"
                         BorderThickness="1">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -241,8 +241,8 @@
                 <!-- TABLE -->
                 <Border Grid.Row="3"
                         Margin="22,0,22,18"
-                        Background="White"
-                        BorderBrush="#D9DEE5"
+                        Background="{StaticResource WhiteBrush}"
+                        BorderBrush="{StaticResource DataGridBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="0">
@@ -315,7 +315,7 @@
                                             <Button Content="🗑️"
                                                     Style="{StaticResource EditButtonStyle}"
                                                     Click="OnDeleteCustomerClick"
-                                                    Foreground="#C62828"
+                                                    Foreground="{StaticResource DeleteActionBrush}"
                                                     ToolTip="Elimina cliente"/>
                                         </StackPanel>
                                         

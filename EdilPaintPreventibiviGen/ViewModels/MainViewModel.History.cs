@@ -109,6 +109,7 @@ public partial class MainViewModel
             Total = TotaleGenerale,
             Status = QuoteStatus.Finalizzato,
             LastModifiedUtc = DateTime.UtcNow,
+            BaseVersionUtc = _isEditingExistingQuote ? _loadedQuoteBaseVersionUtc : default,
             IsJointVenture = IsJointVenture,
             PartnerCompanyName = PartnerCompanyName,
             OurCosts = OurCosts.ToList(),
@@ -127,7 +128,8 @@ public partial class MainViewModel
                 ContentType = a.ContentType,
                 Content = a.Content,
                 ImportedAt = DateTime.Now
-            }).ToList()
+            }).ToList(),
+            HasCompleteAttachmentSnapshot = true
         };
 
         if (isNewEntry)
@@ -143,6 +145,7 @@ public partial class MainViewModel
                 entry.Date = existingEntry.Date;
                 entry.Status = existingEntry.Status;
                 entry.Notes = existingEntry.Notes;
+                entry.BaseVersionUtc = existingEntry.BaseVersionUtc;
 
                 existingEntry.CustomerName = entry.CustomerName;
                 existingEntry.ReferenceName = entry.ReferenceName;
@@ -168,24 +171,29 @@ public partial class MainViewModel
             }
             else
             {
-                // Preventivo non in memoria (altro PC): recupera la data originale dal DB
-                return await SaveWithOriginalDateAsync(entry);
+                // Lo storico principale usa summary leggere: recupera dal DB i metadati da preservare.
+                return await SaveWithExistingMetadataAsync(entry);
             }
         }
 
     }
     
-    private async Task<bool> SaveWithOriginalDateAsync(QuoteHistoryEntry entry)
+    private async Task<bool> SaveWithExistingMetadataAsync(QuoteHistoryEntry entry)
     {
         try
         {
             var existing = await _dataService.GetQuoteByNumberAsync(entry.QuoteNumber);
             if (existing != null)
+            {
                 entry.Date = existing.Date;
+                entry.Status = existing.Status;
+                entry.Notes = existing.Notes;
+                entry.BaseVersionUtc = existing.BaseVersionUtc;
+            }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[SaveWithOriginalDate] Errore recupero data originale: {ex.Message}");
+            Debug.WriteLine($"[SaveWithExistingMetadata] Errore recupero metadati originali: {ex.Message}");
         }
 
         History.Insert(0, entry);
@@ -212,6 +220,7 @@ public partial class MainViewModel
         try
         {
             await _dataService.SaveQuoteAsync(entry);
+            RememberPersistedQuote(entry);
             return true;
         }
         catch (System.Text.Json.JsonException jsonEx)
@@ -221,6 +230,7 @@ public partial class MainViewModel
             {
                 var fallback = CloneEntryWithoutPdfBytes(entry);
                 await _dataService.SaveQuoteAsync(fallback);
+                RememberPersistedQuote(fallback);
                 return true;
             }
             catch (Exception retryEx)
@@ -240,6 +250,13 @@ public partial class MainViewModel
         {
             _isSavingQuoteHistory = false;
         }
+    }
+
+    private void RememberPersistedQuote(QuoteHistoryEntry entry)
+    {
+        _isEditingExistingQuote = true;
+        _loadedQuoteDate = entry.Date;
+        _loadedQuoteBaseVersionUtc = entry.BaseVersionUtc;
     }
 
     private static QuoteHistoryEntry CloneEntryWithoutPdfBytes(QuoteHistoryEntry entry)
@@ -262,6 +279,7 @@ public partial class MainViewModel
             Total = entry.Total,
             Status = entry.Status,
             LastModifiedUtc = entry.LastModifiedUtc,
+            BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,

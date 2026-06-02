@@ -159,6 +159,7 @@ public partial class MainViewModel
 
         if (existing != null)
         {
+            updated.SyncId = existing.SyncId;
             existing.BusinessName = updated.BusinessName;
             existing.Address = updated.Address;
             existing.Email = updated.Email;

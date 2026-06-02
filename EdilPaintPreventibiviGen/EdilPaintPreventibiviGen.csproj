@@ -70,10 +70,6 @@
         <Content Include="Assets\azienda.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
-        <None Remove="Assets\clienti.json" />
-        <Content Include="Assets\clienti.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
         <None Remove="Assets\config_fatture.json" />
         <Content Include="Assets\config_fatture.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

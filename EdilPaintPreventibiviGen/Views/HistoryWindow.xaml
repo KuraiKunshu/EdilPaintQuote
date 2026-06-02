@@ -17,7 +17,7 @@
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
-        Background="Transparent">
+        Background="{StaticResource TransparentBrush}">
 
     <Window.Resources>
         <converters:SyncStatusToColorConverter x:Key="SyncStatusToColorConverter"/>
@@ -25,7 +25,7 @@
         <Style x:Key="HeaderButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="34"/>
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
@@ -40,7 +40,7 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
@@ -48,16 +48,16 @@
             <Setter Property="Height" Value="38"/>
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D0D7DE"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
 
         <Style TargetType="ComboBox">
             <Setter Property="Height" Value="38"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D0D7DE"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Padding" Value="6,4"/>
@@ -65,8 +65,8 @@
 
         <Style TargetType="DatePicker">
             <Setter Property="Height" Value="38"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D0D7DE"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
@@ -82,10 +82,10 @@
             <Setter Property="Margin" Value="3,0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#FFF3F4F6"/>
-            <Setter Property="BorderBrush" Value="#FFD1D5DB"/>
+            <Setter Property="Background" Value="{StaticResource NeutralButtonBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource NeutralButtonBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="#FF1F2937"/>
+            <Setter Property="Foreground" Value="{StaticResource NeutralButtonTextBrush}"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -101,11 +101,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFE5E7EB"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FF9CA3AF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource NeutralButtonHoverBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource NeutralButtonHoverBorderBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFD1D5DB"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource NeutralButtonBorderBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
@@ -117,24 +117,24 @@
         </Style>
 
         <Style x:Key="HistoryPdfButtonStyle" TargetType="Button" BasedOn="{StaticResource HistoryIconButtonStyle}">
-            <Setter Property="Background" Value="#FFFEE2E2"/>
-            <Setter Property="BorderBrush" Value="#FFFCA5A5"/>
-            <Setter Property="Foreground" Value="#FFB91C1C"/>
+            <Setter Property="Background" Value="{StaticResource DangerSoftBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DangerSoftBorderBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DangerSoftTextBrush}"/>
         </Style>
 
         <Style x:Key="HistoryDeleteButtonStyle" TargetType="Button" BasedOn="{StaticResource HistoryIconButtonStyle}">
-            <Setter Property="Background" Value="#FFFEE2E2"/>
-            <Setter Property="BorderBrush" Value="#FFFECACA"/>
+            <Setter Property="Background" Value="{StaticResource DangerSoftBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DangerSoftHoverBorderBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DangerRedBrush}"/>
         </Style>
 
         <Style x:Key="ModernHistoryGridStyle" TargetType="DataGrid">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D9DEE5"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DataGridBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="#EEF2F6"/>
-            <Setter Property="VerticalGridLinesBrush" Value="Transparent"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource DataGridLineBrush}"/>
+            <Setter Property="VerticalGridLinesBrush" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="RowHeight" Value="48"/>
             <Setter Property="ColumnHeaderHeight" Value="42"/>
@@ -145,18 +145,18 @@
             <Setter Property="SelectionMode" Value="Single"/>
             <Setter Property="SelectionUnit" Value="FullRow"/>
             <Setter Property="RowHeaderWidth" Value="0"/>
-            <Setter Property="AlternatingRowBackground" Value="#FAFBFC"/>
-            <Setter Property="RowBackground" Value="White"/>
+            <Setter Property="AlternatingRowBackground" Value="{StaticResource PanelBackgroundBrush}"/>
+            <Setter Property="RowBackground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#F6F8FA"/>
+            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -183,7 +183,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
                     <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
                 </Trigger>
             </Style.Triggers>
@@ -204,7 +204,7 @@
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}"/>
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
 
                 <DataTrigger Binding="{Binding Status}" Value="Spedito">
@@ -216,7 +216,7 @@
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="{StaticResource WarningYellowBrush}"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                    <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
                 </MultiDataTrigger>
 
                 <DataTrigger Binding="{Binding Status}" Value="Confermato">
@@ -228,7 +228,7 @@
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="{StaticResource PurpleBrush}"/>
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
 
                 <DataTrigger Binding="{Binding Status}" Value="Finito">
@@ -240,7 +240,7 @@
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="{StaticResource SuccessGreenBrush}"/>
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
 
                 <DataTrigger Binding="{Binding Status}" Value="Rifiutato">
@@ -252,16 +252,16 @@
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="{StaticResource DangerRedBrush}"/>
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
             </Style.Triggers>
         </Style>
     </Window.Resources>
 
-    <Grid Background="Transparent" Margin="18">
+    <Grid Background="{StaticResource TransparentBrush}" Margin="18">
         <Border Background="{StaticResource RowBackgroundBrush}"
                 CornerRadius="16"
-                BorderBrush="#22000000"
+                BorderBrush="{StaticResource WindowShadowBorderBrush}"
                 BorderThickness="1"
                 SnapsToDevicePixels="True">
             <Border.Effect>
@@ -307,15 +307,15 @@
                 </Grid>
 
                 <!-- DIVIDER -->
-                <Border Grid.Row="1" Background="#18000000"/>
+                <Border Grid.Row="1" Background="{StaticResource WindowDividerShadowBrush}"/>
 
                 <!-- FILTERS -->
                 <Border Grid.Row="2"
                         Margin="22,20,22,14"
-                        Background="#F6F8FA"
+                        Background="{StaticResource SectionPanelBackgroundBrush}"
                         CornerRadius="12"
                         Padding="16"
-                        BorderBrush="#12000000"
+                        BorderBrush="{StaticResource SectionPanelBorderBrush}"
                         BorderThickness="1">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -357,7 +357,7 @@
                                         FontSize="16"
                                         Cursor="Hand"
                                         Background="{StaticResource PrimaryBlueBrush}"
-                                        Foreground="White"
+                                        Foreground="{StaticResource WhiteBrush}"
                                         BorderThickness="0"
                                         Click="OnSearchButtonClick"
                                         ToolTip="Cerca (Invio)">
@@ -372,10 +372,10 @@
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="#1565C0"/>
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource CostsOurBrush}"/>
                                                 </Trigger>
                                                 <Trigger Property="IsPressed" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="#0D47A1"/>
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource CostsOurPressedBrush}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -443,8 +443,8 @@
                 <!-- TABLE -->
                 <Border Grid.Row="3"
                         Margin="22,0,22,18"
-                        Background="White"
-                        BorderBrush="#D9DEE5"
+                        Background="{StaticResource WhiteBrush}"
+                        BorderBrush="{StaticResource DataGridBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="0">
@@ -500,7 +500,7 @@
                                                                        VerticalAlignment="Center"
                                                                        FontSize="14"/>
                                                             <Ellipse Width="9" Height="9"
-                                                                     Fill="Red"
+                                                                     Fill="{StaticResource NotificationRedBrush}"
                                                                      HorizontalAlignment="Right"
                                                                      VerticalAlignment="Top"
                                                                      Margin="0,-2,-2,0">
@@ -593,7 +593,7 @@
                                         <ComboBox ItemsSource="{Binding DataContext.StatusOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   SelectedItem="{Binding Status, Mode=TwoWay}"
                                                   SelectionChanged="OnStatusChanged"
-                                                  Background="Transparent"
+                                                  Background="{StaticResource TransparentBrush}"
                                                   BorderThickness="0"
                                                   HorizontalContentAlignment="Center"
                                                   VerticalContentAlignment="Center"/>
@@ -625,7 +625,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
                         <Border x:Name="LoadingOverlay"
-                                Background="#CC000000"
+                                Background="{StaticResource OverlayBackdropBrush}"
                                 Visibility="Collapsed"
                                 CornerRadius="10">
                             <StackPanel HorizontalAlignment="Center" 
@@ -633,11 +633,11 @@
                                 <TextBlock Text="🔄" 
                                            FontSize="48" 
                                            HorizontalAlignment="Center"
-                                           Foreground="White"/>
+                                           Foreground="{StaticResource WhiteBrush}"/>
                                 <TextBlock Text="Caricamento in corso..." 
                                            FontSize="16" 
                                            Margin="0,10,0,0"
-                                           Foreground="White"
+                                           Foreground="{StaticResource WhiteBrush}"
                                            HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>

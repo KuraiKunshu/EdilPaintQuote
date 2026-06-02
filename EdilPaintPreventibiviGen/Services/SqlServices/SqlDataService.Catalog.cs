@@ -23,13 +23,13 @@ public partial class SqlDataService
     public async Task SaveLaborCatalogAsync(IEnumerable<Item> labors)
     {
         await using var db = AppDbContextFactory.Create();
+        await using var transaction = await db.Database.BeginTransactionAsync();
 
         db.LaborCatalog.RemoveRange(db.LaborCatalog);
-        await db.SaveChangesAsync();
-
         var entities = labors.Select(x => x.ToLaborCatalogEntity()).ToList();
         await db.LaborCatalog.AddRangeAsync(entities);
         await db.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 
     public async Task<List<Item>> GetPersonalMaterialsAsync()
@@ -46,13 +46,13 @@ public partial class SqlDataService
     public async Task SavePersonalMaterialsAsync(IEnumerable<Item> materials)
     {
         await using var db = AppDbContextFactory.Create();
+        await using var transaction = await db.Database.BeginTransactionAsync();
 
         db.PersonalMaterials.RemoveRange(db.PersonalMaterials);
-        await db.SaveChangesAsync();
-
         var entities = materials.Select(x => x.ToPersonalMaterialEntity()).ToList();
         await db.PersonalMaterials.AddRangeAsync(entities);
         await db.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 }
 

@@ -315,9 +315,8 @@ public partial class HistoryWindow : Window
 
         if (notesWin.ShowDialog() == true)
         {
-            fullEntry.Notes = notesWin.ResultNotes;
-            await _historyService.SaveSingleAsync(fullEntry);
-            entry.Notes = fullEntry.Notes;
+            await _historyService.UpdateNotesAsync(entry.QuoteNumber, notesWin.ResultNotes);
+            entry.Notes = notesWin.ResultNotes;
         }
     }
 
@@ -342,19 +341,8 @@ public partial class HistoryWindow : Window
             _isSavingStatus = true;
             Mouse.OverrideCursor = Cursors.Wait;
 
-            var fullEntry = await _historyService.GetQuoteByNumberAsync(summary.QuoteNumber);
-            if (fullEntry == null) return;
-
-            fullEntry.Status = newStatus;
             summary.Status = newStatus;
-
-            // Salva solo i metadati: svuota i byte per evitare crash JSON su file grandi.
-            if (fullEntry.PdfFile != null)
-                fullEntry.PdfFile.Content = [];
-            foreach (var att in fullEntry.Attachments)
-                att.Content = [];
-
-            await _historyService.SaveSingleAsync(fullEntry);
+            await _historyService.UpdateStatusAsync(summary.QuoteNumber, newStatus);
         }
         catch (Exception ex)
         {
@@ -470,7 +458,7 @@ public partial class HistoryWindow : Window
         }
     }
     
-    private void OnOpenCustomerFolderClick(object sender, RoutedEventArgs e)
+    private async void OnOpenCustomerFolderClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry)
             return;
@@ -484,6 +472,10 @@ public partial class HistoryWindow : Window
 
         try
         {
+            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+            if (fullEntry != null)
+                await _historyService.EnsureAttachmentsFolderExistsAsync(fullEntry);
+
             string referenceName = string.IsNullOrWhiteSpace(entry.ReferenceName)
                 ? null!
                 : entry.ReferenceName;

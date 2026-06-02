@@ -11,6 +11,7 @@ public static class EntityModelMapper
     {
         return new Customer
         {
+            SyncId = entity.SyncId,
             BusinessName = entity.BusinessName,
             Address = entity.Address,
             Email = entity.Email,
@@ -25,6 +26,7 @@ public static class EntityModelMapper
     {
         return new CustomerEntity
         {
+            SyncId = model.SyncId,
             BusinessName = model.BusinessName,
             Address = model.Address,
             Email = model.Email,
@@ -140,6 +142,9 @@ public static class EntityModelMapper
             OurCosts = costAlloc?.OurCosts ?? new(),
             PartnerCosts = costAlloc?.PartnerCosts ?? new(),
             AdditionalCosts = costAlloc?.AdditionalCosts ?? new(),
+            LastModifiedUtc = entity.LastModifiedUtc,
+            BaseVersionUtc = entity.LastModifiedUtc,
+            SyncHash = entity.SyncHash,
             Materials = entity.Materials
                 .OrderBy(m => m.SortOrder)
                 .Select(m => new Item

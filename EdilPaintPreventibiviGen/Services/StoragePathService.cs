@@ -95,6 +95,14 @@ public class StoragePathService
         return Path.Combine(folder, fileName);
     }
 
+    public string BuildQuoteCostsPdfPath(string customerName, string quoteNumber, DateTime date, string? referenceName = null)
+    {
+        string quotePath = BuildQuotePdfPath(customerName, quoteNumber, date, referenceName);
+        return Path.Combine(
+            Path.GetDirectoryName(quotePath) ?? string.Empty,
+            Path.GetFileNameWithoutExtension(quotePath) + "_COSTI.pdf");
+    }
+
     public void EnsureFolderExists(string folderPath)
     {
         if (!Directory.Exists(folderPath))
