@@ -119,5 +119,6 @@ mono_crash.mem.*
 **/Assets/clienti.json
 **/Assets/history.json
 **/*_wpftmp.csproj
+tools/updater/updater-settings.json
 .idea/
 *.sln.DotSettings.user
