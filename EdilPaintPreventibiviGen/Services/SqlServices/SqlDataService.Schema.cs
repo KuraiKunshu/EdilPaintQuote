@@ -132,17 +132,29 @@ public partial class SqlDataService
      END
      """, cancellationToken);
         await db.Database.ExecuteSqlRawAsync("""
-     IF NOT EXISTS (
+     IF COL_LENGTH(N'[dbo].[Customers]', N'SyncId') IS NULL
+     BEGIN
+         ALTER TABLE [dbo].[Customers] ADD [SyncId] UNIQUEIDENTIFIER NULL;
+     END
+     """, cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("""
+     UPDATE [dbo].[Customers] SET [SyncId] = NEWID() WHERE [SyncId] IS NULL;
+     """, cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("""
+     IF EXISTS (
          SELECT 1 FROM sys.columns
          WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
            AND name = 'SyncId'
+           AND is_nullable = 1
      )
      BEGIN
-         ALTER TABLE [dbo].[Customers] ADD [SyncId] UNIQUEIDENTIFIER NULL;
-         UPDATE [dbo].[Customers] SET [SyncId] = NEWID() WHERE [SyncId] IS NULL;
          ALTER TABLE [dbo].[Customers] ALTER COLUMN [SyncId] UNIQUEIDENTIFIER NOT NULL;
      END
+     """, cancellationToken);
 
+        await db.Database.ExecuteSqlRawAsync("""
      IF NOT EXISTS (
          SELECT 1 FROM sys.indexes
          WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')

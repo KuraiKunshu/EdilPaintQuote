@@ -15,10 +15,26 @@ namespace EdilPaintPreventibiviGen.Data.Migrations
                 IF COL_LENGTH(N'[dbo].[Customers]', N'SyncId') IS NULL
                 BEGIN
                     ALTER TABLE [dbo].[Customers] ADD [SyncId] UNIQUEIDENTIFIER NULL;
-                    UPDATE [dbo].[Customers] SET [SyncId] = NEWID() WHERE [SyncId] IS NULL;
+                END
+                """);
+
+            migrationBuilder.Sql("""
+                UPDATE [dbo].[Customers] SET [SyncId] = NEWID() WHERE [SyncId] IS NULL;
+                """);
+
+            migrationBuilder.Sql("""
+                IF EXISTS (
+                    SELECT 1 FROM sys.columns
+                    WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
+                      AND name = 'SyncId'
+                      AND is_nullable = 1
+                )
+                BEGIN
                     ALTER TABLE [dbo].[Customers] ALTER COLUMN [SyncId] UNIQUEIDENTIFIER NOT NULL;
                 END
+                """);
 
+            migrationBuilder.Sql("""
                 IF NOT EXISTS (
                     SELECT 1 FROM sys.indexes
                     WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')

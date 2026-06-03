@@ -23,7 +23,15 @@ if (-not (Test-Path -LiteralPath $sourceScript)) {
 }
 
 New-Item -ItemType Directory -Path $UpdaterPath -Force | Out-Null
-Copy-Item -LiteralPath $sourceScript -Destination $targetScript -Force
+
+$resolvedSourceScript = [System.IO.Path]::GetFullPath($sourceScript)
+$resolvedTargetScript = [System.IO.Path]::GetFullPath($targetScript)
+if (-not [string]::Equals($resolvedSourceScript, $resolvedTargetScript, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Copy-Item -LiteralPath $sourceScript -Destination $targetScript -Force
+}
+else {
+    Write-Host "Script updater gia' nella cartella corretta: $targetScript"
+}
 
 if (-not (Test-Path -LiteralPath $settingsPath) -or $OverwriteSettings) {
     $settings = [ordered]@{

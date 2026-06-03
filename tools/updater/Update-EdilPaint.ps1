@@ -233,7 +233,7 @@ try {
 
     if ($runTests) {
         Write-Log "Eseguo test."
-        Invoke-External dotnet test $solutionFullPath -c $configuration --no-restore
+        Invoke-External dotnet test $solutionFullPath --configuration $configuration --no-restore
     }
 
     if (Test-Path -LiteralPath $publishPath) {
@@ -242,7 +242,7 @@ try {
 
     New-Item -ItemType Directory -Path $publishPath -Force | Out-Null
     Write-Log "Pubblico applicazione."
-    Invoke-External dotnet publish $projectFullPath -c $configuration -o $publishPath --no-restore --self-contained false
+    Invoke-External dotnet publish $projectFullPath --configuration $configuration --output $publishPath --no-restore --self-contained false
 
     if (Test-ApplicationRunning -Name $processName) {
         Write-Log "Programma aperto dopo la build: salto copia file. Riprovero' al prossimo login."
