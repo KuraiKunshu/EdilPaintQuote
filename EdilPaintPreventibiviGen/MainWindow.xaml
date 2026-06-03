@@ -1,4 +1,4 @@
-﻿<Window x:Class="EdilPaintPreventibiviGen.MainWindow"
+<Window x:Class="EdilPaintPreventibiviGen.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,11 +6,11 @@
         xmlns:helpers="clr-namespace:EdilPaintPreventibiviGen.Helpers"
         mc:Ignorable="d"
         RenderOptions.BitmapScalingMode="HighQuality"
-        Icon="Assets/Windowsicon/main.png"
+        Icon="pack://application:,,,/Assets/Windowsicon/main.ico"
         Title="Gestione Preventivi - EdilPaint"
         Height="900"
         Width="1250"
-        Background="White"
+        Background="{StaticResource ShellBackgroundBrush}"
         MinWidth="1000"
         MinHeight="700"
         WindowState="Maximized"
@@ -24,9 +24,9 @@
             <Setter Property="Height" Value="32"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="#333"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D9D9D9"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDark333Brush}"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
@@ -36,15 +36,15 @@
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Padding" Value="8,5"/>
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Foreground" Value="#333"/>
+                        <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextDark333Brush}"/>
                         <Setter Property="HorizontalContentAlignment" Value="Left"/>
                         <Style.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter Property="Background" Value="#FFEBEE"/>
+                                <Setter Property="Background" Value="{StaticResource PrimaryRedLightBrush}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#FFCDD2"/>
+                                <Setter Property="Background" Value="{StaticResource RedBorderBrush}"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                         </Style.Triggers>
@@ -76,24 +76,24 @@
                                                     <ColumnDefinition Width="32"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Border Grid.Column="1"
-                                                        Background="#FAFAFA"
-                                                        BorderBrush="#11000000"
+                                                        Background="{StaticResource InputButtonSurfaceBrush}"
+                                                        BorderBrush="{StaticResource LightShadowBrush}"
                                                         BorderThickness="1,0,0,0"
                                                         CornerRadius="0,7,7,0"/>
                                                 <Path Grid.Column="1"
                                                       Width="10" Height="6"
                                                       HorizontalAlignment="Center"
                                                       VerticalAlignment="Center"
-                                                      Fill="#666"
+                                                      Fill="{StaticResource ChevronBrush}"
                                                       Data="M 0 0 L 10 0 L 5 6 Z"/>
                                             </Grid>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Border" Property="BorderBrush" Value="#E57373"/>
+                                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource InputHoverBorderBrush}"/>
                                             </Trigger>
                                             <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="Border" Property="BorderBrush" Value="#D32F2F"/>
+                                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource MaterialRedBrush}"/>
                                             </Trigger>
                                             <Trigger Property="IsEnabled" Value="False">
                                                 <Setter TargetName="Border" Property="Opacity" Value="0.6"/>
@@ -118,8 +118,8 @@
                                    PopupAnimation="Slide">
                                 <Grid MinWidth="{TemplateBinding ActualWidth}"
                                       MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border Background="White"
-                                            BorderBrush="#D9D9D9"
+                                    <Border Background="{StaticResource WhiteBrush}"
+                                            BorderBrush="{StaticResource InputBorderBrush}"
                                             BorderThickness="1"
                                             CornerRadius="8"
                                             Margin="0,4,0,0">
@@ -136,7 +136,7 @@
                                 <Setter TargetName="Popup" Property="MinHeight" Value="24"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="#999"/>
+                                <Setter Property="Foreground" Value="{StaticResource PlaceholderTextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -147,18 +147,31 @@
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="{StaticResource RowBackgroundBrush}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="MinHeight" Value="44"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="{StaticResource RowSelectedBrush}"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                    <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
                 </Trigger>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}"/>
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="{StaticResource HoverSurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
 
         <Style TargetType="DataGridCell">
@@ -167,15 +180,79 @@
             <Setter Property="Padding" Value="6,4"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                    <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="GroupBox">
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
             <Setter Property="Margin" Value="0,8,0,8"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupBox">
+                        <Grid>
+                            <Border Margin="0,10,0,0"
+                                    Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"/>
+                            <Border HorizontalAlignment="Left"
+                                    Margin="12,0,0,0"
+                                    Padding="8,2"
+                                    Background="{StaticResource PanelBackgroundBrush}"
+                                    CornerRadius="5">
+                                <ContentPresenter ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  TextElement.FontWeight="SemiBold"
+                                                  TextElement.Foreground="{StaticResource DefaultTextBrush}"/>
+                            </Border>
+                            <ContentPresenter Margin="12,24,12,12"
+                                              ContentSource="Content"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Stile DataGrid compatto per il pannello collaborazione -->
@@ -187,14 +264,14 @@
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="RowHeight" Value="26"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="GridLinesVisibility" Value="None"/>
             <Setter Property="ColumnHeaderHeight" Value="22"/>
         </Style>
 
         <Style x:Key="CostDataGridRowStyle" TargetType="DataGridRow">
             <Setter Property="MinHeight" Value="26"/>
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
         </Style>
 
         <Style x:Key="CostDataGridCellStyle" TargetType="DataGridCell">
@@ -202,8 +279,8 @@
             <Setter Property="Padding" Value="2,1"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#E3F2FD"/>
-                    <Setter Property="Foreground" Value="Black"/>
+                    <Setter Property="Background" Value="{StaticResource SelectedTabBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -213,13 +290,13 @@
 
         <!-- ═══════════════════════════════════════ HEADER ═══════════════════════════════════════ -->
         <Border DockPanel.Dock="Top"
-                Background="#00FDFDFF"
+                Background="{StaticResource MainHeaderBackgroundBrush}"
                 Effect="{DynamicResource ShadowEffect}"
-                BorderBrush="{StaticResource DangerRedBrush}"
+                BorderBrush="{StaticResource MainHeaderBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="8"
-                Padding="15,10"
-                Margin="0,15,0,0">
+                CornerRadius="10"
+                Padding="18,12"
+                Margin="0,12,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="350"/>
@@ -237,23 +314,27 @@
                         <TextBlock Text="{Binding QuoteNumber}" FontSize="16" FontWeight="Bold"/>
                     </StackPanel>
                     <StackPanel Visibility="{Binding SelectedCustomer, Converter={StaticResource StringToVis}}">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel>
                             <TextBlock Text="{Binding SelectedCustomer.DisplayName}"
                                        FontSize="14" FontWeight="Bold"
                                        TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding SelectedCustomer.DisplayName}"
                                        Foreground="{StaticResource DarkNavyBrush}"/>
-                            <Button Content="📁 Apri Cartella"
-                                    Margin="10,0,0,0" Padding="5,2"
-                                    Background="Transparent"
-                                    BorderBrush="{StaticResource GridLinesBrush}"
-                                    BorderThickness="1" Cursor="Hand"
-                                    Click="OnOpenCustomerFolderClick"/>
-                            <Button Content="✏️ Modifica"
-                                    Margin="6,0,0,0" Padding="5,2"
-                                    Background="Transparent"
-                                    BorderBrush="{StaticResource GridLinesBrush}"
-                                    BorderThickness="1" Cursor="Hand"
-                                    Click="OnEditCustomerClick"/>
+                            <WrapPanel Margin="0,4,0,0">
+                                <Button Content="📁 Apri Cartella"
+                                        Padding="5,2"
+                                        Background="{StaticResource TransparentBrush}"
+                                        BorderBrush="{StaticResource GridLinesBrush}"
+                                        BorderThickness="1" Cursor="Hand"
+                                        Click="OnOpenCustomerFolderClick"/>
+                                <Button Content="✏️ Modifica"
+                                        Margin="6,0,0,0" Padding="5,2"
+                                        Background="{StaticResource TransparentBrush}"
+                                        BorderBrush="{StaticResource GridLinesBrush}"
+                                        BorderThickness="1" Cursor="Hand"
+                                        Click="OnEditCustomerClick"/>
+                            </WrapPanel>
                         </StackPanel>
                         <TextBlock Text="{Binding SelectedCustomer.Address}" FontSize="12" Margin="0,2,0,0"/>
                         <TextBlock Text="{Binding SelectedCustomer.Email}" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
@@ -265,23 +346,28 @@
                             Visibility="{Binding IsSecondCustomerEnabled, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="RIFERIMENTO:" FontSize="10" FontWeight="Bold"
                                Foreground="{StaticResource SecondaryBlueBrush}"/>
-                    <StackPanel Orientation="Horizontal">
+                    <StackPanel>
                         <TextBlock Text="{Binding SelectedSecondCustomer.DisplayName}"
-                                   FontSize="12" FontWeight="Bold"/>
-                        <Button Content="📁 Apri Cartella"
-                                Margin="10,0,0,0" Padding="5,2"
-                                Background="Transparent"
-                                BorderBrush="{StaticResource GridLinesBrush}"
-                                BorderThickness="1" Cursor="Hand"
-                                Click="OnOpenReferenceFolderClick"
-                                Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
-                        <Button Content="✏️ Modifica"
-                                Margin="6,0,0,0" Padding="5,2"
-                                Background="Transparent"
-                                BorderBrush="{StaticResource GridLinesBrush}"
-                                BorderThickness="1" Cursor="Hand"
-                                Click="OnEditReferenceClick"
-                                Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
+                                   FontSize="12" FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding SelectedSecondCustomer.DisplayName}"/>
+                        <WrapPanel Margin="0,4,0,0">
+                            <Button Content="📁 Apri Cartella"
+                                    Padding="5,2"
+                                    Background="{StaticResource TransparentBrush}"
+                                    BorderBrush="{StaticResource GridLinesBrush}"
+                                    BorderThickness="1" Cursor="Hand"
+                                    Click="OnOpenReferenceFolderClick"
+                                    Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
+                            <Button Content="✏️ Modifica"
+                                    Margin="6,0,0,0" Padding="5,2"
+                                    Background="{StaticResource TransparentBrush}"
+                                    BorderBrush="{StaticResource GridLinesBrush}"
+                                    BorderThickness="1" Cursor="Hand"
+                                    Click="OnEditReferenceClick"
+                                    Visibility="{Binding SelectedSecondCustomer, Converter={StaticResource StringToVis}}"/>
+                        </WrapPanel>
                     </StackPanel>
                     <TextBlock Text="{Binding SelectedSecondCustomer.Address}" FontSize="12" Margin="0,2,0,0"/>
                     <TextBlock Text="{Binding SelectedSecondCustomer.Email}" FontSize="12"
@@ -290,13 +376,13 @@
 
                 <!-- Selezione IVA -->
                 <Border Grid.Column="3"
-                        Background="White" Padding="8,4"
-                        CornerRadius="6" BorderBrush="#E0E0E0"
+                        Background="{StaticResource WhiteBrush}" Padding="8,4"
+                        CornerRadius="6" BorderBrush="{StaticResource CompactBorderBrush}"
                         BorderThickness="1" Margin="20,0"
                         VerticalAlignment="Top">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="IVA" VerticalAlignment="Center"
-                                   Margin="0,0,6,0" FontWeight="SemiBold" Foreground="#555"/>
+                                   Margin="0,0,6,0" FontWeight="SemiBold" Foreground="{StaticResource CompactLabelBrush}"/>
                         <ComboBox Width="140"
                                   Style="{StaticResource SoftRedComboBox}"
                                   ItemsSource="{Binding IvaOptions}"
@@ -306,13 +392,13 @@
 
                 <!-- Selezione Logo -->
                 <Border Grid.Column="4"
-                        Background="White" Padding="8,4"
-                        CornerRadius="6" BorderBrush="#E0E0E0"
+                        Background="{StaticResource WhiteBrush}" Padding="8,4"
+                        CornerRadius="6" BorderBrush="{StaticResource CompactBorderBrush}"
                         BorderThickness="1" Margin="10,0,0,0"
                         VerticalAlignment="Top">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Logo" VerticalAlignment="Center"
-                                   Margin="0,0,6,0" FontWeight="SemiBold" Foreground="#555"/>
+                                   Margin="0,0,6,0" FontWeight="SemiBold" Foreground="{StaticResource CompactLabelBrush}"/>
                         <ComboBox Width="140"
                                   Style="{StaticResource SoftRedComboBox}"
                                   ItemsSource="{Binding Logos}"
@@ -331,21 +417,21 @@
                                   IsChecked="{Binding IsJointVenture}"/>
                         <Button Content="NUOVO CLIENTE"
                                 Width="110" Height="30"
-                                Background="{StaticResource PrimaryBlueBrush}"
-                                Foreground="White" BorderThickness="0"
+                                Background="{StaticResource NewCustomerButtonBrush}"
+                                Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                 Click="OnNewCustomerClick"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Content="SEL. RIFERIMENTO"
                                 Width="110" Height="30" Margin="0,0,5,0"
-                                Background="{StaticResource SecondaryBlueBrush}"
-                                Foreground="White" BorderThickness="0"
+                                Background="{StaticResource SelectReferenceButtonBrush}"
+                                Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                 Click="OnSelectReferenceClick"
                                 Visibility="{Binding IsSecondCustomerEnabled, Converter={StaticResource BoolToVis}}"/>
                         <Button Content="SEL. CLIENTE"
                                 Width="110" Height="30"
-                                Background="{StaticResource DarkNavyBrush}"
-                                Foreground="White" BorderThickness="0"
+                                Background="{StaticResource SelectCustomerButtonBrush}"
+                                Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                 Click="OnSelectCustomerClick"/>
                     </StackPanel>
                 </StackPanel>
@@ -355,10 +441,10 @@
         <!-- ═══════════════════════════ PANNELLO COLLABORAZIONE ═══════════════════════════ -->
         <Border DockPanel.Dock="Top"
                 Visibility="{Binding IsJointVenture, Converter={StaticResource BoolToVis}}"
-                Background="#FFF8F0"
-                BorderBrush="#FFCC80"
+                Background="{StaticResource WarningPanelBackgroundBrush}"
+                BorderBrush="{StaticResource WarningPanelBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="8"
+                CornerRadius="10"
                 Padding="12,10"
                 Margin="0,6,0,0">
             <Grid>
@@ -374,13 +460,13 @@
                 <StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Top">
                     <TextBlock Text="🤝 Ditta Partner"
                                FontWeight="Bold" FontSize="11"
-                               Foreground="#E65100" Margin="0,0,0,4"/>
+                               Foreground="{StaticResource CostsPartnerBrush}" Margin="0,0,0,4"/>
                     <TextBox Text="{Binding PartnerCompanyName, UpdateSourceTrigger=PropertyChanged}"
                              Height="28" Padding="6,0"
                              VerticalContentAlignment="Center"
                              FontSize="12"/>
                     <TextBlock Text="Inserisci il nome della ditta collaboratrice"
-                               FontSize="9" Foreground="#999" Margin="0,3,0,0"
+                               FontSize="9" Foreground="{StaticResource PlaceholderTextBrush}" Margin="0,3,0,0"
                                TextWrapping="Wrap"/>
                 </StackPanel>
 
@@ -389,14 +475,14 @@
                     <GroupBox.Header>
                         <TextBlock Text="🏢 Nostri Costi"
                                    FontWeight="SemiBold" FontSize="11"
-                                   Foreground="#1565C0"/>
+                                   Foreground="{StaticResource CostsOurBrush}"/>
                     </GroupBox.Header>
                     <DockPanel LastChildFill="True">
                         <Button DockPanel.Dock="Bottom"
                                 Content="+ Aggiungi voce"
                                 Height="22" FontSize="11"
                                 Margin="0,3,0,0"
-                                Background="#1565C0" Foreground="White"
+                                Background="{StaticResource CostsOurBrush}" Foreground="{StaticResource WhiteBrush}"
                                 BorderThickness="0" Cursor="Hand"
                                 Click="OnAddOurCostClick"/>
                         <DataGrid x:Name="GridOurCosts"
@@ -425,11 +511,14 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
+                                <DataGridTextColumn Header="Note"
+                                                    Binding="{Binding Notes, UpdateSourceTrigger=LostFocus}"
+                                                    Width="90"/>
                                 <DataGridTemplateColumn Width="26">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Button Content="✕" FontSize="10"
-                                                    Background="Transparent" BorderThickness="0"
+                                                    Background="{StaticResource TransparentBrush}" BorderThickness="0"
                                                     Foreground="{StaticResource DangerRedBrush}"
                                                     Cursor="Hand"
                                                     Click="OnDeleteCostRowClick"/>
@@ -446,14 +535,14 @@
                     <GroupBox.Header>
                         <TextBlock Text="🤝 Costi Partner"
                                    FontWeight="SemiBold" FontSize="11"
-                                   Foreground="#E65100"/>
+                                   Foreground="{StaticResource CostsPartnerBrush}"/>
                     </GroupBox.Header>
                     <DockPanel LastChildFill="True">
                         <Button DockPanel.Dock="Bottom"
                                 Content="+ Aggiungi voce"
                                 Height="22" FontSize="11"
                                 Margin="0,3,0,0"
-                                Background="#E65100" Foreground="White"
+                                Background="{StaticResource CostsPartnerBrush}" Foreground="{StaticResource WhiteBrush}"
                                 BorderThickness="0" Cursor="Hand"
                                 Click="OnAddPartnerCostClick"/>
                         <DataGrid x:Name="GridPartnerCosts"
@@ -482,11 +571,14 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
+                                <DataGridTextColumn Header="Note"
+                                                    Binding="{Binding Notes, UpdateSourceTrigger=LostFocus}"
+                                                    Width="90"/>
                                 <DataGridTemplateColumn Width="26">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Button Content="✕" FontSize="10"
-                                                    Background="Transparent" BorderThickness="0"
+                                                    Background="{StaticResource TransparentBrush}" BorderThickness="0"
                                                     Foreground="{StaticResource DangerRedBrush}"
                                                     Cursor="Hand"
                                                     Click="OnDeleteCostRowClick"/>
@@ -503,14 +595,14 @@
                     <GroupBox.Header>
                         <TextBlock Text="➕ Costi Aggiuntivi"
                                    FontWeight="SemiBold" FontSize="11"
-                                   Foreground="#6A1B9A"/>
+                                   Foreground="{StaticResource CostsAdditionalBrush}"/>
                     </GroupBox.Header>
                     <DockPanel LastChildFill="True">
                         <Button DockPanel.Dock="Bottom"
                                 Content="+ Aggiungi voce"
                                 Height="22" FontSize="11"
                                 Margin="0,3,0,0"
-                                Background="#6A1B9A" Foreground="White"
+                                Background="{StaticResource CostsAdditionalBrush}" Foreground="{StaticResource WhiteBrush}"
                                 BorderThickness="0" Cursor="Hand"
                                 Click="OnAddAdditionalCostClick"/>
                         <DataGrid x:Name="GridAdditionalCosts"
@@ -539,11 +631,14 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
+                                <DataGridTextColumn Header="Note"
+                                                    Binding="{Binding Notes, UpdateSourceTrigger=LostFocus}"
+                                                    Width="90"/>
                                 <DataGridTemplateColumn Width="26">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Button Content="✕" FontSize="10"
-                                                    Background="Transparent" BorderThickness="0"
+                                                    Background="{StaticResource TransparentBrush}" BorderThickness="0"
                                                     Foreground="{StaticResource DangerRedBrush}"
                                                     Cursor="Hand"
                                                     Click="OnDeleteCostRowClick"/>
@@ -559,14 +654,14 @@
                 <StackPanel Grid.Column="4" VerticalAlignment="Center" Margin="10,0,0,0" Width="115">
                     <Button Content="📄 PDF Costi"
                             Height="36"
-                            Background="#FF6D00" Foreground="White"
+                            Background="{StaticResource CostsGenerateBrush}" Foreground="{StaticResource WhiteBrush}"
                             BorderThickness="0"
                             FontWeight="Bold" FontSize="12"
                             Cursor="Hand"
                             ToolTip="Genera PDF interno con la ripartizione dei costi"
                             Click="OnGenerateCostsPdfClick"/>
                     <TextBlock Text="uso interno"
-                               FontSize="9" Foreground="#999"
+                               FontSize="9" Foreground="{StaticResource PlaceholderTextBrush}"
                                HorizontalAlignment="Center"
                                Margin="0,3,0,0"/>
                 </StackPanel>
@@ -575,11 +670,11 @@
 
         <!-- ═══════════════════════════════════════ FOOTER ═══════════════════════════════════════ -->
         <Border DockPanel.Dock="Bottom"
-                Background="Crimson"
+                Background="{StaticResource ActionBarBackgroundBrush}"
                 BorderThickness="0"
-                CornerRadius="0"
-                Padding="15,10"
-                Margin="-15,15,-15,-15">
+                CornerRadius="10"
+                Padding="16,12"
+                Margin="0,12,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -590,32 +685,37 @@
 
                 <!-- Pulsanti azione principali -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="✨ Nuovo"
+                    <Button Content="Nuovo ➕"
                             Width="100" Height="35" Margin="0,0,8,0"
-                            Background="{StaticResource WarningYellowBrush}"
-                            Foreground="White" BorderThickness="0"
+                            Background="{StaticResource NewQuoteButtonBrush}"
+                            Foreground="{StaticResource GrayBrush}" BorderThickness="0"
                             Click="OnNewQuoteClick"/>
-                    <Button Content="💾 Genera PDF"
+                    <Button Content="Genera PDF 📄"
                             Width="120" Height="35" Margin="0,0,8,0"
-                            Background="{StaticResource SuccessGreenBrush}"
-                            Foreground="White" BorderThickness="0"
+                            Background="{StaticResource GeneratePdfButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                             FontWeight="Bold"
                             Click="OnGeneratePdfClick"/>
-                    <Button Content="📜 Storico"
+                    <Button Content="Storico 📖"
                             Width="110" Height="35" Margin="0,0,8,0"
-                            Background="{StaticResource DarkNavyBrush}"
-                            Foreground="White" BorderThickness="0"
+                            Background="{StaticResource HistoryButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                             Click="OnOpenHistoryClick"/>
-                    <Button Content="🛠️ Lista Lavori"
+                    <Button Content="Lista Lavori 🛠️"
                             Width="120" Height="35"
-                            Background="{StaticResource PrimaryBlueBrush}"
-                            Foreground="White" BorderThickness="0"
+                            Background="{StaticResource LaborListButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                             Click="OnOpenLaborListClick"/>
-                    <Button Content="📦 Materiali Locali"
+                    <Button Content="Materiali Locali 📦"
                             Width="130" Height="35" Margin="8,0,0,0"
-                            Background="{StaticResource PrimaryBlueBrush}"
-                            Foreground="White" BorderThickness="0"
+                            Background="{StaticResource LocalMaterialsButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                             Click="OnOpenMaterialListClick"/>
+                    <Button Content="⚙️"
+                            Width="auto" Height="35" Margin="8,0,0,0"
+                            Background="{StaticResource SettingsButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                            Click="OnOpenSettingsClick"/>
                 </StackPanel>
 
                 <!-- Sconti -->
@@ -625,14 +725,16 @@
                             Margin="0,0,24,0">
                     <StackPanel Margin="0,0,14,0">
                         <TextBlock Text="Sconto Mat. %"
-                                   FontSize="10" HorizontalAlignment="Center"/>
+                                   FontSize="10" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBox Width="58" Height="28"
                                  TextAlignment="Center"
                                  Text="{Binding MaterialDiscount, UpdateSourceTrigger=PropertyChanged}"/>
                     </StackPanel>
                     <StackPanel>
                         <TextBlock Text="Sconto Lav. %"
-                                   FontSize="10" HorizontalAlignment="Center"/>
+                                   FontSize="10" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBox Width="58" Height="28"
                                  TextAlignment="Center"
                                  Text="{Binding LaborDiscount, UpdateSourceTrigger=PropertyChanged}"/>
@@ -652,23 +754,25 @@
                             <RowDefinition/>
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Imponibile:"
-                                   Foreground="{StaticResource BlackBrush}" FontSize="12"/>
+                                   Foreground="{StaticResource LightTextBrush}" FontSize="12"/>
                         <TextBlock Grid.Row="0" Grid.Column="1"
                                    Text="{Binding Imponibile, StringFormat='€ {0:N2}'}"
-                                   HorizontalAlignment="Right" FontSize="12"/>
+                                   HorizontalAlignment="Right" FontSize="12"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="IVA:"
-                                   Foreground="{StaticResource BlackBrush}" FontSize="12"/>
+                                   Foreground="{StaticResource LightTextBrush}" FontSize="12"/>
                         <TextBlock Grid.Row="1" Grid.Column="1"
                                    Text="{Binding IvaTotale, StringFormat='€ {0:N2}'}"
-                                   HorizontalAlignment="Right" FontSize="12"/>
+                                   HorizontalAlignment="Right" FontSize="12"
+                                   Foreground="{StaticResource LightTextBrush}"/>
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="TOTALE"
                                    FontWeight="Bold" FontSize="18"
-                                   Foreground="{StaticResource DarkNavyBrush}"
+                                   Foreground="{StaticResource LightTextBrush}"
                                    VerticalAlignment="Bottom"/>
                         <TextBlock Grid.Row="2" Grid.Column="1"
                                    Text="{Binding TotaleGenerale, StringFormat='€ {0:N2}'}"
                                    FontWeight="Bold" FontSize="18"
-                                   Foreground="{StaticResource AccentOrangeBrush}"
+                                   Foreground="{StaticResource WarningYellowBrush}"
                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                     </Grid>
                 </StackPanel>
@@ -771,12 +875,12 @@
                             <Button Content="Aggiungi a MATERIALI"
                                     Padding="15,5" Margin="0,0,10,0"
                                     Background="{StaticResource DarkNavyBrush}"
-                                    Foreground="White" BorderThickness="0"
+                                    Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                     Click="OnAddMaterialClick"/>
                             <Button Content="Aggiungi a LAVORI"
                                     Padding="15,5"
                                     Background="{StaticResource SecondaryBlueBrush}"
-                                    Foreground="White" BorderThickness="0"
+                                    Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                     Click="OnAddLaborClick"/>
                         </StackPanel>
                     </Grid>
@@ -803,7 +907,7 @@
                                   GridLinesVisibility="Vertical"
                                   VerticalGridLinesBrush="{StaticResource GridLinesBrush}"
                                   RowHeight="50"
-                                  Background="White"
+                                  Background="{StaticResource WhiteBrush}"
                                   BorderThickness="1"
                                   BorderBrush="{StaticResource GridLinesBrush}"
                                   AlternationCount="2"
@@ -823,7 +927,7 @@
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Content="✏️" Background="Transparent"
+                                            <Button Content="✏️" Background="{StaticResource TransparentBrush}"
                                                     BorderThickness="0" Click="OnEditRowClick"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -861,7 +965,7 @@
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Content="🗑️" Background="Transparent"
+                                            <Button Content="🗑️" Background="{StaticResource TransparentBrush}"
                                                     BorderThickness="0" Click="OnDeleteRowClick"
                                                     Foreground="{StaticResource DangerRedBrush}"/>
                                         </DataTemplate>
@@ -885,7 +989,7 @@
                                   GridLinesVisibility="Vertical"
                                   VerticalGridLinesBrush="{StaticResource GridLinesBrush}"
                                   RowHeight="50"
-                                  Background="White"
+                                  Background="{StaticResource WhiteBrush}"
                                   BorderThickness="1"
                                   BorderBrush="{StaticResource GridLinesBrush}"
                                   AlternationCount="2"
@@ -905,7 +1009,7 @@
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Content="✏️" Background="Transparent"
+                                            <Button Content="✏️" Background="{StaticResource TransparentBrush}"
                                                     BorderThickness="0" Click="OnEditRowClick"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -943,7 +1047,7 @@
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Content="🗑️" Background="Transparent"
+                                            <Button Content="🗑️" Background="{StaticResource TransparentBrush}"
                                                     BorderThickness="0" Click="OnDeleteRowClick"
                                                     Foreground="{StaticResource DangerRedBrush}"/>
                                         </DataTemplate>
@@ -968,23 +1072,23 @@
                             <Button Content="Aggiungi"
                                     Width="110" Height="30" Margin="0,0,5,0"
                                     Background="{StaticResource MutedTextBrush}"
-                                    Foreground="White" BorderThickness="0"
+                                    Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                     Click="OnAddImageClick"/>
                             <Button Content="Rimuovi"
                                     Width="110" Height="30"
                                     Background="{StaticResource DangerRedBrush}"
-                                    Foreground="White" BorderThickness="0"
+                                    Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                     Click="OnRemoveImageClick"/>
                         </StackPanel>
                         <ListBox x:Name="LstImages"
-                                 Background="White" BorderBrush="#ddd"
+                                 Background="{StaticResource WhiteBrush}" BorderBrush="{StaticResource LegacyLightBorderBrush}"
                                  ItemsSource="{Binding AttachedImages}"
                                  AllowDrop="True"
                                  Drop="OnImageDrop"
                                  PreviewKeyDown="OnImagePaste">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Converter={StaticResource StringToVis}, ConverterParameter='FileName'}"/>
+                                    <TextBlock Text="{Binding FileName}"/>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

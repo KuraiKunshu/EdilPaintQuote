@@ -267,6 +267,11 @@ public partial class MainWindow : Window
             win.ShowDialog();
         }
     }
+    private void OnOpenSettingsClick(object sender, RoutedEventArgs e)
+    {
+        var win = new SettingsWindow { Owner = this };
+        win.ShowDialog();
+    }
     private void OnEditRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item) { var win = new EditItemWindow(item) { Owner = this }; if (win.ShowDialog() == true) (DataContext as MainViewModel)?.CalculateTotals(); } }
     private void OnDeleteRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item && DataContext is MainViewModel vm) { if (vm.Materials.Contains(item)) vm.Materials.Remove(item); else if (vm.Labors.Contains(item)) vm.Labors.Remove(item); vm.UpdateItemSortOrders(); vm.CalculateTotals(); } }
     private void OnLaborSearchChanged(object sender, TextChangedEventArgs e) 
@@ -293,6 +298,7 @@ public partial class MainWindow : Window
         string text = cb.Text;
 
         _materialSearchCts?.Cancel();
+        _materialSearchCts?.Dispose();
         _materialSearchCts = new CancellationTokenSource();
         var token = _materialSearchCts.Token;
 
@@ -306,13 +312,13 @@ public partial class MainWindow : Window
             await Task.Delay(150, token);
             if (token.IsCancellationRequested) return;
 
-            await vm.ApplyMaterialFilterAsync(text);
+            await vm.ApplyMaterialFilterAsync(text, token);
             if (token.IsCancellationRequested) return;
 
             cb.SelectedIndex = -1;
             cb.IsDropDownOpen = vm.AllCatalogMaterials.Count > 0;
         }
-        catch (TaskCanceledException) { }
+        catch (OperationCanceledException) { }
     }    
     private void FixComboBoxSelection(ComboBox cb) 
     { 

@@ -12,4 +12,5 @@ public class QuoteLaborEntity
 	public int Quantity { get; set; }
 	public double Discount { get; set; }
 	public bool IsSignificant { get; set; }
+	public int SortOrder { get; set; }
 }

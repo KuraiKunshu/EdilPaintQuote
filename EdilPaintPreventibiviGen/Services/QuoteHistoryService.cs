@@ -1,5 +1,6 @@
 using System.IO;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
@@ -43,6 +44,12 @@ public sealed class QuoteHistoryService
     {
         await _dataService.SaveQuoteAsync(entry);
     }
+    public Task UpdateNotesAsync(string quoteNumber, string notes) =>
+        _dataService.UpdateQuoteNotesAsync(quoteNumber, notes);
+
+    public Task UpdateStatusAsync(string quoteNumber, QuoteStatus status) =>
+        _dataService.UpdateQuoteStatusAsync(quoteNumber, status);
+
     public async Task DeleteQuoteAsync(string quoteNumber)
     {
         await _dataService.DeleteQuoteAsync(quoteNumber);
@@ -87,21 +94,79 @@ public sealed class QuoteHistoryService
         return expectedPath;
     }
 
+    public string GetExpectedCostsPdfPath(QuoteHistoryEntry entry)
+    {
+        return _storagePathService.BuildQuoteCostsPdfPath(
+            entry.CustomerName,
+            entry.QuoteNumber,
+            entry.Date,
+            string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
+    }
+
+    public async Task<string> EnsureCostsPdfExistsAsync(QuoteHistoryEntry entry)
+    {
+        byte[]? costsPdf = await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber);
+        if (costsPdf is not { Length: > 0 })
+            return string.Empty;
+
+        string expectedPath = GetExpectedCostsPdfPath(entry);
+        string? folder = Path.GetDirectoryName(expectedPath);
+        if (!string.IsNullOrWhiteSpace(folder))
+            Directory.CreateDirectory(folder);
+
+        if (!File.Exists(expectedPath) || !FileMatchesBytes(expectedPath, costsPdf))
+            await File.WriteAllBytesAsync(expectedPath, costsPdf);
+
+        return expectedPath;
+    }
+
+    public async Task EnsureAttachmentsFolderExistsAsync(QuoteHistoryEntry entry)
+    {
+        var attachments = await _dataService.GetQuoteAttachmentsAsync(entry.QuoteNumber);
+        if (attachments.Count == 0)
+            return;
+
+        string? parentDir = Path.GetDirectoryName(GetExpectedPdfPath(entry));
+        if (string.IsNullOrWhiteSpace(parentDir))
+            return;
+
+        string attachmentsDir = Path.Combine(parentDir, "Allegati_" + entry.QuoteNumber);
+        Directory.CreateDirectory(attachmentsDir);
+
+        foreach (var attachment in attachments.Where(x => x.Content.Length > 0))
+        {
+            string path = Path.Combine(attachmentsDir, Path.GetFileName(attachment.FileName));
+            if (!File.Exists(path) || !FileMatchesBytes(path, attachment.Content))
+                await File.WriteAllBytesAsync(path, attachment.Content);
+        }
+    }
+
     public void DeleteQuoteFiles(QuoteHistoryEntry entry)
     {
         string expectedPath = GetExpectedPdfPath(entry);
+        string expectedCostsPath = GetExpectedCostsPdfPath(entry);
 
         if (File.Exists(expectedPath))
-        {
             File.Delete(expectedPath);
 
-            string? parentDir = Path.GetDirectoryName(expectedPath);
-            if (!string.IsNullOrWhiteSpace(parentDir))
+        if (File.Exists(expectedCostsPath))
+            File.Delete(expectedCostsPath);
+
+        string? parentDir = Path.GetDirectoryName(expectedPath);
+        if (!string.IsNullOrWhiteSpace(parentDir))
+        {
+            if (Directory.Exists(parentDir))
             {
-                string allegatiDir = Path.Combine(parentDir, "Allegati_" + entry.QuoteNumber);
-                if (Directory.Exists(allegatiDir))
-                    Directory.Delete(allegatiDir, true);
+                foreach (string costsPath in Directory.EnumerateFiles(parentDir, "*_COSTI.pdf"))
+                {
+                    if (IsPdfForQuote(costsPath, entry.QuoteNumber, allowCostsPdf: true))
+                        File.Delete(costsPath);
+                }
             }
+
+            string allegatiDir = Path.Combine(parentDir, "Allegati_" + entry.QuoteNumber);
+            if (Directory.Exists(allegatiDir))
+                Directory.Delete(allegatiDir, true);
         }
     }
     
@@ -122,10 +187,8 @@ public sealed class QuoteHistoryService
             if (!Directory.Exists(customerFolder))
                 return null;
 
-            // Cerca ricorsivamente tutti i PDF che contengono il numero preventivo nel nome
             var matches = Directory.EnumerateFiles(customerFolder, "*.pdf", SearchOption.AllDirectories)
-                .Where(f => Path.GetFileNameWithoutExtension(f)
-                    .Contains(entry.QuoteNumber, StringComparison.OrdinalIgnoreCase))
+                .Where(f => IsPdfForQuote(f, entry.QuoteNumber, allowCostsPdf: false))
                 .ToList();
 
             return matches.FirstOrDefault();
@@ -135,6 +198,16 @@ public sealed class QuoteHistoryService
             System.Diagnostics.Debug.WriteLine($"[FindPdfByQuoteNumber] Errore: {ex.Message}");
             return null;
         }
+    }
+
+    public static bool IsPdfForQuote(string path, string quoteNumber, bool allowCostsPdf)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(path);
+        if (!allowCostsPdf && fileName.EndsWith("_COSTI", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string pattern = $@"(?<![A-Za-z0-9-]){Regex.Escape(quoteNumber)}(?![A-Za-z0-9-])";
+        return Regex.IsMatch(fileName, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     private static bool FileMatchesBytes(string path, byte[] content)

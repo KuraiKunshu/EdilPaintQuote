@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<QuoteMaterialEntity> QuoteMaterials => Set<QuoteMaterialEntity>();
     public DbSet<QuoteLaborEntity> QuoteLabors => Set<QuoteLaborEntity>();
     public DbSet<QuotePdfFileEntity> QuotePdfFiles => Set<QuotePdfFileEntity>();
+    public DbSet<QuoteCostsPdfFileEntity> QuoteCostsPdfFiles => Set<QuoteCostsPdfFileEntity>();
     public DbSet<QuoteAttachmentEntity> QuoteAttachments => Set<QuoteAttachmentEntity>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
@@ -28,7 +29,9 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("Customers");
             entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.SyncId).IsUnique();
 
+            entity.Property(x => x.SyncId).IsRequired();
             entity.Property(x => x.BusinessName).HasMaxLength(250).IsRequired();
             entity.Property(x => x.Address).HasMaxLength(500);
             entity.Property(x => x.Email).HasMaxLength(250);
@@ -71,6 +74,7 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("Quotes");
             entity.HasKey(x => x.Id);
+            entity.HasQueryFilter(x => !x.IsDeleted);
             
             entity.HasIndex(x => x.QuoteNumber).IsUnique();
             entity.HasIndex(x => x.Date);
@@ -94,6 +98,11 @@ public class AppDbContext : DbContext
             entity.HasOne(x => x.PdfFile)
                 .WithOne(x => x.Quote)
                 .HasForeignKey<QuotePdfFileEntity>(x => x.QuoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.CostsPdfFile)
+                .WithOne(x => x.Quote)
+                .HasForeignKey<QuoteCostsPdfFileEntity>(x => x.QuoteId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -148,6 +157,16 @@ public class AppDbContext : DbContext
                 .WithMany(x => x.Attachments)
                 .HasForeignKey(x => x.QuoteId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<QuoteCostsPdfFileEntity>(entity =>
+        {
+            entity.ToTable("QuoteCostsPdfFiles");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FileName).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Content).IsRequired();
         });
     }
 }

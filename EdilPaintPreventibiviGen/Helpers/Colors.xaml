@@ -7,10 +7,14 @@
     <Color x:Key="DarkNavyColor">#2c3e50</Color>
     <Color x:Key="SuccessGreenColor">#27ae60</Color>
     <Color x:Key="DangerRedColor">#e74c3c</Color>
+    <Color x:Key="PrimaryRedColor">#e74c3c</Color>
+    <Color x:Key="PrimaryRedDarkColor">#c0392b</Color>
+    <Color x:Key="PrimaryRedLightColor">#FFEBEE</Color>
+    <Color x:Key="RedBorderColor">#FFCDD2</Color>
     <Color x:Key="Purple">#8b2dc7</Color>
     <Color x:Key="WarningYellowColor">#f1c40f</Color>
     <Color x:Key="AccentOrangeColor">#e67e22</Color>
-    <Color x:Key="Black">Black </Color>
+    <Color x:Key="Black">Black</Color>
     
     <!-- Pennelli (Brushes) -->
     <SolidColorBrush x:Key="PrimaryBlueBrush" Color="{StaticResource PrimaryBlueColor}"/>
@@ -18,10 +22,19 @@
     <SolidColorBrush x:Key="DarkNavyBrush" Color="{StaticResource DarkNavyColor}"/>
     <SolidColorBrush x:Key="SuccessGreenBrush" Color="{StaticResource SuccessGreenColor}"/>
     <SolidColorBrush x:Key="DangerRedBrush" Color="{StaticResource DangerRedColor}"/>
+    <SolidColorBrush x:Key="PrimaryRedBrush" Color="{StaticResource PrimaryRedColor}"/>
+    <SolidColorBrush x:Key="PrimaryRedDarkBrush" Color="{StaticResource PrimaryRedDarkColor}"/>
+    <SolidColorBrush x:Key="PrimaryRedLightBrush" Color="{StaticResource PrimaryRedLightColor}"/>
+    <SolidColorBrush x:Key="RedBorderBrush" Color="{StaticResource RedBorderColor}"/>
     <SolidColorBrush x:Key="PurpleBrush" Color="{StaticResource Purple}"/>
     <SolidColorBrush x:Key="WarningYellowBrush" Color="{StaticResource WarningYellowColor}"/>
     <SolidColorBrush x:Key="AccentOrangeBrush" Color="{StaticResource AccentOrangeColor}"/>
     <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#F3F6FA"/>
+    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#FAFBFC"/>
+    <SolidColorBrush x:Key="SubtleBorderBrush" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="HoverSurfaceBrush" Color="#F8FAFC"/>
 
     <!-- Colori Testo -->
     <SolidColorBrush x:Key="DefaultTextBrush" Color="#2c3e50"/>
@@ -33,11 +46,116 @@
     <SolidColorBrush x:Key="RowSelectedBrush" Color="#FFF9C4"/>
     <SolidColorBrush x:Key="GridLinesBrush" Color="#CCCCCC"/>
 
+    <!-- Colori semantici UI: modifica questi per personalizzare i controlli principali -->
+    <SolidColorBrush x:Key="MainHeaderBackgroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="MainHeaderBorderBrush" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="ActionBarBackgroundBrush" Color="{StaticResource PrimaryRedDarkColor}"/>
+    <SolidColorBrush x:Key="NewQuoteButtonBrush" Color="#f1c40f"/>
+    <SolidColorBrush x:Key="GeneratePdfButtonBrush" Color="#27ae60"/>
+    <SolidColorBrush x:Key="HistoryButtonBrush" Color="#2980b9"/>
+    <SolidColorBrush x:Key="LaborListButtonBrush" Color="#3498db"/>
+    <SolidColorBrush x:Key="LocalMaterialsButtonBrush" Color="#3498db"/>
+    <SolidColorBrush x:Key="SettingsButtonBrush" Color="#7f8c8d"/>
+    <SolidColorBrush x:Key="NewCustomerButtonBrush" Color="#3498db"/>
+    <SolidColorBrush x:Key="SelectReferenceButtonBrush" Color="#2980b9"/>
+    <SolidColorBrush x:Key="SelectCustomerButtonBrush" Color="#2c3e50"/>
+    <SolidColorBrush x:Key="ModalPrimaryActionBrush" Color="#27ae60"/>
+    <SolidColorBrush x:Key="SectionPanelBackgroundBrush" Color="#F6F8FA"/>
+
     <!-- Colori Stati Storico -->
     <SolidColorBrush x:Key="StatusFinalizzatoBrush" Color="#7cc2dc"/>
     <SolidColorBrush x:Key="StatusSpeditoBrush" Color="#fdf282"/>
     <SolidColorBrush x:Key="StatusConfermatoBrush" Color="#ddacf3"/>
     <SolidColorBrush x:Key="StatusFinitoBrush" Color="#b7f3ac"/>
     <SolidColorBrush x:Key="StatusRifiutatoBrush" Color="#f3acac"/>
+
+    <!-- Colori condivisi: ogni valore usato dalle finestre XAML vive qui -->
+    <SolidColorBrush x:Key="TransparentBrush" Color="Transparent"/>
+    <SolidColorBrush x:Key="WhiteBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="GrayBrush" Color="Gray"/>
+    <SolidColorBrush x:Key="NotificationRedBrush" Color="Red"/>
+    <SolidColorBrush x:Key="SyncLocalOnlyBrush" Color="Red"/>
+    <SolidColorBrush x:Key="SyncOnlineOnlyBrush" Color="Orange"/>
+    <SolidColorBrush x:Key="SyncSyncedBrush" Color="LimeGreen"/>
+    <SolidColorBrush x:Key="SyncUnknownBrush" Color="Gray"/>
+    <SolidColorBrush x:Key="CustomerInvalidBorderBrush" Color="Red"/>
+    <SolidColorBrush x:Key="CustomerValidBorderBrush" Color="Green"/>
+
+    <SolidColorBrush x:Key="TextDark333Brush" Color="#333"/>
+    <SolidColorBrush x:Key="CompactLabelBrush" Color="#555"/>
+    <SolidColorBrush x:Key="ChevronBrush" Color="#666"/>
+    <SolidColorBrush x:Key="PlaceholderTextBrush" Color="#999"/>
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#D9D9D9"/>
+    <SolidColorBrush x:Key="ModalFieldBorderBrush" Color="#D0D7DE"/>
+    <SolidColorBrush x:Key="InputButtonSurfaceBrush" Color="#FAFAFA"/>
+    <SolidColorBrush x:Key="InputHoverBorderBrush" Color="#E57373"/>
+    <SolidColorBrush x:Key="MaterialRedBrush" Color="#D32F2F"/>
+    <SolidColorBrush x:Key="SelectedTabBrush" Color="#E3F2FD"/>
+    <SolidColorBrush x:Key="CompactBorderBrush" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="LegacyLightBorderBrush" Color="#ddd"/>
+
+    <SolidColorBrush x:Key="LightShadowBrush" Color="#11000000"/>
+    <SolidColorBrush x:Key="SectionPanelBorderBrush" Color="#12000000"/>
+    <SolidColorBrush x:Key="WindowDividerShadowBrush" Color="#18000000"/>
+    <SolidColorBrush x:Key="WindowShadowBorderBrush" Color="#22000000"/>
+    <SolidColorBrush x:Key="OverlayBackdropBrush" Color="#CC000000"/>
+
+    <SolidColorBrush x:Key="WarningPanelBackgroundBrush" Color="#FFFFFBEB"/>
+    <SolidColorBrush x:Key="WarningPanelBorderBrush" Color="#FFF6C453"/>
+    <SolidColorBrush x:Key="CostsPartnerBrush" Color="#E65100"/>
+    <SolidColorBrush x:Key="CostsOurBrush" Color="#1565C0"/>
+    <SolidColorBrush x:Key="CostsOurPressedBrush" Color="#0D47A1"/>
+    <SolidColorBrush x:Key="CostsAdditionalBrush" Color="#6A1B9A"/>
+    <SolidColorBrush x:Key="CostsGenerateBrush" Color="#FF6D00"/>
+
+    <SolidColorBrush x:Key="NeutralButtonBackgroundBrush" Color="#FFF3F4F6"/>
+    <SolidColorBrush x:Key="NeutralButtonBorderBrush" Color="#FFD1D5DB"/>
+    <SolidColorBrush x:Key="NeutralButtonTextBrush" Color="#FF1F2937"/>
+    <SolidColorBrush x:Key="NeutralButtonHoverBrush" Color="#FFE5E7EB"/>
+    <SolidColorBrush x:Key="NeutralButtonHoverBorderBrush" Color="#FF9CA3AF"/>
+    <SolidColorBrush x:Key="DangerSoftBackgroundBrush" Color="#FFFEE2E2"/>
+    <SolidColorBrush x:Key="DangerSoftBorderBrush" Color="#FFFCA5A5"/>
+    <SolidColorBrush x:Key="DangerSoftHoverBorderBrush" Color="#FFFECACA"/>
+    <SolidColorBrush x:Key="DangerSoftTextBrush" Color="#FFB91C1C"/>
+    <SolidColorBrush x:Key="DataGridBorderBrush" Color="#D9DEE5"/>
+    <SolidColorBrush x:Key="DataGridLineBrush" Color="#EEF2F6"/>
+    <SolidColorBrush x:Key="SearchResultHoverBrush" Color="#F8FBFF"/>
+    <SolidColorBrush x:Key="SearchResultSelectedBrush" Color="#E8F2FF"/>
+    <SolidColorBrush x:Key="DeleteActionBrush" Color="#C62828"/>
+
+    <SolidColorBrush x:Key="LoadingBorderBrush" Color="#E5E7EB"/>
+    <SolidColorBrush x:Key="LoadingIconBackgroundBrush" Color="#FFF1F5F9"/>
+    <SolidColorBrush x:Key="LoadingIconBorderBrush" Color="#FFE2E8F0"/>
+    <SolidColorBrush x:Key="LoadingIconForegroundBrush" Color="#991B1B"/>
+    <SolidColorBrush x:Key="LoadingTitleBrush" Color="#374151"/>
+    <SolidColorBrush x:Key="LoadingMessageBrush" Color="#6B7280"/>
+    <SolidColorBrush x:Key="LoadingProgressBackgroundBrush" Color="#F3F4F6"/>
+    <SolidColorBrush x:Key="LoadingDetailBrush" Color="#9CA3AF"/>
+
+    <SolidColorBrush x:Key="VeluxFooterBackgroundBrush" Color="#f8f9fa"/>
+    <SolidColorBrush x:Key="VeluxLoginButtonBrush" Color="#1abc9c"/>
+
+    <!-- Palette PDF: separata dalla UI ma modificabile dallo stesso file -->
+    <Color x:Key="PdfWhiteColor">#FFFFFF</Color>
+    <Color x:Key="PdfAccentRedColor">#EF5350</Color>
+    <Color x:Key="PdfRedDarken2Color">#D32F2F</Color>
+    <Color x:Key="PdfOrangeMediumColor">#FFA726</Color>
+    <Color x:Key="PdfBlueDarken1Color">#1E88E5</Color>
+    <Color x:Key="PdfGreenMediumColor">#66BB6A</Color>
+    <Color x:Key="PdfGreenDarken1Color">#43A047</Color>
+    <Color x:Key="PdfGreenDarken2Color">#388E3C</Color>
+    <Color x:Key="PdfGreyLighten1Color">#E0E0E0</Color>
+    <Color x:Key="PdfGreyLighten2Color">#EEEEEE</Color>
+    <Color x:Key="PdfGreyLighten3Color">#F5F5F5</Color>
+    <Color x:Key="PdfGreyMediumColor">#BDBDBD</Color>
+    <Color x:Key="PdfGreyDarken1Color">#757575</Color>
+    <Color x:Key="PdfGreyDarken2Color">#616161</Color>
+    <Color x:Key="PdfGreyDarken3Color">#424242</Color>
+
+    <DropShadowEffect x:Key="ShadowEffect"
+                      Color="{StaticResource Black}"
+                      BlurRadius="18"
+                      ShadowDepth="0"
+                      Opacity="0.16"/>
 
 </ResourceDictionary>

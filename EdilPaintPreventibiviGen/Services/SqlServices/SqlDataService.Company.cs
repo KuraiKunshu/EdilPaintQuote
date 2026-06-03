@@ -40,7 +40,7 @@ public partial class SqlDataService
             entity.Email = company.Email;
             entity.LogosJson = System.Text.Json.JsonSerializer.Serialize(company.Logo ?? new List<string>());
             entity.LogoIndex = company.Logo_index;
-            // NON abbassare mai il counter â€” prendi il massimo tra quello attuale nel DB e quello locale
+            // Non abbassare mai il counter: prendi il massimo tra DB e valore locale.
             entity.Counter = Math.Max(entity.Counter, company.Counter);
             entity.PaymentTerms = company.Termini_pagamento;
             entity.SelectedLogo = selectedLogo;
@@ -57,7 +57,7 @@ public partial class SqlDataService
         await using var db = AppDbContextFactory.Create();
 
         // UPDATE atomico: incrementa e restituisce il nuovo valore in un'unica operazione SQL
-        // Questo evita race condition tra piÃ¹ PC che chiamano contemporaneamente
+        // Questo evita race condition tra piu' PC che chiamano contemporaneamente.
         var result = await db.Database.SqlQueryRaw<int>("""
                                                         UPDATE TOP(1) [dbo].[CompanySettings]
                                                         SET [Counter] = [Counter] + 1

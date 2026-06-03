@@ -13,7 +13,7 @@
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
-        Background="Transparent"
+        Background="{StaticResource TransparentBrush}"
         Icon="pack://application:,,,/Assets/Windowsicon/main.png"
         RenderOptions.BitmapScalingMode="HighQuality">
 
@@ -22,8 +22,8 @@
             <Setter Property="Height" Value="38"/>
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D0D7DE"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
@@ -31,7 +31,7 @@
         <Style x:Key="HeaderButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="34"/>
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
@@ -46,15 +46,15 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
     </Window.Resources>
 
-    <Grid Background="Transparent" Margin="18">
+    <Grid Background="{StaticResource TransparentBrush}" Margin="18">
         <Border Background="{StaticResource RowBackgroundBrush}"
                 CornerRadius="16"
-                BorderBrush="#22000000"
+                BorderBrush="{StaticResource WindowShadowBorderBrush}"
                 BorderThickness="1"
                 SnapsToDevicePixels="True">
             <Border.Effect>
@@ -99,7 +99,7 @@
                 </Grid>
 
                 <!-- DIVIDER -->
-                <Border Grid.Row="1" Background="#18000000"/>
+                <Border Grid.Row="1" Background="{StaticResource WindowDividerShadowBrush}"/>
 
                 <!-- CONTENT -->
                 <Grid Grid.Row="2" Margin="22,20,22,18">
@@ -202,8 +202,8 @@
                     <Border Grid.Row="6"
                             Padding="12"
                             CornerRadius="10"
-                            Background="#F6F8FA"
-                            BorderBrush="#12000000"
+                            Background="{StaticResource SectionPanelBackgroundBrush}"
+                            BorderBrush="{StaticResource SectionPanelBorderBrush}"
                             BorderThickness="1">
                         <CheckBox x:Name="ChkSignificant"
                                   Content="Bene significativo (per IVA RC)"
@@ -238,7 +238,7 @@
                             Style="{StaticResource FooterButtonStyle}"
                             Content="Salva"
                             Click="OnSaveClick"
-                            Background="{StaticResource SuccessGreenBrush}"
+                            Background="{StaticResource ModalPrimaryActionBrush}"
                             FontWeight="Bold"/>
                 </Grid>
             </Grid>

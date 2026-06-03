@@ -41,7 +41,7 @@ public partial class MainViewModel
 
         var newItem = new Item
         {
-            Name = InputName,
+            Name = InputName.Trim(),
             Description = InputDescription,
             UnitPrice = InputValue,
             Quantity = InputQuantity,
@@ -51,16 +51,15 @@ public partial class MainViewModel
 
         Materials.Add(newItem);
 
-        var existing = _personalMaterials.FirstOrDefault(m =>
+        bool alreadyInCatalog = _personalMaterials.Any(m =>
             m.Name.Equals(newItem.Name, StringComparison.OrdinalIgnoreCase));
 
-        if (existing != null)
-        {
-            existing.Description = newItem.Description;
-            existing.UnitPrice = newItem.UnitPrice;
-            existing.IsSignificant = newItem.IsSignificant;
-        }
-        else
+        if (!alreadyInCatalog &&
+            MessageBox.Show(
+                $"Il materiale '{newItem.Name}' non è ancora presente nell'anagrafica.\n\nVuoi aggiungerlo ai materiali locali?",
+                "Nuovo materiale",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) == MessageBoxResult.Yes)
         {
             _personalMaterials.Add(new Item
             {
@@ -71,9 +70,10 @@ public partial class MainViewModel
                 IsSignificant = newItem.IsSignificant,
                 SortOrder = _personalMaterials.Count
             });
+
+            SavePersonalMaterials();
         }
 
-        SavePersonalMaterials();
         ResetInputs();
     }
 
@@ -131,6 +131,9 @@ public partial class MainViewModel
                 return;
             }
         }
+
+        if (!App.AppSettings.App.UseVeluxLogin)
+            return;
 
         var details = await _veluxService.GetProductDetailsAsync(uuid);
         if (details != null)

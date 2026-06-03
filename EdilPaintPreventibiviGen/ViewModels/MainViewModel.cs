@@ -11,13 +11,14 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using EdilPaintPreventibiviGen.Helpers;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 using EdilPaintPreventibiviGen.Views;
 
 namespace EdilPaintPreventibiviGen.ViewModels;
 
-public partial class MainViewModel : INotifyPropertyChanged
+public partial class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     #region Services
     private readonly IDataService _dataService;
@@ -55,6 +56,8 @@ public partial class MainViewModel : INotifyPropertyChanged
     private bool _isSavingQuoteHistory;
     private bool _isEditingExistingQuote;
     private bool _isGeneratingPdf;
+    private bool _isGeneratingCostsPdf;
+    private bool _hasPersistedCurrentQuote;
     #endregion
 
     #region Quote Info
@@ -62,6 +65,8 @@ public partial class MainViewModel : INotifyPropertyChanged
     private string _selectedLogo = string.Empty;
     private string _paymentTerms = string.Empty;
     private string _partnerCompanyName = string.Empty;
+    private DateTime? _loadedQuoteDate;
+    private DateTime _loadedQuoteBaseVersionUtc;
     #endregion
 
     #region Input Fields
@@ -82,8 +87,8 @@ public partial class MainViewModel : INotifyPropertyChanged
     #endregion
 
     #region UI Feedback
-    private Brush _customerBorderBrush = Brushes.Red;
-    private Brush _secondCustomerBorderBrush = Brushes.Red;
+    private Brush _customerBorderBrush = GetCustomerSelectionBrush(false);
+    private Brush _secondCustomerBorderBrush = GetCustomerSelectionBrush(false);
     #endregion
 
     #region Collections & Views
@@ -119,6 +124,17 @@ public partial class MainViewModel : INotifyPropertyChanged
         Materials.CollectionChanged += OnItemsCollectionChanged;
         Labors.CollectionChanged += OnItemsCollectionChanged;
     }
+
+    public void Dispose()
+    {
+        Materials.CollectionChanged -= OnItemsCollectionChanged;
+        Labors.CollectionChanged -= OnItemsCollectionChanged;
+        _veluxService.OnLoginRequired -= HandleVeluxLogin;
+        _veluxService.Dispose();
+    }
+
+    private static Brush GetCustomerSelectionBrush(bool hasCustomer) =>
+        ThemeResources.GetBrush(hasCustomer ? "CustomerValidBorderBrush" : "CustomerInvalidBorderBrush");
     #endregion
 
     #region Public Properties
@@ -159,13 +175,13 @@ public partial class MainViewModel : INotifyPropertyChanged
             if (value != null)
             {
                 ApplyCustomerDiscounts(value);
-                CustomerBorderBrush = Brushes.Green;
+                CustomerBorderBrush = GetCustomerSelectionBrush(true);
             }
             else
             {
                 MaterialDiscount = 0;
                 LaborDiscount = 0;
-                CustomerBorderBrush = Brushes.Red;
+                CustomerBorderBrush = GetCustomerSelectionBrush(false);
             }
 
             OnPropertyChanged();
@@ -178,7 +194,7 @@ public partial class MainViewModel : INotifyPropertyChanged
         set
         {
             _selectedSecondCustomer = value;
-            SecondCustomerBorderBrush = value != null ? Brushes.Green : Brushes.Red;
+            SecondCustomerBorderBrush = GetCustomerSelectionBrush(value != null);
             OnPropertyChanged();
         }
     }

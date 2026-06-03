@@ -10,16 +10,16 @@
             <RowDefinition Height="Auto"/> <!-- Pulsante -->
         </Grid.RowDefinitions>
         
-        <Border Background="#3498db" Padding="15">
+        <Border Background="{StaticResource PrimaryBlueBrush}" Padding="15">
             <TextBlock Text="Esegui il login VELUX. Una volta caricata la dashboard principale, clicca il pulsante verde in basso." 
-                       Foreground="White" FontWeight="Bold" TextAlignment="Center" FontSize="14"/>
+                       Foreground="{StaticResource WhiteBrush}" FontWeight="Bold" TextAlignment="Center" FontSize="14"/>
         </Border>
 
         <wv2:WebView2 x:Name="WebView" Grid.Row="1" Source="https://app.velux.it/cas/login"/>
         
-        <Border Grid.Row="2" Background="#f8f9fa" Padding="15" BorderBrush="#ddd" BorderThickness="0,1,0,0">
+        <Border Grid.Row="2" Background="{StaticResource VeluxFooterBackgroundBrush}" Padding="15" BorderBrush="{StaticResource LegacyLightBorderBrush}" BorderThickness="0,1,0,0">
             <Button Content="CONFERMA LOGIN E PROCEDI" Height="50" Width="300" 
-                    Background="#1abc9c" Foreground="White" FontSize="16" FontWeight="Bold" 
+                    Background="{StaticResource VeluxLoginButtonBrush}" Foreground="{StaticResource WhiteBrush}" FontSize="16" FontWeight="Bold"
                     BorderThickness="0" Cursor="Hand" Click="OnConfirmLoginClick"/>
         </Border>
     </Grid>

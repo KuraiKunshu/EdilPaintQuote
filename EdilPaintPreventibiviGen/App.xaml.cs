@@ -8,7 +8,6 @@ using System.Windows;
 using EdilPaintPreventibiviGen.Data;
 using EdilPaintPreventibiviGen.Services;
 using EdilPaintPreventibiviGen.ViewModels;
-using Microsoft.Extensions.Configuration;
 
 namespace EdilPaintPreventibiviGen;
 
@@ -39,10 +38,7 @@ public partial class App : Application
 
             var startupWatch = Stopwatch.StartNew();
 
-            var configuration = new ConfigurationBuilder()
-                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
-                .Build();
+            var configuration = AppSettingsFileService.BuildConfiguration();
 
             AppSettings = new AppSettingsService(configuration);
             IsSilentStartup = AppSettings.App.IsSilentStartup;
@@ -60,10 +56,18 @@ public partial class App : Application
                 Path.Combine(baseDir, "..", "..", "..", "assets")
             ];
             string assetsPath = candidates.FirstOrDefault(Directory.Exists) ?? candidates[0];
-            var localStore = new LocalJsonStoreService(assetsPath);
+            string localDataPath = LocalApplicationDataService.EnsureDataDirectory(assetsPath);
+            var localStore = new LocalJsonStoreService(localDataPath);
+            var pdfOutbox = new LocalPdfOutboxService(localDataPath);
+            var attachmentOutbox = new LocalAttachmentOutboxService(localDataPath);
+            var costsPdfOutbox = new LocalCostsPdfOutboxService(localDataPath);
+            var quotePatchOutbox = new LocalQuotePatchOutboxService(localDataPath);
+            var deletionOutbox = new LocalDeletionOutboxService(localDataPath);
 
-            DataService = new FallbackDataService(sqlService, localStore);
-            SyncService = new SyncService(DataService, sqlService, localStore);
+            DataService = new FallbackDataService(
+                sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
+            SyncService = new SyncService(
+                DataService, sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
 
             var loadingWindow = new LoadingWindow
             {
@@ -77,7 +81,7 @@ public partial class App : Application
             try
             {
                 await SetLoadingStatusAsync(loadingWindow, "1/5 - Connessione al database...");
-                await DataService.InitializeAsync();
+                await DataService.InitializeAsync(shutdownToken);
 
                 if (AppSettings.App.FirstStartup)
                 {
@@ -147,6 +151,9 @@ public partial class App : Application
 
         RunFinalSyncWithTimeout();
 
+        MainVm?.Dispose();
+        MainVm = null;
+
         _shutdownCts?.Dispose();
         _shutdownCts = null;
         _startupSyncTask = null;
@@ -164,7 +171,7 @@ public partial class App : Application
                 if (token.IsCancellationRequested || _isShuttingDown)
                     return;
 
-                var result = await SyncService.SyncAllAsync(force: true);
+                var result = await SyncService.SyncAllAsync(force: true, cancellationToken: token);
                 Debug.WriteLine($"[STARTUP] Sync completed: Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
             }
             catch (OperationCanceledException)
@@ -225,9 +232,11 @@ public partial class App : Application
 
         try
         {
-            var finalSyncTask = Task.Run(() => SyncService.SyncAllAsync(force: true));
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
+            var finalSyncTask = Task.Run(() => SyncService.SyncAllAsync(force: true, cancellationToken: timeoutCts.Token));
             if (!finalSyncTask.Wait(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds)))
             {
+                timeoutCts.Cancel();
                 Debug.WriteLine($"[SHUTDOWN] Final sync skipped after {ShutdownSyncTimeoutSeconds}s timeout.");
             }
         }
@@ -255,7 +264,7 @@ public partial class App : Application
         try
         {
             Debug.WriteLine("[PeriodicSync] Running scheduled sync...");
-            await SyncService.SyncAllAsync();
+            await SyncService.SyncAllAsync(cancellationToken: _shutdownCts?.Token ?? CancellationToken.None);
         }
         catch (Exception ex)
         {

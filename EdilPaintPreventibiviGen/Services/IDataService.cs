@@ -4,13 +4,14 @@ namespace EdilPaintPreventibiviGen.Services;
 // ... existing code ...
 public interface IDataService
 {
-    Task InitializeAsync();
+    Task InitializeAsync(CancellationToken cancellationToken = default);
+    bool CanSynchronize { get; }
     
     // Customers
-    Task<List<Customer>> GetCustomersAsync();
-    Task<Customer> AddCustomerAsync(Customer customer);
+    Task<List<Customer>> GetCustomersAsync(CancellationToken cancellationToken = default);
+    Task<Customer> AddCustomerAsync(Customer customer, CancellationToken cancellationToken = default);
     Task<Customer> UpdateCustomerAsync(string originalBusinessName, Customer customer);
-    Task DeleteCustomerAsync(string businessName);
+    Task DeleteCustomerAsync(Customer customer);
     
     // Company
     Task<Company?> GetCompanyAsync();
@@ -28,17 +29,21 @@ public interface IDataService
     Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take);
     Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int take);
     Task<HashSet<string>> GetAllQuoteNumbersAsync();
-    Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync();
-    Task<List<QuoteHistoryEntry>> GetQuotesByNumbersAsync(IEnumerable<string> quoteNumbers);
+    Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default);
+    Task<List<QuoteHistoryEntry>> GetQuotesByNumbersAsync(IEnumerable<string> quoteNumbers, CancellationToken cancellationToken = default);
     Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber);
-    Task SaveQuoteAsync(QuoteHistoryEntry quote);
+    Task SaveQuoteAsync(QuoteHistoryEntry quote, CancellationToken cancellationToken = default);
     Task DeleteQuoteAsync(string quoteNumber);
+    Task UpdateQuoteNotesAsync(string quoteNumber, string notes, CancellationToken cancellationToken = default);
+    Task UpdateQuoteStatusAsync(string quoteNumber, QuoteStatus status, CancellationToken cancellationToken = default);
     
     // Utilities
     Task<int> GetNextQuoteNumberAsync();
     Task<bool> IsDatabaseEmptyAsync();
-    Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber);
+    Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber, CancellationToken cancellationToken = default);
     Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber);
+    Task<bool> SaveQuoteCostsPdfAsync(string quoteNumber, StoredFile file, CancellationToken cancellationToken = default);
+    Task<byte[]?> GetQuoteCostsPdfContentAsync(string quoteNumber, CancellationToken cancellationToken = default);
 }
 
 public class QuoteMetadata

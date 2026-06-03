@@ -1,0 +1,13 @@
+{
+  "RepositoryUrl": "https://github.com/KuraiKunshu/EdilPaintQuote.git",
+  "Branch": "main",
+  "SourcePath": "C:\\EdilPaintUpdater\\source",
+  "InstallPath": "%USERPROFILE%\\Documents\\EdilPaint Preventivi",
+  "ProjectPath": "EdilPaintPreventibiviGen\\EdilPaintPreventibiviGen.csproj",
+  "SolutionPath": "EdilPaintPreventibiviGen.sln",
+  "Configuration": "Release",
+  "RunTests": true,
+  "ProcessName": "EdilPaintPreventibiviGen",
+  "StartDelaySeconds": 60,
+  "LogPath": "C:\\EdilPaintUpdater\\logs\\update.log"
+}

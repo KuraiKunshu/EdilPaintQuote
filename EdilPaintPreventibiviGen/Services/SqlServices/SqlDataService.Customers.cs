@@ -9,25 +9,30 @@ using Microsoft.EntityFrameworkCore;
 namespace EdilPaintPreventibiviGen.Services;
 public partial class SqlDataService
 {
-    public async Task<List<Customer>> GetCustomersAsync()
+    public async Task<List<Customer>> GetCustomersAsync(CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
         return await db.Customers
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.BusinessName)
             .Select(x => x.ToModel())
-            .ToListAsync()
+            .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
 
-    public async Task<Customer> AddCustomerAsync(Customer customer)
+    public async Task<Customer> AddCustomerAsync(
+        Customer customer,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
+        if (customer.SyncId == Guid.Empty)
+            customer.SyncId = Guid.NewGuid();
 
-        // Controlla se esiste giÃ  un cliente con lo stesso nome (evita duplicati)
         var existing = await db.Customers
-            .FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName);
+            .FirstOrDefaultAsync(x => x.SyncId == customer.SyncId, cancellationToken)
+            ?? await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName, cancellationToken);
 
         if (existing != null)
         {
@@ -38,23 +43,28 @@ public partial class SqlDataService
             existing.MaterialDiscount = customer.MaterialDiscount;
             existing.LaborDiscount = customer.LaborDiscount;
             existing.LastModifiedUtc = customer.LastModifiedUtc;
-            await db.SaveChangesAsync();
+            existing.SyncId = customer.SyncId;
+            existing.IsDeleted = false;
+            await db.SaveChangesAsync(cancellationToken);
             return existing.ToModel();
         }
 
         // Nuovo cliente
         var entity = customer.ToEntity();
         db.Customers.Add(entity);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return entity.ToModel();
     }
 
     public async Task<Customer> UpdateCustomerAsync(string originalBusinessName, Customer customer)
     {
         await using var db = AppDbContextFactory.Create();
+        if (customer.SyncId == Guid.Empty)
+            customer.SyncId = Guid.NewGuid();
 
         var entity = await db.Customers
-            .FirstOrDefaultAsync(x => x.BusinessName == originalBusinessName)
+            .FirstOrDefaultAsync(x => x.SyncId == customer.SyncId)
+            ?? await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == originalBusinessName)
             ?? await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName);
 
         if (entity == null)
@@ -71,19 +81,36 @@ public partial class SqlDataService
             entity.MaterialDiscount = customer.MaterialDiscount;
             entity.LaborDiscount = customer.LaborDiscount;
             entity.LastModifiedUtc = customer.LastModifiedUtc;
+            entity.SyncId = customer.SyncId;
+            entity.IsDeleted = false;
         }
 
         await db.SaveChangesAsync();
         return entity.ToModel();
     }
 
-    public async Task DeleteCustomerAsync(string businessName)
+    public Task DeleteCustomerAsync(Customer customer) =>
+        DeleteCustomerAsync(customer.SyncId, customer.BusinessName);
+
+    public async Task DeleteCustomerAsync(Guid syncId, string businessName)
     {
         await using var db = AppDbContextFactory.Create();
-        var entity = await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == businessName);
+        var entity = await db.Customers.FirstOrDefaultAsync(x =>
+            (syncId != Guid.Empty && x.SyncId == syncId) || x.BusinessName == businessName);
         if (entity == null) return;
-        db.Customers.Remove(entity);
+        entity.IsDeleted = true;
+        entity.LastModifiedUtc = DateTime.UtcNow;
         await db.SaveChangesAsync();
+    }
+
+    public async Task<List<Customer>> GetDeletedCustomersAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+        return await db.Customers
+            .AsNoTracking()
+            .Where(x => x.IsDeleted)
+            .Select(x => x.ToModel())
+            .ToListAsync(cancellationToken);
     }
 }
 

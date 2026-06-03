@@ -25,12 +25,15 @@ public partial class MainViewModel
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             return;
 
-        if (AttachedImages.Any(x => x.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase)))
+        string fileName = Path.GetFileName(filePath);
+        if (AttachedImages.Any(x =>
+                x.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
+                x.FileName.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
             return;
 
         AttachedImages.Add(new SelectedAttachment
         {
-            FileName = Path.GetFileName(filePath),
+            FileName = fileName,
             FilePath = filePath,
             ContentType = GetContentType(filePath),
             Content = File.ReadAllBytes(filePath)

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
+using EdilPaintPreventibiviGen.Services;
 using Microsoft.Web.WebView2.Core;
 
 namespace EdilPaintPreventibiviGen.Views;
@@ -53,8 +54,7 @@ public partial class VeluxLoginWindow : Window
             }
 
             var storage = new { cookies = cookieList };
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "velux_storage.json");
-            File.WriteAllText(path, JsonSerializer.Serialize(storage, new JsonSerializerOptions { WriteIndented = true }));
+            VeluxSessionStorage.Save(JsonSerializer.Serialize(storage, new JsonSerializerOptions { WriteIndented = true }));
 
             this.DialogResult = true;
             this.Close();

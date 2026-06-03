@@ -7,13 +7,14 @@
         SizeToContent="WidthAndHeight"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="Transparent"
+        Background="{StaticResource TransparentBrush}"
+        Icon="pack://application:,,,/Assets/Windowsicon/main.ico"
         Title="Caricamento">
 
-    <Grid Margin="18" Background="Transparent">
+    <Grid Margin="18" Background="{StaticResource TransparentBrush}">
         <Border Padding="24"
-                Background="White"
-                BorderBrush="#E5E7EB"
+                Background="{StaticResource WhiteBrush}"
+                BorderBrush="{StaticResource LoadingBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="14">
             <Border.Effect>
@@ -23,8 +24,8 @@
             </Border.Effect>
 
             <StackPanel Width="340">
-                <Border Background="#FFF1F5F9"
-                        BorderBrush="#FFE2E8F0"
+                <Border Background="{StaticResource LoadingIconBackgroundBrush}"
+                        BorderBrush="{StaticResource LoadingIconBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="10"
@@ -32,7 +33,7 @@
                     <TextBlock Text="EdilPaint"
                                FontSize="20"
                                FontWeight="Bold"
-                               Foreground="#991B1B"
+                               Foreground="{StaticResource LoadingIconForegroundBrush}"
                                HorizontalAlignment="Center"/>
                 </Border>
 
@@ -40,25 +41,25 @@
                            FontSize="14"
                            FontWeight="SemiBold"
                            HorizontalAlignment="Center"
-                           Foreground="#374151"
+                           Foreground="{StaticResource LoadingTitleBrush}"
                            Margin="0,0,0,8"/>
 
                 <TextBlock Text="{Binding StatusText, RelativeSource={RelativeSource AncestorType=Window}}"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
-                           Foreground="#6B7280"
+                           Foreground="{StaticResource LoadingMessageBrush}"
                            Margin="0,0,0,16"/>
 
                 <ProgressBar Height="16"
                              Minimum="0"
                              Maximum="100"
                              IsIndeterminate="{Binding IsLoading, RelativeSource={RelativeSource AncestorType=Window}}"
-                             Background="#F3F4F6"
-                             Foreground="#D32F2F"/>
+                             Background="{StaticResource LoadingProgressBackgroundBrush}"
+                             Foreground="{StaticResource MaterialRedBrush}"/>
 
                 <TextBlock Text="Attendere..."
                            FontSize="11"
-                           Foreground="#9CA3AF"
+                           Foreground="{StaticResource LoadingDetailBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,12,0,0"/>
             </StackPanel>
