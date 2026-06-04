@@ -1,9 +1,5 @@
-using System.Diagnostics;
-using System.Text.Json;
 using EdilPaintPreventibiviGen.Data;
 using EdilPaintPreventibiviGen.Data.Entities;
-using EdilPaintPreventibiviGen.Data.Mappers;
-using EdilPaintPreventibiviGen.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EdilPaintPreventibiviGen.Services;
@@ -11,11 +7,11 @@ public partial class SqlDataService
 {
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        
         await using var db = AppDbContextFactory.Create();
+
         await db.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureQuoteFilesSchemaAsync(db, cancellationToken);
         await db.Database.MigrateAsync(cancellationToken);
+        await EnsureLegacySchemaCompatibilityAsync(db, cancellationToken);
 
         if (!await db.CompanySettings.AnyAsync(cancellationToken))
         {
@@ -36,9 +32,14 @@ public partial class SqlDataService
         }
     }
 
-    private static async Task EnsureQuoteFilesSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
+    public async Task<bool> CanConnectAsync(CancellationToken cancellationToken = default)
     {
-        // --- tabelle esistenti (invariate) ---
+        await using var db = AppDbContextFactory.Create();
+        return await db.Database.CanConnectAsync(cancellationToken);
+    }
+
+    private static async Task EnsureLegacySchemaCompatibilityAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
         await db.Database.ExecuteSqlRawAsync("""
     IF OBJECT_ID(N'[dbo].[QuotePdfFiles]', N'U') IS NULL
     BEGIN
@@ -95,42 +96,40 @@ public partial class SqlDataService
     END
     """, cancellationToken);
 
-        // --- NUOVO: aggiunge LastModifiedUtc alla tabella Quotes se non esiste ---
-        await db.Database.ExecuteSqlRawAsync("""
-    IF NOT EXISTS (
-        SELECT 1 FROM sys.columns 
-        WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-          AND name = 'LastModifiedUtc'
-    )
-    BEGIN
-        ALTER TABLE [dbo].[Quotes] 
-        ADD [LastModifiedUtc] DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z';
-    END
-    """, cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "LastModifiedUtc",
+            "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "SyncHash", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "LastModifiedUtc",
+            "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
+        await EnsureCustomerSyncIdentityAsync(db, cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "IsDeleted", "BIT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "IsJointVenture", "BIT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "PartnerCompanyName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "CostAllocationsJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "IsDeleted", "BIT NOT NULL DEFAULT 0", cancellationToken);
+    }
 
-        // --- NUOVO: aggiunge SyncHash alla tabella Quotes se non esiste ---
-        await db.Database.ExecuteSqlRawAsync("""
-    IF NOT EXISTS (
-        SELECT 1 FROM sys.columns 
-        WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-          AND name = 'SyncHash'
-    )
+    private static Task EnsureColumnAsync(
+        AppDbContext db,
+        string tableName,
+        string columnName,
+        string columnDefinition,
+        CancellationToken cancellationToken)
+    {
+        string sql = $"""
+    IF COL_LENGTH(N'[dbo].[{tableName}]', N'{columnName}') IS NULL
     BEGIN
-        ALTER TABLE [dbo].[Quotes] 
-        ADD [SyncHash] NVARCHAR(100) NOT NULL DEFAULT '';
+        ALTER TABLE [dbo].[{tableName}] ADD [{columnName}] {columnDefinition};
     END
-    """, cancellationToken);
-        await db.Database.ExecuteSqlRawAsync("""
-     IF NOT EXISTS (
-         SELECT 1 FROM sys.columns 
-         WHERE object_id = OBJECT_ID(N'[dbo].[Customers]') 
-           AND name = 'LastModifiedUtc'
-     )
-     BEGIN
-         ALTER TABLE [dbo].[Customers] 
-         ADD [LastModifiedUtc] DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z';
-     END
-     """, cancellationToken);
+    """;
+
+        return db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private static async Task EnsureCustomerSyncIdentityAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
         await db.Database.ExecuteSqlRawAsync("""
      IF COL_LENGTH(N'[dbo].[Customers]', N'SyncId') IS NULL
      BEGIN
@@ -164,81 +163,6 @@ public partial class SqlDataService
          CREATE UNIQUE INDEX [IX_Customers_SyncId] ON [dbo].[Customers]([SyncId]);
      END
      """, cancellationToken);
-        await db.Database.ExecuteSqlRawAsync("""
-     IF NOT EXISTS (
-         SELECT 1 FROM sys.columns
-         WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
-           AND name = 'IsDeleted'
-     )
-     BEGIN
-         ALTER TABLE [dbo].[Customers] ADD [IsDeleted] BIT NOT NULL DEFAULT 0;
-     END
-     """, cancellationToken);
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'MaterialDiscount'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] 
-                                                 ADD [MaterialDiscount] FLOAT NOT NULL DEFAULT 0;
-                                             END
-                                             """, cancellationToken);
-
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'LaborDiscount'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] 
-                                                 ADD [LaborDiscount] FLOAT NOT NULL DEFAULT 0;
-                                             END
-                                             """, cancellationToken);
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'IsJointVenture'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] ADD [IsJointVenture] BIT NOT NULL DEFAULT 0;
-                                             END
-                                             """, cancellationToken);
-
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'PartnerCompanyName'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] ADD [PartnerCompanyName] NVARCHAR(250) NOT NULL DEFAULT '';
-                                             END
-                                             """, cancellationToken);
-
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns 
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]') 
-                                                   AND name = 'CostAllocationsJson'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] ADD [CostAllocationsJson] NVARCHAR(MAX) NOT NULL DEFAULT '';
-                                             END
-                                             """, cancellationToken);
-        await db.Database.ExecuteSqlRawAsync("""
-                                             IF NOT EXISTS (
-                                                 SELECT 1 FROM sys.columns
-                                                 WHERE object_id = OBJECT_ID(N'[dbo].[Quotes]')
-                                                   AND name = 'IsDeleted'
-                                             )
-                                             BEGIN
-                                                 ALTER TABLE [dbo].[Quotes] ADD [IsDeleted] BIT NOT NULL DEFAULT 0;
-                                             END
-                                             """, cancellationToken);
     }
 
     public async Task<bool> IsDatabaseEmptyAsync()

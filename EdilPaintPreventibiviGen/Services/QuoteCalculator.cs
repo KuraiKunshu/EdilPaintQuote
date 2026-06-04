@@ -62,10 +62,8 @@ public sealed class QuoteCalculator
             break;
 
         case "22%":
-            imponibile22 = netMat;
-            imponibile10 = netLab;
+            imponibile22 = netMat + netLab;
             iva22 = imponibile22 * 0.22;
-            iva10 = imponibile10 * 0.10;
             break;
 
         case "esclusa":
