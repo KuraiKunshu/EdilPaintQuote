@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Linq;
@@ -10,12 +11,15 @@ using EdilPaintPreventibiviGen.Services;
 using Microsoft.Win32;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace EdilPaintPreventibiviGen;
 
 public partial class MainWindow : Window
 {
     private CancellationTokenSource? _materialSearchCts;
+    private DispatcherTimer? _draftAutosaveTimer;
+    private bool _isAutosavingDraft;
     
     #region Constructor
     public MainWindow()
@@ -23,12 +27,22 @@ public partial class MainWindow : Window
         InitializeComponent();
         var vm = new MainViewModel();
         DataContext = vm;
-        Loaded += async (_, _) => await vm.InitializeAsync();
+        Loaded += async (_, _) =>
+        {
+            await vm.InitializeAsync();
+            await PromptDraftRecoveryAsync(vm);
+            StartDraftAutosave();
+        };
     }
     public MainWindow(MainViewModel vm)
     {
         InitializeComponent();
         DataContext = vm;
+        Loaded += async (_, _) =>
+        {
+            await PromptDraftRecoveryAsync(vm);
+            StartDraftAutosave();
+        };
     }
     #endregion
     
@@ -47,11 +61,93 @@ public partial class MainWindow : Window
             return;
         }
 
+        StopDraftAutosave();
+        if (DataContext is MainViewModel vm)
+        {
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                vm.SaveDraftAsync(cts.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("[SHUTDOWN] Draft autosave skipped after timeout.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SHUTDOWN] Draft autosave error: {ex.Message}");
+            }
+        }
+
         _materialSearchCts?.Cancel();
         _materialSearchCts?.Dispose();
         _materialSearchCts = null;
     }
     #endregion
+
+    private void StartDraftAutosave()
+    {
+        StopDraftAutosave();
+        _draftAutosaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(25)
+        };
+        _draftAutosaveTimer.Tick += OnDraftAutosaveTick;
+        _draftAutosaveTimer.Start();
+    }
+
+    private void StopDraftAutosave()
+    {
+        if (_draftAutosaveTimer == null)
+            return;
+
+        _draftAutosaveTimer.Stop();
+        _draftAutosaveTimer.Tick -= OnDraftAutosaveTick;
+        _draftAutosaveTimer = null;
+    }
+
+    private async void OnDraftAutosaveTick(object? sender, EventArgs e)
+    {
+        await AutosaveDraftAsync();
+    }
+
+    private async Task AutosaveDraftAsync()
+    {
+        if (_isAutosavingDraft || DataContext is not MainViewModel vm)
+            return;
+
+        _isAutosavingDraft = true;
+        try
+        {
+            await vm.SaveDraftAsync();
+        }
+        finally
+        {
+            _isAutosavingDraft = false;
+        }
+    }
+
+    private async Task PromptDraftRecoveryAsync(MainViewModel vm)
+    {
+        var draft = await vm.LoadDraftAsync();
+        if (draft == null)
+            return;
+
+        string savedAt = draft.LastModifiedUtc == default
+            ? "data sconosciuta"
+            : draft.LastModifiedUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+
+        var result = MessageBox.Show(
+            $"Ho trovato una bozza autosalvata del {savedAt}. Vuoi recuperarla?",
+            "Bozza disponibile",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+            vm.ApplyDraft(draft);
+        else
+            await vm.DiscardDraftAsync();
+    }
     
     #region On drag & drop
     private Point _dragStartPoint;
@@ -148,7 +244,7 @@ public partial class MainWindow : Window
     
     
     #region Image Handlers
-    private void OnAddImageClick(object sender, RoutedEventArgs e)
+    private async void OnAddImageClick(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
         {
@@ -162,7 +258,7 @@ public partial class MainWindow : Window
             {
                 foreach (string file in dialog.FileNames)
                 {
-                    vm.AddAttachmentFromPath(file);
+                    await vm.AddAttachmentFromPathAsync(file);
                 }
             }
         }
@@ -176,7 +272,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnImageDrop(object sender, DragEventArgs e)
+    private async void OnImageDrop(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
@@ -187,14 +283,14 @@ public partial class MainWindow : Window
                     foreach (string file in files)
                     {
                         if (!string.IsNullOrWhiteSpace(file))
-                            vm.AddAttachmentFromPath(file);
+                            await vm.AddAttachmentFromPathAsync(file);
                     }
                 }
             }
         }
     }
 
-    private void OnImagePaste(object sender, System.Windows.Input.KeyEventArgs e)
+    private async void OnImagePaste(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == System.Windows.Input.Key.V && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control)
         {
@@ -206,7 +302,7 @@ public partial class MainWindow : Window
                     foreach (string? file in files)
                     {
                         if (!string.IsNullOrWhiteSpace(file))
-                            vm.AddAttachmentFromPath(file);
+                            await vm.AddAttachmentFromPathAsync(file);
                     }
                 }
             }
@@ -217,7 +313,17 @@ public partial class MainWindow : Window
     #region General Handlers
     private void OnSelectCustomerClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Cliente" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedCustomer = win.SelectedResult; } }
     private void OnSelectReferenceClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Riferimento" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedSecondCustomer = win.SelectedResult; } }
-    private void OnNewQuoteClick(object sender, RoutedEventArgs e) { if (MessageBox.Show("Sicuro?", "Conferma", MessageBoxButton.YesNo) == MessageBoxResult.Yes) (DataContext as MainViewModel)?.ResetQuote(); }
+    private async void OnNewQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Sicuro?", "Conferma", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+            return;
+
+        if (DataContext is MainViewModel vm)
+        {
+            await vm.DiscardDraftAsync();
+            vm.ResetQuote();
+        }
+    }
     private void OnGeneratePdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GeneratePdf();
     private void OnGenerateCostsPdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GenerateCostsPdf();
     private void OnOpenHistoryClick(object sender, RoutedEventArgs e)
@@ -270,6 +376,21 @@ public partial class MainWindow : Window
     private void OnOpenSettingsClick(object sender, RoutedEventArgs e)
     {
         var win = new SettingsWindow { Owner = this };
+        win.ShowDialog();
+    }
+    private void OnOpenDashboardClick(object sender, RoutedEventArgs e)
+    {
+        var win = new DashboardWindow { Owner = this };
+        win.ShowDialog();
+    }
+    private void OnOpenDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        var win = new DiagnosticsWindow { Owner = this };
+        win.ShowDialog();
+    }
+    private void OnOpenPdfAuditClick(object sender, RoutedEventArgs e)
+    {
+        var win = new PdfArchiveAuditWindow { Owner = this };
         win.ShowDialog();
     }
     private void OnEditRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item) { var win = new EditItemWindow(item) { Owner = this }; if (win.ShowDialog() == true) (DataContext as MainViewModel)?.CalculateTotals(); } }

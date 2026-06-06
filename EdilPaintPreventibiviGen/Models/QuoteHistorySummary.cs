@@ -17,6 +17,15 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     private SyncStatus _syncStatus;
     private bool _isJointVenture;
     private string _partnerCompanyName = string.Empty;
+    private string _createdByDevice = string.Empty;
+    private string _lastModifiedByDevice = string.Empty;
+    private DateTime? _sentAtUtc;
+    private string _sentMethod = string.Empty;
+    private string _sentRecipient = string.Empty;
+    private string _sentByDevice = string.Empty;
+    private DateTime? _lastReminderAtUtc;
+    private int _reminderCount;
+    private string _lastReminderByDevice = string.Empty;
 
     public string QuoteNumber
     {
@@ -57,7 +66,12 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     public QuoteStatus Status
     {
         get => _status;
-        set { _status = value; OnPropertyChanged(); }
+        set
+        {
+            _status = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShouldRemind));
+        }
     }
 
     public string Notes
@@ -93,6 +107,88 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         get => _syncStatus;
         set { _syncStatus = value; OnPropertyChanged(); }
     }
+
+    public string CreatedByDevice
+    {
+        get => _createdByDevice;
+        set { _createdByDevice = value; OnPropertyChanged(); }
+    }
+
+    public string LastModifiedByDevice
+    {
+        get => _lastModifiedByDevice;
+        set { _lastModifiedByDevice = value; OnPropertyChanged(); }
+    }
+
+    public DateTime? SentAtUtc
+    {
+        get => _sentAtUtc;
+        set
+        {
+            _sentAtUtc = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SentDisplay));
+            OnPropertyChanged(nameof(IsSent));
+        }
+    }
+
+    public string SentMethod
+    {
+        get => _sentMethod;
+        set { _sentMethod = value; OnPropertyChanged(); OnPropertyChanged(nameof(SentDisplay)); }
+    }
+
+    public string SentRecipient
+    {
+        get => _sentRecipient;
+        set { _sentRecipient = value; OnPropertyChanged(); }
+    }
+
+    public string SentByDevice
+    {
+        get => _sentByDevice;
+        set { _sentByDevice = value; OnPropertyChanged(); }
+    }
+
+    public DateTime? LastReminderAtUtc
+    {
+        get => _lastReminderAtUtc;
+        set
+        {
+            _lastReminderAtUtc = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ReminderDisplay));
+            OnPropertyChanged(nameof(ShouldRemind));
+        }
+    }
+
+    public int ReminderCount
+    {
+        get => _reminderCount;
+        set { _reminderCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(ReminderDisplay)); }
+    }
+
+    public string LastReminderByDevice
+    {
+        get => _lastReminderByDevice;
+        set { _lastReminderByDevice = value; OnPropertyChanged(); }
+    }
+
+    public bool IsSent => SentAtUtc.HasValue;
+
+    public bool ShouldRemind =>
+        Status == QuoteStatus.Spedito &&
+        SentAtUtc.HasValue &&
+        DateTime.UtcNow - SentAtUtc.Value.ToUniversalTime() >= TimeSpan.FromDays(7) &&
+        (!LastReminderAtUtc.HasValue || DateTime.UtcNow - LastReminderAtUtc.Value.ToUniversalTime() >= TimeSpan.FromDays(7));
+
+    public string SentDisplay => SentAtUtc.HasValue
+        ? $"{SentAtUtc.Value.ToLocalTime():dd/MM/yyyy} {SentMethod}".Trim()
+        : "Non inviato";
+
+    public string ReminderDisplay => ReminderCount <= 0
+        ? "Mai"
+        : $"{ReminderCount} solleciti, ultimo {LastReminderAtUtc?.ToLocalTime():dd/MM/yyyy}";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

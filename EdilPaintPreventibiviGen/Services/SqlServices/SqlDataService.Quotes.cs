@@ -60,6 +60,16 @@ public partial class SqlDataService
                 x.LaborDiscount,
                 x.Total,
                 x.Status,
+                x.CreatedByDevice,
+                x.LastModifiedByDevice,
+                x.SentAtUtc,
+                x.SentMethod,
+                x.SentRecipient,
+                x.SentByDevice,
+                x.LastReminderAtUtc,
+                x.ReminderCount,
+                x.LastReminderByDevice,
+                x.EventsJson,
                 x.LastModifiedUtc,
                 x.IsJointVenture,
                 x.PartnerCompanyName,
@@ -127,6 +137,16 @@ public partial class SqlDataService
                 LaborDiscount = x.LaborDiscount,
                 Total = x.Total,
                 Status = x.Status,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice,
+                Events = DeserializeQuoteEvents(x.EventsJson),
                 IsJointVenture = x.IsJointVenture,
                 PartnerCompanyName = x.PartnerCompanyName,
                 OurCosts = costs?.OurCosts ?? [],
@@ -200,6 +220,16 @@ public partial class SqlDataService
             LaborDiscount = x.LaborDiscount,
             Total = x.Total,
             Status = x.Status,
+            CreatedByDevice = x.CreatedByDevice,
+            LastModifiedByDevice = x.LastModifiedByDevice,
+            SentAtUtc = x.SentAtUtc,
+            SentMethod = x.SentMethod,
+            SentRecipient = x.SentRecipient,
+            SentByDevice = x.SentByDevice,
+            LastReminderAtUtc = x.LastReminderAtUtc,
+            ReminderCount = x.ReminderCount,
+            LastReminderByDevice = x.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(x.EventsJson),
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
             SyncHash = x.SyncHash,
@@ -296,6 +326,16 @@ public partial class SqlDataService
             BaseVersionUtc = x.LastModifiedUtc,
             Total = x.Total,
             Status = x.Status,
+            CreatedByDevice = x.CreatedByDevice,
+            LastModifiedByDevice = x.LastModifiedByDevice,
+            SentAtUtc = x.SentAtUtc,
+            SentMethod = x.SentMethod,
+            SentRecipient = x.SentRecipient,
+            SentByDevice = x.SentByDevice,
+            LastReminderAtUtc = x.LastReminderAtUtc,
+            ReminderCount = x.ReminderCount,
+            LastReminderByDevice = x.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(x.EventsJson),
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
                 Name = m.Name,
@@ -363,6 +403,16 @@ public partial class SqlDataService
             LaborDiscount = x.LaborDiscount,
             Total = x.Total,
             Status = x.Status,
+            CreatedByDevice = x.CreatedByDevice,
+            LastModifiedByDevice = x.LastModifiedByDevice,
+            SentAtUtc = x.SentAtUtc,
+            SentMethod = x.SentMethod,
+            SentRecipient = x.SentRecipient,
+            SentByDevice = x.SentByDevice,
+            LastReminderAtUtc = x.LastReminderAtUtc,
+            ReminderCount = x.ReminderCount,
+            LastReminderByDevice = x.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(x.EventsJson),
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
                 Name = m.Name,
@@ -388,7 +438,9 @@ public partial class SqlDataService
         }).ToList();
     }
 
-    public async Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take)
+    public async Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(
+        int take,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -409,9 +461,18 @@ public partial class SqlDataService
                 Status = x.Status,
                 Notes = x.Notes,
                 IsJointVenture = x.IsJointVenture,
-                PartnerCompanyName = x.PartnerCompanyName
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int take)
@@ -446,7 +507,16 @@ public partial class SqlDataService
                 Status = x.Status,
                 Notes = x.Notes,
                 IsJointVenture = x.IsJointVenture,
-                PartnerCompanyName = x.PartnerCompanyName
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice
             })
             .ToListAsync();
     }
@@ -483,7 +553,16 @@ public partial class SqlDataService
                 Status = x.Status,
                 Notes = x.Notes,
                 IsJointVenture = x.IsJointVenture,
-                PartnerCompanyName = x.PartnerCompanyName
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice
             })
             .ToListAsync();
     }
@@ -529,6 +608,16 @@ public partial class SqlDataService
             LaborDiscount = q.LaborDiscount,
             Total = q.Total,
             Status = q.Status,
+            CreatedByDevice = q.CreatedByDevice,
+            LastModifiedByDevice = q.LastModifiedByDevice,
+            SentAtUtc = q.SentAtUtc,
+            SentMethod = q.SentMethod,
+            SentRecipient = q.SentRecipient,
+            SentByDevice = q.SentByDevice,
+            LastReminderAtUtc = q.LastReminderAtUtc,
+            ReminderCount = q.ReminderCount,
+            LastReminderByDevice = q.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(q.EventsJson),
             LastModifiedUtc = q.LastModifiedUtc,
             BaseVersionUtc = q.LastModifiedUtc,
             SyncHash = q.SyncHash,
@@ -607,13 +696,70 @@ public partial class SqlDataService
         string quoteNumber,
         string notes,
         CancellationToken cancellationToken = default) =>
-        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Notes = notes, cancellationToken);
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            quote.Notes = notes;
+            quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            AppendQuoteEvent(quote, "note", string.IsNullOrWhiteSpace(notes) ? "Note svuotate" : "Note aggiornate");
+        }, cancellationToken);
 
     public Task UpdateQuoteStatusAsync(
         string quoteNumber,
         QuoteStatus status,
         CancellationToken cancellationToken = default) =>
-        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Status = status, cancellationToken);
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            quote.Status = status;
+            quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            AppendQuoteEvent(quote, "stato", $"Stato aggiornato: {status}");
+        }, cancellationToken);
+
+    public Task UpdateQuoteSendInfoAsync(
+        string quoteNumber,
+        QuoteSendInfo sendInfo,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(sendInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : sendInfo.DeviceName.Trim();
+
+            quote.Status = QuoteStatus.Spedito;
+            quote.SentAtUtc = sendInfo.SentAtUtc == default ? DateTime.UtcNow : sendInfo.SentAtUtc;
+            quote.SentMethod = sendInfo.Method?.Trim() ?? string.Empty;
+            quote.SentRecipient = sendInfo.Recipient?.Trim() ?? string.Empty;
+            quote.SentByDevice = deviceName;
+            quote.LastModifiedByDevice = deviceName;
+            AppendQuoteEvent(
+                quote,
+                "invio",
+                $"Preventivo inviato tramite {quote.SentMethod}".Trim(),
+                deviceName,
+                quote.SentAtUtc.Value);
+        }, cancellationToken);
+
+    public Task RegisterQuoteReminderAsync(
+        string quoteNumber,
+        QuoteReminderInfo reminderInfo,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(reminderInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : reminderInfo.DeviceName.Trim();
+
+            quote.Status = QuoteStatus.Spedito;
+            quote.LastReminderAtUtc = reminderInfo.ReminderAtUtc == default ? DateTime.UtcNow : reminderInfo.ReminderAtUtc;
+            quote.ReminderCount += 1;
+            quote.LastReminderByDevice = deviceName;
+            quote.LastModifiedByDevice = deviceName;
+            AppendQuoteEvent(
+                quote,
+                "sollecito",
+                $"Sollecito registrato (n. {quote.ReminderCount})",
+                deviceName,
+                quote.LastReminderAtUtc.Value);
+        }, cancellationToken);
 
     private async Task UpdateQuoteMetadataAsync(
         string quoteNumber,
@@ -652,6 +798,16 @@ public partial class SqlDataService
             LaborDiscount = entry.LaborDiscount,
             Total = entry.Total,
             Status = entry.Status,
+            CreatedByDevice = entry.CreatedByDevice,
+            LastModifiedByDevice = entry.LastModifiedByDevice,
+            SentAtUtc = entry.SentAtUtc,
+            SentMethod = entry.SentMethod,
+            SentRecipient = entry.SentRecipient,
+            SentByDevice = entry.SentByDevice,
+            LastReminderAtUtc = entry.LastReminderAtUtc,
+            ReminderCount = entry.ReminderCount,
+            LastReminderByDevice = entry.LastReminderByDevice,
+            Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,
@@ -742,6 +898,16 @@ public partial class SqlDataService
                     existing.LaborDiscount = quote.LaborDiscount;
                     existing.Total = quote.Total;
                     existing.Status = quote.Status;
+                    existing.CreatedByDevice = quote.CreatedByDevice;
+                    existing.LastModifiedByDevice = quote.LastModifiedByDevice;
+                    existing.SentAtUtc = quote.SentAtUtc;
+                    existing.SentMethod = quote.SentMethod;
+                    existing.SentRecipient = quote.SentRecipient;
+                    existing.SentByDevice = quote.SentByDevice;
+                    existing.LastReminderAtUtc = quote.LastReminderAtUtc;
+                    existing.ReminderCount = quote.ReminderCount;
+                    existing.LastReminderByDevice = quote.LastReminderByDevice;
+                    existing.EventsJson = SerializeQuoteEvents(quote.Events);
                     existing.LastModifiedUtc = savedAtUtc;
                     existing.SyncHash = quote.SyncHash;
                     
@@ -844,6 +1010,16 @@ public partial class SqlDataService
                         MaterialDiscount = quote.MaterialDiscount,
                         LaborDiscount = quote.LaborDiscount,
                         Status = quote.Status,
+                        CreatedByDevice = quote.CreatedByDevice,
+                        LastModifiedByDevice = quote.LastModifiedByDevice,
+                        SentAtUtc = quote.SentAtUtc,
+                        SentMethod = quote.SentMethod,
+                        SentRecipient = quote.SentRecipient,
+                        SentByDevice = quote.SentByDevice,
+                        LastReminderAtUtc = quote.LastReminderAtUtc,
+                        ReminderCount = quote.ReminderCount,
+                        LastReminderByDevice = quote.LastReminderByDevice,
+                        EventsJson = SerializeQuoteEvents(quote.Events),
                         LastModifiedUtc = savedAtUtc,
                         SyncHash = quote.SyncHash,
                         IsJointVenture = quote.IsJointVenture,
@@ -1019,6 +1195,41 @@ public partial class SqlDataService
         if (string.IsNullOrWhiteSpace(json)) return null;
         try { return JsonSerializer.Deserialize<CostAllocations>(json); }
         catch { return null; }
+    }
+
+    private static List<QuoteEventEntry> DeserializeQuoteEvents(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new List<QuoteEventEntry>();
+
+        try { return JsonSerializer.Deserialize<List<QuoteEventEntry>>(json) ?? new List<QuoteEventEntry>(); }
+        catch { return new List<QuoteEventEntry>(); }
+    }
+
+    private static string SerializeQuoteEvents(IEnumerable<QuoteEventEntry>? events)
+    {
+        return JsonSerializer.Serialize(events?.ToList() ?? new List<QuoteEventEntry>());
+    }
+
+    private static void AppendQuoteEvent(
+        QuoteEntity quote,
+        string eventType,
+        string description,
+        string? deviceName = null,
+        DateTime? createdAtUtc = null)
+    {
+        var events = DeserializeQuoteEvents(quote.EventsJson);
+        events.Add(new QuoteEventEntry
+        {
+            CreatedAtUtc = (createdAtUtc ?? DateTime.UtcNow).ToUniversalTime(),
+            DeviceName = string.IsNullOrWhiteSpace(deviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : deviceName.Trim(),
+            EventType = eventType,
+            Description = description
+        });
+
+        quote.EventsJson = SerializeQuoteEvents(events);
     }
 }
 

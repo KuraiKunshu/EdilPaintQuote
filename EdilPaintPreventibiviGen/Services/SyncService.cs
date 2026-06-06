@@ -21,7 +21,30 @@ public class SyncService
     private readonly LocalQuotePatchOutboxService _quotePatchOutbox;
     private readonly LocalDeletionOutboxService _deletionOutbox;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
+    private readonly object _statusLock = new();
     private DateTime _lastSyncTime = DateTime.MinValue;
+    private DateTime? _lastSyncCompletedUtc;
+    private string _lastSyncSummary = "Sincronizzazione non ancora eseguita.";
+
+    public bool IsSyncRunning => _syncLock.CurrentCount == 0;
+
+    public DateTime? LastSyncCompletedUtc
+    {
+        get
+        {
+            lock (_statusLock)
+                return _lastSyncCompletedUtc;
+        }
+    }
+
+    public string LastSyncSummary
+    {
+        get
+        {
+            lock (_statusLock)
+                return _lastSyncSummary;
+        }
+    }
 
     public SyncService(
         IDataService dataService,
@@ -61,6 +84,7 @@ public class SyncService
             else if (!await _syncLock.WaitAsync(0, cancellationToken))
             {
                 Debug.WriteLine("[Sync] Already syncing, skipping...");
+                UpdateSyncStatus(null, "Sincronizzazione gia' in corso.");
                 return new SyncResult { AlreadyRunning = true };
             }
             else
@@ -73,12 +97,14 @@ public class SyncService
             if (!_dataService.CanSynchronize)
             {
                 Debug.WriteLine("[Sync] Database unavailable, skipping automatic synchronization.");
+                UpdateSyncStatus(DateTime.UtcNow, "Database non disponibile: sincronizzazione saltata.");
                 return new SyncResult { Skipped = true };
             }
 
             if (!force && (DateTime.UtcNow - _lastSyncTime).TotalSeconds < 30)
             {
                 Debug.WriteLine("[Sync] Too soon since last sync, skipping...");
+                UpdateSyncStatus(_lastSyncTime, "Sincronizzazione saltata: eseguita da meno di 30 secondi.");
                 return new SyncResult { Skipped = true };
             }
 
@@ -103,6 +129,7 @@ public class SyncService
 
             _lastSyncTime = DateTime.UtcNow;
             result.EndTime = DateTime.UtcNow;
+            UpdateSyncStatus(result.EndTime, $"Completata: preventivi {result.QuotesSynced}, clienti {result.CustomersSynced}, conflitti {result.QuotesConflicts + result.CustomersConflicts}.");
 
             Debug.WriteLine($"║ SYNC COMPLETED in {result.Duration.TotalSeconds:F2}s");
             Debug.WriteLine($"║ Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
@@ -112,17 +139,30 @@ public class SyncService
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[Sync] Cancelled.");
+            UpdateSyncStatus(DateTime.UtcNow, "Sincronizzazione annullata.");
             throw;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[Sync] ❌ ERROR: {ex.Message}");
+            UpdateSyncStatus(DateTime.UtcNow, $"Errore sincronizzazione: {ex.Message}");
             return new SyncResult { Error = ex.Message };
         }
         finally
         {
             if (lockTaken)
                 _syncLock.Release();
+        }
+    }
+
+    private void UpdateSyncStatus(DateTime? completedUtc, string summary)
+    {
+        lock (_statusLock)
+        {
+            if (completedUtc.HasValue)
+                _lastSyncCompletedUtc = completedUtc;
+
+            _lastSyncSummary = summary;
         }
     }
 
@@ -446,6 +486,10 @@ public class SyncService
                     await _sqlService.UpdateQuoteNotesAsync(patch.QuoteNumber, patch.Notes, cancellationToken);
                 if (patch.Status.HasValue)
                     await _sqlService.UpdateQuoteStatusAsync(patch.QuoteNumber, patch.Status.Value, cancellationToken);
+                if (patch.SendInfo != null)
+                    await _sqlService.UpdateQuoteSendInfoAsync(patch.QuoteNumber, patch.SendInfo, cancellationToken);
+                if (patch.ReminderInfo != null)
+                    await _sqlService.RegisterQuoteReminderAsync(patch.QuoteNumber, patch.ReminderInfo, cancellationToken);
 
                 var databaseVersion = await _sqlService.GetQuoteByNumberAsync(patch.QuoteNumber);
                 if (databaseVersion != null)

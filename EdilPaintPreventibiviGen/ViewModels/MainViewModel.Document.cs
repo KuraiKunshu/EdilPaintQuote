@@ -59,14 +59,16 @@ public partial class MainViewModel
         CalculateTotals();
     }
 
-    public async Task<bool> HasMissingPdfsAsync()
+    public async Task<bool> HasMissingPdfsAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             // Carica solo i summary (leggeri) invece dell'intero storico
-            var summaries = await _dataService.GetQuoteSummariesAsync(int.MaxValue);
+            var summaries = await _dataService.GetQuoteSummariesAsync(int.MaxValue, cancellationToken);
             foreach (var entry in summaries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 bool isOfficialPdfMissing = !File.Exists(_storagePathService.BuildQuotePdfPath(
                     entry.CustomerName,
                     entry.QuoteNumber,
@@ -85,13 +87,17 @@ public partial class MainViewModel
                         string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName));
 
                 if (isCostsPdfMissing &&
-                    await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber) is { Length: > 0 })
+                    await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber, cancellationToken) is { Length: > 0 })
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -100,7 +106,9 @@ public partial class MainViewModel
         }
     }
 
-    public async Task GenerateInitialPdfsAsync(IProgress<string>? progress = null)
+    public async Task GenerateInitialPdfsAsync(
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         var watch = Stopwatch.StartNew();
 
@@ -121,13 +129,15 @@ public partial class MainViewModel
         }
 
         progress?.Report("Analisi storico: caricamento elenco preventivi...");
-        var historyEntries = await _dataService.GetQuoteSummariesAsync(int.MaxValue);
+        var historyEntries = await _dataService.GetQuoteSummariesAsync(int.MaxValue, cancellationToken);
 
         int total = historyEntries.Count;
         int current = 0;
 
         foreach (var entry in historyEntries)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             current++;
             progress?.Report($"Analisi storico: {current}/{total} - Preventivo {entry.QuoteNumber}");
 
@@ -149,12 +159,12 @@ public partial class MainViewModel
                 string expectedPath = _quoteHistoryService.GetExpectedPdfPath(lightweightEntry);
                 string restoredPath = File.Exists(expectedPath)
                     ? expectedPath
-                    : await _quoteHistoryService.EnsureOfficialPdfExistsAsync(lightweightEntry);
+                    : await _quoteHistoryService.EnsureOfficialPdfExistsAsync(lightweightEntry, cancellationToken);
                 if (entry.IsJointVenture)
                 {
                     string expectedCostsPath = _quoteHistoryService.GetExpectedCostsPdfPath(lightweightEntry);
                     if (!File.Exists(expectedCostsPath))
-                        await _quoteHistoryService.EnsureCostsPdfExistsAsync(lightweightEntry);
+                        await _quoteHistoryService.EnsureCostsPdfExistsAsync(lightweightEntry, cancellationToken);
                 }
 
                 if (!string.IsNullOrWhiteSpace(restoredPath) && File.Exists(restoredPath))
@@ -165,6 +175,9 @@ public partial class MainViewModel
             }
             catch (Exception ex)
             {
+                if (ex is OperationCanceledException)
+                    throw;
+
                 Debug.WriteLine($"[STARTUP][HISTORY] ERRORE su preventivo {entry.QuoteNumber}: {ex.Message}");
             }
         }
@@ -276,6 +289,7 @@ public partial class MainViewModel
             if (!await SaveToHistoryAsync(targetPath, incrementCounter, effectiveDate, pathToGenerate))
                 return;
             _hasPersistedCurrentQuote = true;
+            await DiscardDraftAsync();
 
             try { File.Delete(pathToGenerate); }
             catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error deleting temporary PDF: {ex.Message}"); }

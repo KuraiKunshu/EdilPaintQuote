@@ -18,6 +18,8 @@ namespace EdilPaintPreventibiviGen.Views;
 
 public partial class HistoryWindow : Window
 {
+    private const int MaxVisibleHistoryRows = 250;
+
     private readonly MainViewModel _vm;
     private readonly QuoteHistoryService _historyService;
     private readonly int _initialHistoryCount;
@@ -34,7 +36,7 @@ public partial class HistoryWindow : Window
 
         _vm = vm;
         _historyService = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
-        _initialHistoryCount = Math.Max(1, App.AppSettings.App.NumberOfQuote);
+        _initialHistoryCount = NormalizeHistoryTake(App.AppSettings.App.NumberOfQuote);
 
         DataContext = _vm;
         HistoryView = CollectionViewSource.GetDefaultView(_vm.HistorySummaries);
@@ -139,10 +141,7 @@ public partial class HistoryWindow : Window
 
             Debug.WriteLine($"[LoadInitialHistory] Caricamento primi {_initialHistoryCount} preventivi...");
 
-            await Task.Run(async () =>
-            {
-                await _vm.LoadHistorySummariesAsync(_initialHistoryCount, token);
-            }, token);
+            var summaries = await _historyService.LoadTopSummariesAsync(_initialHistoryCount, token);
 
             if (token.IsCancellationRequested)
             {
@@ -150,8 +149,7 @@ public partial class HistoryWindow : Window
                 return;
             }
 
-            foreach (var summary in _vm.HistorySummaries)
-                _loadedQuoteNumbers.Add(summary.QuoteNumber);
+            ReplaceHistorySummaries(summaries);
 
             Debug.WriteLine($"[LoadInitialHistory] Caricati {_vm.HistorySummaries.Count} preventivi");
 
@@ -187,18 +185,14 @@ public partial class HistoryWindow : Window
 
             Debug.WriteLine($"[RunSearch] Inizio ricerca per: '{searchText}'");
 
-            int take = Math.Max(1, App.AppSettings.App.NumberOfQuote);
+            int take = NormalizeHistoryTake(App.AppSettings.App.NumberOfQuote);
 
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
 
-            var results = await Task.Run(async () =>
-            {
-                Debug.WriteLine("[RunSearch] Chiamata a SearchHistorySummariesAsync...");
-                var data = await _vm.SearchHistorySummariesAsync(searchText, take, linkedCts.Token);
-                Debug.WriteLine($"[RunSearch] Ricevuti {data?.Count ?? 0} risultati");
-                return data;
-            }, linkedCts.Token);
+            Debug.WriteLine("[RunSearch] Chiamata a SearchHistorySummariesAsync...");
+            var results = await _vm.SearchHistorySummariesAsync(searchText, take, linkedCts.Token);
+            Debug.WriteLine($"[RunSearch] Ricevuti {results?.Count ?? 0} risultati");
 
             if (token.IsCancellationRequested)
             {
@@ -206,27 +200,19 @@ public partial class HistoryWindow : Window
                 return;
             }
 
-            _loadedQuoteNumbers.Clear();
-            _vm.HistorySummaries.Clear();
-
-            if (results != null)
-            {
-                foreach (var entry in results)
-                {
-                    _vm.HistorySummaries.Add(entry);
-                    _loadedQuoteNumbers.Add(entry.QuoteNumber);
-                }
-
-                Debug.WriteLine($"[RunSearch] Aggiunti {results.Count} preventivi alla UI");
-            }
+            ReplaceHistorySummaries(results ?? []);
+            Debug.WriteLine($"[RunSearch] Aggiunti {results?.Count ?? 0} preventivi alla UI");
 
             ApplyLocalFilters();
         }
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[RunSearch] Task cancellato o timeout");
-            MessageBox.Show("La ricerca e' stata annullata o ha superato il tempo limite (30 secondi).",
-                "Ricerca Interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (!token.IsCancellationRequested)
+            {
+                MessageBox.Show("La ricerca ha superato il tempo limite (30 secondi).",
+                    "Ricerca interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
         catch (Exception ex)
         {
@@ -269,6 +255,24 @@ public partial class HistoryWindow : Window
         HistoryView.Refresh();
     }
 
+    private static int NormalizeHistoryTake(int configuredTake)
+        => Math.Clamp(configuredTake <= 0 ? 100 : configuredTake, 1, MaxVisibleHistoryRows);
+
+    private void ReplaceHistorySummaries(IEnumerable<QuoteHistorySummary> summaries)
+    {
+        _loadedQuoteNumbers.Clear();
+
+        using (HistoryView.DeferRefresh())
+        {
+            _vm.HistorySummaries.Clear();
+            foreach (var summary in summaries)
+            {
+                _vm.HistorySummaries.Add(summary);
+                _loadedQuoteNumbers.Add(summary.QuoteNumber);
+            }
+        }
+    }
+
     private void OnFilterChanged(object sender, EventArgs e)
     {
         ApplyLocalFilters();
@@ -308,15 +312,79 @@ public partial class HistoryWindow : Window
     {
         if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
 
-        var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
-        if (fullEntry == null) return;
-
-        var notesWin = new NotesWindow(fullEntry.Notes) { Owner = this };
+        var notesWin = new NotesWindow(entry.Notes) { Owner = this };
 
         if (notesWin.ShowDialog() == true)
         {
             await _historyService.UpdateNotesAsync(entry.QuoteNumber, notesWin.ResultNotes);
             entry.Notes = notesWin.ResultNotes;
+        }
+    }
+
+    private async void OnSendQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
+
+        var win = new QuoteSendWindow(entry) { Owner = this };
+        if (win.ShowDialog() != true)
+            return;
+
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            await _historyService.UpdateSendInfoAsync(entry.QuoteNumber, win.Result);
+            entry.Status = QuoteStatus.Spedito;
+            entry.SentAtUtc = win.Result.SentAtUtc;
+            entry.SentMethod = win.Result.Method;
+            entry.SentRecipient = win.Result.Recipient;
+            entry.SentByDevice = win.Result.DeviceName;
+            entry.LastModifiedByDevice = win.Result.DeviceName;
+            ApplyLocalFilters();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore durante il salvataggio dell'invio: {ex.Message}",
+                "Invio preventivo", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+    }
+
+    private async void OnReminderClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
+
+        if (MessageBox.Show($"Registrare un sollecito per il preventivo n. {entry.QuoteNumber}?",
+                "Sollecito", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        var reminder = new QuoteReminderInfo
+        {
+            ReminderAtUtc = DateTime.UtcNow,
+            DeviceName = DeviceNameService.GetCurrentDeviceName()
+        };
+
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            await _historyService.RegisterReminderAsync(entry.QuoteNumber, reminder);
+            entry.Status = QuoteStatus.Spedito;
+            entry.LastReminderAtUtc = reminder.ReminderAtUtc;
+            entry.ReminderCount += 1;
+            entry.LastReminderByDevice = reminder.DeviceName;
+            entry.LastModifiedByDevice = reminder.DeviceName;
+            ApplyLocalFilters();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore durante il salvataggio del sollecito: {ex.Message}",
+                "Sollecito", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
         }
     }
 

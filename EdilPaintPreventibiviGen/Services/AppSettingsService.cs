@@ -10,6 +10,7 @@ public sealed class AppSettingsService
 {
 	public AppSettingsServiceModel App { get; }
 	public PdfStorageSettingsModel PdfStorage { get; }
+	public PdfTemplateSettingsModel PdfTemplate { get; }
 	public DatabaseSettingsModel Database { get; }
 	public string SettingsPath { get; }
 
@@ -18,6 +19,8 @@ public sealed class AppSettingsService
 		SettingsPath = AppSettingsFileService.EnsureExists();
 		App = configuration.GetSection("App").Get<AppSettingsServiceModel>() ?? new AppSettingsServiceModel();
 		PdfStorage = configuration.GetSection("PdfStorage").Get<PdfStorageSettingsModel>() ?? new PdfStorageSettingsModel();
+		PdfTemplate = configuration.GetSection("PdfTemplate").Get<PdfTemplateSettingsModel>() ?? new PdfTemplateSettingsModel();
+		PdfTemplate.Normalize();
 		Database = LoadDatabaseSettings(configuration);
 	}
 
@@ -41,6 +44,7 @@ public sealed class AppSettingsService
 		};
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
+		root["PdfTemplate"] = JsonSerializer.SerializeToNode(PdfTemplate, jsonOptions);
 
 		string temporaryPath = SettingsPath + ".tmp";
 		File.WriteAllText(temporaryPath, root.ToJsonString(jsonOptions));
@@ -119,10 +123,27 @@ public sealed class AppSettingsServiceModel
 {
 	public bool FirstStartup { get; set; } = true;
 	public bool GeneratePDF { get; set; } = true;
+	public bool RestoreMissingPdfsOnStartup { get; set; }
 	public bool IsSilentStartup { get; set; } = true;
 	public bool UseVeluxLogin { get; set; }
 	public int NumberOfQuote { get; set; } = 100;
 	public string TempPath { get; set; } = string.Empty;
+	public string DeviceName { get; set; } = string.Empty;
+
+	public string GetEffectiveDeviceName()
+	{
+		if (!string.IsNullOrWhiteSpace(DeviceName))
+			return DeviceName.Trim();
+
+		try
+		{
+			return Environment.MachineName;
+		}
+		catch
+		{
+			return "PC sconosciuto";
+		}
+	}
 
 	/// <summary>
 	/// Restituisce il percorso temp effettivo: quello configurato se valido, altrimenti %TEMP%\EdilPaintPreventivi.
@@ -158,6 +179,35 @@ public sealed class PdfStorageSettingsModel
 	public string? HistorySubFolder { get; set; }
 	public string? CustomerFolderPattern { get; set; }
 	public string? PdfFileNamePattern { get; set; }
+}
+
+public sealed class PdfTemplateSettingsModel
+{
+	public static readonly string[] AvailableTemplates =
+	[
+		"Standard",
+		"Compatto",
+		"Collaborazione",
+		"Cliente privato",
+		"Impresa"
+	];
+
+	public string ActiveTemplate { get; set; } = "Standard";
+	public string NotesTitle { get; set; } = "NOTE E TERMINI DI PAGAMENTO";
+	public string FooterText { get; set; } = string.Empty;
+	public string SignatureText { get; set; } = "Firma per accettazione";
+	public bool ShowTemplateName { get; set; }
+
+	public void Normalize()
+	{
+		if (string.IsNullOrWhiteSpace(ActiveTemplate))
+			ActiveTemplate = "Standard";
+		if (string.IsNullOrWhiteSpace(NotesTitle))
+			NotesTitle = "NOTE E TERMINI DI PAGAMENTO";
+		if (string.IsNullOrWhiteSpace(SignatureText))
+			SignatureText = "Firma per accettazione";
+		FooterText ??= string.Empty;
+	}
 }
 
 public sealed class DatabaseSettingsModel

@@ -145,6 +145,16 @@ public partial class MainViewModel
                 entry.Date = existingEntry.Date;
                 entry.Status = existingEntry.Status;
                 entry.Notes = existingEntry.Notes;
+                entry.CreatedByDevice = existingEntry.CreatedByDevice;
+                entry.LastModifiedByDevice = existingEntry.LastModifiedByDevice;
+                entry.SentAtUtc = existingEntry.SentAtUtc;
+                entry.SentMethod = existingEntry.SentMethod;
+                entry.SentRecipient = existingEntry.SentRecipient;
+                entry.SentByDevice = existingEntry.SentByDevice;
+                entry.LastReminderAtUtc = existingEntry.LastReminderAtUtc;
+                entry.ReminderCount = existingEntry.ReminderCount;
+                entry.LastReminderByDevice = existingEntry.LastReminderByDevice;
+                entry.Events = existingEntry.Events.ToList();
                 entry.BaseVersionUtc = existingEntry.BaseVersionUtc;
 
                 existingEntry.CustomerName = entry.CustomerName;
@@ -153,6 +163,16 @@ public partial class MainViewModel
                 existingEntry.PaymentTerms = entry.PaymentTerms;
                 existingEntry.IvaType = entry.IvaType;
                 existingEntry.Notes = entry.Notes;
+                existingEntry.CreatedByDevice = entry.CreatedByDevice;
+                existingEntry.LastModifiedByDevice = entry.LastModifiedByDevice;
+                existingEntry.SentAtUtc = entry.SentAtUtc;
+                existingEntry.SentMethod = entry.SentMethod;
+                existingEntry.SentRecipient = entry.SentRecipient;
+                existingEntry.SentByDevice = entry.SentByDevice;
+                existingEntry.LastReminderAtUtc = entry.LastReminderAtUtc;
+                existingEntry.ReminderCount = entry.ReminderCount;
+                existingEntry.LastReminderByDevice = entry.LastReminderByDevice;
+                existingEntry.Events = entry.Events.ToList();
                 existingEntry.Materials = entry.Materials;
                 existingEntry.Labors = entry.Labors;
                 existingEntry.Imponibile = entry.Imponibile;
@@ -188,6 +208,16 @@ public partial class MainViewModel
                 entry.Date = existing.Date;
                 entry.Status = existing.Status;
                 entry.Notes = existing.Notes;
+                entry.CreatedByDevice = existing.CreatedByDevice;
+                entry.LastModifiedByDevice = existing.LastModifiedByDevice;
+                entry.SentAtUtc = existing.SentAtUtc;
+                entry.SentMethod = existing.SentMethod;
+                entry.SentRecipient = existing.SentRecipient;
+                entry.SentByDevice = existing.SentByDevice;
+                entry.LastReminderAtUtc = existing.LastReminderAtUtc;
+                entry.ReminderCount = existing.ReminderCount;
+                entry.LastReminderByDevice = existing.LastReminderByDevice;
+                entry.Events = existing.Events.ToList();
                 entry.BaseVersionUtc = existing.BaseVersionUtc;
             }
         }
@@ -278,6 +308,16 @@ public partial class MainViewModel
             LaborDiscount = entry.LaborDiscount,
             Total = entry.Total,
             Status = entry.Status,
+            CreatedByDevice = entry.CreatedByDevice,
+            LastModifiedByDevice = entry.LastModifiedByDevice,
+            SentAtUtc = entry.SentAtUtc,
+            SentMethod = entry.SentMethod,
+            SentRecipient = entry.SentRecipient,
+            SentByDevice = entry.SentByDevice,
+            LastReminderAtUtc = entry.LastReminderAtUtc,
+            ReminderCount = entry.ReminderCount,
+            LastReminderByDevice = entry.LastReminderByDevice,
+            Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,

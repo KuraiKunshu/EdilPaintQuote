@@ -20,6 +20,8 @@ public partial class VeluxLoginWindow : Window
     {
         try
         {
+            WebView.CoreWebView2?.Stop();
+            WebView.Source = null;
             WebView.Dispose();
         }
         catch (Exception ex)

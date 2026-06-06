@@ -26,7 +26,7 @@ public interface IDataService
     // Quotes
     Task<List<QuoteHistoryEntry>> GetQuotesAsync();
     Task<List<QuoteHistoryEntry>> GetQuotesAsync(int take);
-    Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take);
+    Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take, CancellationToken cancellationToken = default);
     Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int take);
     Task<HashSet<string>> GetAllQuoteNumbersAsync();
     Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default);
@@ -36,6 +36,8 @@ public interface IDataService
     Task DeleteQuoteAsync(string quoteNumber);
     Task UpdateQuoteNotesAsync(string quoteNumber, string notes, CancellationToken cancellationToken = default);
     Task UpdateQuoteStatusAsync(string quoteNumber, QuoteStatus status, CancellationToken cancellationToken = default);
+    Task UpdateQuoteSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo, CancellationToken cancellationToken = default);
+    Task RegisterQuoteReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo, CancellationToken cancellationToken = default);
     
     // Utilities
     Task<int> GetNextQuoteNumberAsync();

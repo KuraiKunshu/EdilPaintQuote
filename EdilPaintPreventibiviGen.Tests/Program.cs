@@ -215,10 +215,24 @@ static async Task TestQuotePatchOutboxAsync()
         var service = new LocalQuotePatchOutboxService(temporaryPath);
         await service.StoreNotesAsync("PREV/PATCH", "nota");
         await service.StoreStatusAsync("PREV/PATCH", QuoteStatus.Spedito);
+        await service.StoreSendInfoAsync("PREV/PATCH", new QuoteSendInfo
+        {
+            Method = "Email",
+            Recipient = "cliente@example.com",
+            SentAtUtc = DateTime.UtcNow,
+            DeviceName = "PC test"
+        });
 
         var patch = (await service.LoadAllAsync()).Single();
         Equal("nota", patch.Notes);
         Equal(QuoteStatus.Spedito, patch.Status);
+        Equal("Email", patch.SendInfo?.Method);
+
+        await service.RemoveAppliedAsync("PREV/PATCH", p => p.Notes = null);
+        patch = (await service.LoadAllAsync()).Single();
+        Equal<string?>(null, patch.Notes);
+        Equal(QuoteStatus.Spedito, patch.Status);
+        Equal("Email", patch.SendInfo?.Method);
 
         await service.RemoveAsync("PREV/PATCH");
         Equal(0, (await service.LoadAllAsync()).Count);

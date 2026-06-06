@@ -403,6 +403,10 @@
                                 <ComboBoxItem Content="Confermato"/>
                                 <ComboBoxItem Content="Finito"/>
                                 <ComboBoxItem Content="Rifiutato"/>
+                                <ComboBoxItem Content="Bozza"/>
+                                <ComboBoxItem Content="DaInviare"/>
+                                <ComboBoxItem Content="DaSollecitare"/>
+                                <ComboBoxItem Content="Archiviato"/>
                             </ComboBox>
                         </Grid>
 
@@ -457,8 +461,10 @@
                                   SelectionMode="Single"
                                   SelectionUnit="FullRow"
                                   EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
                                   VirtualizingPanel.IsVirtualizing="True"
                                   VirtualizingPanel.VirtualizationMode="Recycling"
+                                  ScrollViewer.CanContentScroll="True"
                                   VirtualizingPanel.ScrollUnit="Item">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="" Width="30">
@@ -471,7 +477,7 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="148" Header="Azioni">
+                            <DataGridTemplateColumn Width="220" Header="Azioni">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -519,6 +525,14 @@
                                                     </DataTemplate>
                                                 </Button.ContentTemplate>
                                             </Button>
+                                            <Button Content="Inv"
+                                                    Style="{StaticResource HistoryIconButtonStyle}"
+                                                    Click="OnSendQuoteClick"
+                                                    ToolTip="Registra invio"/>
+                                            <Button Content="Sol"
+                                                    Style="{StaticResource HistoryIconButtonStyle}"
+                                                    Click="OnReminderClick"
+                                                    ToolTip="Registra sollecito"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -600,6 +614,16 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Invio"
+                                                Binding="{Binding SentDisplay}"
+                                                IsReadOnly="True"
+                                                Width="140"/>
+
+                            <DataGridTextColumn Header="PC"
+                                                Binding="{Binding LastModifiedByDevice}"
+                                                IsReadOnly="True"
+                                                Width="120"/>
 
                             <DataGridTemplateColumn Header="" Width="54">
                                 <DataGridTemplateColumn.CellTemplate>

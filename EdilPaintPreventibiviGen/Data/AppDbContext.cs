@@ -84,6 +84,13 @@ public class AppDbContext : DbContext
             entity.Property(x => x.PaymentTerms).HasMaxLength(4000);
             entity.Property(x => x.IvaType).HasMaxLength(50).IsRequired();
             entity.Property(x => x.Notes).HasMaxLength(4000);
+            entity.Property(x => x.CreatedByDevice).HasMaxLength(120);
+            entity.Property(x => x.LastModifiedByDevice).HasMaxLength(120);
+            entity.Property(x => x.SentMethod).HasMaxLength(80);
+            entity.Property(x => x.SentRecipient).HasMaxLength(250);
+            entity.Property(x => x.SentByDevice).HasMaxLength(120);
+            entity.Property(x => x.LastReminderByDevice).HasMaxLength(120);
+            entity.Property(x => x.EventsJson).HasColumnType("nvarchar(max)");
 
             entity.HasOne(x => x.Customer)
                 .WithMany(x => x.QuotesAsCustomer)

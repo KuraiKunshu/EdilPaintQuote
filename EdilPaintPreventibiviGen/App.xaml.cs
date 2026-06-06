@@ -19,7 +19,7 @@ public partial class App : Application
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
 
-    private const int ShutdownSyncTimeoutSeconds = 10;
+    private const int ShutdownSyncTimeoutSeconds = 3;
     private static System.Timers.Timer? _syncTimer;
     private static CancellationTokenSource? _shutdownCts;
     private static Task? _startupSyncTask;
@@ -149,6 +149,8 @@ public partial class App : Application
             _syncTimer = null;
         }
 
+        CloseRemainingWindows();
+        WaitForBackgroundTasksToStopAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
         RunFinalSyncWithTimeoutAsync().GetAwaiter().GetResult();
 
         MainVm?.Dispose();
@@ -196,22 +198,16 @@ public partial class App : Application
                 if (token.IsCancellationRequested || _isShuttingDown || MainVm == null)
                     return;
 
-                if (AppSettings.App.GeneratePDF)
+                if (AppSettings.App.RestoreMissingPdfsOnStartup)
                 {
-                    bool hasMissing = await MainVm.HasMissingPdfsAsync();
-                    if (token.IsCancellationRequested || _isShuttingDown)
-                        return;
-
-                    if (!hasMissing)
-                    {
-                        Debug.WriteLine("[PDF Generation] Tutti i PDF presenti, skip.");
-                        return;
-                    }
-
                     await MainVm.GenerateInitialPdfsAsync(new Progress<string>(text =>
                     {
                         Debug.WriteLine($"[PDF Generation] {text}");
-                    }));
+                    }), token);
+                }
+                else
+                {
+                    Debug.WriteLine("[PDF Generation] Ripristino PDF mancanti all'avvio disattivato.");
                 }
             }
             catch (OperationCanceledException)
@@ -230,13 +226,33 @@ public partial class App : Application
         if (SyncService is null)
             return;
 
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
+        Task<SyncResult> syncTask;
         try
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
-            await SyncService.SyncAllAsync(
+            Debug.WriteLine("[SHUTDOWN] Final sync best-effort start.");
+            syncTask = Task.Run(() => SyncService.SyncAllAsync(
                 force: true,
                 cancellationToken: timeoutCts.Token,
-                waitForCurrentRun: true);
+                waitForCurrentRun: false));
+
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
+            var completed = await Task.WhenAny(syncTask, timeoutTask);
+            if (completed != syncTask)
+            {
+                timeoutCts.Cancel();
+                Debug.WriteLine($"[SHUTDOWN] Final sync skipped after {ShutdownSyncTimeoutSeconds}s timeout.");
+                _ = ObserveBackgroundSyncFailureAsync(syncTask);
+                return;
+            }
+
+            var result = await syncTask;
+            if (result.AlreadyRunning)
+                Debug.WriteLine("[SHUTDOWN] Final sync skipped: sync already running.");
+            else if (!string.IsNullOrWhiteSpace(result.Error))
+                Debug.WriteLine($"[SHUTDOWN] Final sync returned error: {result.Error}");
+            else
+                Debug.WriteLine("[SHUTDOWN] Final sync completed.");
         }
         catch (OperationCanceledException)
         {
@@ -245,6 +261,69 @@ public partial class App : Application
         catch (Exception ex)
         {
             Debug.WriteLine($"[SHUTDOWN] Sync error: {ex.Message}");
+        }
+    }
+
+    private static async Task WaitForBackgroundTasksToStopAsync(TimeSpan timeout)
+    {
+        var tasks = new[] { _startupSyncTask, _startupPdfTask }
+            .Where(task => task is { IsCompleted: false })
+            .Cast<Task>()
+            .ToArray();
+
+        if (tasks.Length == 0)
+            return;
+
+        try
+        {
+            var allTasks = Task.WhenAll(tasks);
+            var completed = await Task.WhenAny(allTasks, Task.Delay(timeout));
+            if (completed != allTasks)
+            {
+                Debug.WriteLine($"[SHUTDOWN] Background startup tasks still stopping after {timeout.TotalSeconds:F0}s.");
+                return;
+            }
+
+            await allTasks;
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.WriteLine("[SHUTDOWN] Background startup tasks cancelled.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Background task stop error: {ex.Message}");
+        }
+    }
+
+    private static async Task ObserveBackgroundSyncFailureAsync(Task<SyncResult> syncTask)
+    {
+        try
+        {
+            await syncTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Final sync background error after timeout: {ex.Message}");
+        }
+    }
+
+    private void CloseRemainingWindows()
+    {
+        foreach (Window window in Windows.Cast<Window>().ToArray())
+        {
+            try
+            {
+                if (ReferenceEquals(window, MainWindow))
+                    continue;
+
+                if (window.IsVisible)
+                    window.Close();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SHUTDOWN] Window close error: {ex.Message}");
+            }
         }
     }
 

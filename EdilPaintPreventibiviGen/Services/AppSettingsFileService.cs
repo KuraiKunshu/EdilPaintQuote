@@ -81,10 +81,12 @@ public static class AppSettingsFileService
             {
                 FirstStartup = false,
                 GeneratePDF = true,
+                RestoreMissingPdfsOnStartup = false,
                 IsSilentStartup = false,
                 UseVeluxLogin = false,
                 NumberOfQuote = 200,
-                TempPath = string.Empty
+                TempPath = string.Empty,
+                DeviceName = Environment.MachineName
             },
             PdfStorage = new
             {
@@ -92,6 +94,14 @@ public static class AppSettingsFileService
                 HistorySubFolder = "Storico",
                 CustomerFolderPattern = "{CustomerName}",
                 PdfFileNamePattern = "{CustomerName}_Preventivo_{QuoteNumber}_{Date}.pdf"
+            },
+            PdfTemplate = new
+            {
+                ActiveTemplate = "Standard",
+                NotesTitle = "NOTE E TERMINI DI PAGAMENTO",
+                FooterText = string.Empty,
+                SignatureText = "Firma per accettazione",
+                ShowTemplateName = false
             }
         };
 

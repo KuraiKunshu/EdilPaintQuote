@@ -26,9 +26,11 @@ public sealed class QuoteHistoryService
         return await _dataService.GetQuotesAsync(Math.Max(1, count));
     }
 
-    public async Task<List<QuoteHistorySummary>> LoadTopSummariesAsync(int count)
+    public async Task<List<QuoteHistorySummary>> LoadTopSummariesAsync(
+        int count,
+        CancellationToken cancellationToken = default)
     {
-        return await _dataService.GetQuoteSummariesAsync(Math.Max(1, count));
+        return await _dataService.GetQuoteSummariesAsync(Math.Max(1, count), cancellationToken);
     }
 
     public async Task<List<QuoteHistorySummary>> SearchSummariesAsync(string text, int take)
@@ -50,6 +52,12 @@ public sealed class QuoteHistoryService
     public Task UpdateStatusAsync(string quoteNumber, QuoteStatus status) =>
         _dataService.UpdateQuoteStatusAsync(quoteNumber, status);
 
+    public Task UpdateSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo) =>
+        _dataService.UpdateQuoteSendInfoAsync(quoteNumber, sendInfo);
+
+    public Task RegisterReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo) =>
+        _dataService.RegisterQuoteReminderAsync(quoteNumber, reminderInfo);
+
     public async Task DeleteQuoteAsync(string quoteNumber)
     {
         await _dataService.DeleteQuoteAsync(quoteNumber);
@@ -64,13 +72,19 @@ public sealed class QuoteHistoryService
             string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
     }
 
-    public async Task<string> EnsureOfficialPdfExistsAsync(QuoteHistoryEntry entry)
+    public async Task<string> EnsureOfficialPdfExistsAsync(
+        QuoteHistoryEntry entry,
+        CancellationToken cancellationToken = default)
     {
         string expectedPath = GetExpectedPdfPath(entry);
         byte[]? officialPdf = null;
         try
         {
-            officialPdf = await _dataService.GetQuotePdfContentAsync(entry.QuoteNumber);
+            officialPdf = await _dataService.GetQuotePdfContentAsync(entry.QuoteNumber, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -88,7 +102,7 @@ public sealed class QuoteHistoryService
             Directory.CreateDirectory(folder);
 
         if (!File.Exists(expectedPath) || !FileMatchesBytes(expectedPath, officialPdf))
-            await File.WriteAllBytesAsync(expectedPath, officialPdf);
+            await File.WriteAllBytesAsync(expectedPath, officialPdf, cancellationToken);
 
         entry.PdfPath = expectedPath;
         return expectedPath;
@@ -103,9 +117,11 @@ public sealed class QuoteHistoryService
             string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
     }
 
-    public async Task<string> EnsureCostsPdfExistsAsync(QuoteHistoryEntry entry)
+    public async Task<string> EnsureCostsPdfExistsAsync(
+        QuoteHistoryEntry entry,
+        CancellationToken cancellationToken = default)
     {
-        byte[]? costsPdf = await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber);
+        byte[]? costsPdf = await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber, cancellationToken);
         if (costsPdf is not { Length: > 0 })
             return string.Empty;
 
@@ -115,7 +131,7 @@ public sealed class QuoteHistoryService
             Directory.CreateDirectory(folder);
 
         if (!File.Exists(expectedPath) || !FileMatchesBytes(expectedPath, costsPdf))
-            await File.WriteAllBytesAsync(expectedPath, costsPdf);
+            await File.WriteAllBytesAsync(expectedPath, costsPdf, cancellationToken);
 
         return expectedPath;
     }

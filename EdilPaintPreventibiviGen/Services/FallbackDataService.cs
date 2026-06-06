@@ -208,6 +208,25 @@ public class FallbackDataService : IDataService
         return _isDatabaseAvailable;
     }
 
+    private static void EnsureDeviceMetadata(QuoteHistoryEntry quote)
+    {
+        string deviceName = DeviceNameService.GetCurrentDeviceName();
+
+        if (string.IsNullOrWhiteSpace(quote.CreatedByDevice))
+        {
+            quote.CreatedByDevice = deviceName;
+            quote.Events.Add(new QuoteEventEntry
+            {
+                CreatedAtUtc = quote.LastModifiedUtc == default ? DateTime.UtcNow : quote.LastModifiedUtc,
+                DeviceName = deviceName,
+                EventType = "creazione",
+                Description = "Preventivo creato"
+            });
+        }
+
+        quote.LastModifiedByDevice = deviceName;
+    }
+
     #endregion
 
     #region Quotes
@@ -249,10 +268,14 @@ public class FallbackDataService : IDataService
         return all.OrderByDescending(q => q.Date).Take(take).ToList();
     }
 
-    public async Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take)
+    public async Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(
+        int take,
+        CancellationToken cancellationToken = default)
 {
     Debug.WriteLine("\n[FallbackDataService] ═══ GetQuoteSummariesAsync START ═══");
     Debug.WriteLine($"[FallbackDataService] Database available: {IsDatabaseAvailable()}");
+
+    cancellationToken.ThrowIfCancellationRequested();
 
     if (IsDatabaseAvailable())
     {
@@ -260,7 +283,8 @@ public class FallbackDataService : IDataService
         {
             // 1 query DB per i summary visualizzati
             Debug.WriteLine("[FallbackDataService] 🗄️ Fetching summaries from DB...");
-            var dbQuotes = await _sqlService.GetQuoteSummariesAsync(take);
+            var dbQuotes = await _sqlService.GetQuoteSummariesAsync(take, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             Debug.WriteLine($"[FallbackDataService] 🗄️ DB returned {dbQuotes.Count} summaries");
 
             // 1 query DB per tutti i numeri (cachata) + 1 lettura JSON (cachata)
@@ -289,6 +313,7 @@ public class FallbackDataService : IDataService
 
             foreach (var q in dbQuotes)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var oldStatus = q.SyncStatus;
                 q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbAllNumbers, localNumbers);
                 
@@ -301,6 +326,10 @@ public class FallbackDataService : IDataService
             Debug.WriteLine("[FallbackDataService] ═══ GetQuoteSummariesAsync END ═══\n");
             return dbQuotes;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"[FallbackDataService] ❌ Error: {ex.Message}");
@@ -311,6 +340,7 @@ public class FallbackDataService : IDataService
     // Fallback: solo JSON locale
     Debug.WriteLine("[FallbackDataService] ⚠️ Using JSON fallback (DB unavailable)");
     var quotes = await _localStore.LoadHistoryAsync();
+    cancellationToken.ThrowIfCancellationRequested();
     return quotes.OrderByDescending(q => q.Date)
         .Take(take)
         .Select(q => new QuoteHistorySummary
@@ -323,6 +353,17 @@ public class FallbackDataService : IDataService
             Total = (decimal)q.Total,
             Status = q.Status,
             Notes = q.Notes,
+            IsJointVenture = q.IsJointVenture,
+            PartnerCompanyName = q.PartnerCompanyName,
+            CreatedByDevice = q.CreatedByDevice,
+            LastModifiedByDevice = q.LastModifiedByDevice,
+            SentAtUtc = q.SentAtUtc,
+            SentMethod = q.SentMethod,
+            SentRecipient = q.SentRecipient,
+            SentByDevice = q.SentByDevice,
+            LastReminderAtUtc = q.LastReminderAtUtc,
+            ReminderCount = q.ReminderCount,
+            LastReminderByDevice = q.LastReminderByDevice,
             SyncStatus = SyncStatus.LocalOnly
         })
         .ToList();
@@ -373,6 +414,17 @@ public class FallbackDataService : IDataService
                 Total = (decimal)q.Total,
                 Status = q.Status,
                 Notes = q.Notes,
+                IsJointVenture = q.IsJointVenture,
+                PartnerCompanyName = q.PartnerCompanyName,
+                CreatedByDevice = q.CreatedByDevice,
+                LastModifiedByDevice = q.LastModifiedByDevice,
+                SentAtUtc = q.SentAtUtc,
+                SentMethod = q.SentMethod,
+                SentRecipient = q.SentRecipient,
+                SentByDevice = q.SentByDevice,
+                LastReminderAtUtc = q.LastReminderAtUtc,
+                ReminderCount = q.ReminderCount,
+                LastReminderByDevice = q.LastReminderByDevice,
                 SyncStatus = SyncStatus.LocalOnly
             })
             .ToList();
@@ -422,6 +474,16 @@ public class FallbackDataService : IDataService
             LaborDiscount = entry.LaborDiscount,
             Total = entry.Total,
             Status = entry.Status,
+            CreatedByDevice = entry.CreatedByDevice,
+            LastModifiedByDevice = entry.LastModifiedByDevice,
+            SentAtUtc = entry.SentAtUtc,
+            SentMethod = entry.SentMethod,
+            SentRecipient = entry.SentRecipient,
+            SentByDevice = entry.SentByDevice,
+            LastReminderAtUtc = entry.LastReminderAtUtc,
+            ReminderCount = entry.ReminderCount,
+            LastReminderByDevice = entry.LastReminderByDevice,
+            Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,
@@ -452,6 +514,7 @@ public class FallbackDataService : IDataService
     {
         cancellationToken.ThrowIfCancellationRequested();
         quote.LastModifiedUtc = DateTime.UtcNow;
+        EnsureDeviceMetadata(quote);
 
         if (quote.PdfFile?.Content is { Length: > 0 } pdfBytes)
             await _pdfOutbox.StoreAsync(quote.QuoteNumber, pdfBytes, cancellationToken);
@@ -550,7 +613,7 @@ public class FallbackDataService : IDataService
             var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
             if (databaseVersion != null)
                 await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-            await _quotePatchOutbox.RemoveAsync(quoteNumber);
+            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.Notes = null, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -575,7 +638,67 @@ public class FallbackDataService : IDataService
             var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
             if (databaseVersion != null)
                 await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-            await _quotePatchOutbox.RemoveAsync(quoteNumber);
+            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.Status = null, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            SetDatabaseUnavailable(ex.Message);
+        }
+    }
+
+    public async Task UpdateQuoteSendInfoAsync(
+        string quoteNumber,
+        QuoteSendInfo sendInfo,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sendInfo.DeviceName))
+            sendInfo.DeviceName = DeviceNameService.GetCurrentDeviceName();
+        if (sendInfo.SentAtUtc == default)
+            sendInfo.SentAtUtc = DateTime.UtcNow;
+
+        await _quotePatchOutbox.StoreSendInfoAsync(quoteNumber, sendInfo, cancellationToken);
+        await _localStore.UpdateQuoteSendInfoAsync(quoteNumber, sendInfo);
+
+        if (!IsDatabaseAvailable())
+            return;
+
+        try
+        {
+            await _sqlService.UpdateQuoteSendInfoAsync(quoteNumber, sendInfo, cancellationToken);
+            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
+            if (databaseVersion != null)
+                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.SendInfo = null, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            SetDatabaseUnavailable(ex.Message);
+        }
+    }
+
+    public async Task RegisterQuoteReminderAsync(
+        string quoteNumber,
+        QuoteReminderInfo reminderInfo,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reminderInfo.DeviceName))
+            reminderInfo.DeviceName = DeviceNameService.GetCurrentDeviceName();
+        if (reminderInfo.ReminderAtUtc == default)
+            reminderInfo.ReminderAtUtc = DateTime.UtcNow;
+
+        await _quotePatchOutbox.StoreReminderAsync(quoteNumber, reminderInfo, cancellationToken);
+        await _localStore.RegisterQuoteReminderAsync(quoteNumber, reminderInfo);
+
+        if (!IsDatabaseAvailable())
+            return;
+
+        try
+        {
+            await _sqlService.RegisterQuoteReminderAsync(quoteNumber, reminderInfo, cancellationToken);
+            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
+            if (databaseVersion != null)
+                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.ReminderInfo = null, cancellationToken);
         }
         catch (Exception ex)
         {
