@@ -276,15 +276,9 @@ public class PdfService
                                     totCol.Item().Row(r => { r.RelativeItem().Text($"IVA ({ctx.IvaType}):"); r.RelativeItem().AlignRight().Text($"{totals.IvaTotale:N2} €"); });
                                     break;
                                 case "22%":
-                                    if (totals.Imponibile10 > 0)
-                                        totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile manodopera (10%):"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile10:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.GreenDarken1); });
-                                    if (totals.Imponibile22 > 0)
-                                        totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile materiali (22%):"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile22:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.GreenDarken1); });
+                                    totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile Totale (22%):"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile22:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.GreenDarken1); });
                                     totCol.Item().PaddingVertical(2).LineHorizontal(0.5f).LineColor(PdfPalette.GreyLighten2);
-                                    if (totals.Iva10 > 0)
-                                        totCol.Item().Row(r => { r.RelativeItem().Text("IVA manodopera (10%):"); r.RelativeItem().AlignRight().Text($"{totals.Iva10:N2} €"); });
-                                    if (totals.Iva22 > 0)
-                                        totCol.Item().Row(r => { r.RelativeItem().Text("IVA materiali (22%):"); r.RelativeItem().AlignRight().Text($"{totals.Iva22:N2} €"); });
+                                    totCol.Item().Row(r => { r.RelativeItem().Text("IVA al 22%:"); r.RelativeItem().AlignRight().Text($"{totals.Iva22:N2} €"); });
                                     break;
                             }
 

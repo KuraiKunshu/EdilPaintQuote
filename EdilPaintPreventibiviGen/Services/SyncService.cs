@@ -46,16 +46,28 @@ public class SyncService
     public async Task<SyncResult> SyncAllAsync(
         bool force = false,
         int take = 0,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool waitForCurrentRun = false)
     {
-        if (!await _syncLock.WaitAsync(0, cancellationToken))
-        {
-            Debug.WriteLine("[Sync] Already syncing, skipping...");
-            return new SyncResult { AlreadyRunning = true };
-        }
+        bool lockTaken = false;
 
         try
         {
+            if (waitForCurrentRun)
+            {
+                await _syncLock.WaitAsync(cancellationToken);
+                lockTaken = true;
+            }
+            else if (!await _syncLock.WaitAsync(0, cancellationToken))
+            {
+                Debug.WriteLine("[Sync] Already syncing, skipping...");
+                return new SyncResult { AlreadyRunning = true };
+            }
+            else
+            {
+                lockTaken = true;
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!_dataService.CanSynchronize)
@@ -109,7 +121,8 @@ public class SyncService
         }
         finally
         {
-            _syncLock.Release();
+            if (lockTaken)
+                _syncLock.Release();
         }
     }
 

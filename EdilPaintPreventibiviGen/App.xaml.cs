@@ -19,7 +19,7 @@ public partial class App : Application
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
 
-    private const int ShutdownSyncTimeoutSeconds = 5;
+    private const int ShutdownSyncTimeoutSeconds = 10;
     private static System.Timers.Timer? _syncTimer;
     private static CancellationTokenSource? _shutdownCts;
     private static Task? _startupSyncTask;
@@ -149,7 +149,7 @@ public partial class App : Application
             _syncTimer = null;
         }
 
-        RunFinalSyncWithTimeout();
+        RunFinalSyncWithTimeoutAsync().GetAwaiter().GetResult();
 
         MainVm?.Dispose();
         MainVm = null;
@@ -225,7 +225,7 @@ public partial class App : Application
         }, token);
     }
 
-    private static void RunFinalSyncWithTimeout()
+    private static async Task RunFinalSyncWithTimeoutAsync()
     {
         if (SyncService is null)
             return;
@@ -233,12 +233,14 @@ public partial class App : Application
         try
         {
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
-            var finalSyncTask = Task.Run(() => SyncService.SyncAllAsync(force: true, cancellationToken: timeoutCts.Token));
-            if (!finalSyncTask.Wait(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds)))
-            {
-                timeoutCts.Cancel();
-                Debug.WriteLine($"[SHUTDOWN] Final sync skipped after {ShutdownSyncTimeoutSeconds}s timeout.");
-            }
+            await SyncService.SyncAllAsync(
+                force: true,
+                cancellationToken: timeoutCts.Token,
+                waitForCurrentRun: true);
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Final sync skipped after {ShutdownSyncTimeoutSeconds}s timeout.");
         }
         catch (Exception ex)
         {

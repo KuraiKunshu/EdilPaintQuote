@@ -5,6 +5,7 @@ var tests = new (string Name, Func<Task> Run)[]
 {
     ("IVA RC suddivide i beni significativi e aggiunge l'imposta", TestReverseChargeAsync),
     ("IVA RC accetta varianti di spaziatura", TestReverseChargeSpacingAsync),
+    ("IVA 22 applica l'aliquota a materiali e lavori", TestVat22AppliesToEverythingAsync),
     ("IVA esclusa non aggiunge imposta", TestExcludedVatAsync),
     ("Outbox PDF conserva e rimuove il documento pendente", TestPdfOutboxAsync),
     ("Outbox allegati conserva file e snapshot vuoti", TestAttachmentOutboxAsync),
@@ -62,6 +63,22 @@ static Task TestReverseChargeSpacingAsync()
 
     Equal(10d, totals.IvaTotale);
     Equal(110d, totals.TotaleGenerale);
+    return Task.CompletedTask;
+}
+
+static Task TestVat22AppliesToEverythingAsync()
+{
+    var calculator = new QuoteCalculator();
+    var materials = new[] { new Item { UnitPrice = 100, Quantity = 1 } };
+    var labors = new[] { new Item { UnitPrice = 200, Quantity = 1 } };
+
+    var totals = calculator.Calculate(materials, labors, 0, 0, "22%");
+
+    Equal(0d, totals.Imponibile10);
+    Equal(300d, totals.Imponibile22);
+    Equal(0d, totals.Iva10);
+    Equal(66d, totals.Iva22);
+    Equal(366d, totals.TotaleGenerale);
     return Task.CompletedTask;
 }
 

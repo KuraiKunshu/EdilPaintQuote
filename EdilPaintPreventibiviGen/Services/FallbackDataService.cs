@@ -22,7 +22,8 @@ public class FallbackDataService : IDataService
     private bool _isDatabaseAvailable = true;
     private DateTime _databaseUnavailableSince = DateTime.MinValue;
     private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromMinutes(2);
-    private static readonly TimeSpan DbInitializationTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan DbConnectionTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan DbSchemaInitializationTimeout = TimeSpan.FromSeconds(60);
 
 
     // Cache dei numeri preventivo presenti nel DB (query leggera, una sola volta ogni 10 min)
@@ -58,18 +59,18 @@ public class FallbackDataService : IDataService
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         Debug.WriteLine("[FallbackDataService] InitializeAsync starting...");
-        using var timeoutCts = new CancellationTokenSource(DbInitializationTimeout);
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
-            await _sqlService.InitializeAsync(linkedCts.Token);
+            await EnsureDatabaseReachableAsync(cancellationToken);
+            await InitializeDatabaseSchemaAsync(cancellationToken);
             
             _isDatabaseAvailable = true;
             Debug.WriteLine("[FallbackDataService] ✅ Database initialized successfully");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            SetDatabaseUnavailable($"Timeout connessione SQL dopo {DbInitializationTimeout.TotalSeconds:F0} secondi.");
+            SetDatabaseUnavailable(
+                $"Timeout inizializzazione SQL. Connessione: {DbConnectionTimeout.TotalSeconds:F0}s; schema: {DbSchemaInitializationTimeout.TotalSeconds:F0}s.");
             Debug.WriteLine("[FallbackDataService] Database initialization timed out. Using local fallback.");
         }
         catch (Exception ex)
@@ -79,6 +80,23 @@ public class FallbackDataService : IDataService
             Debug.WriteLine($"[FallbackDataService] StackTrace: {ex.StackTrace}");
             Debug.WriteLine("[FallbackDataService] ⚠️ Will use local JSON fallback");
         }
+    }
+
+    private async Task EnsureDatabaseReachableAsync(CancellationToken cancellationToken)
+    {
+        using var timeoutCts = new CancellationTokenSource(DbConnectionTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+        if (!await _sqlService.CanConnectAsync(linkedCts.Token))
+            throw new InvalidOperationException("Database SQL non raggiungibile.");
+    }
+
+    private async Task InitializeDatabaseSchemaAsync(CancellationToken cancellationToken)
+    {
+        using var timeoutCts = new CancellationTokenSource(DbSchemaInitializationTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+        await _sqlService.InitializeAsync(linkedCts.Token);
     }
 
     #region Cache helpers
