@@ -12,6 +12,7 @@ public sealed class AppSettingsService
 	public PdfStorageSettingsModel PdfStorage { get; }
 	public PdfTemplateSettingsModel PdfTemplate { get; }
 	public DatabaseSettingsModel Database { get; }
+	public MailSettingsModel Mail { get; }
 	public string SettingsPath { get; }
 
 	public AppSettingsService(IConfiguration configuration)
@@ -22,6 +23,7 @@ public sealed class AppSettingsService
 		PdfTemplate = configuration.GetSection("PdfTemplate").Get<PdfTemplateSettingsModel>() ?? new PdfTemplateSettingsModel();
 		PdfTemplate.Normalize();
 		Database = LoadDatabaseSettings(configuration);
+		Mail = LoadMailSettings(configuration);
 	}
 
 	public void Save()
@@ -45,6 +47,19 @@ public sealed class AppSettingsService
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
 		root["PdfTemplate"] = JsonSerializer.SerializeToNode(PdfTemplate, jsonOptions);
+		root["Mail"] = new JsonObject
+		{
+			["Enabled"] = Mail.Enabled,
+			["SmtpServer"] = Mail.SmtpServer,
+			["Port"] = Mail.Port,
+			["UseSsl"] = Mail.UseSsl,
+			["Username"] = Mail.Username,
+			["Password"] = SecretProtectionService.Protect(Mail.Password, MailSettingsModel.ProtectionPurpose),
+			["SenderEmail"] = Mail.SenderEmail,
+			["SenderName"] = Mail.SenderName,
+			["DefaultSubject"] = Mail.DefaultSubject,
+			["DefaultBody"] = Mail.DefaultBody
+		};
 
 		string temporaryPath = SettingsPath + ".tmp";
 		File.WriteAllText(temporaryPath, root.ToJsonString(jsonOptions));
@@ -116,6 +131,29 @@ public sealed class AppSettingsService
 		{
 			return new DatabaseSettingsModel { RequiresCredentialReset = true };
 		}
+	}
+
+	private static MailSettingsModel LoadMailSettings(IConfiguration configuration)
+	{
+		var section = configuration.GetSection("Mail");
+		if (!section.Exists())
+			return new MailSettingsModel();
+
+		var settings = section.Get<MailSettingsModel>() ?? new MailSettingsModel();
+		try
+		{
+			settings.Password = SecretProtectionService.Unprotect(
+				section["Password"] ?? string.Empty,
+				MailSettingsModel.ProtectionPurpose);
+		}
+		catch (InvalidOperationException)
+		{
+			settings.Password = string.Empty;
+			settings.RequiresCredentialReset = true;
+		}
+
+		settings.Normalize();
+		return settings;
 	}
 }
 
@@ -207,6 +245,59 @@ public sealed class PdfTemplateSettingsModel
 		if (string.IsNullOrWhiteSpace(SignatureText))
 			SignatureText = "Firma per accettazione";
 		FooterText ??= string.Empty;
+	}
+}
+
+public sealed class MailSettingsModel
+{
+	public const string ProtectionPurpose = "MailSettings.v1";
+
+	public bool Enabled { get; set; }
+	public string SmtpServer { get; set; } = "smtp.libero.it";
+	public int Port { get; set; } = 465;
+	public bool UseSsl { get; set; } = true;
+	public string Username { get; set; } = string.Empty;
+	public string Password { get; set; } = string.Empty;
+	public string SenderEmail { get; set; } = string.Empty;
+	public string SenderName { get; set; } = "EdilPaint";
+	public string DefaultSubject { get; set; } = "Preventivo {QuoteNumber}";
+	public string DefaultBody { get; set; } = "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti";
+	public bool RequiresCredentialReset { get; set; }
+
+	public string EffectiveSenderEmail =>
+		string.IsNullOrWhiteSpace(SenderEmail) ? Username.Trim() : SenderEmail.Trim();
+
+	public void Normalize()
+	{
+		SmtpServer = string.IsNullOrWhiteSpace(SmtpServer) ? "smtp.libero.it" : SmtpServer.Trim();
+		Port = Port <= 0 ? 465 : Port;
+		Username = Username?.Trim() ?? string.Empty;
+		SenderEmail = SenderEmail?.Trim() ?? string.Empty;
+		SenderName = string.IsNullOrWhiteSpace(SenderName) ? "EdilPaint" : SenderName.Trim();
+		DefaultSubject = string.IsNullOrWhiteSpace(DefaultSubject)
+			? "Preventivo {QuoteNumber}"
+			: DefaultSubject.Trim();
+		DefaultBody = string.IsNullOrWhiteSpace(DefaultBody)
+			? "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti"
+			: DefaultBody;
+	}
+
+	public void ValidateForSend()
+	{
+		Normalize();
+
+		if (!Enabled)
+			throw new InvalidOperationException("Invio email non abilitato nelle impostazioni.");
+		if (string.IsNullOrWhiteSpace(SmtpServer))
+			throw new InvalidOperationException("Server SMTP non configurato.");
+		if (Port <= 0 || Port > 65535)
+			throw new InvalidOperationException("Porta SMTP non valida.");
+		if (string.IsNullOrWhiteSpace(Username))
+			throw new InvalidOperationException("User SMTP non configurato.");
+		if (string.IsNullOrWhiteSpace(Password))
+			throw new InvalidOperationException("Password SMTP non configurata.");
+		if (string.IsNullOrWhiteSpace(EffectiveSenderEmail))
+			throw new InvalidOperationException("Email mittente non configurata.");
 	}
 }
 

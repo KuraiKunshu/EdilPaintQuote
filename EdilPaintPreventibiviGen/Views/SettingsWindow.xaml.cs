@@ -24,12 +24,23 @@ public partial class SettingsWindow : Window
         var pdf = App.AppSettings.PdfStorage;
         var template = App.AppSettings.PdfTemplate;
         var database = App.AppSettings.Database;
+        var mail = App.AppSettings.Mail;
 
         TxtDatabaseConnectionString.Text = database.ConnectionString;
         TxtDatabaseServer.Text = database.Server;
         TxtDatabaseName.Text = database.Database;
         TxtDatabaseUsername.Text = database.Username;
         TxtDatabasePassword.Password = database.Password;
+        ChkMailEnabled.IsChecked = mail.Enabled;
+        TxtMailSmtpServer.Text = mail.SmtpServer;
+        TxtMailPort.Text = mail.Port.ToString(CultureInfo.InvariantCulture);
+        ChkMailUseSsl.IsChecked = mail.UseSsl;
+        TxtMailUsername.Text = mail.Username;
+        TxtMailPassword.Password = mail.Password;
+        TxtMailSenderEmail.Text = mail.SenderEmail;
+        TxtMailSenderName.Text = mail.SenderName;
+        TxtMailSubject.Text = mail.DefaultSubject;
+        TxtMailBody.Text = mail.DefaultBody;
         ChkGeneratePdf.IsChecked = app.GeneratePDF;
         ChkRestoreMissingPdfsOnStartup.IsChecked = app.RestoreMissingPdfsOnStartup;
         ChkSilentStartup.IsChecked = app.IsSilentStartup;
@@ -55,6 +66,15 @@ public partial class SettingsWindow : Window
             Loaded += (_, _) => MessageBox.Show(
                 "Le credenziali SQL salvate appartengono a un altro utente Windows o a un altro PC. Inseriscile nuovamente e salva.",
                 "Credenziali SQL da reinserire",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        if (mail.RequiresCredentialReset)
+        {
+            Loaded += (_, _) => MessageBox.Show(
+                "La password email salvata appartiene a un altro utente Windows o a un altro PC. Inseriscila nuovamente e salva.",
+                "Password email da reinserire",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -87,6 +107,24 @@ public partial class SettingsWindow : Window
         string databaseName = TxtDatabaseName.Text.Trim();
         string databaseUsername = TxtDatabaseUsername.Text.Trim();
         string databasePassword = TxtDatabasePassword.Password;
+        bool mailEnabled = ChkMailEnabled.IsChecked == true;
+        string mailSmtpServer = TxtMailSmtpServer.Text.Trim();
+        string mailUsername = TxtMailUsername.Text.Trim();
+        string mailPassword = TxtMailPassword.Password;
+        string mailSenderEmail = TxtMailSenderEmail.Text.Trim();
+        string mailSenderName = TxtMailSenderName.Text.Trim();
+        string mailSubject = TxtMailSubject.Text.Trim();
+        string mailBody = TxtMailBody.Text;
+
+        if (!int.TryParse(TxtMailPort.Text, out int mailPort) || mailPort <= 0 || mailPort > 65535)
+        {
+            MessageBox.Show(
+                "La porta SMTP deve essere un numero valido tra 1 e 65535.",
+                "Impostazioni non valide",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         try
         {
@@ -94,6 +132,7 @@ public partial class SettingsWindow : Window
             var pdf = App.AppSettings.PdfStorage;
             var template = App.AppSettings.PdfTemplate;
             var database = App.AppSettings.Database;
+            var mail = App.AppSettings.Mail;
 
             database.ConnectionString = databaseConnectionString;
             database.Server = databaseServer;
@@ -102,8 +141,23 @@ public partial class SettingsWindow : Window
             database.Password = databasePassword;
             database.RequiresCredentialReset = false;
 
+            mail.Enabled = mailEnabled;
+            mail.SmtpServer = mailSmtpServer;
+            mail.Port = mailPort;
+            mail.UseSsl = ChkMailUseSsl.IsChecked == true;
+            mail.Username = mailUsername;
+            mail.Password = mailPassword;
+            mail.SenderEmail = mailSenderEmail;
+            mail.SenderName = mailSenderName;
+            mail.DefaultSubject = mailSubject;
+            mail.DefaultBody = mailBody;
+            mail.RequiresCredentialReset = false;
+            mail.Normalize();
+
             if (database.IsConfigured)
                 _ = database.BuildConnectionString();
+            if (mail.Enabled)
+                mail.ValidateForSend();
             app.GeneratePDF = ChkGeneratePdf.IsChecked == true;
             app.RestoreMissingPdfsOnStartup = ChkRestoreMissingPdfsOnStartup.IsChecked == true;
             app.IsSilentStartup = ChkSilentStartup.IsChecked == true;

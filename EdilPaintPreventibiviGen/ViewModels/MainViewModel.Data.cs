@@ -19,6 +19,8 @@ using EdilPaintPreventibiviGen.Views;
 namespace EdilPaintPreventibiviGen.ViewModels;
 public partial class MainViewModel
 {
+    private const string DefaultLogoFileName = "Edilpaint.png";
+
     #region Data Loading & Saving
     public Task InitializeAsync() => LoadDataAsync();
 
@@ -47,11 +49,7 @@ public partial class MainViewModel
                     foreach (var l in _companyData.Logo)
                         Logos.Add(Path.GetFileName(l));
 
-                    if (_companyData.Logo_index < Logos.Count)
-                    {
-                        _selectedLogo = Logos[_companyData.Logo_index];
-                        OnPropertyChanged(nameof(SelectedLogo));
-                    }
+                    SelectDefaultLogo();
                 }
 
                 _allCustomers = customers.ToList();
@@ -96,6 +94,20 @@ public partial class MainViewModel
     }
 
     private void SaveCompanyData() => _ = SaveCompanyDataAsync();
+
+    private void SelectDefaultLogo()
+    {
+        string defaultLogo = Logos.FirstOrDefault(logo => string.Equals(logo, DefaultLogoFileName, StringComparison.OrdinalIgnoreCase))
+            ?? Logos.FirstOrDefault(logo => logo.Contains("edilpaint", StringComparison.OrdinalIgnoreCase))
+            ?? Logos.FirstOrDefault()
+            ?? string.Empty;
+
+        if (_selectedLogo == defaultLogo)
+            return;
+
+        _selectedLogo = defaultLogo;
+        OnPropertyChanged(nameof(SelectedLogo));
+    }
 
     private async Task SaveCompanyDataAsync()
     {

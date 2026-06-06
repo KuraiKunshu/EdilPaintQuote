@@ -6,6 +6,8 @@ namespace EdilPaintPreventibiviGen.Views;
 
 public partial class DashboardWindow : Window
 {
+    private const int MaxDashboardSummaryRows = 500;
+
     private readonly QuoteHistoryService _historyService;
     private readonly PdfArchiveAuditService _auditService;
     private readonly LocalDraftService _draftService;
@@ -34,7 +36,7 @@ public partial class DashboardWindow : Window
 
         _refreshCts?.Cancel();
         _refreshCts?.Dispose();
-        _refreshCts = new CancellationTokenSource();
+        _refreshCts = AppShutdownManager.CreateLinkedTokenSource();
         var token = _refreshCts.Token;
 
         TxtSubtitle.Text = $"PC: {DeviceNameService.GetCurrentDeviceName()}";
@@ -55,8 +57,13 @@ public partial class DashboardWindow : Window
             TxtSync.Text = $"Sync: {diagnostics.SyncStatus} - ultima: {diagnostics.LastSync}";
             TxtPending.Text = $"Code locali: PDF {diagnostics.PendingPdfs}, allegati {diagnostics.PendingAttachments}, patch {diagnostics.PendingQuotePatches}, eliminazioni {diagnostics.PendingQuoteDeletes + diagnostics.PendingCustomerDeletes}";
 
+            int summaryTake = Math.Clamp(
+                App.AppSettings.App.NumberOfQuote <= 0 ? MaxDashboardSummaryRows : App.AppSettings.App.NumberOfQuote,
+                100,
+                MaxDashboardSummaryRows);
+
             var summaries = await Task.Run(
-                async () => await _historyService.LoadTopSummariesAsync(int.MaxValue, token),
+                async () => await _historyService.LoadTopSummariesAsync(summaryTake, token),
                 token);
             token.ThrowIfCancellationRequested();
 
@@ -76,7 +83,9 @@ public partial class DashboardWindow : Window
             var draft = await draftTask;
             var pdfIssues = await pdfIssuesTask;
 
-            TxtTotalQuotes.Text = summaries.Count.ToString();
+            TxtTotalQuotes.Text = summaries.Count >= summaryTake
+                ? $"{summaries.Count}+"
+                : summaries.Count.ToString();
             TxtToRemind.Text = toRemind.Count.ToString();
             TxtPdfIssues.Text = pdfIssues.Count.ToString();
             TxtDraftState.Text = draft == null ? "Nessuna" : draft.LastModifiedUtc.ToLocalTime().ToString("dd/MM HH:mm");

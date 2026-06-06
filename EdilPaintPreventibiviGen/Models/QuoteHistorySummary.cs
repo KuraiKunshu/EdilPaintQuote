@@ -12,6 +12,9 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     private string _referenceName = string.Empty;
     private string _pdfPath = string.Empty;
     private decimal _total;
+    private string _ivaType = string.Empty;
+    private double _materialDiscount;
+    private double _laborDiscount;
     private QuoteStatus _status;
     private string _notes = string.Empty;
     private SyncStatus _syncStatus;
@@ -61,6 +64,74 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     {
         get => _total;
         set { _total = value; OnPropertyChanged(); }
+    }
+
+    public string IvaType
+    {
+        get => _ivaType;
+        set
+        {
+            if (_ivaType == value)
+                return;
+
+            _ivaType = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IvaDisplay));
+        }
+    }
+
+    public double MaterialDiscount
+    {
+        get => _materialDiscount;
+        set
+        {
+            if (Math.Abs(_materialDiscount - value) < 0.001)
+                return;
+
+            _materialDiscount = value;
+            OnPropertyChanged();
+            OnDiscountChanged();
+        }
+    }
+
+    public double LaborDiscount
+    {
+        get => _laborDiscount;
+        set
+        {
+            if (Math.Abs(_laborDiscount - value) < 0.001)
+                return;
+
+            _laborDiscount = value;
+            OnPropertyChanged();
+            OnDiscountChanged();
+        }
+    }
+
+    public string IvaDisplay => string.IsNullOrWhiteSpace(IvaType) ? "-" : IvaType;
+
+    public bool HasDiscount => Math.Abs(MaterialDiscount) > 0.001 || Math.Abs(LaborDiscount) > 0.001;
+
+    public string DiscountDisplay
+    {
+        get
+        {
+            bool hasMaterialDiscount = Math.Abs(MaterialDiscount) > 0.001;
+            bool hasLaborDiscount = Math.Abs(LaborDiscount) > 0.001;
+
+            if (!hasMaterialDiscount && !hasLaborDiscount)
+                return "No sconto";
+
+            if (hasMaterialDiscount && hasLaborDiscount && Math.Abs(MaterialDiscount - LaborDiscount) < 0.001)
+                return $"Sc. {FormatPercent(MaterialDiscount)}";
+
+            if (hasMaterialDiscount && hasLaborDiscount)
+                return $"Sc. M {FormatPercent(MaterialDiscount)} / L {FormatPercent(LaborDiscount)}";
+
+            return hasMaterialDiscount
+                ? $"Sc. mat. {FormatPercent(MaterialDiscount)}"
+                : $"Sc. lav. {FormatPercent(LaborDiscount)}";
+        }
     }
 
     public QuoteStatus Status
@@ -196,6 +267,14 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    private void OnDiscountChanged()
+    {
+        OnPropertyChanged(nameof(HasDiscount));
+        OnPropertyChanged(nameof(DiscountDisplay));
+    }
+
+    private static string FormatPercent(double value) => $"{value:0.#}%";
 }
 
 public enum SyncStatus

@@ -5,6 +5,8 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public sealed class PdfArchiveAuditService
 {
+    private const int DefaultScanLimit = 300;
+
     private readonly IDataService _dataService;
     private readonly QuoteHistoryService _historyService;
 
@@ -15,7 +17,7 @@ public sealed class PdfArchiveAuditService
     }
 
     public async Task<List<PdfArchiveIssue>> ScanAsync(
-        int take = int.MaxValue,
+        int take = DefaultScanLimit,
         bool includeDatabaseChecks = true,
         CancellationToken cancellationToken = default)
     {

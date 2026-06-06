@@ -46,11 +46,32 @@ public sealed class LocalDraftService
         File.Move(temporaryPath, _draftPath, overwrite: true);
     }
 
-    public Task DeleteAsync()
+    public async Task DeleteAsync(CancellationToken cancellationToken = default)
     {
-        if (File.Exists(_draftPath))
-            File.Delete(_draftPath);
+        await DeleteIfExistsAsync(_draftPath, cancellationToken);
+        await DeleteIfExistsAsync(_draftPath + ".tmp", cancellationToken);
+    }
 
-        return Task.CompletedTask;
+    private static async Task DeleteIfExistsAsync(string path, CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+
+                return;
+            }
+            catch (IOException) when (attempt < 2)
+            {
+                await Task.Delay(120, cancellationToken);
+            }
+            catch (UnauthorizedAccessException) when (attempt < 2)
+            {
+                await Task.Delay(120, cancellationToken);
+            }
+        }
     }
 }

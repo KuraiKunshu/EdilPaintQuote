@@ -22,7 +22,7 @@ public partial class MainViewModel
 
             if (!HasDraftContent())
             {
-                await _draftService.DeleteAsync();
+                await _draftService.DeleteAsync(cancellationToken);
                 return;
             }
 
@@ -38,7 +38,8 @@ public partial class MainViewModel
         }
     }
 
-    public Task DiscardDraftAsync() => _draftService.DeleteAsync();
+    public Task DiscardDraftAsync(CancellationToken cancellationToken = default) =>
+        _draftService.DeleteAsync(cancellationToken);
 
     public void ApplyDraft(QuoteHistoryEntry draft)
     {

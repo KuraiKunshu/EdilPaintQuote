@@ -18,6 +18,8 @@ using EdilPaintPreventibiviGen.Views;
 namespace EdilPaintPreventibiviGen.ViewModels;
 public partial class MainViewModel
 {
+    private const int MaxStartupPdfRestoreRows = 300;
+
     #region Document Logic
     public void ResetQuote()
     {
@@ -45,6 +47,7 @@ public partial class MainViewModel
 
         PaymentTerms = _companyData.Termini_pagamento;
         QuoteNumber = _companyData.Counter.ToString();
+        SelectDefaultLogo();
 
         OnPropertyChanged(nameof(SelectedCustomer));
         OnPropertyChanged(nameof(SelectedSecondCustomer));
@@ -64,7 +67,7 @@ public partial class MainViewModel
         try
         {
             // Carica solo i summary (leggeri) invece dell'intero storico
-            var summaries = await _dataService.GetQuoteSummariesAsync(int.MaxValue, cancellationToken);
+            var summaries = await _dataService.GetQuoteSummariesAsync(MaxStartupPdfRestoreRows, cancellationToken);
             foreach (var entry in summaries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -129,7 +132,7 @@ public partial class MainViewModel
         }
 
         progress?.Report("Analisi storico: caricamento elenco preventivi...");
-        var historyEntries = await _dataService.GetQuoteSummariesAsync(int.MaxValue, cancellationToken);
+        var historyEntries = await _dataService.GetQuoteSummariesAsync(MaxStartupPdfRestoreRows, cancellationToken);
 
         int total = historyEntries.Count;
         int current = 0;

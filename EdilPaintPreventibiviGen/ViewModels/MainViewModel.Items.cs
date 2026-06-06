@@ -105,9 +105,12 @@ public partial class MainViewModel
         OnPropertyChanged(string.Empty);
     }
 
-    public async Task FetchVeluxDetails(string uuid)
+    public async Task FetchVeluxDetails(string uuid, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(uuid))
+            return;
+
+        if (cancellationToken.IsCancellationRequested)
             return;
 
         if (uuid.StartsWith("LOCAL_"))
@@ -117,6 +120,9 @@ public partial class MainViewModel
 
             if (localItem != null)
             {
+                if (SelectedCatalogMaterial?.Id != uuid)
+                    return;
+
                 InputName = localItem.Name;
                 InputDescription = localItem.Description;
                 InputValue = localItem.UnitPrice;
@@ -135,9 +141,24 @@ public partial class MainViewModel
         if (!App.AppSettings.App.UseVeluxLogin)
             return;
 
-        var details = await _veluxService.GetProductDetailsAsync(uuid);
+        Item? details;
+        try
+        {
+            details = await _veluxService.GetProductDetailsAsync(uuid, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
         if (details != null)
         {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            if (SelectedCatalogMaterial?.Id != uuid)
+                return;
+
             InputName = details.Name;
             InputDescription = details.Description;
             InputValue = details.UnitPrice;

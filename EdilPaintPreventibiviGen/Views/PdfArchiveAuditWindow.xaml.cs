@@ -38,7 +38,7 @@ public partial class PdfArchiveAuditWindow : Window
 
         _scanCts?.Cancel();
         _scanCts?.Dispose();
-        _scanCts = new CancellationTokenSource();
+        _scanCts = AppShutdownManager.CreateLinkedTokenSource();
         var token = _scanCts.Token;
 
         TxtStatus.Text = "Scansione in corso...";
@@ -102,7 +102,7 @@ public partial class PdfArchiveAuditWindow : Window
         {
             _restoreCts?.Cancel();
             _restoreCts?.Dispose();
-            _restoreCts = new CancellationTokenSource();
+            _restoreCts = AppShutdownManager.CreateLinkedTokenSource();
             var token = _restoreCts.Token;
             _isRestoring = true;
             Cursor = System.Windows.Input.Cursors.Wait;

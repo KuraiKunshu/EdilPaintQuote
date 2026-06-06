@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Linq;
@@ -20,6 +22,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _materialSearchCts;
     private DispatcherTimer? _draftAutosaveTimer;
     private bool _isAutosavingDraft;
+    private bool _isCloseConfirmed;
+    private bool _isCloseCleanupRunning;
     
     #region Constructor
     public MainWindow()
@@ -47,43 +51,94 @@ public partial class MainWindow : Window
     #endregion
     
     #region Window events
-    private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    private void Window_Closing(object sender, CancelEventArgs e)
     {
-        var result = MessageBox.Show(
-            "Sei sicuro di voler chiudere l'applicazione?",
-            "Conferma chiusura",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result == MessageBoxResult.No)
+        if (_isCloseCleanupRunning)
         {
             e.Cancel = true;
             return;
         }
 
-        StopDraftAutosave();
-        if (DataContext is MainViewModel vm)
+        if (!_isCloseConfirmed && !AppShutdownManager.IsShutdownRequested)
         {
-            try
+            var result = MessageBox.Show(
+                "Sei sicuro di voler chiudere l'applicazione?",
+                "Conferma chiusura",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.No)
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                vm.SaveDraftAsync(cts.Token).GetAwaiter().GetResult();
-            }
-            catch (OperationCanceledException)
-            {
-                Debug.WriteLine("[SHUTDOWN] Draft autosave skipped after timeout.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[SHUTDOWN] Draft autosave error: {ex.Message}");
+                e.Cancel = true;
+                return;
             }
         }
 
-        _materialSearchCts?.Cancel();
-        _materialSearchCts?.Dispose();
-        _materialSearchCts = null;
+        if (!_isCloseConfirmed)
+        {
+            e.Cancel = true;
+            _isCloseConfirmed = true;
+            _ = CloseAfterCleanupAsync();
+            return;
+        }
+
+        AppShutdownManager.RequestShutdown();
     }
     #endregion
+
+    private async Task CloseAfterCleanupAsync()
+    {
+        try
+        {
+            await Task.Yield();
+            await PrepareForCloseAsync();
+            await Dispatcher.InvokeAsync(Close, DispatcherPriority.Background);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Close retry error: {ex.Message}");
+            AppShutdownManager.RequestShutdown();
+            await Dispatcher.InvokeAsync(Close, DispatcherPriority.Background);
+        }
+    }
+
+    private async Task PrepareForCloseAsync()
+    {
+        if (_isCloseCleanupRunning)
+            return;
+
+        _isCloseCleanupRunning = true;
+        try
+        {
+            StopDraftAutosave();
+            _materialSearchCts?.Cancel();
+
+            if (DataContext is MainViewModel vm)
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    await vm.SaveDraftAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Debug.WriteLine("[SHUTDOWN] Draft autosave skipped after timeout.");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SHUTDOWN] Draft autosave error: {ex.Message}");
+                }
+            }
+
+            AppShutdownManager.RequestShutdown();
+        }
+        finally
+        {
+            _materialSearchCts?.Dispose();
+            _materialSearchCts = null;
+            _isCloseCleanupRunning = false;
+        }
+    }
 
     private void StartDraftAutosave()
     {
@@ -144,9 +199,14 @@ public partial class MainWindow : Window
             MessageBoxImage.Question);
 
         if (result == MessageBoxResult.Yes)
+        {
             vm.ApplyDraft(draft);
+        }
         else
+        {
             await vm.DiscardDraftAsync();
+            vm.ResetQuote();
+        }
     }
     
     #region On drag & drop
@@ -420,7 +480,7 @@ public partial class MainWindow : Window
 
         _materialSearchCts?.Cancel();
         _materialSearchCts?.Dispose();
-        _materialSearchCts = new CancellationTokenSource();
+        _materialSearchCts = AppShutdownManager.CreateLinkedTokenSource();
         var token = _materialSearchCts.Token;
 
         _ = RunMaterialSearchAsync(vm, cb, text, token);

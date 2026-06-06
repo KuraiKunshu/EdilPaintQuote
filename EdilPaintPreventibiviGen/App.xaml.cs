@@ -19,11 +19,11 @@ public partial class App : Application
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
 
-    private const int ShutdownSyncTimeoutSeconds = 3;
+    private const int ShutdownSyncTimeoutSeconds = 2;
+    private const int ShutdownBackgroundTimeoutSeconds = 2;
+    private const int HardShutdownTimeoutSeconds = 8;
     private static System.Timers.Timer? _syncTimer;
     private static CancellationTokenSource? _shutdownCts;
-    private static Task? _startupSyncTask;
-    private static Task? _startupPdfTask;
     private static bool _isShuttingDown;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -33,7 +33,7 @@ public partial class App : Application
         try
         {
             _isShuttingDown = false;
-            _shutdownCts = new CancellationTokenSource();
+            _shutdownCts = AppShutdownManager.CreateLinkedTokenSource();
             var shutdownToken = _shutdownCts.Token;
 
             var startupWatch = Stopwatch.StartNew();
@@ -87,7 +87,7 @@ public partial class App : Application
                 {
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Import dati legacy...");
                     var importer = new JsonImportService(sqlService);
-                    await Task.Run(() => importer.ImportAllAsync(assetsPath));
+                    await Task.Run(() => importer.ImportAllAsync(assetsPath), shutdownToken);
                 }
                 else
                 {
@@ -95,7 +95,7 @@ public partial class App : Application
                 }
 
                 await SetLoadingStatusAsync(loadingWindow, "3/5 - Sincronizzazione dati...");
-                _startupSyncTask = RunStartupSyncAsync(shutdownToken);
+                _ = RunStartupSyncAsync(shutdownToken);
 
                 await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
                 MainVm = new MainViewModel();
@@ -109,7 +109,7 @@ public partial class App : Application
                 mainWindow.Show();
 
                 StartPeriodicSync();
-                _startupPdfTask = RunStartupPdfGenerationAsync(shutdownToken);
+                _ = RunStartupPdfGenerationAsync(shutdownToken);
 
                 Debug.WriteLine($"[STARTUP] Startup completato in {startupWatch.Elapsed}");
             }
@@ -138,42 +138,57 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _isShuttingDown = true;
-        _shutdownCts?.Cancel();
+        AppShutdownManager.ArmProcessKillSwitch(TimeSpan.FromSeconds(HardShutdownTimeoutSeconds));
 
-        if (_syncTimer != null)
+        try
         {
-            _syncTimer.Stop();
-            _syncTimer.Elapsed -= OnPeriodicSyncElapsed;
-            _syncTimer.Dispose();
-            _syncTimer = null;
+            _isShuttingDown = true;
+            AppShutdownManager.RequestShutdown();
+            _shutdownCts?.Cancel();
+
+            if (_syncTimer != null)
+            {
+                _syncTimer.Stop();
+                _syncTimer.Elapsed -= OnPeriodicSyncElapsed;
+                _syncTimer.Dispose();
+                _syncTimer = null;
+            }
+
+            CloseRemainingWindows();
+            AppShutdownManager.WaitForCompletionAsync(TimeSpan.FromSeconds(ShutdownBackgroundTimeoutSeconds))
+                .GetAwaiter()
+                .GetResult();
+            RunFinalSyncWithTimeoutAsync().GetAwaiter().GetResult();
+            AppShutdownManager.WaitForCompletionAsync(TimeSpan.FromSeconds(1))
+                .GetAwaiter()
+                .GetResult();
+
+            MainVm?.Dispose();
+            MainVm = null;
+
+            _shutdownCts?.Dispose();
+            _shutdownCts = null;
         }
-
-        CloseRemainingWindows();
-        WaitForBackgroundTasksToStopAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
-        RunFinalSyncWithTimeoutAsync().GetAwaiter().GetResult();
-
-        MainVm?.Dispose();
-        MainVm = null;
-
-        _shutdownCts?.Dispose();
-        _shutdownCts = null;
-        _startupSyncTask = null;
-        _startupPdfTask = null;
-
-        base.OnExit(e);
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Cleanup error: {ex}");
+        }
+        finally
+        {
+            base.OnExit(e);
+        }
     }
 
     private static Task RunStartupSyncAsync(CancellationToken token)
     {
-        return Task.Run(async () =>
+        return AppShutdownManager.Track("Startup sync", async operationToken =>
         {
             try
             {
-                if (token.IsCancellationRequested || _isShuttingDown)
+                if (operationToken.IsCancellationRequested || _isShuttingDown)
                     return;
 
-                var result = await SyncService.SyncAllAsync(force: true, cancellationToken: token);
+                var result = await SyncService.SyncAllAsync(force: true, cancellationToken: operationToken);
                 Debug.WriteLine($"[STARTUP] Sync completed: Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
             }
             catch (OperationCanceledException)
@@ -189,13 +204,13 @@ public partial class App : Application
 
     private static Task RunStartupPdfGenerationAsync(CancellationToken token)
     {
-        return Task.Run(async () =>
+        return AppShutdownManager.Track("Startup PDF restore", async operationToken =>
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(30), token);
+                await Task.Delay(TimeSpan.FromSeconds(30), operationToken);
 
-                if (token.IsCancellationRequested || _isShuttingDown || MainVm == null)
+                if (operationToken.IsCancellationRequested || _isShuttingDown || MainVm == null)
                     return;
 
                 if (AppSettings.App.RestoreMissingPdfsOnStartup)
@@ -203,7 +218,7 @@ public partial class App : Application
                     await MainVm.GenerateInitialPdfsAsync(new Progress<string>(text =>
                     {
                         Debug.WriteLine($"[PDF Generation] {text}");
-                    }), token);
+                    }), operationToken);
                 }
                 else
                 {
@@ -225,6 +240,12 @@ public partial class App : Application
     {
         if (SyncService is null)
             return;
+
+        if (SyncService.IsSyncRunning)
+        {
+            Debug.WriteLine("[SHUTDOWN] Final sync skipped: sync gia' in corso.");
+            return;
+        }
 
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
         Task<SyncResult> syncTask;
@@ -261,38 +282,6 @@ public partial class App : Application
         catch (Exception ex)
         {
             Debug.WriteLine($"[SHUTDOWN] Sync error: {ex.Message}");
-        }
-    }
-
-    private static async Task WaitForBackgroundTasksToStopAsync(TimeSpan timeout)
-    {
-        var tasks = new[] { _startupSyncTask, _startupPdfTask }
-            .Where(task => task is { IsCompleted: false })
-            .Cast<Task>()
-            .ToArray();
-
-        if (tasks.Length == 0)
-            return;
-
-        try
-        {
-            var allTasks = Task.WhenAll(tasks);
-            var completed = await Task.WhenAny(allTasks, Task.Delay(timeout));
-            if (completed != allTasks)
-            {
-                Debug.WriteLine($"[SHUTDOWN] Background startup tasks still stopping after {timeout.TotalSeconds:F0}s.");
-                return;
-            }
-
-            await allTasks;
-        }
-        catch (OperationCanceledException)
-        {
-            Debug.WriteLine("[SHUTDOWN] Background startup tasks cancelled.");
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[SHUTDOWN] Background task stop error: {ex.Message}");
         }
     }
 
@@ -345,7 +334,10 @@ public partial class App : Application
         try
         {
             Debug.WriteLine("[PeriodicSync] Running scheduled sync...");
-            await SyncService.SyncAllAsync(cancellationToken: _shutdownCts?.Token ?? CancellationToken.None);
+            await AppShutdownManager.Track(
+                "Periodic sync",
+                async token => await SyncService.SyncAllAsync(cancellationToken: token),
+                _shutdownCts?.Token ?? CancellationToken.None);
         }
         catch (Exception ex)
         {
