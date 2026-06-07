@@ -18,7 +18,7 @@ public sealed class PdfArchiveAuditService
 
     public async Task<List<PdfArchiveIssue>> ScanAsync(
         int take = DefaultScanLimit,
-        bool includeDatabaseChecks = true,
+        bool includeDatabaseChecks = false,
         CancellationToken cancellationToken = default)
     {
         var issues = new List<PdfArchiveIssue>();
@@ -44,8 +44,7 @@ public sealed class PdfArchiveAuditService
             await CheckOfficialPdfAsync(entry, issues, includeDatabaseChecks, cancellationToken);
             await CheckCostsPdfAsync(entry, issues, includeDatabaseChecks, cancellationToken);
 
-            if (includeDatabaseChecks)
-                await CheckAttachmentsAsync(entry, issues, cancellationToken);
+            await Task.CompletedTask;
         }
 
         return issues;
@@ -83,19 +82,8 @@ public sealed class PdfArchiveAuditService
         if (File.Exists(expectedPath))
             return;
 
-        if (!includeDatabaseChecks)
-        {
-            issues.Add(CreateIssue(entry, PdfArchiveIssueType.OfficialPdfMissing, expectedPath, true));
-            return;
-        }
-
-        byte[]? dbPdf = null;
-        try { dbPdf = await _dataService.GetQuotePdfContentAsync(entry.QuoteNumber, cancellationToken).ConfigureAwait(false); }
-        catch { }
-
-        issues.Add(dbPdf is { Length: > 0 }
-            ? CreateIssue(entry, PdfArchiveIssueType.OfficialPdfMissing, expectedPath, true)
-            : CreateIssue(entry, PdfArchiveIssueType.OfficialPdfMissingInDatabase, expectedPath, false));
+        await Task.CompletedTask;
+        issues.Add(CreateIssue(entry, PdfArchiveIssueType.OfficialPdfMissing, expectedPath, false));
     }
 
     private async Task CheckCostsPdfAsync(
@@ -111,19 +99,8 @@ public sealed class PdfArchiveAuditService
         if (File.Exists(expectedPath))
             return;
 
-        if (!includeDatabaseChecks)
-        {
-            issues.Add(CreateIssue(entry, PdfArchiveIssueType.CostsPdfMissing, expectedPath, true));
-            return;
-        }
-
-        byte[]? dbPdf = null;
-        try { dbPdf = await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber, cancellationToken).ConfigureAwait(false); }
-        catch { }
-
-        issues.Add(dbPdf is { Length: > 0 }
-            ? CreateIssue(entry, PdfArchiveIssueType.CostsPdfMissing, expectedPath, true)
-            : CreateIssue(entry, PdfArchiveIssueType.CostsPdfMissingInDatabase, expectedPath, false));
+        await Task.CompletedTask;
+        issues.Add(CreateIssue(entry, PdfArchiveIssueType.CostsPdfMissing, expectedPath, false));
     }
 
     private async Task CheckAttachmentsAsync(

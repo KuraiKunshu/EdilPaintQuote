@@ -141,4 +141,42 @@ public partial class DashboardWindow : Window
         var win = new DiagnosticsWindow { Owner = this };
         win.ShowDialog();
     }
+
+    private async void OnSyncNowClick(object sender, RoutedEventArgs e)
+    {
+        if (App.SyncService.IsSyncRunning)
+        {
+            MessageBox.Show(
+                "La sincronizzazione e' gia' in corso.",
+                "Sincronizzazione",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            Cursor = System.Windows.Input.Cursors.Wait;
+            TxtSync.Text = "Sync: in corso...";
+            var result = await App.SyncService.SyncAllAsync(force: true);
+            string lastSync = App.SyncService.LastSyncCompletedUtc.HasValue
+                ? App.SyncService.LastSyncCompletedUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+                : "Mai";
+            TxtSync.Text = string.IsNullOrWhiteSpace(result.Error)
+                ? $"Sync: {App.SyncService.LastSyncSummary} - ultima: {lastSync}"
+                : $"Sync: errore - {result.Error}";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Sincronizzazione non riuscita.\n\n{ex.Message}",
+                "Sincronizzazione",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Cursor = null;
+        }
+    }
 }

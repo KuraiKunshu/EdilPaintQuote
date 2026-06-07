@@ -199,8 +199,6 @@ public partial class SqlDataService
             .Include(x => x.ReferenceCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
-            .Include(x => x.PdfFile)
-            .Include(x => x.Attachments)
             .Where(x => numberList.Contains(x.QuoteNumber))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -258,21 +256,8 @@ public partial class SqlDataService
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
             }).ToList(),
-            PdfFile = x.PdfFile == null ? null : new StoredFile
-            {
-                FileName = x.PdfFile.FileName,
-                ContentType = x.PdfFile.ContentType,
-                Content = x.PdfFile.Content,
-                ImportedAt = x.PdfFile.ImportedAt
-            },
-            Attachments = x.Attachments.Select(a => new StoredFile
-            {
-                FileName = a.FileName,
-                ContentType = a.ContentType,
-                Content = a.Content,
-                ImportedAt = a.ImportedAt
-            }).ToList(),
-            HasCompleteAttachmentSnapshot = true
+            PdfFile = null,
+            Attachments = []
         }).ToList();
     }
 
@@ -299,8 +284,6 @@ public partial class SqlDataService
             .Include(x => x.ReferenceCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
-            .Include(x => x.PdfFile)
-            .Include(x => x.Attachments)
             .OrderByDescending(x => x.Date)
             .ToListAsync();
 
@@ -356,21 +339,8 @@ public partial class SqlDataService
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
             }).ToList(),
-            PdfFile = x.PdfFile == null ? null : new StoredFile
-            {
-                FileName = x.PdfFile.FileName,
-                ContentType = x.PdfFile.ContentType,
-                Content = x.PdfFile.Content,
-                ImportedAt = x.PdfFile.ImportedAt
-            },
-            Attachments = x.Attachments.Select(a => new StoredFile
-            {
-                FileName = a.FileName,
-                ContentType = a.ContentType,
-                Content = a.Content,
-                ImportedAt = a.ImportedAt
-            }).ToList(),
-            HasCompleteAttachmentSnapshot = true
+            PdfFile = null,
+            Attachments = []
         }).ToList();
     }
 
@@ -596,8 +566,6 @@ public partial class SqlDataService
             .Include(x => x.ReferenceCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
-            .Include(x => x.PdfFile)
-            .Include(x => x.Attachments)
             .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber);
 
         if (q == null) return null;
@@ -647,17 +615,8 @@ public partial class SqlDataService
                 Quantity = l.Quantity, Discount = l.Discount, IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
             }).ToList(),
-            PdfFile = q.PdfFile == null ? null : new StoredFile
-            {
-                FileName = q.PdfFile.FileName, ContentType = q.PdfFile.ContentType,
-                Content = q.PdfFile.Content, ImportedAt = q.PdfFile.ImportedAt
-            },
-            Attachments = q.Attachments.Select(a => new StoredFile
-            {
-                FileName = a.FileName, ContentType = a.ContentType,
-                Content = a.Content, ImportedAt = a.ImportedAt
-            }).ToList(),
-            HasCompleteAttachmentSnapshot = true
+            PdfFile = null,
+            Attachments = []
         };
     }
 
@@ -879,8 +838,6 @@ public partial class SqlDataService
                     .IgnoreQueryFilters()
                     .Include(x => x.Materials)
                     .Include(x => x.Labors)
-                    .Include(x => x.PdfFile)
-                    .Include(x => x.Attachments)
                     .FirstOrDefaultAsync(x => x.QuoteNumber == quote.QuoteNumber, cancellationToken);
 
                 if (existing != null)
@@ -956,47 +913,6 @@ public partial class SqlDataService
                         SortOrder = l.SortOrder
                     }).ToList();
 
-                    bool hasOfficialPdfPayload = quote.PdfFile?.Content is { Length: > 0 };
-
-                    // Aggiorna il PDF ufficiale solo quando arrivano bytes reali.
-                    // I salvataggi metadata-only passano un PdfFile senza bytes e non devono cancellare il PDF nel DB.
-                    if (hasOfficialPdfPayload)
-                    {
-                        if (existing.PdfFile != null)
-                        {
-                            existing.PdfFile.FileName = quote.PdfFile!.FileName;
-                            existing.PdfFile.ContentType = quote.PdfFile.ContentType;
-                            existing.PdfFile.Content = quote.PdfFile.Content;
-                            existing.PdfFile.ImportedAt = quote.PdfFile.ImportedAt;
-                        }
-                        else
-                        {
-                            existing.PdfFile = new QuotePdfFileEntity
-                            {
-                                FileName = quote.PdfFile!.FileName,
-                                ContentType = quote.PdfFile.ContentType,
-                                Content = quote.PdfFile.Content,
-                                ImportedAt = quote.PdfFile.ImportedAt
-                            };
-                        }
-                    }
-
-                    bool hasAttachmentPayload = quote.Attachments.Any(a => a.Content.Length > 0);
-
-                    if (quote.HasCompleteAttachmentSnapshot || hasAttachmentPayload)
-                    {
-                        db.QuoteAttachments.RemoveRange(existing.Attachments);
-                        existing.Attachments = quote.Attachments
-                            .Where(a => a.Content.Length > 0)
-                            .Select(a => new QuoteAttachmentEntity
-                            {
-                                FileName = a.FileName,
-                                ContentType = a.ContentType,
-                                Content = a.Content,
-                                ImportedAt = a.ImportedAt
-                            }).ToList();
-                    }
-
                     quote.LastModifiedUtc = savedAtUtc;
                     quote.BaseVersionUtc = savedAtUtc;
                 }
@@ -1060,24 +976,6 @@ public partial class SqlDataService
                             Discount = l.Discount,
                             IsSignificant = l.IsSignificant,
                             SortOrder = l.SortOrder
-                        }).ToList(),
-                        PdfFile = quote.PdfFile?.Content is not { Length: > 0 }
-                            ? null
-                            : new QuotePdfFileEntity
-                            {
-                                FileName = quote.PdfFile.FileName,
-                                ContentType = quote.PdfFile.ContentType,
-                                Content = quote.PdfFile.Content,
-                                ImportedAt = quote.PdfFile.ImportedAt
-                            },
-                        Attachments = quote.Attachments
-                            .Where(a => a.Content.Length > 0)
-                            .Select(a => new QuoteAttachmentEntity
-                        {
-                            FileName = a.FileName,
-                            ContentType = a.ContentType,
-                            Content = a.Content,
-                            ImportedAt = a.ImportedAt
                         }).ToList()
                     };
 
@@ -1101,31 +999,14 @@ public partial class SqlDataService
         string quoteNumber,
         CancellationToken cancellationToken = default)
     {
-        await using var db = AppDbContextFactory.Create();
-
-        return await db.QuotePdfFiles
-            .AsNoTracking()
-            .Where(x => x.Quote.QuoteNumber == quoteNumber)
-            .Select(x => x.Content)
-            .FirstOrDefaultAsync(cancellationToken);
+        await Task.CompletedTask;
+        return null;
     }
 
     public async Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber)
     {
-        await using var db = AppDbContextFactory.Create();
-
-        return await db.QuoteAttachments
-            .AsNoTracking()
-            .Where(x => x.Quote.QuoteNumber == quoteNumber)
-            .OrderBy(x => x.FileName)
-            .Select(x => new StoredFile
-            {
-                FileName = x.FileName,
-                ContentType = x.ContentType,
-                Content = x.Content,
-                ImportedAt = x.ImportedAt
-            })
-            .ToListAsync();
+        await Task.CompletedTask;
+        return [];
     }
 
     public async Task<bool> SaveQuoteAttachmentsAsync(
@@ -1133,27 +1014,8 @@ public partial class SqlDataService
         IEnumerable<StoredFile> attachments,
         CancellationToken cancellationToken = default)
     {
-        await using var db = AppDbContextFactory.Create();
-        var quote = await db.Quotes
-            .Include(x => x.Attachments)
-            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
-
-        if (quote == null)
-            return false;
-
-        db.QuoteAttachments.RemoveRange(quote.Attachments);
-        quote.Attachments = attachments
-            .Where(file => file.Content.Length > 0)
-            .Select(file => new QuoteAttachmentEntity
-            {
-                FileName = file.FileName,
-                ContentType = file.ContentType,
-                Content = file.Content,
-                ImportedAt = file.ImportedAt
-            }).ToList();
-
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
+        await Task.CompletedTask;
+        return false;
     }
 
     public async Task<bool> SaveQuoteCostsPdfAsync(
@@ -1161,42 +1023,16 @@ public partial class SqlDataService
         StoredFile file,
         CancellationToken cancellationToken = default)
     {
-        if (file.Content.Length == 0)
-            return false;
-
-        await using var db = AppDbContextFactory.Create();
-        var quote = await db.Quotes
-            .Include(x => x.CostsPdfFile)
-            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
-
-        if (quote == null)
-            return false;
-
-        if (quote.CostsPdfFile == null)
-        {
-            quote.CostsPdfFile = new QuoteCostsPdfFileEntity();
-        }
-
-        quote.CostsPdfFile.FileName = file.FileName;
-        quote.CostsPdfFile.ContentType = file.ContentType;
-        quote.CostsPdfFile.Content = file.Content;
-        quote.CostsPdfFile.ImportedAt = file.ImportedAt;
-
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
+        await Task.CompletedTask;
+        return false;
     }
 
     public async Task<byte[]?> GetQuoteCostsPdfContentAsync(
         string quoteNumber,
         CancellationToken cancellationToken = default)
     {
-        await using var db = AppDbContextFactory.Create();
-
-        return await db.QuoteCostsPdfFiles
-            .AsNoTracking()
-            .Where(x => x.Quote.QuoteNumber == quoteNumber)
-            .Select(x => x.Content)
-            .FirstOrDefaultAsync(cancellationToken);
+        await Task.CompletedTask;
+        return null;
     }
 
     private static CostAllocations? DeserializeCostAllocations(string? json)

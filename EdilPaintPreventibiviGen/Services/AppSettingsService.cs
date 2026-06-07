@@ -162,6 +162,7 @@ public sealed class AppSettingsServiceModel
 	public bool FirstStartup { get; set; } = true;
 	public bool GeneratePDF { get; set; } = true;
 	public bool RestoreMissingPdfsOnStartup { get; set; }
+	public bool DatabaseCostSavingMode { get; set; } = true;
 	public bool IsSilentStartup { get; set; } = true;
 	public bool UseVeluxLogin { get; set; }
 	public int NumberOfQuote { get; set; } = 100;

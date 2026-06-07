@@ -89,11 +89,8 @@ public partial class MainViewModel
                         entry.Date.DateTime,
                         string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName));
 
-                if (isCostsPdfMissing &&
-                    await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber, cancellationToken) is { Length: > 0 })
-                {
+                if (isCostsPdfMissing)
                     return true;
-                }
             }
 
             return false;
@@ -393,19 +390,61 @@ public partial class MainViewModel
             });
         }
 
-        foreach (var attachment in entry.Attachments)
+        foreach (var attachment in LoadAttachmentsForQuote(entry))
         {
-            AttachedImages.Add(new SelectedAttachment
+            AttachedImages.Add(attachment);
+        }
+
+        UpdateItemSortOrders();
+        CalculateTotals();
+    }
+
+    private List<SelectedAttachment> LoadAttachmentsForQuote(QuoteHistoryEntry entry)
+    {
+        var embeddedAttachments = entry.Attachments
+            .Where(attachment => attachment.Content.Length > 0)
+            .Select(attachment => new SelectedAttachment
             {
                 FileName = attachment.FileName,
                 FilePath = string.Empty,
                 ContentType = attachment.ContentType,
                 Content = attachment.Content
-            });
-        }
+            })
+            .ToList();
 
-        UpdateItemSortOrders();
-        CalculateTotals();
+        if (embeddedAttachments.Count > 0)
+            return embeddedAttachments;
+
+        try
+        {
+            string expectedPdfPath = _storagePathService.BuildQuotePdfPath(
+                entry.CustomerName,
+                entry.QuoteNumber,
+                entry.Date,
+                string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
+            string? parentDir = Path.GetDirectoryName(expectedPdfPath);
+            if (string.IsNullOrWhiteSpace(parentDir))
+                return [];
+
+            string attachmentsDir = Path.Combine(parentDir, "Allegati_" + entry.QuoteNumber);
+            if (!Directory.Exists(attachmentsDir))
+                return [];
+
+            return Directory.EnumerateFiles(attachmentsDir)
+                .Select(path => new SelectedAttachment
+                {
+                    FileName = Path.GetFileName(path),
+                    FilePath = path,
+                    ContentType = GetContentType(path),
+                    Content = File.ReadAllBytes(path)
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[LoadAttachmentsForQuote] Errore lettura allegati locali: {ex.Message}");
+            return [];
+        }
     }
 
     public void GenerateCostsPdf() => _ = GenerateCostsPdfAsync();
@@ -465,15 +504,6 @@ public partial class MainViewModel
                 Total = TotaleGenerale
             }, _companyData, temporaryPath);
 
-            byte[] pdfBytes = await File.ReadAllBytesAsync(temporaryPath);
-            await _dataService.SaveQuoteCostsPdfAsync(QuoteNumber, new StoredFile
-            {
-                FileName = Path.GetFileName(costsPath),
-                ContentType = "application/pdf",
-                Content = pdfBytes,
-                ImportedAt = DateTime.UtcNow
-            });
-
             bool copiedToTarget = false;
             try
             {
@@ -489,18 +519,18 @@ public partial class MainViewModel
                 Debug.WriteLine($"[GenerateCostsPdf] Copia nella cartella condivisa non riuscita: {ex.Message}");
             }
 
-            try { File.Delete(temporaryPath); }
-            catch (Exception ex) { Debug.WriteLine($"[GenerateCostsPdf] Eliminazione file temporaneo non riuscita: {ex.Message}"); }
-
             if (!copiedToTarget)
             {
                 MessageBox.Show(
-                    "Il PDF dei costi e' al sicuro nel database o nella coda locale. Verra' ripristinato quando la cartella condivisa sara' disponibile.",
+                    $"La cartella condivisa non e' disponibile. Il PDF dei costi e' stato generato nel percorso temporaneo:\n\n{temporaryPath}",
                     "Cartella condivisa non disponibile",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
+
+            try { File.Delete(temporaryPath); }
+            catch (Exception ex) { Debug.WriteLine($"[GenerateCostsPdf] Eliminazione file temporaneo non riuscita: {ex.Message}"); }
 
             Process.Start("explorer.exe", $"/select,\"{costsPath}\"");
         }

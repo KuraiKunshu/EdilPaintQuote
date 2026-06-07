@@ -108,7 +108,7 @@ public partial class App : Application
                 MainWindow = mainWindow;
                 mainWindow.Show();
 
-                StartPeriodicSync();
+                StartPeriodicSyncIfEnabled();
                 _ = RunStartupPdfGenerationAsync(shutdownToken);
 
                 Debug.WriteLine($"[STARTUP] Startup completato in {startupWatch.Elapsed}");
@@ -241,6 +241,12 @@ public partial class App : Application
         if (SyncService is null)
             return;
 
+        if (AppSettings.App.DatabaseCostSavingMode)
+        {
+            Debug.WriteLine("[SHUTDOWN] Final sync skipped: modalita' risparmio DB attiva.");
+            return;
+        }
+
         if (SyncService.IsSyncRunning)
         {
             Debug.WriteLine("[SHUTDOWN] Final sync skipped: sync gia' in corso.");
@@ -316,8 +322,14 @@ public partial class App : Application
         }
     }
 
-    private static void StartPeriodicSync()
+    private static void StartPeriodicSyncIfEnabled()
     {
+        if (AppSettings.App.DatabaseCostSavingMode)
+        {
+            Debug.WriteLine("[STARTUP] Periodic sync disabled: modalita' risparmio DB attiva.");
+            return;
+        }
+
         _syncTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
         _syncTimer.Elapsed += OnPeriodicSyncElapsed;
         _syncTimer.AutoReset = true;

@@ -522,12 +522,6 @@ public class FallbackDataService : IDataService
         quote.LastModifiedUtc = DateTime.UtcNow;
         EnsureDeviceMetadata(quote);
 
-        if (quote.PdfFile?.Content is { Length: > 0 } pdfBytes)
-            await _pdfOutbox.StoreAsync(quote.QuoteNumber, pdfBytes, cancellationToken);
-
-        if (quote.HasCompleteAttachmentSnapshot)
-            await _attachmentOutbox.StoreAsync(quote.QuoteNumber, quote.Attachments, cancellationToken);
-        
         var lightEntry = CreateLightEntry(quote);
         lightEntry.SyncHash = QuoteSyncHashService.Compute(lightEntry);
         quote.SyncHash = lightEntry.SyncHash;
@@ -538,18 +532,12 @@ public class FallbackDataService : IDataService
         {
             try
             {
-                await _sqlService.SaveQuoteAsync(quote, cancellationToken);
-                await _localStore.SaveOrUpdateQuoteAsync(CreateLightEntry(quote));
+                await _sqlService.SaveQuoteAsync(lightEntry, cancellationToken);
+                await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
                 await _pdfOutbox.RemoveAsync(quote.QuoteNumber);
                 if (quote.HasCompleteAttachmentSnapshot)
                     await _attachmentOutbox.RemoveAsync(quote.QuoteNumber);
-
-                var pendingCostsPdf = await _costsPdfOutbox.TryReadAsync(quote.QuoteNumber, cancellationToken);
-                if (pendingCostsPdf != null &&
-                    await _sqlService.SaveQuoteCostsPdfAsync(quote.QuoteNumber, pendingCostsPdf, cancellationToken))
-                {
-                    await _costsPdfOutbox.RemoveAsync(quote.QuoteNumber);
-                }
+                await _costsPdfOutbox.RemoveAsync(quote.QuoteNumber);
             }
             catch (QuoteConflictException)
             {
@@ -924,12 +912,6 @@ public class FallbackDataService : IDataService
         if (pendingPdf is { Length: > 0 })
             return pendingPdf;
 
-        if (IsDatabaseAvailable())
-        {
-            try { return await _sqlService.GetQuotePdfContentAsync(quoteNumber, cancellationToken); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
-        }
-
         return null;
     }
 
@@ -939,12 +921,6 @@ public class FallbackDataService : IDataService
         if (pendingAttachments != null)
             return pendingAttachments;
 
-        if (IsDatabaseAvailable())
-        {
-            try { return await _sqlService.GetQuoteAttachmentsAsync(quoteNumber); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
-        }
-
         return [];
     }
 
@@ -953,28 +929,8 @@ public class FallbackDataService : IDataService
         StoredFile file,
         CancellationToken cancellationToken = default)
     {
-        await _costsPdfOutbox.StoreAsync(quoteNumber, file, cancellationToken);
-
-        if (!IsDatabaseAvailable())
-            return false;
-
-        try
-        {
-            bool saved = await _sqlService.SaveQuoteCostsPdfAsync(quoteNumber, file, cancellationToken);
-            if (saved)
-                await _costsPdfOutbox.RemoveAsync(quoteNumber);
-
-            return saved;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            SetDatabaseUnavailable(ex.Message);
-            return false;
-        }
+        await _costsPdfOutbox.RemoveAsync(quoteNumber);
+        return false;
     }
 
     public async Task<byte[]?> GetQuoteCostsPdfContentAsync(
@@ -984,12 +940,6 @@ public class FallbackDataService : IDataService
         var pendingFile = await _costsPdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
         if (pendingFile?.Content is { Length: > 0 })
             return pendingFile.Content;
-
-        if (IsDatabaseAvailable())
-        {
-            try { return await _sqlService.GetQuoteCostsPdfContentAsync(quoteNumber, cancellationToken); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
-        }
 
         return null;
     }

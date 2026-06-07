@@ -43,6 +43,7 @@ public partial class SettingsWindow : Window
         TxtMailBody.Text = mail.DefaultBody;
         ChkGeneratePdf.IsChecked = app.GeneratePDF;
         ChkRestoreMissingPdfsOnStartup.IsChecked = app.RestoreMissingPdfsOnStartup;
+        ChkDatabaseCostSavingMode.IsChecked = app.DatabaseCostSavingMode;
         ChkSilentStartup.IsChecked = app.IsSilentStartup;
         ChkUseVeluxLogin.IsChecked = app.UseVeluxLogin;
         TxtHistoryResultLimit.Text = app.NumberOfQuote.ToString(CultureInfo.InvariantCulture);
@@ -160,6 +161,7 @@ public partial class SettingsWindow : Window
                 mail.ValidateForSend();
             app.GeneratePDF = ChkGeneratePdf.IsChecked == true;
             app.RestoreMissingPdfsOnStartup = ChkRestoreMissingPdfsOnStartup.IsChecked == true;
+            app.DatabaseCostSavingMode = ChkDatabaseCostSavingMode.IsChecked == true;
             app.IsSilentStartup = ChkSilentStartup.IsChecked == true;
             app.UseVeluxLogin = ChkUseVeluxLogin.IsChecked == true;
             app.NumberOfQuote = historyResultLimit;

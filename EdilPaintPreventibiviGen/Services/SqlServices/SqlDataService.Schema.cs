@@ -50,62 +50,6 @@ public partial class SqlDataService
 
     private static async Task EnsureLegacySchemaCompatibilityAsync(AppDbContext db, CancellationToken cancellationToken)
     {
-        await db.Database.ExecuteSqlRawAsync("""
-    IF OBJECT_ID(N'[dbo].[QuotePdfFiles]', N'U') IS NULL
-    BEGIN
-        CREATE TABLE [dbo].[QuotePdfFiles]
-        (
-            [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            [QuoteId] INT NOT NULL,
-            [FileName] NVARCHAR(500) NOT NULL,
-            [ContentType] NVARCHAR(200) NOT NULL,
-            [Content] VARBINARY(MAX) NOT NULL,
-            [ImportedAt] DATETIME2 NOT NULL,
-            CONSTRAINT [FK_QuotePdfFiles_Quotes_QuoteId]
-                FOREIGN KEY ([QuoteId]) REFERENCES [dbo].[Quotes]([Id]) ON DELETE CASCADE,
-            CONSTRAINT [AK_QuotePdfFiles_QuoteId] UNIQUE ([QuoteId])
-        );
-        CREATE INDEX [IX_QuotePdfFiles_QuoteId] ON [dbo].[QuotePdfFiles]([QuoteId]);
-    END
-    """, cancellationToken);
-
-        await db.Database.ExecuteSqlRawAsync("""
-    IF OBJECT_ID(N'[dbo].[QuoteAttachments]', N'U') IS NULL
-    BEGIN
-        CREATE TABLE [dbo].[QuoteAttachments]
-        (
-            [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            [QuoteId] INT NOT NULL,
-            [FileName] NVARCHAR(500) NOT NULL,
-            [ContentType] NVARCHAR(200) NOT NULL,
-            [Content] VARBINARY(MAX) NOT NULL,
-            [ImportedAt] DATETIME2 NOT NULL,
-            CONSTRAINT [FK_QuoteAttachments_Quotes_QuoteId]
-                FOREIGN KEY ([QuoteId]) REFERENCES [dbo].[Quotes]([Id]) ON DELETE CASCADE
-        );
-        CREATE INDEX [IX_QuoteAttachments_QuoteId] ON [dbo].[QuoteAttachments]([QuoteId]);
-    END
-    """, cancellationToken);
-
-        await db.Database.ExecuteSqlRawAsync("""
-    IF OBJECT_ID(N'[dbo].[QuoteCostsPdfFiles]', N'U') IS NULL
-    BEGIN
-        CREATE TABLE [dbo].[QuoteCostsPdfFiles]
-        (
-            [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            [QuoteId] INT NOT NULL,
-            [FileName] NVARCHAR(500) NOT NULL,
-            [ContentType] NVARCHAR(200) NOT NULL,
-            [Content] VARBINARY(MAX) NOT NULL,
-            [ImportedAt] DATETIME2 NOT NULL,
-            CONSTRAINT [FK_QuoteCostsPdfFiles_Quotes_QuoteId]
-                FOREIGN KEY ([QuoteId]) REFERENCES [dbo].[Quotes]([Id]) ON DELETE CASCADE,
-            CONSTRAINT [AK_QuoteCostsPdfFiles_QuoteId] UNIQUE ([QuoteId])
-        );
-        CREATE INDEX [IX_QuoteCostsPdfFiles_QuoteId] ON [dbo].[QuoteCostsPdfFiles]([QuoteId]);
-    END
-    """, cancellationToken);
-
         await EnsureColumnAsync(db, "Quotes", "LastModifiedUtc",
             "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "SyncHash", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);

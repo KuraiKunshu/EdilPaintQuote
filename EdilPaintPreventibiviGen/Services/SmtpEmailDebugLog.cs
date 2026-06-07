@@ -12,7 +12,7 @@ public sealed class SmtpEmailDebugLog
 
     public SmtpEmailDebugLog()
     {
-        string logDirectory = Path.Combine(LocalApplicationDataService.GetDataDirectoryPath(), "MailLogs");
+        string logDirectory = ResolveLogDirectory();
         Directory.CreateDirectory(logDirectory);
         FilePath = Path.Combine(logDirectory, $"smtp-{DateTime.Now:yyyyMMdd}.log");
     }
@@ -37,6 +37,32 @@ public sealed class SmtpEmailDebugLog
         catch (Exception ex)
         {
             Debug.WriteLine($"[SMTP] Impossibile scrivere il log SMTP: {ex.Message}");
+        }
+    }
+
+    private static string ResolveLogDirectory()
+    {
+        string appLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MailLogs");
+        if (CanWriteToDirectory(appLogDirectory))
+            return appLogDirectory;
+
+        return Path.Combine(LocalApplicationDataService.GetDataDirectoryPath(), "MailLogs");
+    }
+
+    private static bool CanWriteToDirectory(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            string testPath = Path.Combine(directory, ".writetest");
+            File.WriteAllText(testPath, "test", Encoding.UTF8);
+            File.Delete(testPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SMTP] Cartella log non scrivibile '{directory}': {ex.Message}");
+            return false;
         }
     }
 }

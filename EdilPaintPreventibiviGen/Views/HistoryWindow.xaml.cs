@@ -386,10 +386,7 @@ public partial class HistoryWindow : Window
             if (emailResult != null)
             {
                 MessageBox.Show(
-                    "Email accettata dal server SMTP e storico aggiornato.\n\n" +
-                    $"Message-ID: {emailResult.MessageId}\n" +
-                    $"Log SMTP: {emailResult.DebugLogPath}\n\n" +
-                    "Se non arriva, controlla spam, eventuali email di mancata consegna nella casella mittente e il log SMTP.",
+                    "Preventivo inviato correttamente.",
                     "Invio preventivo",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -402,7 +399,8 @@ public partial class HistoryWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Errore durante l'invio/salvataggio: {ex.Message}",
+            Debug.WriteLine($"[SendQuote] Errore invio/salvataggio: {ex}");
+            MessageBox.Show("Preventivo non inviato. Controlla il log SMTP per i dettagli.",
                 "Invio preventivo", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally

@@ -77,22 +77,7 @@ public sealed class QuoteHistoryService
         CancellationToken cancellationToken = default)
     {
         string expectedPath = GetExpectedPdfPath(entry);
-        byte[]? officialPdf = null;
-        try
-        {
-            officialPdf = await _dataService.GetQuotePdfContentAsync(entry.QuoteNumber, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[EnsureOfficialPdfExists] DB PDF non disponibile per {entry.QuoteNumber}: {ex.Message}");
-        }
-
-        if (officialPdf is not { Length: > 0 })
-            officialPdf = entry.PdfFile?.Content is { Length: > 0 } ? entry.PdfFile.Content : null;
+        byte[]? officialPdf = entry.PdfFile?.Content is { Length: > 0 } ? entry.PdfFile.Content : null;
 
         if (officialPdf is not { Length: > 0 })
             return string.Empty;
@@ -121,24 +106,13 @@ public sealed class QuoteHistoryService
         QuoteHistoryEntry entry,
         CancellationToken cancellationToken = default)
     {
-        byte[]? costsPdf = await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber, cancellationToken);
-        if (costsPdf is not { Length: > 0 })
-            return string.Empty;
-
-        string expectedPath = GetExpectedCostsPdfPath(entry);
-        string? folder = Path.GetDirectoryName(expectedPath);
-        if (!string.IsNullOrWhiteSpace(folder))
-            Directory.CreateDirectory(folder);
-
-        if (!File.Exists(expectedPath) || !FileMatchesBytes(expectedPath, costsPdf))
-            await File.WriteAllBytesAsync(expectedPath, costsPdf, cancellationToken);
-
-        return expectedPath;
+        await Task.CompletedTask;
+        return string.Empty;
     }
 
     public async Task EnsureAttachmentsFolderExistsAsync(QuoteHistoryEntry entry)
     {
-        var attachments = await _dataService.GetQuoteAttachmentsAsync(entry.QuoteNumber);
+        var attachments = entry.Attachments.Where(x => x.Content.Length > 0).ToList();
         if (attachments.Count == 0)
             return;
 

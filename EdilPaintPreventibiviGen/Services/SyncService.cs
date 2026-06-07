@@ -121,8 +121,6 @@ public class SyncService
             result.QuotesSynced = quotesResult.synced;
             result.QuotesConflicts = quotesResult.conflicts;
 
-            await FlushPendingQuoteFilesAsync(cancellationToken);
-
             var customersResult = await SyncCustomersAsync(cancellationToken);
             result.CustomersSynced = customersResult.synced;
             result.CustomersConflicts = customersResult.conflicts;
@@ -326,23 +324,8 @@ public class SyncService
                     {
                         cancellationToken.ThrowIfCancellationRequested();
 
-                        var pendingPdf = await _pdfOutbox.TryReadAsync(q.QuoteNumber, cancellationToken);
-                        bool hasPendingPdf = pendingPdf is { Length: > 0 };
-                        if (pendingPdf is { Length: > 0 })
-                        {
-                            q.PdfFile ??= new StoredFile
-                            {
-                                FileName = $"{q.QuoteNumber}.pdf",
-                                ContentType = "application/pdf",
-                                ImportedAt = DateTime.UtcNow
-                            };
-                            q.PdfFile.Content = pendingPdf;
-                        }
-
                         await _sqlService.SaveQuoteAsync(q, cancellationToken);
                         await _localStore.BulkUpdateQuotesAsync([q], cancellationToken);
-                        if (hasPendingPdf)
-                            await _pdfOutbox.RemoveAsync(q.QuoteNumber);
                     }
                     catch (QuoteConflictException ex)
                     {
@@ -523,29 +506,8 @@ public class SyncService
 
     private async Task FlushPendingQuoteFilesAsync(CancellationToken cancellationToken)
     {
-        foreach (string quoteNumber in await _attachmentOutbox.GetPendingQuoteNumbersAsync(cancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var attachments = await _attachmentOutbox.TryReadAsync(quoteNumber, cancellationToken);
-            if (attachments != null &&
-                await _sqlService.SaveQuoteAttachmentsAsync(quoteNumber, attachments, cancellationToken))
-            {
-                await _attachmentOutbox.RemoveAsync(quoteNumber);
-                Debug.WriteLine($"[Sync] Allegati pendenti sincronizzati per {quoteNumber}.");
-            }
-        }
-
-        foreach (string quoteNumber in await _costsPdfOutbox.GetPendingQuoteNumbersAsync(cancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var costsPdf = await _costsPdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
-            if (costsPdf != null &&
-                await _sqlService.SaveQuoteCostsPdfAsync(quoteNumber, costsPdf, cancellationToken))
-            {
-                await _costsPdfOutbox.RemoveAsync(quoteNumber);
-                Debug.WriteLine($"[Sync] PDF costi pendente sincronizzato per {quoteNumber}.");
-            }
-        }
+        await Task.CompletedTask;
+        Debug.WriteLine("[Sync] Sincronizzazione file binari saltata: PDF e allegati restano su file system.");
     }
 
     private async Task<(int synced, int conflicts)> SyncCustomersAsync(CancellationToken cancellationToken)

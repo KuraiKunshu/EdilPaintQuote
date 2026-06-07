@@ -124,8 +124,13 @@
                                     Click="OnPdfAuditClick"/>
                             <Button Content="Diagnostica"
                                     Width="106"
+                                    Margin="0,0,8,8"
                                     Height="32"
                                     Click="OnDiagnosticsClick"/>
+                            <Button Content="Sync ora"
+                                    Width="96"
+                                    Height="32"
+                                    Click="OnSyncNowClick"/>
                         </WrapPanel>
                     </StackPanel>
                 </Border>

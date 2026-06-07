@@ -82,6 +82,7 @@ public static class AppSettingsFileService
                 FirstStartup = false,
                 GeneratePDF = true,
                 RestoreMissingPdfsOnStartup = false,
+                DatabaseCostSavingMode = true,
                 IsSilentStartup = false,
                 UseVeluxLogin = false,
                 NumberOfQuote = 200,

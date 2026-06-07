@@ -186,6 +186,9 @@
                                 <CheckBox x:Name="ChkRestoreMissingPdfsOnStartup"
                                           Content="Ripristina automaticamente i PDF mancanti all'avvio (puo' essere lento)"
                                           Margin="0,0,0,9"/>
+                                <CheckBox x:Name="ChkDatabaseCostSavingMode"
+                                          Content="Modalita' risparmio DB dal prossimo avvio (disattiva la sincronizzazione automatica ogni 5 minuti)"
+                                          Margin="0,0,0,9"/>
                                 <CheckBox x:Name="ChkSilentStartup"
                                           Content="Chiudi silenziosamente l'app se si verifica un errore durante l'avvio"/>
                             </StackPanel>

@@ -89,7 +89,7 @@ public partial class MainViewModel
         DateTime? quoteDate = null,
         string? pdfContentPath = null)
     {
-        byte[] pdfBytes = await ReadPdfBytesWithRetryAsync(pdfContentPath ?? pdfPath);
+        await SaveAttachmentsToFileSystemAsync(pdfPath, QuoteNumber);
 
         var entry = new QuoteHistoryEntry
         {
@@ -115,18 +115,18 @@ public partial class MainViewModel
             OurCosts = OurCosts.ToList(),
             PartnerCosts = PartnerCosts.ToList(),
             AdditionalCosts = AdditionalCosts.ToList(),
-            PdfFile = pdfBytes.Length == 0 ? null : new StoredFile
+            PdfFile = new StoredFile
             {
                 FileName = Path.GetFileName(pdfPath) ?? "preventivo.pdf",
                 ContentType = "application/pdf",
-                Content = pdfBytes,
+                Content = [],
                 ImportedAt = DateTime.Now
             },
             Attachments = AttachedImages.Select(a => new StoredFile
             {
                 FileName = a.FileName,
                 ContentType = a.ContentType,
-                Content = a.Content,
+                Content = [],
                 ImportedAt = DateTime.Now
             }).ToList(),
             HasCompleteAttachmentSnapshot = true
@@ -287,6 +287,48 @@ public partial class MainViewModel
         _isEditingExistingQuote = true;
         _loadedQuoteDate = entry.Date;
         _loadedQuoteBaseVersionUtc = entry.BaseVersionUtc;
+    }
+
+    private async Task SaveAttachmentsToFileSystemAsync(string pdfPath, string quoteNumber)
+    {
+        try
+        {
+            string? parentDir = Path.GetDirectoryName(pdfPath);
+            if (string.IsNullOrWhiteSpace(parentDir))
+                return;
+
+            string attachmentsDir = Path.Combine(parentDir, "Allegati_" + quoteNumber);
+            if (Directory.Exists(attachmentsDir))
+                Directory.Delete(attachmentsDir, recursive: true);
+
+            if (AttachedImages.Count == 0)
+                return;
+
+            Directory.CreateDirectory(attachmentsDir);
+            foreach (var attachment in AttachedImages)
+            {
+                byte[] content = attachment.Content;
+                if (content.Length == 0 &&
+                    !string.IsNullOrWhiteSpace(attachment.FilePath) &&
+                    File.Exists(attachment.FilePath))
+                {
+                    content = await File.ReadAllBytesAsync(attachment.FilePath);
+                }
+
+                if (content.Length == 0)
+                    continue;
+
+                string fileName = Path.GetFileName(attachment.FileName);
+                string targetPath = Path.Combine(attachmentsDir, fileName);
+                await File.WriteAllBytesAsync(targetPath, content);
+                attachment.FilePath = targetPath;
+                attachment.Content = content;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SaveAttachmentsToFileSystem] Errore salvataggio allegati: {ex.Message}");
+        }
     }
 
     private static QuoteHistoryEntry CloneEntryWithoutPdfBytes(QuoteHistoryEntry entry)
