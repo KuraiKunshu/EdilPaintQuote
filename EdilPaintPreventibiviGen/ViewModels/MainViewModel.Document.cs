@@ -18,6 +18,8 @@ using EdilPaintPreventibiviGen.Views;
 namespace EdilPaintPreventibiviGen.ViewModels;
 public partial class MainViewModel
 {
+    private const int MaxStartupPdfRestoreRows = 300;
+
     #region Document Logic
     public void ResetQuote()
     {
@@ -45,6 +47,7 @@ public partial class MainViewModel
 
         PaymentTerms = _companyData.Termini_pagamento;
         QuoteNumber = _companyData.Counter.ToString();
+        SelectDefaultLogo();
 
         OnPropertyChanged(nameof(SelectedCustomer));
         OnPropertyChanged(nameof(SelectedSecondCustomer));
@@ -59,14 +62,16 @@ public partial class MainViewModel
         CalculateTotals();
     }
 
-    public async Task<bool> HasMissingPdfsAsync()
+    public async Task<bool> HasMissingPdfsAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             // Carica solo i summary (leggeri) invece dell'intero storico
-            var summaries = await _dataService.GetQuoteSummariesAsync(int.MaxValue);
+            var summaries = await _dataService.GetQuoteSummariesAsync(MaxStartupPdfRestoreRows, cancellationToken);
             foreach (var entry in summaries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 bool isOfficialPdfMissing = !File.Exists(_storagePathService.BuildQuotePdfPath(
                     entry.CustomerName,
                     entry.QuoteNumber,
@@ -84,14 +89,15 @@ public partial class MainViewModel
                         entry.Date.DateTime,
                         string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName));
 
-                if (isCostsPdfMissing &&
-                    await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber) is { Length: > 0 })
-                {
+                if (isCostsPdfMissing)
                     return true;
-                }
             }
 
             return false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -100,7 +106,9 @@ public partial class MainViewModel
         }
     }
 
-    public async Task GenerateInitialPdfsAsync(IProgress<string>? progress = null)
+    public async Task GenerateInitialPdfsAsync(
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         var watch = Stopwatch.StartNew();
 
@@ -121,13 +129,15 @@ public partial class MainViewModel
         }
 
         progress?.Report("Analisi storico: caricamento elenco preventivi...");
-        var historyEntries = await _dataService.GetQuoteSummariesAsync(int.MaxValue);
+        var historyEntries = await _dataService.GetQuoteSummariesAsync(MaxStartupPdfRestoreRows, cancellationToken);
 
         int total = historyEntries.Count;
         int current = 0;
 
         foreach (var entry in historyEntries)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             current++;
             progress?.Report($"Analisi storico: {current}/{total} - Preventivo {entry.QuoteNumber}");
 
@@ -149,12 +159,12 @@ public partial class MainViewModel
                 string expectedPath = _quoteHistoryService.GetExpectedPdfPath(lightweightEntry);
                 string restoredPath = File.Exists(expectedPath)
                     ? expectedPath
-                    : await _quoteHistoryService.EnsureOfficialPdfExistsAsync(lightweightEntry);
+                    : await _quoteHistoryService.EnsureOfficialPdfExistsAsync(lightweightEntry, cancellationToken);
                 if (entry.IsJointVenture)
                 {
                     string expectedCostsPath = _quoteHistoryService.GetExpectedCostsPdfPath(lightweightEntry);
                     if (!File.Exists(expectedCostsPath))
-                        await _quoteHistoryService.EnsureCostsPdfExistsAsync(lightweightEntry);
+                        await _quoteHistoryService.EnsureCostsPdfExistsAsync(lightweightEntry, cancellationToken);
                 }
 
                 if (!string.IsNullOrWhiteSpace(restoredPath) && File.Exists(restoredPath))
@@ -165,6 +175,9 @@ public partial class MainViewModel
             }
             catch (Exception ex)
             {
+                if (ex is OperationCanceledException)
+                    throw;
+
                 Debug.WriteLine($"[STARTUP][HISTORY] ERRORE su preventivo {entry.QuoteNumber}: {ex.Message}");
             }
         }
@@ -273,17 +286,25 @@ public partial class MainViewModel
                 Debug.WriteLine($"ERRORE copia PDF su share: {targetPath} -> {ex.Message}");
             }
 
-            if (!await SaveToHistoryAsync(targetPath, incrementCounter, effectiveDate, pathToGenerate))
+            string persistedPdfPath = copiedToTarget
+                ? targetPath
+                : MoveTemporaryPdfToLocalFallback(pathToGenerate, targetPath);
+
+            if (!await SaveToHistoryAsync(persistedPdfPath, incrementCounter, effectiveDate))
                 return;
             _hasPersistedCurrentQuote = true;
+            await DiscardDraftAsync();
 
-            try { File.Delete(pathToGenerate); }
-            catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error deleting temporary PDF: {ex.Message}"); }
+            if (copiedToTarget)
+            {
+                try { File.Delete(pathToGenerate); }
+                catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error deleting temporary PDF: {ex.Message}"); }
+            }
 
             if (!copiedToTarget)
             {
                 MessageBox.Show(
-                    "Il PDF e' al sicuro nel database o nella coda locale ed e' in attesa di essere ripristinato nella cartella condivisa.",
+                    $"La cartella condivisa non e' disponibile. Il PDF e' stato salvato localmente qui:\n\n{persistedPdfPath}",
                     "Cartella condivisa non disponibile",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -376,19 +397,61 @@ public partial class MainViewModel
             });
         }
 
-        foreach (var attachment in entry.Attachments)
+        foreach (var attachment in LoadAttachmentsForQuote(entry))
         {
-            AttachedImages.Add(new SelectedAttachment
+            AttachedImages.Add(attachment);
+        }
+
+        UpdateItemSortOrders();
+        CalculateTotals();
+    }
+
+    private List<SelectedAttachment> LoadAttachmentsForQuote(QuoteHistoryEntry entry)
+    {
+        var embeddedAttachments = entry.Attachments
+            .Where(attachment => attachment.Content.Length > 0)
+            .Select(attachment => new SelectedAttachment
             {
                 FileName = attachment.FileName,
                 FilePath = string.Empty,
                 ContentType = attachment.ContentType,
                 Content = attachment.Content
-            });
-        }
+            })
+            .ToList();
 
-        UpdateItemSortOrders();
-        CalculateTotals();
+        if (embeddedAttachments.Count > 0)
+            return embeddedAttachments;
+
+        try
+        {
+            string expectedPdfPath = _storagePathService.BuildQuotePdfPath(
+                entry.CustomerName,
+                entry.QuoteNumber,
+                entry.Date,
+                string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
+            string? parentDir = Path.GetDirectoryName(expectedPdfPath);
+            if (string.IsNullOrWhiteSpace(parentDir))
+                return [];
+
+            string attachmentsDir = Path.Combine(parentDir, "Allegati_" + entry.QuoteNumber);
+            if (!Directory.Exists(attachmentsDir))
+                return [];
+
+            return Directory.EnumerateFiles(attachmentsDir)
+                .Select(path => new SelectedAttachment
+                {
+                    FileName = Path.GetFileName(path),
+                    FilePath = path,
+                    ContentType = GetContentType(path),
+                    Content = File.ReadAllBytes(path)
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[LoadAttachmentsForQuote] Errore lettura allegati locali: {ex.Message}");
+            return [];
+        }
     }
 
     public void GenerateCostsPdf() => _ = GenerateCostsPdfAsync();
@@ -448,15 +511,6 @@ public partial class MainViewModel
                 Total = TotaleGenerale
             }, _companyData, temporaryPath);
 
-            byte[] pdfBytes = await File.ReadAllBytesAsync(temporaryPath);
-            await _dataService.SaveQuoteCostsPdfAsync(QuoteNumber, new StoredFile
-            {
-                FileName = Path.GetFileName(costsPath),
-                ContentType = "application/pdf",
-                Content = pdfBytes,
-                ImportedAt = DateTime.UtcNow
-            });
-
             bool copiedToTarget = false;
             try
             {
@@ -472,18 +526,19 @@ public partial class MainViewModel
                 Debug.WriteLine($"[GenerateCostsPdf] Copia nella cartella condivisa non riuscita: {ex.Message}");
             }
 
-            try { File.Delete(temporaryPath); }
-            catch (Exception ex) { Debug.WriteLine($"[GenerateCostsPdf] Eliminazione file temporaneo non riuscita: {ex.Message}"); }
-
             if (!copiedToTarget)
             {
+                string fallbackPath = MoveTemporaryPdfToLocalFallback(temporaryPath, costsPath);
                 MessageBox.Show(
-                    "Il PDF dei costi e' al sicuro nel database o nella coda locale. Verra' ripristinato quando la cartella condivisa sara' disponibile.",
+                    $"La cartella condivisa non e' disponibile. Il PDF dei costi e' stato salvato localmente qui:\n\n{fallbackPath}",
                     "Cartella condivisa non disponibile",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
+
+            try { File.Delete(temporaryPath); }
+            catch (Exception ex) { Debug.WriteLine($"[GenerateCostsPdf] Eliminazione file temporaneo non riuscita: {ex.Message}"); }
 
             Process.Start("explorer.exe", $"/select,\"{costsPath}\"");
         }
@@ -495,6 +550,56 @@ public partial class MainViewModel
         {
             _isGeneratingCostsPdf = false;
         }
+    }
+
+    private static string MoveTemporaryPdfToLocalFallback(string temporaryPath, string intendedPath)
+    {
+        try
+        {
+            if (!File.Exists(temporaryPath))
+                return temporaryPath;
+
+            string fallbackRoot = Path.Combine(
+                LocalApplicationDataService.GetDataDirectoryPath(),
+                "GeneratedPdfs");
+            Directory.CreateDirectory(fallbackRoot);
+
+            string fileName = Path.GetFileName(intendedPath);
+            if (string.IsNullOrWhiteSpace(fileName))
+                fileName = Path.GetFileName(temporaryPath);
+            if (string.IsNullOrWhiteSpace(fileName))
+                fileName = $"Preventivo_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+            string fallbackPath = BuildUniqueFallbackPath(fallbackRoot, fileName);
+            File.Move(temporaryPath, fallbackPath);
+            return fallbackPath;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PDF Fallback] Impossibile spostare il PDF locale: {ex.Message}");
+            return temporaryPath;
+        }
+    }
+
+    private static string BuildUniqueFallbackPath(string folder, string fileName)
+    {
+        string safeName = StoragePathService.SanitizeFolderName(Path.GetFileNameWithoutExtension(fileName));
+        string extension = Path.GetExtension(fileName);
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = ".pdf";
+
+        string candidate = Path.Combine(folder, safeName + extension);
+        if (!File.Exists(candidate))
+            return candidate;
+
+        for (int i = 1; i < 1000; i++)
+        {
+            candidate = Path.Combine(folder, $"{safeName}_{i}{extension}");
+            if (!File.Exists(candidate))
+                return candidate;
+        }
+
+        return Path.Combine(folder, $"{safeName}_{Guid.NewGuid():N}{extension}");
     }
     #endregion
 }

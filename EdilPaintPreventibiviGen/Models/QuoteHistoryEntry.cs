@@ -10,7 +10,33 @@ public enum QuoteStatus
 	Spedito,
 	Confermato,
 	Finito,
-	Rifiutato
+	Rifiutato,
+	Bozza,
+	DaInviare,
+	DaSollecitare,
+	Archiviato
+}
+
+public sealed class QuoteEventEntry
+{
+	public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+	public string DeviceName { get; set; } = string.Empty;
+	public string EventType { get; set; } = string.Empty;
+	public string Description { get; set; } = string.Empty;
+}
+
+public sealed class QuoteSendInfo
+{
+	public DateTime SentAtUtc { get; set; } = DateTime.UtcNow;
+	public string Method { get; set; } = string.Empty;
+	public string Recipient { get; set; } = string.Empty;
+	public string DeviceName { get; set; } = string.Empty;
+}
+
+public sealed class QuoteReminderInfo
+{
+	public DateTime ReminderAtUtc { get; set; } = DateTime.UtcNow;
+	public string DeviceName { get; set; } = string.Empty;
 }
 
 public class QuoteHistoryEntry
@@ -30,6 +56,16 @@ public class QuoteHistoryEntry
 	public double LaborDiscount { get; set; }
 	public double Total { get; set; }
 	public QuoteStatus Status { get; set; } = QuoteStatus.Finalizzato;
+	public string CreatedByDevice { get; set; } = string.Empty;
+	public string LastModifiedByDevice { get; set; } = string.Empty;
+	public DateTime? SentAtUtc { get; set; }
+	public string SentMethod { get; set; } = string.Empty;
+	public string SentRecipient { get; set; } = string.Empty;
+	public string SentByDevice { get; set; } = string.Empty;
+	public DateTime? LastReminderAtUtc { get; set; }
+	public int ReminderCount { get; set; }
+	public string LastReminderByDevice { get; set; } = string.Empty;
+	public List<QuoteEventEntry> Events { get; set; } = new();
 
 	//-----------------collaborazione-------------
 	// Collaborazione con altra ditta

@@ -26,14 +26,19 @@ public sealed class QuoteHistoryService
         return await _dataService.GetQuotesAsync(Math.Max(1, count));
     }
 
-    public async Task<List<QuoteHistorySummary>> LoadTopSummariesAsync(int count)
+    public async Task<List<QuoteHistorySummary>> LoadTopSummariesAsync(
+        int count,
+        CancellationToken cancellationToken = default)
     {
-        return await _dataService.GetQuoteSummariesAsync(Math.Max(1, count));
+        return await _dataService.GetQuoteSummariesAsync(Math.Max(1, count), cancellationToken);
     }
 
-    public async Task<List<QuoteHistorySummary>> SearchSummariesAsync(string text, int take)
+    public async Task<List<QuoteHistorySummary>> SearchSummariesAsync(
+        string text,
+        int take,
+        CancellationToken cancellationToken = default)
     {
-        return await _dataService.SearchQuoteSummariesAsync(text, take);
+        return await _dataService.SearchQuoteSummariesAsync(text, take, cancellationToken);
     }
     
     public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber)
@@ -50,6 +55,12 @@ public sealed class QuoteHistoryService
     public Task UpdateStatusAsync(string quoteNumber, QuoteStatus status) =>
         _dataService.UpdateQuoteStatusAsync(quoteNumber, status);
 
+    public Task UpdateSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo) =>
+        _dataService.UpdateQuoteSendInfoAsync(quoteNumber, sendInfo);
+
+    public Task RegisterReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo) =>
+        _dataService.RegisterQuoteReminderAsync(quoteNumber, reminderInfo);
+
     public async Task DeleteQuoteAsync(string quoteNumber)
     {
         await _dataService.DeleteQuoteAsync(quoteNumber);
@@ -64,21 +75,12 @@ public sealed class QuoteHistoryService
             string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
     }
 
-    public async Task<string> EnsureOfficialPdfExistsAsync(QuoteHistoryEntry entry)
+    public async Task<string> EnsureOfficialPdfExistsAsync(
+        QuoteHistoryEntry entry,
+        CancellationToken cancellationToken = default)
     {
         string expectedPath = GetExpectedPdfPath(entry);
-        byte[]? officialPdf = null;
-        try
-        {
-            officialPdf = await _dataService.GetQuotePdfContentAsync(entry.QuoteNumber);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[EnsureOfficialPdfExists] DB PDF non disponibile per {entry.QuoteNumber}: {ex.Message}");
-        }
-
-        if (officialPdf is not { Length: > 0 })
-            officialPdf = entry.PdfFile?.Content is { Length: > 0 } ? entry.PdfFile.Content : null;
+        byte[]? officialPdf = entry.PdfFile?.Content is { Length: > 0 } ? entry.PdfFile.Content : null;
 
         if (officialPdf is not { Length: > 0 })
             return string.Empty;
@@ -88,7 +90,7 @@ public sealed class QuoteHistoryService
             Directory.CreateDirectory(folder);
 
         if (!File.Exists(expectedPath) || !FileMatchesBytes(expectedPath, officialPdf))
-            await File.WriteAllBytesAsync(expectedPath, officialPdf);
+            await File.WriteAllBytesAsync(expectedPath, officialPdf, cancellationToken);
 
         entry.PdfPath = expectedPath;
         return expectedPath;
@@ -103,26 +105,17 @@ public sealed class QuoteHistoryService
             string.IsNullOrWhiteSpace(entry.ReferenceName) ? null : entry.ReferenceName);
     }
 
-    public async Task<string> EnsureCostsPdfExistsAsync(QuoteHistoryEntry entry)
+    public async Task<string> EnsureCostsPdfExistsAsync(
+        QuoteHistoryEntry entry,
+        CancellationToken cancellationToken = default)
     {
-        byte[]? costsPdf = await _dataService.GetQuoteCostsPdfContentAsync(entry.QuoteNumber);
-        if (costsPdf is not { Length: > 0 })
-            return string.Empty;
-
-        string expectedPath = GetExpectedCostsPdfPath(entry);
-        string? folder = Path.GetDirectoryName(expectedPath);
-        if (!string.IsNullOrWhiteSpace(folder))
-            Directory.CreateDirectory(folder);
-
-        if (!File.Exists(expectedPath) || !FileMatchesBytes(expectedPath, costsPdf))
-            await File.WriteAllBytesAsync(expectedPath, costsPdf);
-
-        return expectedPath;
+        await Task.CompletedTask;
+        return string.Empty;
     }
 
     public async Task EnsureAttachmentsFolderExistsAsync(QuoteHistoryEntry entry)
     {
-        var attachments = await _dataService.GetQuoteAttachmentsAsync(entry.QuoteNumber);
+        var attachments = entry.Attachments.Where(x => x.Content.Length > 0).ToList();
         if (attachments.Count == 0)
             return;
 

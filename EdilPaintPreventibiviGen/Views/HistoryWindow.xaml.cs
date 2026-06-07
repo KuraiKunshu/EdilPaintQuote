@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -18,12 +19,15 @@ namespace EdilPaintPreventibiviGen.Views;
 
 public partial class HistoryWindow : Window
 {
+    private const int MaxVisibleHistoryRows = 250;
+
     private readonly MainViewModel _vm;
     private readonly QuoteHistoryService _historyService;
     private readonly int _initialHistoryCount;
     private bool _isLoadingHistory;
     private bool _isSavingStatus;
     private readonly HashSet<string> _loadedQuoteNumbers = new();
+    private readonly List<QuoteHistorySummary> _currentSummaries = new();
     private CancellationTokenSource? _searchCts;
 
     public ICollectionView HistoryView { get; private set; } = null!;
@@ -34,18 +38,11 @@ public partial class HistoryWindow : Window
 
         _vm = vm;
         _historyService = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
-        _initialHistoryCount = Math.Max(1, App.AppSettings.App.NumberOfQuote);
+        _initialHistoryCount = NormalizeHistoryTake(App.AppSettings.App.NumberOfQuote);
 
         DataContext = _vm;
         HistoryView = CollectionViewSource.GetDefaultView(_vm.HistorySummaries);
-        if (HistoryView is ListCollectionView lcv)
-        {
-            lcv.CustomSort = null;
-            lcv.SortDescriptions.Clear();
-            lcv.SortDescriptions.Add(new SortDescription(nameof(QuoteHistorySummary.Date), ListSortDirection.Descending));
-        }
-        
-        GridHistory.ItemsSource = HistoryView;
+        GridHistory.ItemsSource = _vm.HistorySummaries;
 
         PreviewKeyDown += HistoryWindow_PreviewKeyDown;
         Closed += HistoryWindow_Closed;
@@ -98,7 +95,7 @@ public partial class HistoryWindow : Window
         // Cancella qualsiasi ricerca precedente
         _searchCts?.Cancel();
         _searchCts?.Dispose();
-        _searchCts = new CancellationTokenSource();
+        _searchCts = AppShutdownManager.CreateLinkedTokenSource();
         var token = _searchCts.Token;
 
         // Previeni ricerche multiple simultanee
@@ -124,7 +121,7 @@ public partial class HistoryWindow : Window
     {
         _searchCts?.Cancel();
         _searchCts?.Dispose();
-        _searchCts = new CancellationTokenSource();
+        _searchCts = AppShutdownManager.CreateLinkedTokenSource();
         var token = _searchCts.Token;
 
         if (_isLoadingHistory) return;
@@ -139,10 +136,7 @@ public partial class HistoryWindow : Window
 
             Debug.WriteLine($"[LoadInitialHistory] Caricamento primi {_initialHistoryCount} preventivi...");
 
-            await Task.Run(async () =>
-            {
-                await _vm.LoadHistorySummariesAsync(_initialHistoryCount, token);
-            }, token);
+            var summaries = await _historyService.LoadTopSummariesAsync(_initialHistoryCount, token);
 
             if (token.IsCancellationRequested)
             {
@@ -150,12 +144,9 @@ public partial class HistoryWindow : Window
                 return;
             }
 
-            foreach (var summary in _vm.HistorySummaries)
-                _loadedQuoteNumbers.Add(summary.QuoteNumber);
+            SetCurrentHistorySummaries(summaries);
 
             Debug.WriteLine($"[LoadInitialHistory] Caricati {_vm.HistorySummaries.Count} preventivi");
-
-            ApplyLocalFilters();
         }
         catch (OperationCanceledException)
         {
@@ -187,18 +178,14 @@ public partial class HistoryWindow : Window
 
             Debug.WriteLine($"[RunSearch] Inizio ricerca per: '{searchText}'");
 
-            int take = Math.Max(1, App.AppSettings.App.NumberOfQuote);
+            int take = NormalizeHistoryTake(App.AppSettings.App.NumberOfQuote);
 
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
 
-            var results = await Task.Run(async () =>
-            {
-                Debug.WriteLine("[RunSearch] Chiamata a SearchHistorySummariesAsync...");
-                var data = await _vm.SearchHistorySummariesAsync(searchText, take, linkedCts.Token);
-                Debug.WriteLine($"[RunSearch] Ricevuti {data?.Count ?? 0} risultati");
-                return data;
-            }, linkedCts.Token);
+            Debug.WriteLine("[RunSearch] Chiamata a SearchHistorySummariesAsync...");
+            var results = await _vm.SearchHistorySummariesAsync(searchText, take, linkedCts.Token);
+            Debug.WriteLine($"[RunSearch] Ricevuti {results?.Count ?? 0} risultati");
 
             if (token.IsCancellationRequested)
             {
@@ -206,27 +193,17 @@ public partial class HistoryWindow : Window
                 return;
             }
 
-            _loadedQuoteNumbers.Clear();
-            _vm.HistorySummaries.Clear();
-
-            if (results != null)
-            {
-                foreach (var entry in results)
-                {
-                    _vm.HistorySummaries.Add(entry);
-                    _loadedQuoteNumbers.Add(entry.QuoteNumber);
-                }
-
-                Debug.WriteLine($"[RunSearch] Aggiunti {results.Count} preventivi alla UI");
-            }
-
-            ApplyLocalFilters();
+            SetCurrentHistorySummaries(results ?? []);
+            Debug.WriteLine($"[RunSearch] Aggiunti {results?.Count ?? 0} preventivi alla UI");
         }
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[RunSearch] Task cancellato o timeout");
-            MessageBox.Show("La ricerca e' stata annullata o ha superato il tempo limite (30 secondi).",
-                "Ricerca Interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (!token.IsCancellationRequested)
+            {
+                MessageBox.Show("La ricerca ha superato il tempo limite (30 secondi).",
+                    "Ricerca interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
         catch (Exception ex)
         {
@@ -245,14 +222,13 @@ public partial class HistoryWindow : Window
     
     private void ApplyLocalFilters()
     {
-        if (HistoryView == null) return;
+        if (!IsInitialized || GridHistory == null)
+            return;
 
         string selectedStatus = (CboFilterStatus.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Tutti";
 
-        HistoryView.Filter = item =>
+        var filtered = _currentSummaries.Where(quote =>
         {
-            if (item is not QuoteHistorySummary quote) return false;
-
             bool matchesStatus = selectedStatus == "Tutti" ||
                 quote.Status.ToString().Equals(selectedStatus, StringComparison.OrdinalIgnoreCase);
 
@@ -264,9 +240,33 @@ public partial class HistoryWindow : Window
                 matchesDate &= quote.Date.Date <= DpEnd.SelectedDate.Value.Date;
 
             return matchesStatus && matchesDate;
-        };
+        }).ToList();
 
-        HistoryView.Refresh();
+        ReplaceVisibleHistorySummaries(filtered);
+    }
+
+    private static int NormalizeHistoryTake(int configuredTake)
+        => Math.Clamp(configuredTake <= 0 ? 100 : configuredTake, 1, MaxVisibleHistoryRows);
+
+    private void SetCurrentHistorySummaries(IEnumerable<QuoteHistorySummary> summaries)
+    {
+        _currentSummaries.Clear();
+        _currentSummaries.AddRange(summaries);
+        ApplyLocalFilters();
+    }
+
+    private void ReplaceVisibleHistorySummaries(IEnumerable<QuoteHistorySummary> summaries)
+    {
+        _loadedQuoteNumbers.Clear();
+
+        GridHistory.ItemsSource = null;
+        _vm.HistorySummaries.Clear();
+        foreach (var summary in summaries)
+        {
+            _vm.HistorySummaries.Add(summary);
+            _loadedQuoteNumbers.Add(summary.QuoteNumber);
+        }
+        GridHistory.ItemsSource = _vm.HistorySummaries;
     }
 
     private void OnFilterChanged(object sender, EventArgs e)
@@ -276,8 +276,13 @@ public partial class HistoryWindow : Window
 
     private async void OnCopyPastQuoteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
+        if (!TryGetSummary(sender, out var entry)) return;
 
+        await CopyPastQuoteAsync(entry);
+    }
+
+    private async Task CopyPastQuoteAsync(QuoteHistorySummary entry)
+    {
         var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
         if (fullEntry == null) return;
 
@@ -291,8 +296,13 @@ public partial class HistoryWindow : Window
 
     private async void OnEditPastQuoteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
+        if (!TryGetSummary(sender, out var entry)) return;
 
+        await EditPastQuoteAsync(entry);
+    }
+
+    private async Task EditPastQuoteAsync(QuoteHistorySummary entry)
+    {
         var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
         if (fullEntry == null) return;
 
@@ -306,17 +316,237 @@ public partial class HistoryWindow : Window
 
     private async void OnNotesClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
+        if (!TryGetSummary(sender, out var entry)) return;
 
-        var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
-        if (fullEntry == null) return;
+        await EditNotesAsync(entry);
+    }
 
-        var notesWin = new NotesWindow(fullEntry.Notes) { Owner = this };
+    private async Task EditNotesAsync(QuoteHistorySummary entry)
+    {
+        var notesWin = new NotesWindow(entry.Notes) { Owner = this };
 
         if (notesWin.ShowDialog() == true)
         {
             await _historyService.UpdateNotesAsync(entry.QuoteNumber, notesWin.ResultNotes);
             entry.Notes = notesWin.ResultNotes;
+        }
+    }
+
+    private async void OnSendQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await SendQuoteAsync(entry);
+    }
+
+    private async Task SendQuoteAsync(QuoteHistorySummary entry)
+    {
+        var win = new QuoteSendWindow(
+            entry,
+            ResolveDefaultRecipient(entry),
+            FormatMailTemplate(App.AppSettings.Mail.DefaultSubject, entry),
+            FormatMailTemplate(App.AppSettings.Mail.DefaultBody, entry),
+            ResolveDefaultWhatsAppPhone(entry))
+        {
+            Owner = this
+        };
+
+        if (win.ShowDialog() != true)
+            return;
+
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+
+            SmtpEmailSendResult? emailResult = null;
+            if (App.AppSettings.Mail.Enabled)
+            {
+                emailResult = await SendQuoteEmailAsync(entry, win);
+            }
+            else if (MessageBox.Show(
+                "L'invio email SMTP non e' abilitato nelle impostazioni.\nVuoi registrare comunque l'invio manualmente?",
+                "Invio email",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            await _historyService.UpdateSendInfoAsync(entry.QuoteNumber, win.Result);
+            entry.Status = QuoteStatus.Spedito;
+            entry.SentAtUtc = win.Result.SentAtUtc;
+            entry.SentMethod = win.Result.Method;
+            entry.SentRecipient = win.Result.Recipient;
+            entry.SentByDevice = win.Result.DeviceName;
+            entry.LastModifiedByDevice = win.Result.DeviceName;
+            ApplyLocalFilters();
+
+            if (emailResult != null)
+            {
+                MessageBox.Show(
+                    "Preventivo inviato correttamente.",
+                    "Invio preventivo",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            if (win.ShouldOpenWhatsApp)
+                TryOpenWhatsAppMessage(win);
+        }
+        catch (OperationCanceledException)
+        {
+            MessageBox.Show("Invio email annullato o interrotto per timeout.",
+                "Invio preventivo", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] Errore invio/salvataggio: {ex}");
+            MessageBox.Show("Preventivo non inviato. Controlla il log SMTP per i dettagli.",
+                "Invio preventivo", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+    }
+
+    private async Task<SmtpEmailSendResult> SendQuoteEmailAsync(QuoteHistorySummary entry, QuoteSendWindow win)
+    {
+        using var emailCts = AppShutdownManager.CreateLinkedTokenSource();
+        emailCts.CancelAfter(TimeSpan.FromSeconds(45));
+        var token = emailCts.Token;
+
+        string pdfPath = await ResolvePdfPathForEmailAsync(entry, token);
+        var service = new SmtpEmailService(App.AppSettings.Mail);
+        return await service.SendAsync(new SmtpEmailRequest
+        {
+            Recipient = win.Result.Recipient,
+            Subject = win.EmailSubject,
+            Body = win.EmailBody,
+            AttachmentPath = pdfPath
+        }, token);
+    }
+
+    private void TryOpenWhatsAppMessage(QuoteSendWindow win)
+    {
+        try
+        {
+            OpenWhatsAppMessage(win.WhatsAppPhone, win.WhatsAppMessage);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] Impossibile aprire WhatsApp: {ex}");
+            MessageBox.Show(
+                "Preventivo inviato, ma non sono riuscito ad aprire WhatsApp.",
+                "WhatsApp",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static void OpenWhatsAppMessage(string phone, string message)
+    {
+        string digits = new(phone.Where(char.IsDigit).ToArray());
+        string encodedMessage = Uri.EscapeDataString(message ?? string.Empty);
+        string url = string.IsNullOrWhiteSpace(digits)
+            ? $"https://wa.me/?text={encodedMessage}"
+            : $"https://wa.me/{digits}?text={encodedMessage}";
+
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    }
+
+    private async Task<string> ResolvePdfPathForEmailAsync(
+        QuoteHistorySummary entry,
+        CancellationToken cancellationToken)
+    {
+        var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber)
+            ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
+
+        string officialPath = await _historyService.EnsureOfficialPdfExistsAsync(fullEntry, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(officialPath) && File.Exists(officialPath))
+            return officialPath;
+
+        if (!string.IsNullOrWhiteSpace(fullEntry.PdfPath) && File.Exists(fullEntry.PdfPath))
+            return fullEntry.PdfPath;
+
+        string expectedPath = _historyService.GetExpectedPdfPath(fullEntry);
+        if (File.Exists(expectedPath))
+            return expectedPath;
+
+        string? foundPath = _historyService.FindPdfByQuoteNumber(fullEntry);
+        if (!string.IsNullOrWhiteSpace(foundPath) && File.Exists(foundPath))
+            return foundPath;
+
+        throw new InvalidOperationException(
+            $"PDF del preventivo n. {entry.QuoteNumber} non trovato. Apri o rigenera prima il PDF del preventivo.");
+    }
+
+    private string ResolveDefaultRecipient(QuoteHistorySummary entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.SentRecipient))
+            return entry.SentRecipient;
+
+        return ResolveCustomer(entry)?.Email ?? string.Empty;
+    }
+
+    private string ResolveDefaultWhatsAppPhone(QuoteHistorySummary entry) =>
+        ResolveCustomer(entry)?.Phone ?? string.Empty;
+
+    private Customer? ResolveCustomer(QuoteHistorySummary entry) =>
+        _vm.AllCustomers.FirstOrDefault(customer => string.Equals(
+            customer.BusinessName,
+            entry.CustomerName,
+            StringComparison.OrdinalIgnoreCase));
+
+    private static string FormatMailTemplate(string template, QuoteHistorySummary entry)
+    {
+        string text = string.IsNullOrWhiteSpace(template) ? string.Empty : template;
+        return text
+            .Replace("{QuoteNumber}", entry.QuoteNumber, StringComparison.OrdinalIgnoreCase)
+            .Replace("{CustomerName}", entry.CustomerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{ReferenceName}", BlankToDash(entry.ReferenceName), StringComparison.OrdinalIgnoreCase)
+            .Replace("{Date}", entry.Date.ToLocalTime().ToString("dd/MM/yyyy", CultureInfo.GetCultureInfo("it-IT")), StringComparison.OrdinalIgnoreCase)
+            .Replace("{Total}", entry.Total.ToString("N2", CultureInfo.GetCultureInfo("it-IT")), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async void OnReminderClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await RegisterReminderAsync(entry);
+    }
+
+    private async Task RegisterReminderAsync(QuoteHistorySummary entry)
+    {
+        if (MessageBox.Show($"Registrare un sollecito per il preventivo n. {entry.QuoteNumber}?",
+                "Sollecito", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        var reminder = new QuoteReminderInfo
+        {
+            ReminderAtUtc = DateTime.UtcNow,
+            DeviceName = DeviceNameService.GetCurrentDeviceName()
+        };
+
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            await _historyService.RegisterReminderAsync(entry.QuoteNumber, reminder);
+            entry.Status = QuoteStatus.Spedito;
+            entry.LastReminderAtUtc = reminder.ReminderAtUtc;
+            entry.ReminderCount += 1;
+            entry.LastReminderByDevice = reminder.DeviceName;
+            entry.LastModifiedByDevice = reminder.DeviceName;
+            ApplyLocalFilters();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore durante il salvataggio del sollecito: {ex.Message}",
+                "Sollecito", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
         }
     }
 
@@ -360,8 +590,13 @@ public partial class HistoryWindow : Window
 
     private async void OnDeletePastQuoteClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
+        if (!TryGetSummary(sender, out var entry)) return;
 
+        await DeletePastQuoteAsync(entry);
+    }
+
+    private async Task DeletePastQuoteAsync(QuoteHistorySummary entry)
+    {
         var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
         if (fullEntry == null) return;
 
@@ -373,6 +608,7 @@ public partial class HistoryWindow : Window
         {
             _historyService.DeleteQuoteFiles(fullEntry);
             await _historyService.DeleteQuoteAsync(fullEntry.QuoteNumber);
+            _currentSummaries.Remove(entry);
             _vm.HistorySummaries.Remove(entry);
         }
         catch (Exception ex)
@@ -383,7 +619,7 @@ public partial class HistoryWindow : Window
 
     private async void OnOpenPastQuotePdfClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry) return;
+        if (!TryGetSummary(sender, out var entry)) return;
 
         try
         {
@@ -460,9 +696,13 @@ public partial class HistoryWindow : Window
     
     private async void OnOpenCustomerFolderClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry)
-            return;
+        if (!TryGetSummary(sender, out var entry)) return;
 
+        await OpenCustomerFolderAsync(entry);
+    }
+
+    private async Task OpenCustomerFolderAsync(QuoteHistorySummary entry)
+    {
         if (string.IsNullOrWhiteSpace(entry.CustomerName))
         {
             MessageBox.Show("Nessun cliente associato a questo preventivo.",
@@ -491,6 +731,65 @@ public partial class HistoryWindow : Window
                 "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    private void OnMoreActionsClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry)
+            return;
+
+        var menu = new ContextMenu
+        {
+            PlacementTarget = btn
+        };
+
+        menu.Items.Add(CreateDisabledMenuItem($"Preventivo {entry.QuoteNumber}"));
+        menu.Items.Add(CreateDisabledMenuItem($"IVA: {entry.IvaDisplay}"));
+        menu.Items.Add(CreateDisabledMenuItem($"Sconti: {entry.DiscountDisplay}"));
+        menu.Items.Add(CreateDisabledMenuItem($"Invio: {entry.SentDisplay}"));
+        menu.Items.Add(CreateDisabledMenuItem($"Solleciti: {entry.ReminderDisplay}"));
+        menu.Items.Add(CreateDisabledMenuItem($"PC: {BlankToDash(entry.LastModifiedByDevice)}"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateMenuItem("Copia in nuovo preventivo", async () => await CopyPastQuoteAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Registra sollecito", async () => await RegisterReminderAsync(entry)));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));
+
+        btn.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
+    private static bool TryGetSummary(object sender, out QuoteHistorySummary entry)
+    {
+        if (sender is FrameworkElement element && element.DataContext is QuoteHistorySummary summary)
+        {
+            entry = summary;
+            return true;
+        }
+
+        entry = null!;
+        return false;
+    }
+
+    private static MenuItem CreateDisabledMenuItem(string header)
+    {
+        return new MenuItem
+        {
+            Header = header,
+            IsEnabled = false
+        };
+    }
+
+    private static MenuItem CreateMenuItem(string header, Func<Task> action)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += async (_, _) => await action();
+        return item;
+    }
+
+    private static string BlankToDash(string value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value;
             
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 }

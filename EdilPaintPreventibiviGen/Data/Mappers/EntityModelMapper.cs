@@ -122,6 +122,14 @@ public static class EntityModelMapper
             try { costAlloc = JsonSerializer.Deserialize<CostAllocations>(entity.CostAllocationsJson); }
             catch { /* ignora JSON malformato */ }
         }
+
+        List<QuoteEventEntry> events = new();
+        if (!string.IsNullOrWhiteSpace(entity.EventsJson))
+        {
+            try { events = JsonSerializer.Deserialize<List<QuoteEventEntry>>(entity.EventsJson) ?? new(); }
+            catch { /* ignora JSON malformato */ }
+        }
+
         return new QuoteHistoryEntry
         {
             QuoteNumber = entity.QuoteNumber,
@@ -137,6 +145,16 @@ public static class EntityModelMapper
             LaborDiscount = entity.LaborDiscount,
             Total = entity.Total,
             Status = entity.Status,
+            CreatedByDevice = entity.CreatedByDevice,
+            LastModifiedByDevice = entity.LastModifiedByDevice,
+            SentAtUtc = entity.SentAtUtc,
+            SentMethod = entity.SentMethod,
+            SentRecipient = entity.SentRecipient,
+            SentByDevice = entity.SentByDevice,
+            LastReminderAtUtc = entity.LastReminderAtUtc,
+            ReminderCount = entity.ReminderCount,
+            LastReminderByDevice = entity.LastReminderByDevice,
+            Events = events,
             IsJointVenture = entity.IsJointVenture,
             PartnerCompanyName = entity.PartnerCompanyName,
             OurCosts = costAlloc?.OurCosts ?? new(),

@@ -5,6 +5,14 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public static class LocalApplicationDataService
 {
+    public static string GetDataDirectoryPath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "EdilPaintPreventivi",
+            "Data");
+    }
+
     private static readonly string[] LegacyDataFiles =
     [
         "azienda.json",
@@ -17,10 +25,7 @@ public static class LocalApplicationDataService
 
     public static string EnsureDataDirectory(string legacyAssetsPath)
     {
-        string dataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "EdilPaintPreventivi",
-            "Data");
+        string dataPath = GetDataDirectoryPath();
 
         Directory.CreateDirectory(dataPath);
 

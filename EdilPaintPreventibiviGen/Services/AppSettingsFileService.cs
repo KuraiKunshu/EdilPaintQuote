@@ -81,10 +81,13 @@ public static class AppSettingsFileService
             {
                 FirstStartup = false,
                 GeneratePDF = true,
+                RestoreMissingPdfsOnStartup = false,
+                DatabaseCostSavingMode = true,
                 IsSilentStartup = false,
                 UseVeluxLogin = false,
                 NumberOfQuote = 200,
-                TempPath = string.Empty
+                TempPath = string.Empty,
+                DeviceName = Environment.MachineName
             },
             PdfStorage = new
             {
@@ -92,6 +95,27 @@ public static class AppSettingsFileService
                 HistorySubFolder = "Storico",
                 CustomerFolderPattern = "{CustomerName}",
                 PdfFileNamePattern = "{CustomerName}_Preventivo_{QuoteNumber}_{Date}.pdf"
+            },
+            PdfTemplate = new
+            {
+                ActiveTemplate = "Standard",
+                NotesTitle = "NOTE E TERMINI DI PAGAMENTO",
+                FooterText = string.Empty,
+                SignatureText = "Firma per accettazione",
+                ShowTemplateName = false
+            },
+            Mail = new
+            {
+                Enabled = false,
+                SmtpServer = "smtp.libero.it",
+                Port = 465,
+                UseSsl = true,
+                Username = string.Empty,
+                Password = string.Empty,
+                SenderEmail = string.Empty,
+                SenderName = "EdilPaint",
+                DefaultSubject = "Preventivo {QuoteNumber}",
+                DefaultBody = "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti"
             }
         };
 

@@ -59,6 +59,9 @@ public class VeluxService : IDisposable
         CancellationToken cancellationToken = default)
     {
         try {
+            if (AppShutdownManager.IsShutdownRequested)
+                return new List<VeluxResult>();
+
             var url = $"https://app.velux.it/preventivi/it/backoffice/line_items/autocomplete_product_code?term={Uri.EscapeDataString(term)}";
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("X-Requested-With", "XMLHttpRequest");
@@ -85,6 +88,9 @@ public class VeluxService : IDisposable
 
     private async Task<bool> TryLoginOnceAsync(CancellationToken cancellationToken)
     {
+        if (AppShutdownManager.IsShutdownRequested)
+            return false;
+
         await _loginLock.WaitAsync(cancellationToken);
         try
         {
@@ -105,6 +111,9 @@ public class VeluxService : IDisposable
         CancellationToken cancellationToken = default)
     {
         try {
+            if (AppShutdownManager.IsShutdownRequested)
+                return null;
+
             var url = $"https://app.velux.it/preventivi/it/backoffice/product_data?id={uuid}&description_type=false&description_change=false";
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("X-Requested-With", "XMLHttpRequest");
@@ -163,6 +172,14 @@ public class VeluxService : IDisposable
 
     public void Dispose()
     {
+        try
+        {
+            _httpClient.CancelPendingRequests();
+        }
+        catch
+        {
+        }
+
         _httpClient.Dispose();
         _loginLock.Dispose();
     }

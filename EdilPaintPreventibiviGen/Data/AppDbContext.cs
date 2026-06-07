@@ -12,9 +12,6 @@ public class AppDbContext : DbContext
     public DbSet<QuoteEntity> Quotes => Set<QuoteEntity>();
     public DbSet<QuoteMaterialEntity> QuoteMaterials => Set<QuoteMaterialEntity>();
     public DbSet<QuoteLaborEntity> QuoteLabors => Set<QuoteLaborEntity>();
-    public DbSet<QuotePdfFileEntity> QuotePdfFiles => Set<QuotePdfFileEntity>();
-    public DbSet<QuoteCostsPdfFileEntity> QuoteCostsPdfFiles => Set<QuoteCostsPdfFileEntity>();
-    public DbSet<QuoteAttachmentEntity> QuoteAttachments => Set<QuoteAttachmentEntity>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
@@ -84,6 +81,13 @@ public class AppDbContext : DbContext
             entity.Property(x => x.PaymentTerms).HasMaxLength(4000);
             entity.Property(x => x.IvaType).HasMaxLength(50).IsRequired();
             entity.Property(x => x.Notes).HasMaxLength(4000);
+            entity.Property(x => x.CreatedByDevice).HasMaxLength(120);
+            entity.Property(x => x.LastModifiedByDevice).HasMaxLength(120);
+            entity.Property(x => x.SentMethod).HasMaxLength(80);
+            entity.Property(x => x.SentRecipient).HasMaxLength(250);
+            entity.Property(x => x.SentByDevice).HasMaxLength(120);
+            entity.Property(x => x.LastReminderByDevice).HasMaxLength(120);
+            entity.Property(x => x.EventsJson).HasColumnType("nvarchar(max)");
 
             entity.HasOne(x => x.Customer)
                 .WithMany(x => x.QuotesAsCustomer)
@@ -95,15 +99,6 @@ public class AppDbContext : DbContext
                 .HasForeignKey(x => x.ReferenceCustomerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(x => x.PdfFile)
-                .WithOne(x => x.Quote)
-                .HasForeignKey<QuotePdfFileEntity>(x => x.QuoteId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(x => x.CostsPdfFile)
-                .WithOne(x => x.Quote)
-                .HasForeignKey<QuoteCostsPdfFileEntity>(x => x.QuoteId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<QuoteMaterialEntity>(entity =>
@@ -134,39 +129,5 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<QuotePdfFileEntity>(entity =>
-        {
-            entity.ToTable("QuotePdfFiles");
-            entity.HasKey(x => x.Id);
-
-            entity.Property(x => x.FileName).HasMaxLength(500).IsRequired();
-            entity.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Content).IsRequired();
-        });
-
-        modelBuilder.Entity<QuoteAttachmentEntity>(entity =>
-        {
-            entity.ToTable("QuoteAttachments");
-            entity.HasKey(x => x.Id);
-
-            entity.Property(x => x.FileName).HasMaxLength(500).IsRequired();
-            entity.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Content).IsRequired();
-
-            entity.HasOne(x => x.Quote)
-                .WithMany(x => x.Attachments)
-                .HasForeignKey(x => x.QuoteId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<QuoteCostsPdfFileEntity>(entity =>
-        {
-            entity.ToTable("QuoteCostsPdfFiles");
-            entity.HasKey(x => x.Id);
-
-            entity.Property(x => x.FileName).HasMaxLength(500).IsRequired();
-            entity.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Content).IsRequired();
-        });
     }
 }

@@ -20,7 +20,7 @@ namespace EdilPaintPreventibiviGen.ViewModels;
 public partial class MainViewModel
 {
     #region Attachments
-    public void AddAttachmentFromPath(string filePath)
+    public async Task AddAttachmentFromPathAsync(string filePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             return;
@@ -31,12 +31,28 @@ public partial class MainViewModel
                 x.FileName.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
             return;
 
+        byte[] content;
+        try
+        {
+            content = await File.ReadAllBytesAsync(filePath, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"[ATTACHMENT] File non leggibile: {filePath} -> {ex.Message}");
+            return;
+        }
+
+        if (AttachedImages.Any(x =>
+                x.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
+                x.FileName.Equals(fileName, StringComparison.OrdinalIgnoreCase)))
+            return;
+
         AttachedImages.Add(new SelectedAttachment
         {
             FileName = fileName,
             FilePath = filePath,
             ContentType = GetContentType(filePath),
-            Content = File.ReadAllBytes(filePath)
+            Content = content
         });
     }
 

@@ -26,8 +26,11 @@ public interface IDataService
     // Quotes
     Task<List<QuoteHistoryEntry>> GetQuotesAsync();
     Task<List<QuoteHistoryEntry>> GetQuotesAsync(int take);
-    Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take);
-    Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int take);
+    Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take, CancellationToken cancellationToken = default);
+    Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
+        string searchText,
+        int take,
+        CancellationToken cancellationToken = default);
     Task<HashSet<string>> GetAllQuoteNumbersAsync();
     Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default);
     Task<List<QuoteHistoryEntry>> GetQuotesByNumbersAsync(IEnumerable<string> quoteNumbers, CancellationToken cancellationToken = default);
@@ -36,14 +39,12 @@ public interface IDataService
     Task DeleteQuoteAsync(string quoteNumber);
     Task UpdateQuoteNotesAsync(string quoteNumber, string notes, CancellationToken cancellationToken = default);
     Task UpdateQuoteStatusAsync(string quoteNumber, QuoteStatus status, CancellationToken cancellationToken = default);
+    Task UpdateQuoteSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo, CancellationToken cancellationToken = default);
+    Task RegisterQuoteReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo, CancellationToken cancellationToken = default);
     
     // Utilities
     Task<int> GetNextQuoteNumberAsync();
     Task<bool> IsDatabaseEmptyAsync();
-    Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber, CancellationToken cancellationToken = default);
-    Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber);
-    Task<bool> SaveQuoteCostsPdfAsync(string quoteNumber, StoredFile file, CancellationToken cancellationToken = default);
-    Task<byte[]?> GetQuoteCostsPdfContentAsync(string quoteNumber, CancellationToken cancellationToken = default);
 }
 
 public class QuoteMetadata

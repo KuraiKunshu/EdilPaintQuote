@@ -24,6 +24,16 @@ public class QuoteEntity
 	public double LaborDiscount { get; set; }
 	public double Total { get; set; }
 	public QuoteStatus Status { get; set; } = QuoteStatus.Finalizzato;
+	public string CreatedByDevice { get; set; } = string.Empty;
+	public string LastModifiedByDevice { get; set; } = string.Empty;
+	public DateTime? SentAtUtc { get; set; }
+	public string SentMethod { get; set; } = string.Empty;
+	public string SentRecipient { get; set; } = string.Empty;
+	public string SentByDevice { get; set; } = string.Empty;
+	public DateTime? LastReminderAtUtc { get; set; }
+	public int ReminderCount { get; set; }
+	public string LastReminderByDevice { get; set; } = string.Empty;
+	public string EventsJson { get; set; } = string.Empty;
 	
 	// Collaborazione con altra ditta
 	public bool IsJointVenture { get; set; }
@@ -38,9 +48,6 @@ public class QuoteEntity
 	public string SyncHash { get; set; } = string.Empty;
 	public bool IsDeleted { get; set; }
 	
-	public QuotePdfFileEntity? PdfFile { get; set; }
-	public QuoteCostsPdfFileEntity? CostsPdfFile { get; set; }
-	public ICollection<QuoteAttachmentEntity> Attachments { get; set; } = new List<QuoteAttachmentEntity>();
 	public ICollection<QuoteMaterialEntity> Materials { get; set; } = new List<QuoteMaterialEntity>();
 	public ICollection<QuoteLaborEntity> Labors { get; set; } = new List<QuoteLaborEntity>();
 }

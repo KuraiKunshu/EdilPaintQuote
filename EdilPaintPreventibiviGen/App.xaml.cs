@@ -19,11 +19,11 @@ public partial class App : Application
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
 
-    private const int ShutdownSyncTimeoutSeconds = 10;
+    private const int ShutdownSyncTimeoutSeconds = 2;
+    private const int ShutdownBackgroundTimeoutSeconds = 2;
+    private const int HardShutdownTimeoutSeconds = 8;
     private static System.Timers.Timer? _syncTimer;
     private static CancellationTokenSource? _shutdownCts;
-    private static Task? _startupSyncTask;
-    private static Task? _startupPdfTask;
     private static bool _isShuttingDown;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -33,7 +33,7 @@ public partial class App : Application
         try
         {
             _isShuttingDown = false;
-            _shutdownCts = new CancellationTokenSource();
+            _shutdownCts = AppShutdownManager.CreateLinkedTokenSource();
             var shutdownToken = _shutdownCts.Token;
 
             var startupWatch = Stopwatch.StartNew();
@@ -58,16 +58,13 @@ public partial class App : Application
             string assetsPath = candidates.FirstOrDefault(Directory.Exists) ?? candidates[0];
             string localDataPath = LocalApplicationDataService.EnsureDataDirectory(assetsPath);
             var localStore = new LocalJsonStoreService(localDataPath);
-            var pdfOutbox = new LocalPdfOutboxService(localDataPath);
-            var attachmentOutbox = new LocalAttachmentOutboxService(localDataPath);
-            var costsPdfOutbox = new LocalCostsPdfOutboxService(localDataPath);
             var quotePatchOutbox = new LocalQuotePatchOutboxService(localDataPath);
             var deletionOutbox = new LocalDeletionOutboxService(localDataPath);
 
             DataService = new FallbackDataService(
-                sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
+                sqlService, localStore, quotePatchOutbox, deletionOutbox);
             SyncService = new SyncService(
-                DataService, sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
+                DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox);
 
             var loadingWindow = new LoadingWindow
             {
@@ -87,7 +84,7 @@ public partial class App : Application
                 {
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Import dati legacy...");
                     var importer = new JsonImportService(sqlService);
-                    await Task.Run(() => importer.ImportAllAsync(assetsPath));
+                    await Task.Run(() => importer.ImportAllAsync(assetsPath), shutdownToken);
                 }
                 else
                 {
@@ -95,7 +92,7 @@ public partial class App : Application
                 }
 
                 await SetLoadingStatusAsync(loadingWindow, "3/5 - Sincronizzazione dati...");
-                _startupSyncTask = RunStartupSyncAsync(shutdownToken);
+                _ = RunStartupSyncAsync(shutdownToken);
 
                 await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
                 MainVm = new MainViewModel();
@@ -108,8 +105,8 @@ public partial class App : Application
                 MainWindow = mainWindow;
                 mainWindow.Show();
 
-                StartPeriodicSync();
-                _startupPdfTask = RunStartupPdfGenerationAsync(shutdownToken);
+                StartPeriodicSyncIfEnabled();
+                _ = RunStartupPdfGenerationAsync(shutdownToken);
 
                 Debug.WriteLine($"[STARTUP] Startup completato in {startupWatch.Elapsed}");
             }
@@ -138,40 +135,57 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _isShuttingDown = true;
-        _shutdownCts?.Cancel();
+        AppShutdownManager.ArmProcessKillSwitch(TimeSpan.FromSeconds(HardShutdownTimeoutSeconds));
 
-        if (_syncTimer != null)
+        try
         {
-            _syncTimer.Stop();
-            _syncTimer.Elapsed -= OnPeriodicSyncElapsed;
-            _syncTimer.Dispose();
-            _syncTimer = null;
+            _isShuttingDown = true;
+            AppShutdownManager.RequestShutdown();
+            _shutdownCts?.Cancel();
+
+            if (_syncTimer != null)
+            {
+                _syncTimer.Stop();
+                _syncTimer.Elapsed -= OnPeriodicSyncElapsed;
+                _syncTimer.Dispose();
+                _syncTimer = null;
+            }
+
+            CloseRemainingWindows();
+            AppShutdownManager.WaitForCompletionAsync(TimeSpan.FromSeconds(ShutdownBackgroundTimeoutSeconds))
+                .GetAwaiter()
+                .GetResult();
+            RunFinalSyncWithTimeoutAsync().GetAwaiter().GetResult();
+            AppShutdownManager.WaitForCompletionAsync(TimeSpan.FromSeconds(1))
+                .GetAwaiter()
+                .GetResult();
+
+            MainVm?.Dispose();
+            MainVm = null;
+
+            _shutdownCts?.Dispose();
+            _shutdownCts = null;
         }
-
-        RunFinalSyncWithTimeoutAsync().GetAwaiter().GetResult();
-
-        MainVm?.Dispose();
-        MainVm = null;
-
-        _shutdownCts?.Dispose();
-        _shutdownCts = null;
-        _startupSyncTask = null;
-        _startupPdfTask = null;
-
-        base.OnExit(e);
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Cleanup error: {ex}");
+        }
+        finally
+        {
+            base.OnExit(e);
+        }
     }
 
     private static Task RunStartupSyncAsync(CancellationToken token)
     {
-        return Task.Run(async () =>
+        return AppShutdownManager.Track("Startup sync", async operationToken =>
         {
             try
             {
-                if (token.IsCancellationRequested || _isShuttingDown)
+                if (operationToken.IsCancellationRequested || _isShuttingDown)
                     return;
 
-                var result = await SyncService.SyncAllAsync(force: true, cancellationToken: token);
+                var result = await SyncService.SyncAllAsync(force: true, cancellationToken: operationToken);
                 Debug.WriteLine($"[STARTUP] Sync completed: Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
             }
             catch (OperationCanceledException)
@@ -187,31 +201,25 @@ public partial class App : Application
 
     private static Task RunStartupPdfGenerationAsync(CancellationToken token)
     {
-        return Task.Run(async () =>
+        return AppShutdownManager.Track("Startup PDF restore", async operationToken =>
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(30), token);
+                await Task.Delay(TimeSpan.FromSeconds(30), operationToken);
 
-                if (token.IsCancellationRequested || _isShuttingDown || MainVm == null)
+                if (operationToken.IsCancellationRequested || _isShuttingDown || MainVm == null)
                     return;
 
-                if (AppSettings.App.GeneratePDF)
+                if (AppSettings.App.RestoreMissingPdfsOnStartup)
                 {
-                    bool hasMissing = await MainVm.HasMissingPdfsAsync();
-                    if (token.IsCancellationRequested || _isShuttingDown)
-                        return;
-
-                    if (!hasMissing)
-                    {
-                        Debug.WriteLine("[PDF Generation] Tutti i PDF presenti, skip.");
-                        return;
-                    }
-
                     await MainVm.GenerateInitialPdfsAsync(new Progress<string>(text =>
                     {
                         Debug.WriteLine($"[PDF Generation] {text}");
-                    }));
+                    }), operationToken);
+                }
+                else
+                {
+                    Debug.WriteLine("[PDF Generation] Ripristino PDF mancanti all'avvio disattivato.");
                 }
             }
             catch (OperationCanceledException)
@@ -230,13 +238,45 @@ public partial class App : Application
         if (SyncService is null)
             return;
 
+        if (AppSettings.App.DatabaseCostSavingMode)
+        {
+            Debug.WriteLine("[SHUTDOWN] Final sync skipped: modalita' risparmio DB attiva.");
+            return;
+        }
+
+        if (SyncService.IsSyncRunning)
+        {
+            Debug.WriteLine("[SHUTDOWN] Final sync skipped: sync gia' in corso.");
+            return;
+        }
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
+        Task<SyncResult> syncTask;
         try
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
-            await SyncService.SyncAllAsync(
+            Debug.WriteLine("[SHUTDOWN] Final sync best-effort start.");
+            syncTask = Task.Run(() => SyncService.SyncAllAsync(
                 force: true,
                 cancellationToken: timeoutCts.Token,
-                waitForCurrentRun: true);
+                waitForCurrentRun: false));
+
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
+            var completed = await Task.WhenAny(syncTask, timeoutTask);
+            if (completed != syncTask)
+            {
+                timeoutCts.Cancel();
+                Debug.WriteLine($"[SHUTDOWN] Final sync skipped after {ShutdownSyncTimeoutSeconds}s timeout.");
+                _ = ObserveBackgroundSyncFailureAsync(syncTask);
+                return;
+            }
+
+            var result = await syncTask;
+            if (result.AlreadyRunning)
+                Debug.WriteLine("[SHUTDOWN] Final sync skipped: sync already running.");
+            else if (!string.IsNullOrWhiteSpace(result.Error))
+                Debug.WriteLine($"[SHUTDOWN] Final sync returned error: {result.Error}");
+            else
+                Debug.WriteLine("[SHUTDOWN] Final sync completed.");
         }
         catch (OperationCanceledException)
         {
@@ -248,8 +288,45 @@ public partial class App : Application
         }
     }
 
-    private static void StartPeriodicSync()
+    private static async Task ObserveBackgroundSyncFailureAsync(Task<SyncResult> syncTask)
     {
+        try
+        {
+            await syncTask;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Final sync background error after timeout: {ex.Message}");
+        }
+    }
+
+    private void CloseRemainingWindows()
+    {
+        foreach (Window window in Windows.Cast<Window>().ToArray())
+        {
+            try
+            {
+                if (ReferenceEquals(window, MainWindow))
+                    continue;
+
+                if (window.IsVisible)
+                    window.Close();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SHUTDOWN] Window close error: {ex.Message}");
+            }
+        }
+    }
+
+    private static void StartPeriodicSyncIfEnabled()
+    {
+        if (AppSettings.App.DatabaseCostSavingMode)
+        {
+            Debug.WriteLine("[STARTUP] Periodic sync disabled: modalita' risparmio DB attiva.");
+            return;
+        }
+
         _syncTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
         _syncTimer.Elapsed += OnPeriodicSyncElapsed;
         _syncTimer.AutoReset = true;
@@ -266,7 +343,10 @@ public partial class App : Application
         try
         {
             Debug.WriteLine("[PeriodicSync] Running scheduled sync...");
-            await SyncService.SyncAllAsync(cancellationToken: _shutdownCts?.Token ?? CancellationToken.None);
+            await AppShutdownManager.Track(
+                "Periodic sync",
+                async token => await SyncService.SyncAllAsync(cancellationToken: token),
+                _shutdownCts?.Token ?? CancellationToken.None);
         }
         catch (Exception ex)
         {

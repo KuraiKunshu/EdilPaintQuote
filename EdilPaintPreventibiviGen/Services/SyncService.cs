@@ -15,30 +15,44 @@ public class SyncService
     private readonly IDataService _dataService;
     private readonly LocalJsonStoreService _localStore;
     private readonly SqlDataService _sqlService;
-    private readonly LocalPdfOutboxService _pdfOutbox;
-    private readonly LocalAttachmentOutboxService _attachmentOutbox;
-    private readonly LocalCostsPdfOutboxService _costsPdfOutbox;
     private readonly LocalQuotePatchOutboxService _quotePatchOutbox;
     private readonly LocalDeletionOutboxService _deletionOutbox;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
+    private readonly object _statusLock = new();
     private DateTime _lastSyncTime = DateTime.MinValue;
+    private DateTime? _lastSyncCompletedUtc;
+    private string _lastSyncSummary = "Sincronizzazione non ancora eseguita.";
+
+    public bool IsSyncRunning => _syncLock.CurrentCount == 0;
+
+    public DateTime? LastSyncCompletedUtc
+    {
+        get
+        {
+            lock (_statusLock)
+                return _lastSyncCompletedUtc;
+        }
+    }
+
+    public string LastSyncSummary
+    {
+        get
+        {
+            lock (_statusLock)
+                return _lastSyncSummary;
+        }
+    }
 
     public SyncService(
         IDataService dataService,
         SqlDataService sqlService,
         LocalJsonStoreService localStore,
-        LocalPdfOutboxService pdfOutbox,
-        LocalAttachmentOutboxService attachmentOutbox,
-        LocalCostsPdfOutboxService costsPdfOutbox,
         LocalQuotePatchOutboxService quotePatchOutbox,
         LocalDeletionOutboxService deletionOutbox)
     {
         _dataService = dataService;
         _sqlService = sqlService;
         _localStore = localStore;
-        _pdfOutbox = pdfOutbox;
-        _attachmentOutbox = attachmentOutbox;
-        _costsPdfOutbox = costsPdfOutbox;
         _quotePatchOutbox = quotePatchOutbox;
         _deletionOutbox = deletionOutbox;
     }
@@ -61,6 +75,7 @@ public class SyncService
             else if (!await _syncLock.WaitAsync(0, cancellationToken))
             {
                 Debug.WriteLine("[Sync] Already syncing, skipping...");
+                UpdateSyncStatus(null, "Sincronizzazione gia' in corso.");
                 return new SyncResult { AlreadyRunning = true };
             }
             else
@@ -73,12 +88,14 @@ public class SyncService
             if (!_dataService.CanSynchronize)
             {
                 Debug.WriteLine("[Sync] Database unavailable, skipping automatic synchronization.");
+                UpdateSyncStatus(DateTime.UtcNow, "Database non disponibile: sincronizzazione saltata.");
                 return new SyncResult { Skipped = true };
             }
 
             if (!force && (DateTime.UtcNow - _lastSyncTime).TotalSeconds < 30)
             {
                 Debug.WriteLine("[Sync] Too soon since last sync, skipping...");
+                UpdateSyncStatus(_lastSyncTime, "Sincronizzazione saltata: eseguita da meno di 30 secondi.");
                 return new SyncResult { Skipped = true };
             }
 
@@ -95,14 +112,13 @@ public class SyncService
             result.QuotesSynced = quotesResult.synced;
             result.QuotesConflicts = quotesResult.conflicts;
 
-            await FlushPendingQuoteFilesAsync(cancellationToken);
-
             var customersResult = await SyncCustomersAsync(cancellationToken);
             result.CustomersSynced = customersResult.synced;
             result.CustomersConflicts = customersResult.conflicts;
 
             _lastSyncTime = DateTime.UtcNow;
             result.EndTime = DateTime.UtcNow;
+            UpdateSyncStatus(result.EndTime, $"Completata: preventivi {result.QuotesSynced}, clienti {result.CustomersSynced}, conflitti {result.QuotesConflicts + result.CustomersConflicts}.");
 
             Debug.WriteLine($"║ SYNC COMPLETED in {result.Duration.TotalSeconds:F2}s");
             Debug.WriteLine($"║ Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
@@ -112,17 +128,30 @@ public class SyncService
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[Sync] Cancelled.");
+            UpdateSyncStatus(DateTime.UtcNow, "Sincronizzazione annullata.");
             throw;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[Sync] ❌ ERROR: {ex.Message}");
+            UpdateSyncStatus(DateTime.UtcNow, $"Errore sincronizzazione: {ex.Message}");
             return new SyncResult { Error = ex.Message };
         }
         finally
         {
             if (lockTaken)
                 _syncLock.Release();
+        }
+    }
+
+    private void UpdateSyncStatus(DateTime? completedUtc, string summary)
+    {
+        lock (_statusLock)
+        {
+            if (completedUtc.HasValue)
+                _lastSyncCompletedUtc = completedUtc;
+
+            _lastSyncSummary = summary;
         }
     }
 
@@ -286,23 +315,8 @@ public class SyncService
                     {
                         cancellationToken.ThrowIfCancellationRequested();
 
-                        var pendingPdf = await _pdfOutbox.TryReadAsync(q.QuoteNumber, cancellationToken);
-                        bool hasPendingPdf = pendingPdf is { Length: > 0 };
-                        if (pendingPdf is { Length: > 0 })
-                        {
-                            q.PdfFile ??= new StoredFile
-                            {
-                                FileName = $"{q.QuoteNumber}.pdf",
-                                ContentType = "application/pdf",
-                                ImportedAt = DateTime.UtcNow
-                            };
-                            q.PdfFile.Content = pendingPdf;
-                        }
-
                         await _sqlService.SaveQuoteAsync(q, cancellationToken);
                         await _localStore.BulkUpdateQuotesAsync([q], cancellationToken);
-                        if (hasPendingPdf)
-                            await _pdfOutbox.RemoveAsync(q.QuoteNumber);
                     }
                     catch (QuoteConflictException ex)
                     {
@@ -446,6 +460,10 @@ public class SyncService
                     await _sqlService.UpdateQuoteNotesAsync(patch.QuoteNumber, patch.Notes, cancellationToken);
                 if (patch.Status.HasValue)
                     await _sqlService.UpdateQuoteStatusAsync(patch.QuoteNumber, patch.Status.Value, cancellationToken);
+                if (patch.SendInfo != null)
+                    await _sqlService.UpdateQuoteSendInfoAsync(patch.QuoteNumber, patch.SendInfo, cancellationToken);
+                if (patch.ReminderInfo != null)
+                    await _sqlService.RegisterQuoteReminderAsync(patch.QuoteNumber, patch.ReminderInfo, cancellationToken);
 
                 var databaseVersion = await _sqlService.GetQuoteByNumberAsync(patch.QuoteNumber);
                 if (databaseVersion != null)
@@ -470,37 +488,7 @@ public class SyncService
         await _localStore.DeleteQuotesAsync(deletedQuoteNumbers, cancellationToken);
         foreach (string quoteNumber in deletedQuoteNumbers)
         {
-            await _pdfOutbox.RemoveAsync(quoteNumber);
-            await _attachmentOutbox.RemoveAsync(quoteNumber);
-            await _costsPdfOutbox.RemoveAsync(quoteNumber);
             await _quotePatchOutbox.RemoveAsync(quoteNumber);
-        }
-    }
-
-    private async Task FlushPendingQuoteFilesAsync(CancellationToken cancellationToken)
-    {
-        foreach (string quoteNumber in await _attachmentOutbox.GetPendingQuoteNumbersAsync(cancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var attachments = await _attachmentOutbox.TryReadAsync(quoteNumber, cancellationToken);
-            if (attachments != null &&
-                await _sqlService.SaveQuoteAttachmentsAsync(quoteNumber, attachments, cancellationToken))
-            {
-                await _attachmentOutbox.RemoveAsync(quoteNumber);
-                Debug.WriteLine($"[Sync] Allegati pendenti sincronizzati per {quoteNumber}.");
-            }
-        }
-
-        foreach (string quoteNumber in await _costsPdfOutbox.GetPendingQuoteNumbersAsync(cancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var costsPdf = await _costsPdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
-            if (costsPdf != null &&
-                await _sqlService.SaveQuoteCostsPdfAsync(quoteNumber, costsPdf, cancellationToken))
-            {
-                await _costsPdfOutbox.RemoveAsync(quoteNumber);
-                Debug.WriteLine($"[Sync] PDF costi pendente sincronizzato per {quoteNumber}.");
-            }
         }
     }
 

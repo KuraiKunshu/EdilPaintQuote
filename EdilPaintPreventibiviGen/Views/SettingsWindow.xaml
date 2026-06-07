@@ -181,7 +181,13 @@
                                            Foreground="{StaticResource DefaultTextBrush}"
                                            Margin="0,0,0,10"/>
                                 <CheckBox x:Name="ChkGeneratePdf"
-                                          Content="Genera automaticamente i PDF mancanti all'avvio"
+                                          Content="Abilita generazione PDF"
+                                          Margin="0,0,0,9"/>
+                                <CheckBox x:Name="ChkRestoreMissingPdfsOnStartup"
+                                          Content="Ripristina automaticamente i PDF mancanti all'avvio (puo' essere lento)"
+                                          Margin="0,0,0,9"/>
+                                <CheckBox x:Name="ChkDatabaseCostSavingMode"
+                                          Content="Modalita' risparmio DB dal prossimo avvio (disattiva la sincronizzazione automatica ogni 5 minuti)"
                                           Margin="0,0,0,9"/>
                                 <CheckBox x:Name="ChkSilentStartup"
                                           Content="Chiudi silenziosamente l'app se si verifica un errore durante l'avvio"/>
@@ -216,6 +222,91 @@
                                         BorderThickness="0"
                                         Click="OnClearVeluxSessionClick"/>
                             </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource SectionStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Invio email"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource DefaultTextBrush}"
+                                           Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkMailEnabled"
+                                          Content="Abilita invio preventivi via SMTP"
+                                          Margin="0,0,0,12"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Server SMTP"/>
+                                        <TextBox x:Name="TxtMailSmtpServer"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Porta"/>
+                                        <TextBox x:Name="TxtMailPort"/>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="4"
+                                              x:Name="ChkMailUseSsl"
+                                              Content="SSL/TLS"
+                                              VerticalAlignment="Bottom"
+                                              Margin="0,0,0,8"/>
+                                </Grid>
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="User / email Libero"/>
+                                        <TextBox x:Name="TxtMailUsername"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Password"/>
+                                        <PasswordBox x:Name="TxtMailPassword"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Email mittente"/>
+                                        <TextBox x:Name="TxtMailSenderEmail"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Nome mittente"/>
+                                        <TextBox x:Name="TxtMailSenderName"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Style="{StaticResource LabelStyle}"
+                                           Text="Oggetto predefinito"
+                                           Margin="0,12,0,5"/>
+                                <TextBox x:Name="TxtMailSubject"/>
+
+                                <TextBlock Style="{StaticResource LabelStyle}"
+                                           Text="Testo predefinito"
+                                           Margin="0,12,0,5"/>
+                                <TextBox x:Name="TxtMailBody"
+                                         Height="86"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"/>
+                                <TextBlock Style="{StaticResource HintStyle}"
+                                           Text="Parametri Libero: smtp.libero.it, porta 465, SSL/TLS. Segnaposto disponibili: {QuoteNumber}, {CustomerName}, {ReferenceName}, {Date}, {Total}."/>
+                            </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource SectionStyle}">
@@ -278,6 +369,63 @@
 
                         <Border Style="{StaticResource SectionStyle}">
                             <StackPanel>
+                                <TextBlock Text="Template PDF"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource DefaultTextBrush}"
+                                           Margin="0,0,0,12"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Template attivo"/>
+                                        <ComboBox x:Name="CmbPdfTemplate"
+                                                  Height="34"
+                                                  Background="{StaticResource WhiteBrush}"
+                                                  BorderBrush="{StaticResource ModalFieldBorderBrush}"
+                                                  BorderThickness="1"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Firma"/>
+                                        <TextBox x:Name="TxtPdfSignatureText"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Style="{StaticResource LabelStyle}"
+                                           Text="Titolo note"
+                                           Margin="0,12,0,5"/>
+                                <TextBox x:Name="TxtPdfNotesTitle"/>
+
+                                <TextBlock Style="{StaticResource LabelStyle}"
+                                           Text="Footer PDF"
+                                           Margin="0,12,0,5"/>
+                                <TextBox x:Name="TxtPdfFooterText"
+                                         Height="58"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"/>
+                                <CheckBox x:Name="ChkPdfShowTemplateName"
+                                          Content="Mostra nome template nel PDF"
+                                          Margin="0,10,0,0"/>
+                                <Button Content="Anteprima template"
+                                        Width="150"
+                                        Height="34"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,12,0,0"
+                                        Background="{StaticResource SecondaryBlueBrush}"
+                                        Foreground="{StaticResource WhiteBrush}"
+                                        BorderThickness="0"
+                                        Click="OnPreviewPdfTemplateClick"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource SectionStyle}">
+                            <StackPanel>
                                 <TextBlock Text="Avanzate"
                                            FontSize="15"
                                            FontWeight="SemiBold"
@@ -302,6 +450,13 @@
                                 </Grid>
                                 <TextBlock Style="{StaticResource HintStyle}"
                                            Text="Se lasciato vuoto viene usata automaticamente la cartella temporanea di Windows."/>
+
+                                <TextBlock Style="{StaticResource LabelStyle}"
+                                           Text="Nome dispositivo"
+                                           Margin="0,12,0,5"/>
+                                <TextBox x:Name="TxtDeviceName"/>
+                                <TextBlock Style="{StaticResource HintStyle}"
+                                           Text="Nome usato nei log, nello storico e nella sincronizzazione multi PC."/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

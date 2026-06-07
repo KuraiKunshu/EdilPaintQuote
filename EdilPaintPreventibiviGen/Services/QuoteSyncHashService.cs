@@ -25,11 +25,10 @@ internal static class QuoteSyncHashService
             string.Join("|", entry.PartnerCosts.Select(c => $"{c.Description}:{Number(c.Amount)}:{c.Notes}")) + "|" +
             string.Join("|", entry.AdditionalCosts.Select(c => $"{c.Description}:{Number(c.Amount)}:{c.Notes}"));
 
-        var attachmentsHash = string.Join("|", entry.Attachments
-            .OrderBy(a => a.FileName, StringComparer.OrdinalIgnoreCase)
-            .Select(a => $"{a.FileName}:{a.ContentType}"));
-
-        var pdfState = entry.PdfFile == null ? "no-pdf" : "has-pdf";
+        var eventsHash = string.Join("|", entry.Events
+            .OrderBy(e => e.CreatedAtUtc)
+            .ThenBy(e => e.EventType, StringComparer.OrdinalIgnoreCase)
+            .Select(e => $"{e.CreatedAtUtc.ToUniversalTime():O}:{e.DeviceName}:{e.EventType}:{e.Description}"));
 
         var data = string.Join("|",
             entry.QuoteNumber,
@@ -44,13 +43,21 @@ internal static class QuoteSyncHashService
             Number(entry.LaborDiscount),
             Number(entry.Total),
             entry.Status,
+            entry.CreatedByDevice,
+            entry.LastModifiedByDevice,
+            entry.SentAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            entry.SentMethod,
+            entry.SentRecipient,
+            entry.SentByDevice,
+            entry.LastReminderAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            entry.ReminderCount.ToString(CultureInfo.InvariantCulture),
+            entry.LastReminderByDevice,
             entry.IsJointVenture,
             entry.PartnerCompanyName,
             materialsHash,
             laborsHash,
             costsHash,
-            attachmentsHash,
-            pdfState);
+            eventsHash);
 
         var bytes = Encoding.UTF8.GetBytes(data);
         var hash = SHA256.HashData(bytes);

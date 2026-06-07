@@ -332,10 +332,51 @@ public class LocalJsonStoreService
     }
 
     public Task<QuoteHistoryEntry?> UpdateQuoteNotesAsync(string quoteNumber, string notes) =>
-        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Notes = notes);
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            quote.Notes = notes;
+            quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            AddEvent(quote, "note", string.IsNullOrWhiteSpace(notes) ? "Note svuotate" : "Note aggiornate");
+        });
 
     public Task<QuoteHistoryEntry?> UpdateQuoteStatusAsync(string quoteNumber, QuoteStatus status) =>
-        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Status = status);
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            quote.Status = status;
+            quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            AddEvent(quote, "stato", $"Stato aggiornato: {status}");
+        });
+
+    public Task<QuoteHistoryEntry?> UpdateQuoteSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(sendInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : sendInfo.DeviceName.Trim();
+
+            quote.Status = QuoteStatus.Spedito;
+            quote.SentAtUtc = sendInfo.SentAtUtc == default ? DateTime.UtcNow : sendInfo.SentAtUtc;
+            quote.SentMethod = sendInfo.Method?.Trim() ?? string.Empty;
+            quote.SentRecipient = sendInfo.Recipient?.Trim() ?? string.Empty;
+            quote.SentByDevice = deviceName;
+            quote.LastModifiedByDevice = deviceName;
+            AddEvent(quote, "invio", $"Preventivo inviato tramite {quote.SentMethod}".Trim(), deviceName, quote.SentAtUtc);
+        });
+
+    public Task<QuoteHistoryEntry?> RegisterQuoteReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(reminderInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : reminderInfo.DeviceName.Trim();
+
+            quote.Status = QuoteStatus.Spedito;
+            quote.LastReminderAtUtc = reminderInfo.ReminderAtUtc == default ? DateTime.UtcNow : reminderInfo.ReminderAtUtc;
+            quote.ReminderCount += 1;
+            quote.LastReminderByDevice = deviceName;
+            quote.LastModifiedByDevice = deviceName;
+            AddEvent(quote, "sollecito", $"Sollecito registrato (n. {quote.ReminderCount})", deviceName, quote.LastReminderAtUtc);
+        });
 
     public async Task ArchiveQuoteConflictAsync(
         QuoteHistoryEntry entry,
@@ -692,6 +733,16 @@ public class LocalJsonStoreService
             LaborDiscount = entry.LaborDiscount,
             Total = entry.Total,
             Status = entry.Status,
+            CreatedByDevice = entry.CreatedByDevice,
+            LastModifiedByDevice = entry.LastModifiedByDevice,
+            SentAtUtc = entry.SentAtUtc,
+            SentMethod = entry.SentMethod,
+            SentRecipient = entry.SentRecipient,
+            SentByDevice = entry.SentByDevice,
+            LastReminderAtUtc = entry.LastReminderAtUtc,
+            ReminderCount = entry.ReminderCount,
+            LastReminderByDevice = entry.LastReminderByDevice,
+            Events = entry.Events.ToList(),
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,
             OurCosts = entry.OurCosts,
@@ -720,6 +771,22 @@ public class LocalJsonStoreService
     private static string ComputeQuoteHash(QuoteHistoryEntry entry)
     {
         return QuoteSyncHashService.Compute(entry);
+    }
+
+    private static void AddEvent(
+        QuoteHistoryEntry quote,
+        string eventType,
+        string description,
+        string? deviceName = null,
+        DateTime? createdAtUtc = null)
+    {
+        quote.Events.Add(new QuoteEventEntry
+        {
+            CreatedAtUtc = (createdAtUtc ?? DateTime.UtcNow).ToUniversalTime(),
+            DeviceName = string.IsNullOrWhiteSpace(deviceName) ? DeviceNameService.GetCurrentDeviceName() : deviceName.Trim(),
+            EventType = eventType,
+            Description = description
+        });
     }
 
     #endregion

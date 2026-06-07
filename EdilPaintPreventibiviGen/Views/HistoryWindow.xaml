@@ -167,6 +167,7 @@
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -176,7 +177,7 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter VerticalAlignment="Center"
-                                              HorizontalAlignment="Center"/>
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -403,6 +404,10 @@
                                 <ComboBoxItem Content="Confermato"/>
                                 <ComboBoxItem Content="Finito"/>
                                 <ComboBoxItem Content="Rifiutato"/>
+                                <ComboBoxItem Content="Bozza"/>
+                                <ComboBoxItem Content="DaInviare"/>
+                                <ComboBoxItem Content="DaSollecitare"/>
+                                <ComboBoxItem Content="Archiviato"/>
                             </ComboBox>
                         </Grid>
 
@@ -457,8 +462,10 @@
                                   SelectionMode="Single"
                                   SelectionUnit="FullRow"
                                   EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
                                   VirtualizingPanel.IsVirtualizing="True"
                                   VirtualizingPanel.VirtualizationMode="Recycling"
+                                  ScrollViewer.CanContentScroll="True"
                                   VirtualizingPanel.ScrollUnit="Item">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="" Width="30">
@@ -471,7 +478,147 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="148" Header="Azioni">
+
+                            <DataGridTemplateColumn Header="Preventivo" Width="120">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding QuoteNumber}"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Date, StringFormat=dd/MM/yyyy}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="Cliente / riferimento" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Stretch" Margin="4,0">
+                                            <TextBlock Text="{Binding CustomerName}"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding CustomerName}"/>
+                                            <TextBlock Text="{Binding ReferenceName}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding ReferenceName}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Totale"
+                                                Binding="{Binding Total, StringFormat={}{0:N2}}"
+                                                IsReadOnly="True"
+                                                Width="100">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <DataGridTemplateColumn Header="IVA / sconti" Width="145">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Stretch" Margin="4,0">
+                                            <TextBlock Text="{Binding IvaDisplay}"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding IvaDisplay}"/>
+                                            <TextBlock Text="{Binding DiscountDisplay}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       Margin="0,2,0,0"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding DiscountDisplay}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="Stato" Width="135">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.StatusOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  SelectedItem="{Binding Status, Mode=TwoWay}"
+                                                  SelectionChanged="OnStatusChanged"
+                                                  Background="{StaticResource TransparentBrush}"
+                                                  BorderThickness="0"
+                                                  HorizontalContentAlignment="Center"
+                                                  VerticalContentAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="Azioni" Width="220">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <Button Content="Apri"
+                                                    Width="44"
+                                                    Style="{StaticResource HistoryPdfButtonStyle}"
+                                                    Click="OnOpenPastQuotePdfClick"
+                                                    ToolTip="Apri o rigenera PDF"/>
+                                            <Button Content="✏️"
+                                                    Width="44"
+                                                    Style="{StaticResource HistoryIconButtonStyle}"
+                                                    Click="OnEditPastQuoteClick"
+                                                    ToolTip="Modifica e aggiorna questo preventivo"/>
+                                            <Button Style="{StaticResource HistoryIconButtonStyle}"
+                                                    Click="OnNotesClick"
+                                                    ToolTip="Apri appunti interni"
+                                                    Width="48"
+                                                    Height="30"
+                                                    Content="{Binding}">
+                                                <Button.ContentTemplate>
+                                                    <DataTemplate DataType="{x:Type models:QuoteHistorySummary}">
+                                                        <Grid Width="36" Height="20">
+                                                            <TextBlock Text="Note"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       FontSize="12"/>
+                                                            <Ellipse Width="9" Height="9"
+                                                                     Fill="{StaticResource NotificationRedBrush}"
+                                                                     HorizontalAlignment="Right"
+                                                                     VerticalAlignment="Top"
+                                                                     Margin="0,-2,-2,0">
+                                                                <Ellipse.Style>
+                                                                    <Style TargetType="Ellipse">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding HasNotes}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Ellipse.Style>
+                                                            </Ellipse>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </Button.ContentTemplate>
+                                            </Button>
+                                            <Button Content="Altro"
+                                                    Width="56"
+                                                    Style="{StaticResource HistoryIconButtonStyle}"
+                                                    Click="OnMoreActionsClick"
+                                                    ToolTip="Altre azioni e dettagli"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="220" Header="Azioni" Visibility="Collapsed">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -519,12 +666,21 @@
                                                     </DataTemplate>
                                                 </Button.ContentTemplate>
                                             </Button>
+                                            <Button Content="Inv"
+                                                    Style="{StaticResource HistoryIconButtonStyle}"
+                                                    Click="OnSendQuoteClick"
+                                                    ToolTip="Registra invio"/>
+                                            <Button Content="Sol"
+                                                    Style="{StaticResource HistoryIconButtonStyle}"
+                                                    Click="OnReminderClick"
+                                                    ToolTip="Registra sollecito"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="Data"
+                                                Visibility="Collapsed"
                                                 Binding="{Binding Date, StringFormat=dd/MM/yyyy}"
                                                 IsReadOnly="True"
                                                 Width="100">
@@ -537,6 +693,7 @@
                             </DataGridTextColumn>
 
                             <DataGridTextColumn Header="N. Prev"
+                                                Visibility="Collapsed"
                                                 Binding="{Binding QuoteNumber}"
                                                 IsReadOnly="True"
                                                 Width="100">
@@ -550,6 +707,7 @@
                             </DataGridTextColumn>
 
                             <DataGridTextColumn Header="Cliente"
+                                                Visibility="Collapsed"
                                                 Binding="{Binding CustomerName}"
                                                 IsReadOnly="True"
                                                 Width="*">
@@ -563,6 +721,7 @@
                             </DataGridTextColumn>
 
                             <DataGridTextColumn Header="Riferimento"
+                                                Visibility="Collapsed"
                                                 Binding="{Binding ReferenceName}"
                                                 IsReadOnly="True"
                                                 Width="*">
@@ -576,6 +735,7 @@
                             </DataGridTextColumn>
 
                             <DataGridTextColumn Header="Totale (€)"
+                                                Visibility="Collapsed"
                                                 Binding="{Binding Total, StringFormat={}{0:N2}}"
                                                 IsReadOnly="True"
                                                 Width="120">
@@ -587,7 +747,7 @@
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
 
-                            <DataGridTemplateColumn Header="Stato" Width="170">
+                            <DataGridTemplateColumn Header="Stato" Width="170" Visibility="Collapsed">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <ComboBox ItemsSource="{Binding DataContext.StatusOptions, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -601,7 +761,19 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="" Width="54">
+                            <DataGridTextColumn Header="Invio"
+                                                Visibility="Collapsed"
+                                                Binding="{Binding SentDisplay}"
+                                                IsReadOnly="True"
+                                                Width="140"/>
+
+                            <DataGridTextColumn Header="PC"
+                                                Visibility="Collapsed"
+                                                Binding="{Binding LastModifiedByDevice}"
+                                                IsReadOnly="True"
+                                                Width="120"/>
+
+                            <DataGridTemplateColumn Header="" Width="54" Visibility="Collapsed">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="🔍"
@@ -612,7 +784,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="" Width="54">
+                            <DataGridTemplateColumn Header="" Width="54" Visibility="Collapsed">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="🗑️"

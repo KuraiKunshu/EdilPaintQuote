@@ -25,7 +25,7 @@ public partial class MainViewModel
         try
         {
             var service = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
-            var summaries = await service.LoadTopSummariesAsync(count);
+            var summaries = await service.LoadTopSummariesAsync(count, cancellationToken);
 
             if (cancellationToken.IsCancellationRequested)
                 return;
@@ -48,7 +48,7 @@ public partial class MainViewModel
         try
         {
             var service = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
-            var results = await service.SearchSummariesAsync(searchText, take);
+            var results = await service.SearchSummariesAsync(searchText, take, cancellationToken);
 
             if (cancellationToken.IsCancellationRequested)
                 return new List<QuoteHistorySummary>();
@@ -62,34 +62,12 @@ public partial class MainViewModel
         }
     }
 
-    private static async Task<byte[]> ReadPdfBytesWithRetryAsync(string pdfPath, int maxAttempts = 3, int delayMs = 200)
-    {
-        for (int i = 0; i < maxAttempts; i++)
-        {
-            try
-            {
-                if (File.Exists(pdfPath))
-                    return await File.ReadAllBytesAsync(pdfPath);
-            }
-            catch (IOException)
-            {
-                Debug.WriteLine($"[ReadPdf] Tentativo {i + 1}/{maxAttempts} fallito per: {pdfPath}");
-            }
-
-            if (i < maxAttempts - 1)
-                await Task.Delay(delayMs);
-        }
-
-        return [];
-    }
-
     private async Task<bool> SaveToHistoryAsync(
         string pdfPath,
         bool isNewEntry = false,
-        DateTime? quoteDate = null,
-        string? pdfContentPath = null)
+        DateTime? quoteDate = null)
     {
-        byte[] pdfBytes = await ReadPdfBytesWithRetryAsync(pdfContentPath ?? pdfPath);
+        await SaveAttachmentsToFileSystemAsync(pdfPath, QuoteNumber);
 
         var entry = new QuoteHistoryEntry
         {
@@ -115,18 +93,12 @@ public partial class MainViewModel
             OurCosts = OurCosts.ToList(),
             PartnerCosts = PartnerCosts.ToList(),
             AdditionalCosts = AdditionalCosts.ToList(),
-            PdfFile = pdfBytes.Length == 0 ? null : new StoredFile
-            {
-                FileName = Path.GetFileName(pdfPath) ?? "preventivo.pdf",
-                ContentType = "application/pdf",
-                Content = pdfBytes,
-                ImportedAt = DateTime.Now
-            },
+            PdfFile = null,
             Attachments = AttachedImages.Select(a => new StoredFile
             {
                 FileName = a.FileName,
                 ContentType = a.ContentType,
-                Content = a.Content,
+                Content = [],
                 ImportedAt = DateTime.Now
             }).ToList(),
             HasCompleteAttachmentSnapshot = true
@@ -145,6 +117,16 @@ public partial class MainViewModel
                 entry.Date = existingEntry.Date;
                 entry.Status = existingEntry.Status;
                 entry.Notes = existingEntry.Notes;
+                entry.CreatedByDevice = existingEntry.CreatedByDevice;
+                entry.LastModifiedByDevice = existingEntry.LastModifiedByDevice;
+                entry.SentAtUtc = existingEntry.SentAtUtc;
+                entry.SentMethod = existingEntry.SentMethod;
+                entry.SentRecipient = existingEntry.SentRecipient;
+                entry.SentByDevice = existingEntry.SentByDevice;
+                entry.LastReminderAtUtc = existingEntry.LastReminderAtUtc;
+                entry.ReminderCount = existingEntry.ReminderCount;
+                entry.LastReminderByDevice = existingEntry.LastReminderByDevice;
+                entry.Events = existingEntry.Events.ToList();
                 entry.BaseVersionUtc = existingEntry.BaseVersionUtc;
 
                 existingEntry.CustomerName = entry.CustomerName;
@@ -153,6 +135,16 @@ public partial class MainViewModel
                 existingEntry.PaymentTerms = entry.PaymentTerms;
                 existingEntry.IvaType = entry.IvaType;
                 existingEntry.Notes = entry.Notes;
+                existingEntry.CreatedByDevice = entry.CreatedByDevice;
+                existingEntry.LastModifiedByDevice = entry.LastModifiedByDevice;
+                existingEntry.SentAtUtc = entry.SentAtUtc;
+                existingEntry.SentMethod = entry.SentMethod;
+                existingEntry.SentRecipient = entry.SentRecipient;
+                existingEntry.SentByDevice = entry.SentByDevice;
+                existingEntry.LastReminderAtUtc = entry.LastReminderAtUtc;
+                existingEntry.ReminderCount = entry.ReminderCount;
+                existingEntry.LastReminderByDevice = entry.LastReminderByDevice;
+                existingEntry.Events = entry.Events.ToList();
                 existingEntry.Materials = entry.Materials;
                 existingEntry.Labors = entry.Labors;
                 existingEntry.Imponibile = entry.Imponibile;
@@ -188,6 +180,16 @@ public partial class MainViewModel
                 entry.Date = existing.Date;
                 entry.Status = existing.Status;
                 entry.Notes = existing.Notes;
+                entry.CreatedByDevice = existing.CreatedByDevice;
+                entry.LastModifiedByDevice = existing.LastModifiedByDevice;
+                entry.SentAtUtc = existing.SentAtUtc;
+                entry.SentMethod = existing.SentMethod;
+                entry.SentRecipient = existing.SentRecipient;
+                entry.SentByDevice = existing.SentByDevice;
+                entry.LastReminderAtUtc = existing.LastReminderAtUtc;
+                entry.ReminderCount = existing.ReminderCount;
+                entry.LastReminderByDevice = existing.LastReminderByDevice;
+                entry.Events = existing.Events.ToList();
                 entry.BaseVersionUtc = existing.BaseVersionUtc;
             }
         }
@@ -259,6 +261,48 @@ public partial class MainViewModel
         _loadedQuoteBaseVersionUtc = entry.BaseVersionUtc;
     }
 
+    private async Task SaveAttachmentsToFileSystemAsync(string pdfPath, string quoteNumber)
+    {
+        try
+        {
+            string? parentDir = Path.GetDirectoryName(pdfPath);
+            if (string.IsNullOrWhiteSpace(parentDir))
+                return;
+
+            string attachmentsDir = Path.Combine(parentDir, "Allegati_" + quoteNumber);
+            if (Directory.Exists(attachmentsDir))
+                Directory.Delete(attachmentsDir, recursive: true);
+
+            if (AttachedImages.Count == 0)
+                return;
+
+            Directory.CreateDirectory(attachmentsDir);
+            foreach (var attachment in AttachedImages)
+            {
+                byte[] content = attachment.Content;
+                if (content.Length == 0 &&
+                    !string.IsNullOrWhiteSpace(attachment.FilePath) &&
+                    File.Exists(attachment.FilePath))
+                {
+                    content = await File.ReadAllBytesAsync(attachment.FilePath);
+                }
+
+                if (content.Length == 0)
+                    continue;
+
+                string fileName = Path.GetFileName(attachment.FileName);
+                string targetPath = Path.Combine(attachmentsDir, fileName);
+                await File.WriteAllBytesAsync(targetPath, content);
+                attachment.FilePath = targetPath;
+                attachment.Content = content;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SaveAttachmentsToFileSystem] Errore salvataggio allegati: {ex.Message}");
+        }
+    }
+
     private static QuoteHistoryEntry CloneEntryWithoutPdfBytes(QuoteHistoryEntry entry)
     {
         return new QuoteHistoryEntry
@@ -278,6 +322,16 @@ public partial class MainViewModel
             LaborDiscount = entry.LaborDiscount,
             Total = entry.Total,
             Status = entry.Status,
+            CreatedByDevice = entry.CreatedByDevice,
+            LastModifiedByDevice = entry.LastModifiedByDevice,
+            SentAtUtc = entry.SentAtUtc,
+            SentMethod = entry.SentMethod,
+            SentRecipient = entry.SentRecipient,
+            SentByDevice = entry.SentByDevice,
+            LastReminderAtUtc = entry.LastReminderAtUtc,
+            ReminderCount = entry.ReminderCount,
+            LastReminderByDevice = entry.LastReminderByDevice,
+            Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,

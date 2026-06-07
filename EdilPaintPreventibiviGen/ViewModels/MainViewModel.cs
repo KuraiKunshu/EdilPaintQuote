@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
@@ -42,6 +43,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private Customer? _selectedSecondCustomer;
     private VeluxResult? _selectedCatalogMaterial;
     private Item? _selectedCatalogLabor;
+    private CancellationTokenSource? _veluxDetailsCts;
     #endregion
 
     #region UI State - Search
@@ -129,6 +131,9 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         Materials.CollectionChanged -= OnItemsCollectionChanged;
         Labors.CollectionChanged -= OnItemsCollectionChanged;
+        _veluxDetailsCts?.Cancel();
+        _veluxDetailsCts?.Dispose();
+        _veluxDetailsCts = null;
         _veluxService.OnLoginRequired -= HandleVeluxLogin;
         _veluxService.Dispose();
     }
@@ -205,8 +210,16 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             _selectedCatalogMaterial = value;
+            _veluxDetailsCts?.Cancel();
+            _veluxDetailsCts?.Dispose();
+            _veluxDetailsCts = null;
+
             if (value != null)
-                _ = FetchVeluxDetails(value.Id);
+            {
+                _veluxDetailsCts = AppShutdownManager.CreateLinkedTokenSource();
+                _ = FetchVeluxDetails(value.Id, _veluxDetailsCts.Token);
+            }
+
             OnPropertyChanged();
         }
     }
@@ -240,9 +253,11 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _selectedLogo;
         set
         {
-            _selectedLogo = value;
+            if (_selectedLogo == value)
+                return;
+
+            _selectedLogo = value ?? string.Empty;
             OnPropertyChanged();
-            SaveCompanyData();
         }
     }
 

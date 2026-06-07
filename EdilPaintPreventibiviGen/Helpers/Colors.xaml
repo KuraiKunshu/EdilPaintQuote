@@ -56,6 +56,7 @@
     <SolidColorBrush x:Key="LaborListButtonBrush" Color="#3498db"/>
     <SolidColorBrush x:Key="LocalMaterialsButtonBrush" Color="#3498db"/>
     <SolidColorBrush x:Key="SettingsButtonBrush" Color="#7f8c8d"/>
+    <SolidColorBrush x:Key="DiagnosticsButtonBrush" Color="#7f8c8d"/>
     <SolidColorBrush x:Key="NewCustomerButtonBrush" Color="#3498db"/>
     <SolidColorBrush x:Key="SelectReferenceButtonBrush" Color="#2980b9"/>
     <SolidColorBrush x:Key="SelectCustomerButtonBrush" Color="#2c3e50"/>

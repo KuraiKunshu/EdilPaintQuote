@@ -23,6 +23,12 @@ public sealed class LocalQuotePatchOutboxService
     public Task StoreStatusAsync(string quoteNumber, QuoteStatus status, CancellationToken cancellationToken = default) =>
         UpdateAsync(quoteNumber, patch => patch.Status = status, cancellationToken);
 
+    public Task StoreSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo, CancellationToken cancellationToken = default) =>
+        UpdateAsync(quoteNumber, patch => patch.SendInfo = sendInfo, cancellationToken);
+
+    public Task StoreReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo, CancellationToken cancellationToken = default) =>
+        UpdateAsync(quoteNumber, patch => patch.ReminderInfo = reminderInfo, cancellationToken);
+
     public async Task<List<PendingQuotePatch>> LoadAllAsync(CancellationToken cancellationToken = default)
     {
         var patches = new List<PendingQuotePatch>();
@@ -51,6 +57,34 @@ public sealed class LocalQuotePatchOutboxService
             File.Delete(path);
 
         return Task.CompletedTask;
+    }
+
+    public async Task RemoveAppliedAsync(
+        string quoteNumber,
+        Action<PendingQuotePatch> clearApplied,
+        CancellationToken cancellationToken = default)
+    {
+        string path = BuildPath(quoteNumber);
+        if (!File.Exists(path))
+            return;
+
+        string existing = await File.ReadAllTextAsync(path, cancellationToken);
+        var patch = JsonSerializer.Deserialize<PendingQuotePatch>(existing, JsonOptions);
+        if (patch == null)
+        {
+            File.Delete(path);
+            return;
+        }
+
+        clearApplied(patch);
+
+        if (patch.IsEmpty)
+        {
+            File.Delete(path);
+            return;
+        }
+
+        await LocalDeletionOutboxService.WriteAtomicAsync(path, patch, cancellationToken);
     }
 
     private async Task UpdateAsync(
@@ -88,5 +122,13 @@ public sealed class PendingQuotePatch
     public string QuoteNumber { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public QuoteStatus? Status { get; set; }
+    public QuoteSendInfo? SendInfo { get; set; }
+    public QuoteReminderInfo? ReminderInfo { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+
+    public bool IsEmpty =>
+        Notes == null &&
+        !Status.HasValue &&
+        SendInfo == null &&
+        ReminderInfo == null;
 }

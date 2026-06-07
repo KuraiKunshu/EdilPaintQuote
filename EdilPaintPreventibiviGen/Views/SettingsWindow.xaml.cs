@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using EdilPaintPreventibiviGen.Services;
@@ -12,6 +13,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        CmbPdfTemplate.ItemsSource = PdfTemplateSettingsModel.AvailableTemplates;
         LoadSettings();
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
@@ -20,29 +22,60 @@ public partial class SettingsWindow : Window
     {
         var app = App.AppSettings.App;
         var pdf = App.AppSettings.PdfStorage;
+        var template = App.AppSettings.PdfTemplate;
         var database = App.AppSettings.Database;
+        var mail = App.AppSettings.Mail;
 
         TxtDatabaseConnectionString.Text = database.ConnectionString;
         TxtDatabaseServer.Text = database.Server;
         TxtDatabaseName.Text = database.Database;
         TxtDatabaseUsername.Text = database.Username;
         TxtDatabasePassword.Password = database.Password;
+        ChkMailEnabled.IsChecked = mail.Enabled;
+        TxtMailSmtpServer.Text = mail.SmtpServer;
+        TxtMailPort.Text = mail.Port.ToString(CultureInfo.InvariantCulture);
+        ChkMailUseSsl.IsChecked = mail.UseSsl;
+        TxtMailUsername.Text = mail.Username;
+        TxtMailPassword.Password = mail.Password;
+        TxtMailSenderEmail.Text = mail.SenderEmail;
+        TxtMailSenderName.Text = mail.SenderName;
+        TxtMailSubject.Text = mail.DefaultSubject;
+        TxtMailBody.Text = mail.DefaultBody;
         ChkGeneratePdf.IsChecked = app.GeneratePDF;
+        ChkRestoreMissingPdfsOnStartup.IsChecked = app.RestoreMissingPdfsOnStartup;
+        ChkDatabaseCostSavingMode.IsChecked = app.DatabaseCostSavingMode;
         ChkSilentStartup.IsChecked = app.IsSilentStartup;
         ChkUseVeluxLogin.IsChecked = app.UseVeluxLogin;
         TxtHistoryResultLimit.Text = app.NumberOfQuote.ToString(CultureInfo.InvariantCulture);
         TxtTempPath.Text = app.TempPath;
+        TxtDeviceName.Text = app.GetEffectiveDeviceName();
 
         TxtPdfRootPath.Text = pdf.RootPath;
         TxtHistorySubFolder.Text = pdf.HistorySubFolder ?? string.Empty;
         TxtCustomerFolderPattern.Text = pdf.CustomerFolderPattern ?? string.Empty;
         TxtPdfFileNamePattern.Text = pdf.PdfFileNamePattern ?? string.Empty;
+        CmbPdfTemplate.SelectedItem = PdfTemplateSettingsModel.AvailableTemplates.Contains(template.ActiveTemplate)
+            ? template.ActiveTemplate
+            : "Standard";
+        TxtPdfNotesTitle.Text = template.NotesTitle;
+        TxtPdfFooterText.Text = template.FooterText;
+        TxtPdfSignatureText.Text = template.SignatureText;
+        ChkPdfShowTemplateName.IsChecked = template.ShowTemplateName;
 
         if (database.RequiresCredentialReset)
         {
             Loaded += (_, _) => MessageBox.Show(
                 "Le credenziali SQL salvate appartengono a un altro utente Windows o a un altro PC. Inseriscile nuovamente e salva.",
                 "Credenziali SQL da reinserire",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        if (mail.RequiresCredentialReset)
+        {
+            Loaded += (_, _) => MessageBox.Show(
+                "La password email salvata appartiene a un altro utente Windows o a un altro PC. Inseriscila nuovamente e salva.",
+                "Password email da reinserire",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -75,12 +108,32 @@ public partial class SettingsWindow : Window
         string databaseName = TxtDatabaseName.Text.Trim();
         string databaseUsername = TxtDatabaseUsername.Text.Trim();
         string databasePassword = TxtDatabasePassword.Password;
+        bool mailEnabled = ChkMailEnabled.IsChecked == true;
+        string mailSmtpServer = TxtMailSmtpServer.Text.Trim();
+        string mailUsername = TxtMailUsername.Text.Trim();
+        string mailPassword = TxtMailPassword.Password;
+        string mailSenderEmail = TxtMailSenderEmail.Text.Trim();
+        string mailSenderName = TxtMailSenderName.Text.Trim();
+        string mailSubject = TxtMailSubject.Text.Trim();
+        string mailBody = TxtMailBody.Text;
+
+        if (!int.TryParse(TxtMailPort.Text, out int mailPort) || mailPort <= 0 || mailPort > 65535)
+        {
+            MessageBox.Show(
+                "La porta SMTP deve essere un numero valido tra 1 e 65535.",
+                "Impostazioni non valide",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         try
         {
             var app = App.AppSettings.App;
             var pdf = App.AppSettings.PdfStorage;
+            var template = App.AppSettings.PdfTemplate;
             var database = App.AppSettings.Database;
+            var mail = App.AppSettings.Mail;
 
             database.ConnectionString = databaseConnectionString;
             database.Server = databaseServer;
@@ -89,18 +142,44 @@ public partial class SettingsWindow : Window
             database.Password = databasePassword;
             database.RequiresCredentialReset = false;
 
+            mail.Enabled = mailEnabled;
+            mail.SmtpServer = mailSmtpServer;
+            mail.Port = mailPort;
+            mail.UseSsl = ChkMailUseSsl.IsChecked == true;
+            mail.Username = mailUsername;
+            mail.Password = mailPassword;
+            mail.SenderEmail = mailSenderEmail;
+            mail.SenderName = mailSenderName;
+            mail.DefaultSubject = mailSubject;
+            mail.DefaultBody = mailBody;
+            mail.RequiresCredentialReset = false;
+            mail.Normalize();
+
             if (database.IsConfigured)
                 _ = database.BuildConnectionString();
+            if (mail.Enabled)
+                mail.ValidateForSend();
             app.GeneratePDF = ChkGeneratePdf.IsChecked == true;
+            app.RestoreMissingPdfsOnStartup = ChkRestoreMissingPdfsOnStartup.IsChecked == true;
+            app.DatabaseCostSavingMode = ChkDatabaseCostSavingMode.IsChecked == true;
             app.IsSilentStartup = ChkSilentStartup.IsChecked == true;
             app.UseVeluxLogin = ChkUseVeluxLogin.IsChecked == true;
             app.NumberOfQuote = historyResultLimit;
             app.TempPath = TxtTempPath.Text.Trim();
+            app.DeviceName = string.IsNullOrWhiteSpace(TxtDeviceName.Text)
+                ? Environment.MachineName
+                : TxtDeviceName.Text.Trim();
 
             pdf.RootPath = TxtPdfRootPath.Text.Trim();
             pdf.HistorySubFolder = EmptyToNull(TxtHistorySubFolder.Text);
             pdf.CustomerFolderPattern = EmptyToNull(TxtCustomerFolderPattern.Text);
             pdf.PdfFileNamePattern = EmptyToNull(TxtPdfFileNamePattern.Text);
+            template.ActiveTemplate = CmbPdfTemplate.SelectedItem?.ToString() ?? "Standard";
+            template.NotesTitle = TxtPdfNotesTitle.Text.Trim();
+            template.FooterText = TxtPdfFooterText.Text.Trim();
+            template.SignatureText = TxtPdfSignatureText.Text.Trim();
+            template.ShowTemplateName = ChkPdfShowTemplateName.IsChecked == true;
+            template.Normalize();
 
             App.AppSettings.Save();
 
@@ -162,6 +241,38 @@ public partial class SettingsWindow : Window
                 "Errore sessione Velux",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+        }
+    }
+
+    private async void OnPreviewPdfTemplateClick(object sender, RoutedEventArgs e)
+    {
+        var template = new PdfTemplateSettingsModel
+        {
+            ActiveTemplate = CmbPdfTemplate.SelectedItem?.ToString() ?? "Standard",
+            NotesTitle = TxtPdfNotesTitle.Text.Trim(),
+            FooterText = TxtPdfFooterText.Text.Trim(),
+            SignatureText = TxtPdfSignatureText.Text.Trim(),
+            ShowTemplateName = ChkPdfShowTemplateName.IsChecked == true
+        };
+
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            var previewService = new PdfTemplatePreviewService(App.DataService);
+            string previewPath = await previewService.GenerateQuotePreviewAsync(template);
+            PdfTemplatePreviewService.OpenPreview(previewPath);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Impossibile generare l'anteprima del template.\n\n{ex.Message}",
+                "Anteprima template",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
         }
     }
 

@@ -60,18 +60,20 @@ public partial class SqlDataService
                 x.LaborDiscount,
                 x.Total,
                 x.Status,
+                x.CreatedByDevice,
+                x.LastModifiedByDevice,
+                x.SentAtUtc,
+                x.SentMethod,
+                x.SentRecipient,
+                x.SentByDevice,
+                x.LastReminderAtUtc,
+                x.ReminderCount,
+                x.LastReminderByDevice,
+                x.EventsJson,
                 x.LastModifiedUtc,
                 x.IsJointVenture,
                 x.PartnerCompanyName,
                 x.CostAllocationsJson,
-                PdfFile = x.PdfFile == null
-                    ? null
-                    : new StoredFile
-                    {
-                        FileName = x.PdfFile.FileName,
-                        ContentType = x.PdfFile.ContentType,
-                        ImportedAt = x.PdfFile.ImportedAt
-                    },
                 Materials = x.Materials
                     .OrderBy(m => m.SortOrder)
                     .Select(m => new Item
@@ -98,14 +100,6 @@ public partial class SqlDataService
                         SortOrder = l.SortOrder
                     })
                     .ToList(),
-                Attachments = x.Attachments
-                    .Select(a => new StoredFile
-                    {
-                        FileName = a.FileName,
-                        ContentType = a.ContentType,
-                        ImportedAt = a.ImportedAt
-                    })
-                    .ToList()
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -127,6 +121,16 @@ public partial class SqlDataService
                 LaborDiscount = x.LaborDiscount,
                 Total = x.Total,
                 Status = x.Status,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice,
+                Events = DeserializeQuoteEvents(x.EventsJson),
                 IsJointVenture = x.IsJointVenture,
                 PartnerCompanyName = x.PartnerCompanyName,
                 OurCosts = costs?.OurCosts ?? [],
@@ -134,10 +138,8 @@ public partial class SqlDataService
                 AdditionalCosts = costs?.AdditionalCosts ?? [],
                 LastModifiedUtc = x.LastModifiedUtc,
                 BaseVersionUtc = x.LastModifiedUtc,
-                PdfFile = x.PdfFile,
                 Materials = x.Materials,
-                Labors = x.Labors,
-                Attachments = x.Attachments
+                Labors = x.Labors
             };
         }).ToList();
     }
@@ -179,8 +181,6 @@ public partial class SqlDataService
             .Include(x => x.ReferenceCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
-            .Include(x => x.PdfFile)
-            .Include(x => x.Attachments)
             .Where(x => numberList.Contains(x.QuoteNumber))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -200,6 +200,16 @@ public partial class SqlDataService
             LaborDiscount = x.LaborDiscount,
             Total = x.Total,
             Status = x.Status,
+            CreatedByDevice = x.CreatedByDevice,
+            LastModifiedByDevice = x.LastModifiedByDevice,
+            SentAtUtc = x.SentAtUtc,
+            SentMethod = x.SentMethod,
+            SentRecipient = x.SentRecipient,
+            SentByDevice = x.SentByDevice,
+            LastReminderAtUtc = x.LastReminderAtUtc,
+            ReminderCount = x.ReminderCount,
+            LastReminderByDevice = x.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(x.EventsJson),
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
             SyncHash = x.SyncHash,
@@ -228,21 +238,8 @@ public partial class SqlDataService
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
             }).ToList(),
-            PdfFile = x.PdfFile == null ? null : new StoredFile
-            {
-                FileName = x.PdfFile.FileName,
-                ContentType = x.PdfFile.ContentType,
-                Content = x.PdfFile.Content,
-                ImportedAt = x.PdfFile.ImportedAt
-            },
-            Attachments = x.Attachments.Select(a => new StoredFile
-            {
-                FileName = a.FileName,
-                ContentType = a.ContentType,
-                Content = a.Content,
-                ImportedAt = a.ImportedAt
-            }).ToList(),
-            HasCompleteAttachmentSnapshot = true
+            PdfFile = null,
+            Attachments = []
         }).ToList();
     }
 
@@ -269,8 +266,6 @@ public partial class SqlDataService
             .Include(x => x.ReferenceCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
-            .Include(x => x.PdfFile)
-            .Include(x => x.Attachments)
             .OrderByDescending(x => x.Date)
             .ToListAsync();
 
@@ -296,6 +291,16 @@ public partial class SqlDataService
             BaseVersionUtc = x.LastModifiedUtc,
             Total = x.Total,
             Status = x.Status,
+            CreatedByDevice = x.CreatedByDevice,
+            LastModifiedByDevice = x.LastModifiedByDevice,
+            SentAtUtc = x.SentAtUtc,
+            SentMethod = x.SentMethod,
+            SentRecipient = x.SentRecipient,
+            SentByDevice = x.SentByDevice,
+            LastReminderAtUtc = x.LastReminderAtUtc,
+            ReminderCount = x.ReminderCount,
+            LastReminderByDevice = x.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(x.EventsJson),
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
                 Name = m.Name,
@@ -316,21 +321,8 @@ public partial class SqlDataService
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
             }).ToList(),
-            PdfFile = x.PdfFile == null ? null : new StoredFile
-            {
-                FileName = x.PdfFile.FileName,
-                ContentType = x.PdfFile.ContentType,
-                Content = x.PdfFile.Content,
-                ImportedAt = x.PdfFile.ImportedAt
-            },
-            Attachments = x.Attachments.Select(a => new StoredFile
-            {
-                FileName = a.FileName,
-                ContentType = a.ContentType,
-                Content = a.Content,
-                ImportedAt = a.ImportedAt
-            }).ToList(),
-            HasCompleteAttachmentSnapshot = true
+            PdfFile = null,
+            Attachments = []
         }).ToList();
     }
 
@@ -363,6 +355,16 @@ public partial class SqlDataService
             LaborDiscount = x.LaborDiscount,
             Total = x.Total,
             Status = x.Status,
+            CreatedByDevice = x.CreatedByDevice,
+            LastModifiedByDevice = x.LastModifiedByDevice,
+            SentAtUtc = x.SentAtUtc,
+            SentMethod = x.SentMethod,
+            SentRecipient = x.SentRecipient,
+            SentByDevice = x.SentByDevice,
+            LastReminderAtUtc = x.LastReminderAtUtc,
+            ReminderCount = x.ReminderCount,
+            LastReminderByDevice = x.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(x.EventsJson),
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
                 Name = m.Name,
@@ -388,7 +390,9 @@ public partial class SqlDataService
         }).ToList();
     }
 
-    public async Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take)
+    public async Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(
+        int take,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -406,15 +410,30 @@ public partial class SqlDataService
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
                 PdfPath = x.PdfPath,
                 Total = (decimal)x.Total,
+                IvaType = x.IvaType,
+                MaterialDiscount = x.MaterialDiscount,
+                LaborDiscount = x.LaborDiscount,
                 Status = x.Status,
                 Notes = x.Notes,
                 IsJointVenture = x.IsJointVenture,
-                PartnerCompanyName = x.PartnerCompanyName
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int take)
+    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
+        string searchText,
+        int take,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -443,15 +462,31 @@ public partial class SqlDataService
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
                 PdfPath = x.PdfPath,
                 Total = (decimal)x.Total,
+                IvaType = x.IvaType,
+                MaterialDiscount = x.MaterialDiscount,
+                LaborDiscount = x.LaborDiscount,
                 Status = x.Status,
                 Notes = x.Notes,
                 IsJointVenture = x.IsJointVenture,
-                PartnerCompanyName = x.PartnerCompanyName
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int skip, int take)
+    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
+        string searchText,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -480,12 +515,24 @@ public partial class SqlDataService
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
                 PdfPath = x.PdfPath,
                 Total = (decimal)x.Total,
+                IvaType = x.IvaType,
+                MaterialDiscount = x.MaterialDiscount,
+                LaborDiscount = x.LaborDiscount,
                 Status = x.Status,
                 Notes = x.Notes,
                 IsJointVenture = x.IsJointVenture,
-                PartnerCompanyName = x.PartnerCompanyName
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<HashSet<string>> GetAllQuoteNumbersAsync()
@@ -508,8 +555,6 @@ public partial class SqlDataService
             .Include(x => x.ReferenceCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
-            .Include(x => x.PdfFile)
-            .Include(x => x.Attachments)
             .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber);
 
         if (q == null) return null;
@@ -529,6 +574,16 @@ public partial class SqlDataService
             LaborDiscount = q.LaborDiscount,
             Total = q.Total,
             Status = q.Status,
+            CreatedByDevice = q.CreatedByDevice,
+            LastModifiedByDevice = q.LastModifiedByDevice,
+            SentAtUtc = q.SentAtUtc,
+            SentMethod = q.SentMethod,
+            SentRecipient = q.SentRecipient,
+            SentByDevice = q.SentByDevice,
+            LastReminderAtUtc = q.LastReminderAtUtc,
+            ReminderCount = q.ReminderCount,
+            LastReminderByDevice = q.LastReminderByDevice,
+            Events = DeserializeQuoteEvents(q.EventsJson),
             LastModifiedUtc = q.LastModifiedUtc,
             BaseVersionUtc = q.LastModifiedUtc,
             SyncHash = q.SyncHash,
@@ -549,17 +604,8 @@ public partial class SqlDataService
                 Quantity = l.Quantity, Discount = l.Discount, IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
             }).ToList(),
-            PdfFile = q.PdfFile == null ? null : new StoredFile
-            {
-                FileName = q.PdfFile.FileName, ContentType = q.PdfFile.ContentType,
-                Content = q.PdfFile.Content, ImportedAt = q.PdfFile.ImportedAt
-            },
-            Attachments = q.Attachments.Select(a => new StoredFile
-            {
-                FileName = a.FileName, ContentType = a.ContentType,
-                Content = a.Content, ImportedAt = a.ImportedAt
-            }).ToList(),
-            HasCompleteAttachmentSnapshot = true
+            PdfFile = null,
+            Attachments = []
         };
     }
 
@@ -607,13 +653,70 @@ public partial class SqlDataService
         string quoteNumber,
         string notes,
         CancellationToken cancellationToken = default) =>
-        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Notes = notes, cancellationToken);
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            quote.Notes = notes;
+            quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            AppendQuoteEvent(quote, "note", string.IsNullOrWhiteSpace(notes) ? "Note svuotate" : "Note aggiornate");
+        }, cancellationToken);
 
     public Task UpdateQuoteStatusAsync(
         string quoteNumber,
         QuoteStatus status,
         CancellationToken cancellationToken = default) =>
-        UpdateQuoteMetadataAsync(quoteNumber, quote => quote.Status = status, cancellationToken);
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            quote.Status = status;
+            quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            AppendQuoteEvent(quote, "stato", $"Stato aggiornato: {status}");
+        }, cancellationToken);
+
+    public Task UpdateQuoteSendInfoAsync(
+        string quoteNumber,
+        QuoteSendInfo sendInfo,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(sendInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : sendInfo.DeviceName.Trim();
+
+            quote.Status = QuoteStatus.Spedito;
+            quote.SentAtUtc = sendInfo.SentAtUtc == default ? DateTime.UtcNow : sendInfo.SentAtUtc;
+            quote.SentMethod = sendInfo.Method?.Trim() ?? string.Empty;
+            quote.SentRecipient = sendInfo.Recipient?.Trim() ?? string.Empty;
+            quote.SentByDevice = deviceName;
+            quote.LastModifiedByDevice = deviceName;
+            AppendQuoteEvent(
+                quote,
+                "invio",
+                $"Preventivo inviato tramite {quote.SentMethod}".Trim(),
+                deviceName,
+                quote.SentAtUtc.Value);
+        }, cancellationToken);
+
+    public Task RegisterQuoteReminderAsync(
+        string quoteNumber,
+        QuoteReminderInfo reminderInfo,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(reminderInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : reminderInfo.DeviceName.Trim();
+
+            quote.Status = QuoteStatus.Spedito;
+            quote.LastReminderAtUtc = reminderInfo.ReminderAtUtc == default ? DateTime.UtcNow : reminderInfo.ReminderAtUtc;
+            quote.ReminderCount += 1;
+            quote.LastReminderByDevice = deviceName;
+            quote.LastModifiedByDevice = deviceName;
+            AppendQuoteEvent(
+                quote,
+                "sollecito",
+                $"Sollecito registrato (n. {quote.ReminderCount})",
+                deviceName,
+                quote.LastReminderAtUtc.Value);
+        }, cancellationToken);
 
     private async Task UpdateQuoteMetadataAsync(
         string quoteNumber,
@@ -652,6 +755,16 @@ public partial class SqlDataService
             LaborDiscount = entry.LaborDiscount,
             Total = entry.Total,
             Status = entry.Status,
+            CreatedByDevice = entry.CreatedByDevice,
+            LastModifiedByDevice = entry.LastModifiedByDevice,
+            SentAtUtc = entry.SentAtUtc,
+            SentMethod = entry.SentMethod,
+            SentRecipient = entry.SentRecipient,
+            SentByDevice = entry.SentByDevice,
+            LastReminderAtUtc = entry.LastReminderAtUtc,
+            ReminderCount = entry.ReminderCount,
+            LastReminderByDevice = entry.LastReminderByDevice,
+            Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             SyncHash = entry.SyncHash,
@@ -714,8 +827,6 @@ public partial class SqlDataService
                     .IgnoreQueryFilters()
                     .Include(x => x.Materials)
                     .Include(x => x.Labors)
-                    .Include(x => x.PdfFile)
-                    .Include(x => x.Attachments)
                     .FirstOrDefaultAsync(x => x.QuoteNumber == quote.QuoteNumber, cancellationToken);
 
                 if (existing != null)
@@ -742,6 +853,16 @@ public partial class SqlDataService
                     existing.LaborDiscount = quote.LaborDiscount;
                     existing.Total = quote.Total;
                     existing.Status = quote.Status;
+                    existing.CreatedByDevice = quote.CreatedByDevice;
+                    existing.LastModifiedByDevice = quote.LastModifiedByDevice;
+                    existing.SentAtUtc = quote.SentAtUtc;
+                    existing.SentMethod = quote.SentMethod;
+                    existing.SentRecipient = quote.SentRecipient;
+                    existing.SentByDevice = quote.SentByDevice;
+                    existing.LastReminderAtUtc = quote.LastReminderAtUtc;
+                    existing.ReminderCount = quote.ReminderCount;
+                    existing.LastReminderByDevice = quote.LastReminderByDevice;
+                    existing.EventsJson = SerializeQuoteEvents(quote.Events);
                     existing.LastModifiedUtc = savedAtUtc;
                     existing.SyncHash = quote.SyncHash;
                     
@@ -781,47 +902,6 @@ public partial class SqlDataService
                         SortOrder = l.SortOrder
                     }).ToList();
 
-                    bool hasOfficialPdfPayload = quote.PdfFile?.Content is { Length: > 0 };
-
-                    // Aggiorna il PDF ufficiale solo quando arrivano bytes reali.
-                    // I salvataggi metadata-only passano un PdfFile senza bytes e non devono cancellare il PDF nel DB.
-                    if (hasOfficialPdfPayload)
-                    {
-                        if (existing.PdfFile != null)
-                        {
-                            existing.PdfFile.FileName = quote.PdfFile!.FileName;
-                            existing.PdfFile.ContentType = quote.PdfFile.ContentType;
-                            existing.PdfFile.Content = quote.PdfFile.Content;
-                            existing.PdfFile.ImportedAt = quote.PdfFile.ImportedAt;
-                        }
-                        else
-                        {
-                            existing.PdfFile = new QuotePdfFileEntity
-                            {
-                                FileName = quote.PdfFile!.FileName,
-                                ContentType = quote.PdfFile.ContentType,
-                                Content = quote.PdfFile.Content,
-                                ImportedAt = quote.PdfFile.ImportedAt
-                            };
-                        }
-                    }
-
-                    bool hasAttachmentPayload = quote.Attachments.Any(a => a.Content.Length > 0);
-
-                    if (quote.HasCompleteAttachmentSnapshot || hasAttachmentPayload)
-                    {
-                        db.QuoteAttachments.RemoveRange(existing.Attachments);
-                        existing.Attachments = quote.Attachments
-                            .Where(a => a.Content.Length > 0)
-                            .Select(a => new QuoteAttachmentEntity
-                            {
-                                FileName = a.FileName,
-                                ContentType = a.ContentType,
-                                Content = a.Content,
-                                ImportedAt = a.ImportedAt
-                            }).ToList();
-                    }
-
                     quote.LastModifiedUtc = savedAtUtc;
                     quote.BaseVersionUtc = savedAtUtc;
                 }
@@ -844,6 +924,16 @@ public partial class SqlDataService
                         MaterialDiscount = quote.MaterialDiscount,
                         LaborDiscount = quote.LaborDiscount,
                         Status = quote.Status,
+                        CreatedByDevice = quote.CreatedByDevice,
+                        LastModifiedByDevice = quote.LastModifiedByDevice,
+                        SentAtUtc = quote.SentAtUtc,
+                        SentMethod = quote.SentMethod,
+                        SentRecipient = quote.SentRecipient,
+                        SentByDevice = quote.SentByDevice,
+                        LastReminderAtUtc = quote.LastReminderAtUtc,
+                        ReminderCount = quote.ReminderCount,
+                        LastReminderByDevice = quote.LastReminderByDevice,
+                        EventsJson = SerializeQuoteEvents(quote.Events),
                         LastModifiedUtc = savedAtUtc,
                         SyncHash = quote.SyncHash,
                         IsJointVenture = quote.IsJointVenture,
@@ -875,24 +965,6 @@ public partial class SqlDataService
                             Discount = l.Discount,
                             IsSignificant = l.IsSignificant,
                             SortOrder = l.SortOrder
-                        }).ToList(),
-                        PdfFile = quote.PdfFile?.Content is not { Length: > 0 }
-                            ? null
-                            : new QuotePdfFileEntity
-                            {
-                                FileName = quote.PdfFile.FileName,
-                                ContentType = quote.PdfFile.ContentType,
-                                Content = quote.PdfFile.Content,
-                                ImportedAt = quote.PdfFile.ImportedAt
-                            },
-                        Attachments = quote.Attachments
-                            .Where(a => a.Content.Length > 0)
-                            .Select(a => new QuoteAttachmentEntity
-                        {
-                            FileName = a.FileName,
-                            ContentType = a.ContentType,
-                            Content = a.Content,
-                            ImportedAt = a.ImportedAt
                         }).ToList()
                     };
 
@@ -912,113 +984,46 @@ public partial class SqlDataService
         });
     }
 
-    public async Task<byte[]?> GetQuotePdfContentAsync(
-        string quoteNumber,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = AppDbContextFactory.Create();
-
-        return await db.QuotePdfFiles
-            .AsNoTracking()
-            .Where(x => x.Quote.QuoteNumber == quoteNumber)
-            .Select(x => x.Content)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
-    public async Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber)
-    {
-        await using var db = AppDbContextFactory.Create();
-
-        return await db.QuoteAttachments
-            .AsNoTracking()
-            .Where(x => x.Quote.QuoteNumber == quoteNumber)
-            .OrderBy(x => x.FileName)
-            .Select(x => new StoredFile
-            {
-                FileName = x.FileName,
-                ContentType = x.ContentType,
-                Content = x.Content,
-                ImportedAt = x.ImportedAt
-            })
-            .ToListAsync();
-    }
-
-    public async Task<bool> SaveQuoteAttachmentsAsync(
-        string quoteNumber,
-        IEnumerable<StoredFile> attachments,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = AppDbContextFactory.Create();
-        var quote = await db.Quotes
-            .Include(x => x.Attachments)
-            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
-
-        if (quote == null)
-            return false;
-
-        db.QuoteAttachments.RemoveRange(quote.Attachments);
-        quote.Attachments = attachments
-            .Where(file => file.Content.Length > 0)
-            .Select(file => new QuoteAttachmentEntity
-            {
-                FileName = file.FileName,
-                ContentType = file.ContentType,
-                Content = file.Content,
-                ImportedAt = file.ImportedAt
-            }).ToList();
-
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
-    }
-
-    public async Task<bool> SaveQuoteCostsPdfAsync(
-        string quoteNumber,
-        StoredFile file,
-        CancellationToken cancellationToken = default)
-    {
-        if (file.Content.Length == 0)
-            return false;
-
-        await using var db = AppDbContextFactory.Create();
-        var quote = await db.Quotes
-            .Include(x => x.CostsPdfFile)
-            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
-
-        if (quote == null)
-            return false;
-
-        if (quote.CostsPdfFile == null)
-        {
-            quote.CostsPdfFile = new QuoteCostsPdfFileEntity();
-        }
-
-        quote.CostsPdfFile.FileName = file.FileName;
-        quote.CostsPdfFile.ContentType = file.ContentType;
-        quote.CostsPdfFile.Content = file.Content;
-        quote.CostsPdfFile.ImportedAt = file.ImportedAt;
-
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
-    }
-
-    public async Task<byte[]?> GetQuoteCostsPdfContentAsync(
-        string quoteNumber,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = AppDbContextFactory.Create();
-
-        return await db.QuoteCostsPdfFiles
-            .AsNoTracking()
-            .Where(x => x.Quote.QuoteNumber == quoteNumber)
-            .Select(x => x.Content)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
     private static CostAllocations? DeserializeCostAllocations(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
         try { return JsonSerializer.Deserialize<CostAllocations>(json); }
         catch { return null; }
+    }
+
+    private static List<QuoteEventEntry> DeserializeQuoteEvents(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new List<QuoteEventEntry>();
+
+        try { return JsonSerializer.Deserialize<List<QuoteEventEntry>>(json) ?? new List<QuoteEventEntry>(); }
+        catch { return new List<QuoteEventEntry>(); }
+    }
+
+    private static string SerializeQuoteEvents(IEnumerable<QuoteEventEntry>? events)
+    {
+        return JsonSerializer.Serialize(events?.ToList() ?? new List<QuoteEventEntry>());
+    }
+
+    private static void AppendQuoteEvent(
+        QuoteEntity quote,
+        string eventType,
+        string description,
+        string? deviceName = null,
+        DateTime? createdAtUtc = null)
+    {
+        var events = DeserializeQuoteEvents(quote.EventsJson);
+        events.Add(new QuoteEventEntry
+        {
+            CreatedAtUtc = (createdAtUtc ?? DateTime.UtcNow).ToUniversalTime(),
+            DeviceName = string.IsNullOrWhiteSpace(deviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : deviceName.Trim(),
+            EventType = eventType,
+            Description = description
+        });
+
+        quote.EventsJson = SerializeQuoteEvents(events);
     }
 }
 

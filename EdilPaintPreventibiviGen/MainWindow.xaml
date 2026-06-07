@@ -287,6 +287,47 @@
     </Window.Resources>
 
     <DockPanel Margin="15">
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource SubtleBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="10,8"
+                Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="EdilPaint Preventivi"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource DefaultTextBrush}"
+                           VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Dashboard"
+                            Width="105" Height="30" Margin="0,0,8,0"
+                            Background="{StaticResource DiagnosticsButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                            Click="OnOpenDashboardClick"/>
+                    <Button Content="PDF"
+                            Width="60" Height="30" Margin="0,0,8,0"
+                            Background="{StaticResource LocalMaterialsButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                            Click="OnOpenPdfAuditClick"/>
+                    <Button Content="Diagnostica"
+                            Width="95" Height="30" Margin="0,0,8,0"
+                            Background="{StaticResource DiagnosticsButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                            Click="OnOpenDiagnosticsClick"/>
+                    <Button Content="Impostazioni"
+                            Width="105" Height="30"
+                            Background="{StaticResource SettingsButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                            Click="OnOpenSettingsClick"/>
+                </StackPanel>
+            </Grid>
+        </Border>
 
         <!-- ═══════════════════════════════════════ HEADER ═══════════════════════════════════════ -->
         <Border DockPanel.Dock="Top"
@@ -711,11 +752,6 @@
                             Background="{StaticResource LocalMaterialsButtonBrush}"
                             Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                             Click="OnOpenMaterialListClick"/>
-                    <Button Content="⚙️"
-                            Width="auto" Height="35" Margin="8,0,0,0"
-                            Background="{StaticResource SettingsButtonBrush}"
-                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
-                            Click="OnOpenSettingsClick"/>
                 </StackPanel>
 
                 <!-- Sconti -->

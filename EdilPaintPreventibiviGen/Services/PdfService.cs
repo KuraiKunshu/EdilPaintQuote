@@ -5,6 +5,7 @@ using System.Diagnostics;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using EdilPaintPreventibiviGen;
 using EdilPaintPreventibiviGen.Helpers;
 using EdilPaintPreventibiviGen.ViewModels;
 using EdilPaintPreventibiviGen.Models;
@@ -30,6 +31,54 @@ public class PdfService
         public static readonly Color GreyDarken1 = ThemeResources.GetPdfColor("PdfGreyDarken1Color");
         public static readonly Color GreyDarken2 = ThemeResources.GetPdfColor("PdfGreyDarken2Color");
         public static readonly Color GreyDarken3 = ThemeResources.GetPdfColor("PdfGreyDarken3Color");
+    }
+
+    private sealed class PdfTemplateStyle
+    {
+        public float MarginCm { get; init; } = 1.5f;
+        public float BodyFontSize { get; init; } = 10;
+        public float TitleFontSize { get; init; } = 22;
+        public Color AccentColor { get; init; } = PdfPalette.AccentRed;
+        public Color TitleColor { get; init; } = PdfPalette.GreyLighten2;
+
+        public static PdfTemplateStyle Resolve(string? templateName)
+        {
+            return templateName?.Trim() switch
+            {
+                "Compatto" => new PdfTemplateStyle
+                {
+                    MarginCm = 1.0f,
+                    BodyFontSize = 9,
+                    TitleFontSize = 20,
+                    AccentColor = PdfPalette.RedDarken2
+                },
+                "Collaborazione" => new PdfTemplateStyle
+                {
+                    MarginCm = 1.35f,
+                    BodyFontSize = 9.5f,
+                    TitleFontSize = 21,
+                    AccentColor = PdfPalette.BlueDarken1,
+                    TitleColor = PdfPalette.BlueDarken1
+                },
+                "Cliente privato" => new PdfTemplateStyle
+                {
+                    MarginCm = 1.6f,
+                    BodyFontSize = 10.5f,
+                    TitleFontSize = 22,
+                    AccentColor = PdfPalette.GreenDarken1,
+                    TitleColor = PdfPalette.GreenDarken1
+                },
+                "Impresa" => new PdfTemplateStyle
+                {
+                    MarginCm = 1.35f,
+                    BodyFontSize = 10,
+                    TitleFontSize = 23,
+                    AccentColor = PdfPalette.GreyDarken3,
+                    TitleColor = PdfPalette.GreyDarken3
+                },
+                _ => new PdfTemplateStyle()
+            };
+        }
     }
 
     public static double CalculateEstimatedMargin(CostsPdfContext ctx)
@@ -70,7 +119,12 @@ public class PdfService
                 Content = a.Content,
                 ImportedAt = DateTime.Now
             }).ToList(),
-            AllCustomers = vm.AllCustomers.ToList()
+            AllCustomers = vm.AllCustomers.ToList(),
+            PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
+            PdfNotesTitle = App.AppSettings.PdfTemplate.NotesTitle,
+            PdfFooterText = App.AppSettings.PdfTemplate.FooterText,
+            PdfSignatureText = App.AppSettings.PdfTemplate.SignatureText,
+            PdfShowTemplateName = App.AppSettings.PdfTemplate.ShowTemplateName
         };
 
         GenerateQuoteFromContext(ctx, company, filePath);
@@ -82,6 +136,8 @@ public class PdfService
     public void GenerateQuoteFromContext(PdfGenerationContext ctx, Company company, string filePath)
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        NormalizePdfTemplate(ctx);
+        var templateStyle = PdfTemplateStyle.Resolve(ctx.PdfTemplateName);
 
         var customer = ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.CustomerName);
         var reference = !string.IsNullOrWhiteSpace(ctx.ReferenceName)
@@ -96,9 +152,9 @@ public class PdfService
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.Margin(1.5f, Unit.Centimetre);
+                page.Margin(templateStyle.MarginCm, Unit.Centimetre);
                 page.PageColor(PdfPalette.White);
-                page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Segoe UI"));
+                page.DefaultTextStyle(x => x.FontSize(templateStyle.BodyFontSize).FontFamily("Segoe UI"));
 
                 #region Header
                 page.Header().ShowOnce().Row(row =>
@@ -116,7 +172,7 @@ public class PdfService
                         else
                             col.Item().Height(60);
 
-                        col.Item().PaddingTop(10).Text(company.Nome).FontSize(14).Bold().FontColor(PdfPalette.AccentRed);
+                        col.Item().PaddingTop(10).Text(company.Nome).FontSize(14).Bold().FontColor(templateStyle.AccentColor);
                         col.Item().Text(company.Indirizzo).FontSize(9).FontColor(PdfPalette.GreyDarken2);
                         col.Item().Text($"P.IVA: {company.Piva}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
                         col.Item().Text($"Email: {company.Email}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
@@ -124,8 +180,10 @@ public class PdfService
 
                     row.RelativeItem().Column(col =>
                     {
-                        col.Item().AlignRight().Text("PREVENTIVO").FontSize(22).ExtraBold().FontColor(PdfPalette.GreyLighten2);
+                        col.Item().AlignRight().Text("PREVENTIVO").FontSize(templateStyle.TitleFontSize).ExtraBold().FontColor(templateStyle.TitleColor);
                         col.Item().AlignRight().Text($"n. {ctx.QuoteNumber}").FontSize(16).Bold();
+                        if (ctx.PdfShowTemplateName)
+                            col.Item().AlignRight().Text($"Template: {ctx.PdfTemplateName}").FontSize(8).FontColor(PdfPalette.GreyMedium);
 
                         var dataScadenza = ctx.Date.AddMonths(1).AddDays(15);
                         col.Item().AlignRight().Text(ctx.Date.ToString("dd MMMM yyyy")).FontSize(10).Italic();
@@ -146,7 +204,7 @@ public class PdfService
                                 if (reference != null)
                                 {
                                     custCol.Item().PaddingTop(10).Text("Riferimento:").FontSize(8).Italic().FontColor(PdfPalette.GreyMedium);
-                                    custCol.Item().Text(reference.BusinessName).Bold().FontSize(11).FontColor(PdfPalette.AccentRed);
+                                    custCol.Item().Text(reference.BusinessName).Bold().FontSize(11).FontColor(templateStyle.AccentColor);
                                     custCol.Item().Text(reference.Address).FontSize(9);
                                     if (!string.IsNullOrWhiteSpace(reference.Phone))
                                         custCol.Item().Text($"Tel: {reference.Phone}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
@@ -164,8 +222,8 @@ public class PdfService
                     #region Materiali
                     if (ctx.Materials.Count > 0)
                     {
-                        col.Item().BorderBottom(1).BorderColor(PdfPalette.AccentRed).PaddingBottom(5)
-                           .Text("MATERIALI").FontSize(11).Bold().FontColor(PdfPalette.AccentRed);
+                        col.Item().BorderBottom(1).BorderColor(templateStyle.AccentColor).PaddingBottom(5)
+                           .Text("MATERIALI").FontSize(11).Bold().FontColor(templateStyle.AccentColor);
 
                         col.Item().PaddingBottom(15).Table(table =>
                         {
@@ -182,7 +240,7 @@ public class PdfService
                                     {
                                         text.Span(item.Name).Bold();
                                         if (item.IsSignificant)
-                                            text.Span(" [*]").FontSize(8).FontColor(PdfPalette.AccentRed).Italic();
+                                            text.Span(" [*]").FontSize(8).FontColor(templateStyle.AccentColor).Italic();
                                     });
                                     if (!string.IsNullOrWhiteSpace(item.Description))
                                         c.Item().Text(item.Description).FontSize(8).FontColor(PdfPalette.GreyDarken1);
@@ -205,8 +263,8 @@ public class PdfService
                     #region Lavorazioni
                     if (ctx.Labors.Count > 0)
                     {
-                        col.Item().BorderBottom(1).BorderColor(PdfPalette.AccentRed).PaddingBottom(5)
-                           .Text("VOCI MANODOPERA").FontSize(11).Bold().FontColor(PdfPalette.AccentRed);
+                        col.Item().BorderBottom(1).BorderColor(templateStyle.AccentColor).PaddingBottom(5)
+                           .Text("VOCI MANODOPERA").FontSize(11).Bold().FontColor(templateStyle.AccentColor);
 
                         col.Item().Table(table =>
                         {
@@ -223,7 +281,7 @@ public class PdfService
                                     {
                                         text.Span(item.Name).Bold();
                                         if (item.IsSignificant)
-                                            text.Span(" [*]").FontSize(8).FontColor(PdfPalette.AccentRed).Italic();
+                                            text.Span(" [*]").FontSize(8).FontColor(templateStyle.AccentColor).Italic();
                                     });
                                     if (!string.IsNullOrWhiteSpace(item.Description))
                                         c.Item().Text(item.Description).FontSize(8).FontColor(PdfPalette.GreyDarken1);
@@ -248,7 +306,7 @@ public class PdfService
                         #region Note
                         row.RelativeItem().PaddingRight(30).Column(noteCol =>
                         {
-                            noteCol.Item().Text("NOTE E TERMINI DI PAGAMENTO").FontSize(9).Bold();
+                            noteCol.Item().Text(ctx.PdfNotesTitle).FontSize(9).Bold();
                             noteCol.Item().PaddingTop(5).PaddingBottom(15).Text(ctx.PaymentTerms).FontSize(9).LineHeight(1.2f);
                         });
                         #endregion
@@ -297,7 +355,7 @@ public class PdfService
                     #region Firma
                     col.Item().PaddingTop(20).EnsureSpace(80).Column(firmaCol =>
                     {
-                        firmaCol.Item().PaddingBottom(6).Text("Firma per accettazione").FontSize(9).SemiBold().FontColor(PdfPalette.GreyDarken2);
+                        firmaCol.Item().PaddingBottom(6).Text(ctx.PdfSignatureText).FontSize(9).SemiBold().FontColor(PdfPalette.GreyDarken2);
                         firmaCol.Item().PaddingTop(18).Row(row =>
                         {
                             row.RelativeItem().BorderBottom(1).BorderColor(PdfPalette.GreyDarken1).Height(18);
@@ -315,6 +373,8 @@ public class PdfService
                     {
                         x.Span("Pagina "); x.CurrentPageNumber(); x.Span(" di "); x.TotalPages();
                     });
+                    if (!string.IsNullOrWhiteSpace(ctx.PdfFooterText))
+                        col.Item().PaddingTop(4).AlignCenter().Text(ctx.PdfFooterText).FontSize(8).Italic().FontColor(PdfPalette.GreyMedium);
                 });
             });
         }).GeneratePdf(filePath);
@@ -447,5 +507,16 @@ public class PdfService
                 });
             });
         }).GeneratePdf(filePath);
+    }
+
+    private static void NormalizePdfTemplate(PdfGenerationContext ctx)
+    {
+        if (string.IsNullOrWhiteSpace(ctx.PdfTemplateName))
+            ctx.PdfTemplateName = "Standard";
+        if (string.IsNullOrWhiteSpace(ctx.PdfNotesTitle))
+            ctx.PdfNotesTitle = "NOTE E TERMINI DI PAGAMENTO";
+        if (string.IsNullOrWhiteSpace(ctx.PdfSignatureText))
+            ctx.PdfSignatureText = "Firma per accettazione";
+        ctx.PdfFooterText ??= string.Empty;
     }
 }

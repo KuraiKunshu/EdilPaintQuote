@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Linq;
@@ -10,12 +13,18 @@ using EdilPaintPreventibiviGen.Services;
 using Microsoft.Win32;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace EdilPaintPreventibiviGen;
 
 public partial class MainWindow : Window
 {
     private CancellationTokenSource? _materialSearchCts;
+    private CancellationTokenSource? _draftAutosaveCts;
+    private DispatcherTimer? _draftAutosaveTimer;
+    private bool _isAutosavingDraft;
+    private bool _isCloseConfirmed;
+    private bool _isCloseCleanupRunning;
     
     #region Constructor
     public MainWindow()
@@ -23,35 +32,212 @@ public partial class MainWindow : Window
         InitializeComponent();
         var vm = new MainViewModel();
         DataContext = vm;
-        Loaded += async (_, _) => await vm.InitializeAsync();
+        Loaded += async (_, _) =>
+        {
+            await vm.InitializeAsync();
+            await PromptDraftRecoveryAsync(vm);
+            StartDraftAutosave();
+        };
     }
     public MainWindow(MainViewModel vm)
     {
         InitializeComponent();
         DataContext = vm;
+        Loaded += async (_, _) =>
+        {
+            await PromptDraftRecoveryAsync(vm);
+            StartDraftAutosave();
+        };
     }
     #endregion
     
     #region Window events
-    private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    private void Window_Closing(object sender, CancelEventArgs e)
     {
-        var result = MessageBox.Show(
-            "Sei sicuro di voler chiudere l'applicazione?",
-            "Conferma chiusura",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
+        if (AppShutdownManager.IsShutdownRequested)
+        {
+            StopDraftAutosave();
+            _materialSearchCts?.Cancel();
+            return;
+        }
 
-        if (result == MessageBoxResult.No)
+        if (_isCloseCleanupRunning)
         {
             e.Cancel = true;
             return;
         }
 
-        _materialSearchCts?.Cancel();
-        _materialSearchCts?.Dispose();
-        _materialSearchCts = null;
+        if (!_isCloseConfirmed)
+        {
+            var result = MessageBox.Show(
+                "Sei sicuro di voler chiudere l'applicazione?",
+                "Conferma chiusura",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.No)
+            {
+                e.Cancel = true;
+                return;
+            }
+        }
+
+        if (!_isCloseConfirmed)
+        {
+            e.Cancel = true;
+            _isCloseConfirmed = true;
+            _ = ShutdownAfterCleanupAsync();
+            return;
+        }
     }
     #endregion
+
+    private async Task ShutdownAfterCleanupAsync()
+    {
+        try
+        {
+            await Task.Yield();
+            await PrepareForCloseAsync();
+            await Dispatcher.InvokeAsync(() =>
+            {
+                AppShutdownManager.RequestShutdown();
+                Application.Current.Shutdown();
+            }, DispatcherPriority.Background);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SHUTDOWN] Close retry error: {ex.Message}");
+            await Dispatcher.InvokeAsync(() =>
+            {
+                AppShutdownManager.RequestShutdown();
+                Application.Current.Shutdown();
+            }, DispatcherPriority.Background);
+        }
+    }
+
+    private async Task PrepareForCloseAsync()
+    {
+        if (_isCloseCleanupRunning)
+            return;
+
+        _isCloseCleanupRunning = true;
+        try
+        {
+            StopDraftAutosave();
+            _materialSearchCts?.Cancel();
+
+            if (DataContext is MainViewModel vm)
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    await vm.SaveDraftAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Debug.WriteLine("[SHUTDOWN] Draft autosave skipped after timeout.");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SHUTDOWN] Draft autosave error: {ex.Message}");
+                }
+            }
+
+            AppShutdownManager.RequestShutdown();
+        }
+        finally
+        {
+            _materialSearchCts?.Dispose();
+            _materialSearchCts = null;
+            _isCloseCleanupRunning = false;
+        }
+    }
+
+    private void StartDraftAutosave()
+    {
+        StopDraftAutosave();
+        _draftAutosaveCts = AppShutdownManager.CreateLinkedTokenSource();
+        _draftAutosaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(25)
+        };
+        _draftAutosaveTimer.Tick += OnDraftAutosaveTick;
+        _draftAutosaveTimer.Start();
+    }
+
+    private void StopDraftAutosave()
+    {
+        _draftAutosaveCts?.Cancel();
+        _draftAutosaveCts?.Dispose();
+        _draftAutosaveCts = null;
+
+        if (_draftAutosaveTimer != null)
+        {
+            _draftAutosaveTimer.Stop();
+            _draftAutosaveTimer.Tick -= OnDraftAutosaveTick;
+            _draftAutosaveTimer = null;
+        }
+    }
+
+    private async void OnDraftAutosaveTick(object? sender, EventArgs e)
+    {
+        var token = _draftAutosaveCts?.Token ?? CancellationToken.None;
+        await AutosaveDraftAsync(token);
+    }
+
+    private async Task AutosaveDraftAsync(CancellationToken cancellationToken)
+    {
+        if (_isAutosavingDraft ||
+            AppShutdownManager.IsShutdownRequested ||
+            cancellationToken.IsCancellationRequested ||
+            DataContext is not MainViewModel vm)
+            return;
+
+        _isAutosavingDraft = true;
+        try
+        {
+            await vm.SaveDraftAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.WriteLine("[Draft] Autosalvataggio annullato.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Draft] Autosalvataggio non riuscito: {ex.Message}");
+        }
+        finally
+        {
+            _isAutosavingDraft = false;
+        }
+    }
+
+    private async Task PromptDraftRecoveryAsync(MainViewModel vm)
+    {
+        var draft = await vm.LoadDraftAsync();
+        if (draft == null)
+            return;
+
+        string savedAt = draft.LastModifiedUtc == default
+            ? "data sconosciuta"
+            : draft.LastModifiedUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+
+        var result = MessageBox.Show(
+            $"Ho trovato una bozza autosalvata del {savedAt}. Vuoi recuperarla?",
+            "Bozza disponibile",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            vm.ApplyDraft(draft);
+        }
+        else
+        {
+            await vm.DiscardDraftAsync();
+            vm.ResetQuote();
+        }
+    }
     
     #region On drag & drop
     private Point _dragStartPoint;
@@ -148,7 +334,7 @@ public partial class MainWindow : Window
     
     
     #region Image Handlers
-    private void OnAddImageClick(object sender, RoutedEventArgs e)
+    private async void OnAddImageClick(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
         {
@@ -162,7 +348,7 @@ public partial class MainWindow : Window
             {
                 foreach (string file in dialog.FileNames)
                 {
-                    vm.AddAttachmentFromPath(file);
+                    await vm.AddAttachmentFromPathAsync(file);
                 }
             }
         }
@@ -176,7 +362,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnImageDrop(object sender, DragEventArgs e)
+    private async void OnImageDrop(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
@@ -187,14 +373,14 @@ public partial class MainWindow : Window
                     foreach (string file in files)
                     {
                         if (!string.IsNullOrWhiteSpace(file))
-                            vm.AddAttachmentFromPath(file);
+                            await vm.AddAttachmentFromPathAsync(file);
                     }
                 }
             }
         }
     }
 
-    private void OnImagePaste(object sender, System.Windows.Input.KeyEventArgs e)
+    private async void OnImagePaste(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == System.Windows.Input.Key.V && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control)
         {
@@ -206,7 +392,7 @@ public partial class MainWindow : Window
                     foreach (string? file in files)
                     {
                         if (!string.IsNullOrWhiteSpace(file))
-                            vm.AddAttachmentFromPath(file);
+                            await vm.AddAttachmentFromPathAsync(file);
                     }
                 }
             }
@@ -217,7 +403,17 @@ public partial class MainWindow : Window
     #region General Handlers
     private void OnSelectCustomerClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Cliente" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedCustomer = win.SelectedResult; } }
     private void OnSelectReferenceClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Riferimento" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedSecondCustomer = win.SelectedResult; } }
-    private void OnNewQuoteClick(object sender, RoutedEventArgs e) { if (MessageBox.Show("Sicuro?", "Conferma", MessageBoxButton.YesNo) == MessageBoxResult.Yes) (DataContext as MainViewModel)?.ResetQuote(); }
+    private async void OnNewQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Sicuro?", "Conferma", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+            return;
+
+        if (DataContext is MainViewModel vm)
+        {
+            await vm.DiscardDraftAsync();
+            vm.ResetQuote();
+        }
+    }
     private void OnGeneratePdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GeneratePdf();
     private void OnGenerateCostsPdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GenerateCostsPdf();
     private void OnOpenHistoryClick(object sender, RoutedEventArgs e)
@@ -272,6 +468,21 @@ public partial class MainWindow : Window
         var win = new SettingsWindow { Owner = this };
         win.ShowDialog();
     }
+    private void OnOpenDashboardClick(object sender, RoutedEventArgs e)
+    {
+        var win = new DashboardWindow { Owner = this };
+        win.ShowDialog();
+    }
+    private void OnOpenDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        var win = new DiagnosticsWindow { Owner = this };
+        win.ShowDialog();
+    }
+    private void OnOpenPdfAuditClick(object sender, RoutedEventArgs e)
+    {
+        var win = new PdfArchiveAuditWindow { Owner = this };
+        win.ShowDialog();
+    }
     private void OnEditRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item) { var win = new EditItemWindow(item) { Owner = this }; if (win.ShowDialog() == true) (DataContext as MainViewModel)?.CalculateTotals(); } }
     private void OnDeleteRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item && DataContext is MainViewModel vm) { if (vm.Materials.Contains(item)) vm.Materials.Remove(item); else if (vm.Labors.Contains(item)) vm.Labors.Remove(item); vm.UpdateItemSortOrders(); vm.CalculateTotals(); } }
     private void OnLaborSearchChanged(object sender, TextChangedEventArgs e) 
@@ -299,7 +510,7 @@ public partial class MainWindow : Window
 
         _materialSearchCts?.Cancel();
         _materialSearchCts?.Dispose();
-        _materialSearchCts = new CancellationTokenSource();
+        _materialSearchCts = AppShutdownManager.CreateLinkedTokenSource();
         var token = _materialSearchCts.Token;
 
         _ = RunMaterialSearchAsync(vm, cb, text, token);
