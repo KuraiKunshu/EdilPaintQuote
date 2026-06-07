@@ -74,14 +74,6 @@ public partial class SqlDataService
                 x.IsJointVenture,
                 x.PartnerCompanyName,
                 x.CostAllocationsJson,
-                PdfFile = x.PdfFile == null
-                    ? null
-                    : new StoredFile
-                    {
-                        FileName = x.PdfFile.FileName,
-                        ContentType = x.PdfFile.ContentType,
-                        ImportedAt = x.PdfFile.ImportedAt
-                    },
                 Materials = x.Materials
                     .OrderBy(m => m.SortOrder)
                     .Select(m => new Item
@@ -108,14 +100,6 @@ public partial class SqlDataService
                         SortOrder = l.SortOrder
                     })
                     .ToList(),
-                Attachments = x.Attachments
-                    .Select(a => new StoredFile
-                    {
-                        FileName = a.FileName,
-                        ContentType = a.ContentType,
-                        ImportedAt = a.ImportedAt
-                    })
-                    .ToList()
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -154,10 +138,8 @@ public partial class SqlDataService
                 AdditionalCosts = costs?.AdditionalCosts ?? [],
                 LastModifiedUtc = x.LastModifiedUtc,
                 BaseVersionUtc = x.LastModifiedUtc,
-                PdfFile = x.PdfFile,
                 Materials = x.Materials,
-                Labors = x.Labors,
-                Attachments = x.Attachments
+                Labors = x.Labors
             };
         }).ToList();
     }
@@ -448,7 +430,10 @@ public partial class SqlDataService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int take)
+    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
+        string searchText,
+        int take,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -494,10 +479,14 @@ public partial class SqlDataService
                 ReminderCount = x.ReminderCount,
                 LastReminderByDevice = x.LastReminderByDevice
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int skip, int take)
+    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
+        string searchText,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -543,7 +532,7 @@ public partial class SqlDataService
                 ReminderCount = x.ReminderCount,
                 LastReminderByDevice = x.LastReminderByDevice
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<HashSet<string>> GetAllQuoteNumbersAsync()
@@ -993,46 +982,6 @@ public partial class SqlDataService
                 throw;
             }
         });
-    }
-
-    public async Task<byte[]?> GetQuotePdfContentAsync(
-        string quoteNumber,
-        CancellationToken cancellationToken = default)
-    {
-        await Task.CompletedTask;
-        return null;
-    }
-
-    public async Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber)
-    {
-        await Task.CompletedTask;
-        return [];
-    }
-
-    public async Task<bool> SaveQuoteAttachmentsAsync(
-        string quoteNumber,
-        IEnumerable<StoredFile> attachments,
-        CancellationToken cancellationToken = default)
-    {
-        await Task.CompletedTask;
-        return false;
-    }
-
-    public async Task<bool> SaveQuoteCostsPdfAsync(
-        string quoteNumber,
-        StoredFile file,
-        CancellationToken cancellationToken = default)
-    {
-        await Task.CompletedTask;
-        return false;
-    }
-
-    public async Task<byte[]?> GetQuoteCostsPdfContentAsync(
-        string quoteNumber,
-        CancellationToken cancellationToken = default)
-    {
-        await Task.CompletedTask;
-        return null;
     }
 
     private static CostAllocations? DeserializeCostAllocations(string? json)

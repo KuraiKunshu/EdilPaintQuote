@@ -25,12 +25,6 @@ internal static class QuoteSyncHashService
             string.Join("|", entry.PartnerCosts.Select(c => $"{c.Description}:{Number(c.Amount)}:{c.Notes}")) + "|" +
             string.Join("|", entry.AdditionalCosts.Select(c => $"{c.Description}:{Number(c.Amount)}:{c.Notes}"));
 
-        var attachmentsHash = string.Join("|", entry.Attachments
-            .OrderBy(a => a.FileName, StringComparer.OrdinalIgnoreCase)
-            .Select(a => $"{a.FileName}:{a.ContentType}"));
-
-        var pdfState = entry.PdfFile == null ? "no-pdf" : "has-pdf";
-
         var eventsHash = string.Join("|", entry.Events
             .OrderBy(e => e.CreatedAtUtc)
             .ThenBy(e => e.EventType, StringComparer.OrdinalIgnoreCase)
@@ -63,8 +57,6 @@ internal static class QuoteSyncHashService
             materialsHash,
             laborsHash,
             costsHash,
-            attachmentsHash,
-            pdfState,
             eventsHash);
 
         var bytes = Encoding.UTF8.GetBytes(data);

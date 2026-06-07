@@ -29,9 +29,6 @@ public partial class DiagnosticsWindow : Window
         TxtUpdaterStatus.Text = _snapshot.UpdaterStatus;
         TxtSyncStatus.Text = _snapshot.SyncStatus;
         TxtLastSync.Text = _snapshot.LastSync;
-        TxtPendingPdfs.Text = FormatCount(_snapshot.PendingPdfs);
-        TxtPendingAttachments.Text = FormatCount(_snapshot.PendingAttachments);
-        TxtPendingCostsPdfs.Text = FormatCount(_snapshot.PendingCostsPdfs);
         TxtPendingQuotePatches.Text = FormatCount(_snapshot.PendingQuotePatches);
         TxtPendingDeletes.Text = $"{_snapshot.PendingQuoteDeletes} preventivi, {_snapshot.PendingCustomerDeletes} clienti";
         TxtExecutablePath.Text = _snapshot.ExecutablePath;

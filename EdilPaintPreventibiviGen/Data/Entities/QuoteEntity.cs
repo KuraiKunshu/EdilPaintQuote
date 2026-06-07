@@ -48,9 +48,6 @@ public class QuoteEntity
 	public string SyncHash { get; set; } = string.Empty;
 	public bool IsDeleted { get; set; }
 	
-	public QuotePdfFileEntity? PdfFile { get; set; }
-	public QuoteCostsPdfFileEntity? CostsPdfFile { get; set; }
-	public ICollection<QuoteAttachmentEntity> Attachments { get; set; } = new List<QuoteAttachmentEntity>();
 	public ICollection<QuoteMaterialEntity> Materials { get; set; } = new List<QuoteMaterialEntity>();
 	public ICollection<QuoteLaborEntity> Labors { get; set; } = new List<QuoteLaborEntity>();
 }

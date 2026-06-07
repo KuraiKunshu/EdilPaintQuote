@@ -33,9 +33,12 @@ public sealed class QuoteHistoryService
         return await _dataService.GetQuoteSummariesAsync(Math.Max(1, count), cancellationToken);
     }
 
-    public async Task<List<QuoteHistorySummary>> SearchSummariesAsync(string text, int take)
+    public async Task<List<QuoteHistorySummary>> SearchSummariesAsync(
+        string text,
+        int take,
+        CancellationToken cancellationToken = default)
     {
-        return await _dataService.SearchQuoteSummariesAsync(text, take);
+        return await _dataService.SearchQuoteSummariesAsync(text, take, cancellationToken);
     }
     
     public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber)

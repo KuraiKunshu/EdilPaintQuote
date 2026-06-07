@@ -15,9 +15,6 @@ public class SyncService
     private readonly IDataService _dataService;
     private readonly LocalJsonStoreService _localStore;
     private readonly SqlDataService _sqlService;
-    private readonly LocalPdfOutboxService _pdfOutbox;
-    private readonly LocalAttachmentOutboxService _attachmentOutbox;
-    private readonly LocalCostsPdfOutboxService _costsPdfOutbox;
     private readonly LocalQuotePatchOutboxService _quotePatchOutbox;
     private readonly LocalDeletionOutboxService _deletionOutbox;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
@@ -50,18 +47,12 @@ public class SyncService
         IDataService dataService,
         SqlDataService sqlService,
         LocalJsonStoreService localStore,
-        LocalPdfOutboxService pdfOutbox,
-        LocalAttachmentOutboxService attachmentOutbox,
-        LocalCostsPdfOutboxService costsPdfOutbox,
         LocalQuotePatchOutboxService quotePatchOutbox,
         LocalDeletionOutboxService deletionOutbox)
     {
         _dataService = dataService;
         _sqlService = sqlService;
         _localStore = localStore;
-        _pdfOutbox = pdfOutbox;
-        _attachmentOutbox = attachmentOutbox;
-        _costsPdfOutbox = costsPdfOutbox;
         _quotePatchOutbox = quotePatchOutbox;
         _deletionOutbox = deletionOutbox;
     }
@@ -497,17 +488,8 @@ public class SyncService
         await _localStore.DeleteQuotesAsync(deletedQuoteNumbers, cancellationToken);
         foreach (string quoteNumber in deletedQuoteNumbers)
         {
-            await _pdfOutbox.RemoveAsync(quoteNumber);
-            await _attachmentOutbox.RemoveAsync(quoteNumber);
-            await _costsPdfOutbox.RemoveAsync(quoteNumber);
             await _quotePatchOutbox.RemoveAsync(quoteNumber);
         }
-    }
-
-    private async Task FlushPendingQuoteFilesAsync(CancellationToken cancellationToken)
-    {
-        await Task.CompletedTask;
-        Debug.WriteLine("[Sync] Sincronizzazione file binari saltata: PDF e allegati restano su file system.");
     }
 
     private async Task<(int synced, int conflicts)> SyncCustomersAsync(CancellationToken cancellationToken)

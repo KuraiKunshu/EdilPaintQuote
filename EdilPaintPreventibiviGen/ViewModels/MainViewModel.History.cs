@@ -25,7 +25,7 @@ public partial class MainViewModel
         try
         {
             var service = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
-            var summaries = await service.LoadTopSummariesAsync(count);
+            var summaries = await service.LoadTopSummariesAsync(count, cancellationToken);
 
             if (cancellationToken.IsCancellationRequested)
                 return;
@@ -48,7 +48,7 @@ public partial class MainViewModel
         try
         {
             var service = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
-            var results = await service.SearchSummariesAsync(searchText, take);
+            var results = await service.SearchSummariesAsync(searchText, take, cancellationToken);
 
             if (cancellationToken.IsCancellationRequested)
                 return new List<QuoteHistorySummary>();
@@ -62,32 +62,10 @@ public partial class MainViewModel
         }
     }
 
-    private static async Task<byte[]> ReadPdfBytesWithRetryAsync(string pdfPath, int maxAttempts = 3, int delayMs = 200)
-    {
-        for (int i = 0; i < maxAttempts; i++)
-        {
-            try
-            {
-                if (File.Exists(pdfPath))
-                    return await File.ReadAllBytesAsync(pdfPath);
-            }
-            catch (IOException)
-            {
-                Debug.WriteLine($"[ReadPdf] Tentativo {i + 1}/{maxAttempts} fallito per: {pdfPath}");
-            }
-
-            if (i < maxAttempts - 1)
-                await Task.Delay(delayMs);
-        }
-
-        return [];
-    }
-
     private async Task<bool> SaveToHistoryAsync(
         string pdfPath,
         bool isNewEntry = false,
-        DateTime? quoteDate = null,
-        string? pdfContentPath = null)
+        DateTime? quoteDate = null)
     {
         await SaveAttachmentsToFileSystemAsync(pdfPath, QuoteNumber);
 
@@ -115,13 +93,7 @@ public partial class MainViewModel
             OurCosts = OurCosts.ToList(),
             PartnerCosts = PartnerCosts.ToList(),
             AdditionalCosts = AdditionalCosts.ToList(),
-            PdfFile = new StoredFile
-            {
-                FileName = Path.GetFileName(pdfPath) ?? "preventivo.pdf",
-                ContentType = "application/pdf",
-                Content = [],
-                ImportedAt = DateTime.Now
-            },
+            PdfFile = null,
             Attachments = AttachedImages.Select(a => new StoredFile
             {
                 FileName = a.FileName,

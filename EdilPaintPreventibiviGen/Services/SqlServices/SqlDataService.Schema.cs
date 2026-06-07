@@ -10,17 +10,6 @@ public partial class SqlDataService
         await using var db = AppDbContextFactory.Create();
 
         await db.Database.EnsureCreatedAsync(cancellationToken);
-        try
-        {
-            await db.Database.MigrateAsync(cancellationToken);
-        }
-        catch (InvalidOperationException ex) when (
-            ex.Message.Contains("PendingModelChangesWarning", StringComparison.OrdinalIgnoreCase))
-        {
-            System.Diagnostics.Debug.WriteLine(
-                "[SQL] Migrazioni EF non aggiornate rispetto al modello corrente; continuo con compatibilita' schema manuale.");
-        }
-
         await EnsureLegacySchemaCompatibilityAsync(db, cancellationToken);
 
         if (!await db.CompanySettings.AnyAsync(cancellationToken))

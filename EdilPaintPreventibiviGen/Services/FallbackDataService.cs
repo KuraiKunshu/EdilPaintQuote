@@ -14,9 +14,6 @@ public class FallbackDataService : IDataService
 {
     private readonly SqlDataService _sqlService;
     private readonly LocalJsonStoreService _localStore;
-    private readonly LocalPdfOutboxService _pdfOutbox;
-    private readonly LocalAttachmentOutboxService _attachmentOutbox;
-    private readonly LocalCostsPdfOutboxService _costsPdfOutbox;
     private readonly LocalQuotePatchOutboxService _quotePatchOutbox;
     private readonly LocalDeletionOutboxService _deletionOutbox;
     private bool _isDatabaseAvailable = true;
@@ -39,17 +36,11 @@ public class FallbackDataService : IDataService
     public FallbackDataService(
         SqlDataService sqlService,
         LocalJsonStoreService localStore,
-        LocalPdfOutboxService pdfOutbox,
-        LocalAttachmentOutboxService attachmentOutbox,
-        LocalCostsPdfOutboxService costsPdfOutbox,
         LocalQuotePatchOutboxService quotePatchOutbox,
         LocalDeletionOutboxService deletionOutbox)
     {
         _sqlService = sqlService;
         _localStore = localStore;
-        _pdfOutbox = pdfOutbox;
-        _attachmentOutbox = attachmentOutbox;
-        _costsPdfOutbox = costsPdfOutbox;
         _quotePatchOutbox = quotePatchOutbox;
         _deletionOutbox = deletionOutbox;
     }
@@ -372,23 +363,35 @@ public class FallbackDataService : IDataService
         .ToList();
 }
 
-    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(string searchText, int take)
+    public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
+        string searchText,
+        int take,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (IsDatabaseAvailable())
         {
             try
             {
                 // 1 query DB per i risultati di ricerca
-                var dbQuotes = await _sqlService.SearchQuoteSummariesAsync(searchText, take);
+                var dbQuotes = await _sqlService.SearchQuoteSummariesAsync(searchText, take, cancellationToken);
 
                 // Riusa le cache — nessuna ulteriore lettura su disco o DB
                 var dbAllNumbers = await GetDbQuoteNumbersCachedAsync();
                 var localNumbers = await GetLocalQuoteNumbersCachedAsync();
 
                 foreach (var q in dbQuotes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbAllNumbers, localNumbers);
+                }
 
                 return dbQuotes;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch( Exception ex)
             {
@@ -398,6 +401,8 @@ public class FallbackDataService : IDataService
 
         // Fallback: solo JSON locale
         var allQuotes = await _localStore.LoadHistoryAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+
         var filtered = string.IsNullOrWhiteSpace(searchText)
             ? allQuotes
             : allQuotes.Where(q =>
@@ -447,13 +452,6 @@ public class FallbackDataService : IDataService
         var localQuote = await _localStore.GetQuoteByNumberAsync(quoteNumber);
         if (localQuote == null)
             return null;
-
-        var pendingAttachments = await _attachmentOutbox.TryReadAsync(quoteNumber);
-        if (pendingAttachments != null)
-        {
-            localQuote.Attachments = pendingAttachments;
-            localQuote.HasCompleteAttachmentSnapshot = true;
-        }
 
         return localQuote;
     }
@@ -534,10 +532,6 @@ public class FallbackDataService : IDataService
             {
                 await _sqlService.SaveQuoteAsync(lightEntry, cancellationToken);
                 await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
-                await _pdfOutbox.RemoveAsync(quote.QuoteNumber);
-                if (quote.HasCompleteAttachmentSnapshot)
-                    await _attachmentOutbox.RemoveAsync(quote.QuoteNumber);
-                await _costsPdfOutbox.RemoveAsync(quote.QuoteNumber);
             }
             catch (QuoteConflictException)
             {
@@ -549,8 +543,6 @@ public class FallbackDataService : IDataService
                 if (databaseVersion != null)
                     await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
 
-                await _pdfOutbox.RemoveAsync(quote.QuoteNumber);
-                await _attachmentOutbox.RemoveAsync(quote.QuoteNumber);
                 throw;
             }
             catch (OperationCanceledException)
@@ -572,9 +564,6 @@ public class FallbackDataService : IDataService
     {
         await _deletionOutbox.AddQuoteAsync(quoteNumber);
         await _localStore.DeleteQuoteAsync(quoteNumber);
-        await _pdfOutbox.RemoveAsync(quoteNumber);
-        await _attachmentOutbox.RemoveAsync(quoteNumber);
-        await _costsPdfOutbox.RemoveAsync(quoteNumber);
 
         if (IsDatabaseAvailable())
         {
@@ -906,44 +895,6 @@ public class FallbackDataService : IDataService
         var localCustomers = await _localStore.LoadCustomersAsync();
         return localHistory.Count == 0 && localCustomers.Count == 0;
     }
-    public async Task<byte[]?> GetQuotePdfContentAsync(string quoteNumber, CancellationToken cancellationToken = default)
-    {
-        var pendingPdf = await _pdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
-        if (pendingPdf is { Length: > 0 })
-            return pendingPdf;
-
-        return null;
-    }
-
-    public async Task<List<StoredFile>> GetQuoteAttachmentsAsync(string quoteNumber)
-    {
-        var pendingAttachments = await _attachmentOutbox.TryReadAsync(quoteNumber);
-        if (pendingAttachments != null)
-            return pendingAttachments;
-
-        return [];
-    }
-
-    public async Task<bool> SaveQuoteCostsPdfAsync(
-        string quoteNumber,
-        StoredFile file,
-        CancellationToken cancellationToken = default)
-    {
-        await _costsPdfOutbox.RemoveAsync(quoteNumber);
-        return false;
-    }
-
-    public async Task<byte[]?> GetQuoteCostsPdfContentAsync(
-        string quoteNumber,
-        CancellationToken cancellationToken = default)
-    {
-        var pendingFile = await _costsPdfOutbox.TryReadAsync(quoteNumber, cancellationToken);
-        if (pendingFile?.Content is { Length: > 0 })
-            return pendingFile.Content;
-
-        return null;
-    }
-
     public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default)
     {
         if (IsDatabaseAvailable())

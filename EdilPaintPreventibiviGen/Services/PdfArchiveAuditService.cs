@@ -18,7 +18,6 @@ public sealed class PdfArchiveAuditService
 
     public async Task<List<PdfArchiveIssue>> ScanAsync(
         int take = DefaultScanLimit,
-        bool includeDatabaseChecks = false,
         CancellationToken cancellationToken = default)
     {
         var issues = new List<PdfArchiveIssue>();
@@ -41,10 +40,9 @@ public sealed class PdfArchiveAuditService
                 PartnerCompanyName = summary.PartnerCompanyName
             };
 
-            await CheckOfficialPdfAsync(entry, issues, includeDatabaseChecks, cancellationToken);
-            await CheckCostsPdfAsync(entry, issues, includeDatabaseChecks, cancellationToken);
-
-            await Task.CompletedTask;
+            await CheckOfficialPdfAsync(entry, issues, cancellationToken);
+            await CheckCostsPdfAsync(entry, issues, cancellationToken);
+            await CheckAttachmentsAsync(summary.QuoteNumber, issues, cancellationToken);
         }
 
         return issues;
@@ -75,7 +73,6 @@ public sealed class PdfArchiveAuditService
     private async Task CheckOfficialPdfAsync(
         QuoteHistoryEntry entry,
         List<PdfArchiveIssue> issues,
-        bool includeDatabaseChecks,
         CancellationToken cancellationToken)
     {
         string expectedPath = _historyService.GetExpectedPdfPath(entry);
@@ -89,7 +86,6 @@ public sealed class PdfArchiveAuditService
     private async Task CheckCostsPdfAsync(
         QuoteHistoryEntry entry,
         List<PdfArchiveIssue> issues,
-        bool includeDatabaseChecks,
         CancellationToken cancellationToken)
     {
         if (!entry.IsJointVenture)
@@ -104,13 +100,17 @@ public sealed class PdfArchiveAuditService
     }
 
     private async Task CheckAttachmentsAsync(
-        QuoteHistoryEntry entry,
+        string quoteNumber,
         List<PdfArchiveIssue> issues,
         CancellationToken cancellationToken)
     {
-        List<StoredFile> attachments;
-        try { attachments = await _dataService.GetQuoteAttachmentsAsync(entry.QuoteNumber).ConfigureAwait(false); }
-        catch { return; }
+        var entry = await _historyService.GetQuoteByNumberAsync(quoteNumber).ConfigureAwait(false);
+        if (entry == null)
+            return;
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        List<StoredFile> attachments = entry.Attachments;
 
         if (attachments.Count == 0)
             return;
@@ -149,7 +149,7 @@ public sealed class PdfArchiveAuditService
             CanRestore = canRestore,
             Details = canRestore
                 ? "Il file manca dalla cartella, ma ci sono dati per ripristinarlo."
-                : "Il database non contiene il file: serve rigenerarlo dal preventivo."
+                : "Non ci sono dati incorporati per ripristinarlo: serve rigenerarlo dal preventivo."
         };
     }
 }

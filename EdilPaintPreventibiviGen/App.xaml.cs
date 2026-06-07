@@ -58,16 +58,13 @@ public partial class App : Application
             string assetsPath = candidates.FirstOrDefault(Directory.Exists) ?? candidates[0];
             string localDataPath = LocalApplicationDataService.EnsureDataDirectory(assetsPath);
             var localStore = new LocalJsonStoreService(localDataPath);
-            var pdfOutbox = new LocalPdfOutboxService(localDataPath);
-            var attachmentOutbox = new LocalAttachmentOutboxService(localDataPath);
-            var costsPdfOutbox = new LocalCostsPdfOutboxService(localDataPath);
             var quotePatchOutbox = new LocalQuotePatchOutboxService(localDataPath);
             var deletionOutbox = new LocalDeletionOutboxService(localDataPath);
 
             DataService = new FallbackDataService(
-                sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
+                sqlService, localStore, quotePatchOutbox, deletionOutbox);
             SyncService = new SyncService(
-                DataService, sqlService, localStore, pdfOutbox, attachmentOutbox, costsPdfOutbox, quotePatchOutbox, deletionOutbox);
+                DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox);
 
             var loadingWindow = new LoadingWindow
             {

@@ -286,18 +286,25 @@ public partial class MainViewModel
                 Debug.WriteLine($"ERRORE copia PDF su share: {targetPath} -> {ex.Message}");
             }
 
-            if (!await SaveToHistoryAsync(targetPath, incrementCounter, effectiveDate, pathToGenerate))
+            string persistedPdfPath = copiedToTarget
+                ? targetPath
+                : MoveTemporaryPdfToLocalFallback(pathToGenerate, targetPath);
+
+            if (!await SaveToHistoryAsync(persistedPdfPath, incrementCounter, effectiveDate))
                 return;
             _hasPersistedCurrentQuote = true;
             await DiscardDraftAsync();
 
-            try { File.Delete(pathToGenerate); }
-            catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error deleting temporary PDF: {ex.Message}"); }
+            if (copiedToTarget)
+            {
+                try { File.Delete(pathToGenerate); }
+                catch (Exception ex) { Debug.WriteLine($"[GENERATEPDF] Error deleting temporary PDF: {ex.Message}"); }
+            }
 
             if (!copiedToTarget)
             {
                 MessageBox.Show(
-                    "Il PDF e' al sicuro nel database o nella coda locale ed e' in attesa di essere ripristinato nella cartella condivisa.",
+                    $"La cartella condivisa non e' disponibile. Il PDF e' stato salvato localmente qui:\n\n{persistedPdfPath}",
                     "Cartella condivisa non disponibile",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -521,8 +528,9 @@ public partial class MainViewModel
 
             if (!copiedToTarget)
             {
+                string fallbackPath = MoveTemporaryPdfToLocalFallback(temporaryPath, costsPath);
                 MessageBox.Show(
-                    $"La cartella condivisa non e' disponibile. Il PDF dei costi e' stato generato nel percorso temporaneo:\n\n{temporaryPath}",
+                    $"La cartella condivisa non e' disponibile. Il PDF dei costi e' stato salvato localmente qui:\n\n{fallbackPath}",
                     "Cartella condivisa non disponibile",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -542,6 +550,56 @@ public partial class MainViewModel
         {
             _isGeneratingCostsPdf = false;
         }
+    }
+
+    private static string MoveTemporaryPdfToLocalFallback(string temporaryPath, string intendedPath)
+    {
+        try
+        {
+            if (!File.Exists(temporaryPath))
+                return temporaryPath;
+
+            string fallbackRoot = Path.Combine(
+                LocalApplicationDataService.GetDataDirectoryPath(),
+                "GeneratedPdfs");
+            Directory.CreateDirectory(fallbackRoot);
+
+            string fileName = Path.GetFileName(intendedPath);
+            if (string.IsNullOrWhiteSpace(fileName))
+                fileName = Path.GetFileName(temporaryPath);
+            if (string.IsNullOrWhiteSpace(fileName))
+                fileName = $"Preventivo_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+            string fallbackPath = BuildUniqueFallbackPath(fallbackRoot, fileName);
+            File.Move(temporaryPath, fallbackPath);
+            return fallbackPath;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PDF Fallback] Impossibile spostare il PDF locale: {ex.Message}");
+            return temporaryPath;
+        }
+    }
+
+    private static string BuildUniqueFallbackPath(string folder, string fileName)
+    {
+        string safeName = StoragePathService.SanitizeFolderName(Path.GetFileNameWithoutExtension(fileName));
+        string extension = Path.GetExtension(fileName);
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = ".pdf";
+
+        string candidate = Path.Combine(folder, safeName + extension);
+        if (!File.Exists(candidate))
+            return candidate;
+
+        for (int i = 1; i < 1000; i++)
+        {
+            candidate = Path.Combine(folder, $"{safeName}_{i}{extension}");
+            if (!File.Exists(candidate))
+                return candidate;
+        }
+
+        return Path.Combine(folder, $"{safeName}_{Guid.NewGuid():N}{extension}");
     }
     #endregion
 }

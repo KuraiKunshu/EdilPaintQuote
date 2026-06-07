@@ -55,7 +55,7 @@ public partial class DashboardWindow : Window
             TxtDevice.Text = $"Nome dispositivo: {DeviceNameService.GetCurrentDeviceName()}";
             TxtDatabase.Text = $"Database: {diagnostics.DatabaseStatus}";
             TxtSync.Text = $"Sync: {diagnostics.SyncStatus} - ultima: {diagnostics.LastSync}";
-            TxtPending.Text = $"Code locali: PDF {diagnostics.PendingPdfs}, allegati {diagnostics.PendingAttachments}, patch {diagnostics.PendingQuotePatches}, eliminazioni {diagnostics.PendingQuoteDeletes + diagnostics.PendingCustomerDeletes}";
+            TxtPending.Text = $"Code locali: patch {diagnostics.PendingQuotePatches}, eliminazioni {diagnostics.PendingQuoteDeletes + diagnostics.PendingCustomerDeletes}";
 
             int summaryTake = Math.Clamp(
                 App.AppSettings.App.NumberOfQuote <= 0 ? MaxDashboardSummaryRows : App.AppSettings.App.NumberOfQuote,
@@ -74,7 +74,7 @@ public partial class DashboardWindow : Window
 
             var draftTask = _draftService.LoadAsync(token);
             var pdfIssuesTask = Task.Run(
-                async () => await _auditService.ScanAsync(300, includeDatabaseChecks: false, token),
+                async () => await _auditService.ScanAsync(300, token),
                 token);
 
             await Task.WhenAll(draftTask, pdfIssuesTask);

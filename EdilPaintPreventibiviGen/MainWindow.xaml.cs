@@ -20,6 +20,7 @@ namespace EdilPaintPreventibiviGen;
 public partial class MainWindow : Window
 {
     private CancellationTokenSource? _materialSearchCts;
+    private CancellationTokenSource? _draftAutosaveCts;
     private DispatcherTimer? _draftAutosaveTimer;
     private bool _isAutosavingDraft;
     private bool _isCloseConfirmed;
@@ -53,13 +54,20 @@ public partial class MainWindow : Window
     #region Window events
     private void Window_Closing(object sender, CancelEventArgs e)
     {
+        if (AppShutdownManager.IsShutdownRequested)
+        {
+            StopDraftAutosave();
+            _materialSearchCts?.Cancel();
+            return;
+        }
+
         if (_isCloseCleanupRunning)
         {
             e.Cancel = true;
             return;
         }
 
-        if (!_isCloseConfirmed && !AppShutdownManager.IsShutdownRequested)
+        if (!_isCloseConfirmed)
         {
             var result = MessageBox.Show(
                 "Sei sicuro di voler chiudere l'applicazione?",
@@ -78,27 +86,32 @@ public partial class MainWindow : Window
         {
             e.Cancel = true;
             _isCloseConfirmed = true;
-            _ = CloseAfterCleanupAsync();
+            _ = ShutdownAfterCleanupAsync();
             return;
         }
-
-        AppShutdownManager.RequestShutdown();
     }
     #endregion
 
-    private async Task CloseAfterCleanupAsync()
+    private async Task ShutdownAfterCleanupAsync()
     {
         try
         {
             await Task.Yield();
             await PrepareForCloseAsync();
-            await Dispatcher.InvokeAsync(Close, DispatcherPriority.Background);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                AppShutdownManager.RequestShutdown();
+                Application.Current.Shutdown();
+            }, DispatcherPriority.Background);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[SHUTDOWN] Close retry error: {ex.Message}");
-            AppShutdownManager.RequestShutdown();
-            await Dispatcher.InvokeAsync(Close, DispatcherPriority.Background);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                AppShutdownManager.RequestShutdown();
+                Application.Current.Shutdown();
+            }, DispatcherPriority.Background);
         }
     }
 
@@ -143,6 +156,7 @@ public partial class MainWindow : Window
     private void StartDraftAutosave()
     {
         StopDraftAutosave();
+        _draftAutosaveCts = AppShutdownManager.CreateLinkedTokenSource();
         _draftAutosaveTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(25)
@@ -153,28 +167,44 @@ public partial class MainWindow : Window
 
     private void StopDraftAutosave()
     {
-        if (_draftAutosaveTimer == null)
-            return;
+        _draftAutosaveCts?.Cancel();
+        _draftAutosaveCts?.Dispose();
+        _draftAutosaveCts = null;
 
-        _draftAutosaveTimer.Stop();
-        _draftAutosaveTimer.Tick -= OnDraftAutosaveTick;
-        _draftAutosaveTimer = null;
+        if (_draftAutosaveTimer != null)
+        {
+            _draftAutosaveTimer.Stop();
+            _draftAutosaveTimer.Tick -= OnDraftAutosaveTick;
+            _draftAutosaveTimer = null;
+        }
     }
 
     private async void OnDraftAutosaveTick(object? sender, EventArgs e)
     {
-        await AutosaveDraftAsync();
+        var token = _draftAutosaveCts?.Token ?? CancellationToken.None;
+        await AutosaveDraftAsync(token);
     }
 
-    private async Task AutosaveDraftAsync()
+    private async Task AutosaveDraftAsync(CancellationToken cancellationToken)
     {
-        if (_isAutosavingDraft || DataContext is not MainViewModel vm)
+        if (_isAutosavingDraft ||
+            AppShutdownManager.IsShutdownRequested ||
+            cancellationToken.IsCancellationRequested ||
+            DataContext is not MainViewModel vm)
             return;
 
         _isAutosavingDraft = true;
         try
         {
-            await vm.SaveDraftAsync();
+            await vm.SaveDraftAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.WriteLine("[Draft] Autosalvataggio annullato.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Draft] Autosalvataggio non riuscito: {ex.Message}");
         }
         finally
         {

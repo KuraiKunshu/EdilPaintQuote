@@ -58,9 +58,6 @@ public static class DiagnosticsService
             UpdaterStatus = updater.status,
             UpdaterStatePath = updater.path,
             PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
-            PendingPdfs = CountFiles(Path.Combine(localDataPath, "PendingPdfs"), "*.pdf"),
-            PendingAttachments = CountFiles(Path.Combine(localDataPath, "PendingAttachments"), "*.json"),
-            PendingCostsPdfs = CountFiles(Path.Combine(localDataPath, "PendingCostsPdfs"), "*.json"),
             PendingQuotePatches = CountFiles(Path.Combine(localDataPath, "PendingQuotePatches"), "*.json"),
             PendingQuoteDeletes = deletes.quotes,
             PendingCustomerDeletes = deletes.customers

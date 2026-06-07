@@ -153,26 +153,15 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="Stato"/>
                                     <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtSyncStatus"/>
                                     <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="Ultima sync"/>
                                     <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtLastSync"/>
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="PDF preventivi"/>
-                                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtPendingPdfs"/>
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="Allegati"/>
-                                    <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtPendingAttachments"/>
-                                    <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="PDF costi"/>
-                                    <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtPendingCostsPdfs"/>
-                                    <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="Patch preventivi"/>
-                                    <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtPendingQuotePatches"/>
-                                    <TextBlock Grid.Row="6" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="Eliminazioni"/>
-                                    <TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtPendingDeletes"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="Patch preventivi"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtPendingQuotePatches"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource LabelStyle}" Text="Eliminazioni"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource ValueStyle}" x:Name="TxtPendingDeletes"/>
                                 </Grid>
                             </StackPanel>
                         </Border>
