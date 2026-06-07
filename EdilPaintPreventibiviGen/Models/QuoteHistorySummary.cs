@@ -254,7 +254,7 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         (!LastReminderAtUtc.HasValue || DateTime.UtcNow - LastReminderAtUtc.Value.ToUniversalTime() >= TimeSpan.FromDays(7));
 
     public string SentDisplay => SentAtUtc.HasValue
-        ? $"{SentAtUtc.Value.ToLocalTime():dd/MM/yyyy} {SentMethod}".Trim()
+        ? "Email inviata"
         : "Non inviato";
 
     public string ReminderDisplay => ReminderCount <= 0

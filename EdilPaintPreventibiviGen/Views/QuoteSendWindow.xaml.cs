@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Controls;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 
@@ -10,12 +9,17 @@ public partial class QuoteSendWindow : Window
     public QuoteSendInfo Result { get; private set; } = new();
     public string EmailSubject => TxtSubject.Text.Trim();
     public string EmailBody => TxtBody.Text;
+    public bool ShouldOpenWhatsApp => ChkSendWhatsApp.IsChecked == true;
+    public string WhatsAppPhone => TxtWhatsAppPhone.Text.Trim();
+    public string WhatsAppMessage => TxtWhatsAppMessage.Text.Trim();
 
     public QuoteSendWindow(
         QuoteHistorySummary summary,
         string defaultRecipient = "",
         string defaultSubject = "",
-        string defaultBody = "")
+        string defaultBody = "",
+        string defaultWhatsAppPhone = "",
+        string defaultWhatsAppMessage = "")
     {
         InitializeComponent();
         TxtQuoteTitle.Text = $"Preventivo n. {summary.QuoteNumber}";
@@ -27,21 +31,17 @@ public partial class QuoteSendWindow : Window
             : summary.SentRecipient;
         TxtSubject.Text = defaultSubject;
         TxtBody.Text = defaultBody;
-        DpSentDate.SelectedDate = summary.SentAtUtc?.ToLocalTime().Date ?? DateTime.Today;
-        if (!string.IsNullOrWhiteSpace(summary.SentMethod))
-            CboMethod.Text = summary.SentMethod;
+        TxtWhatsAppPhone.Text = defaultWhatsAppPhone;
+        TxtWhatsAppMessage.Text = string.IsNullOrWhiteSpace(defaultWhatsAppMessage)
+            ? BuildDefaultWhatsAppMessage(summary)
+            : defaultWhatsAppMessage;
 
         UpdateMethodUi();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
-        DateTime date = DpSentDate.SelectedDate ?? DateTime.Today;
-        string method = CboMethod.Text.Trim();
-        if (string.IsNullOrWhiteSpace(method) && CboMethod.SelectedItem is ComboBoxItem item)
-            method = item.Content?.ToString() ?? string.Empty;
-
-        if (IsEmailMethod(method) && string.IsNullOrWhiteSpace(TxtRecipient.Text))
+        if (string.IsNullOrWhiteSpace(TxtRecipient.Text))
         {
             MessageBox.Show(
                 "Inserisci un destinatario email prima di procedere.",
@@ -54,8 +54,8 @@ public partial class QuoteSendWindow : Window
 
         Result = new QuoteSendInfo
         {
-            SentAtUtc = date.ToUniversalTime(),
-            Method = string.IsNullOrWhiteSpace(method) ? "Invio" : method,
+            SentAtUtc = DateTime.UtcNow,
+            Method = "Email",
             Recipient = TxtRecipient.Text.Trim(),
             DeviceName = DeviceNameService.GetCurrentDeviceName()
         };
@@ -68,41 +68,17 @@ public partial class QuoteSendWindow : Window
         DialogResult = false;
     }
 
-    private void OnMethodChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!IsLoaded)
-            return;
-
-        UpdateMethodUi();
-    }
-
-    private void OnMethodLostFocus(object sender, RoutedEventArgs e)
-    {
-        UpdateMethodUi();
-    }
-
     private void UpdateMethodUi()
     {
-        bool isEmail = IsEmailMethod(GetSelectedMethod());
-        EmailFieldsPanel.Visibility = isEmail ? Visibility.Visible : Visibility.Collapsed;
-        BtnSave.Content = isEmail && App.AppSettings.Mail.Enabled
+        EmailFieldsPanel.Visibility = Visibility.Visible;
+        BtnSave.Content = App.AppSettings.Mail.Enabled
             ? "Invia email"
             : "Salva invio";
-        TxtActionHint.Text = isEmail && App.AppSettings.Mail.Enabled
+        TxtActionHint.Text = App.AppSettings.Mail.Enabled
             ? "Allega il PDF e invia tramite SMTP"
             : "Registra l'invio nello storico";
     }
 
-    private string GetSelectedMethod()
-    {
-        string method = CboMethod.Text.Trim();
-        if (string.IsNullOrWhiteSpace(method) && CboMethod.SelectedItem is ComboBoxItem item)
-            method = item.Content?.ToString() ?? string.Empty;
-
-        return method;
-    }
-
-    private static bool IsEmailMethod(string method) =>
-        method.Equals("Email", StringComparison.OrdinalIgnoreCase) ||
-        method.Equals("E-mail", StringComparison.OrdinalIgnoreCase);
+    private static string BuildDefaultWhatsAppMessage(QuoteHistorySummary summary) =>
+        $"Buongiorno, abbiamo inviato via email il preventivo n. {summary.QuoteNumber}. Cordiali saluti.";
 }

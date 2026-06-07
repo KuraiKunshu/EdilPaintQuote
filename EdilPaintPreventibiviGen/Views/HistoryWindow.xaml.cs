@@ -345,7 +345,8 @@ public partial class HistoryWindow : Window
             entry,
             ResolveDefaultRecipient(entry),
             FormatMailTemplate(App.AppSettings.Mail.DefaultSubject, entry),
-            FormatMailTemplate(App.AppSettings.Mail.DefaultBody, entry))
+            FormatMailTemplate(App.AppSettings.Mail.DefaultBody, entry),
+            ResolveDefaultWhatsAppPhone(entry))
         {
             Owner = this
         };
@@ -358,20 +359,17 @@ public partial class HistoryWindow : Window
             Mouse.OverrideCursor = Cursors.Wait;
 
             SmtpEmailSendResult? emailResult = null;
-            if (IsEmailMethod(win.Result.Method))
+            if (App.AppSettings.Mail.Enabled)
             {
-                if (App.AppSettings.Mail.Enabled)
-                {
-                    emailResult = await SendQuoteEmailAsync(entry, win);
-                }
-                else if (MessageBox.Show(
-                    "L'invio email SMTP non e' abilitato nelle impostazioni.\nVuoi registrare comunque l'invio manualmente?",
-                    "Invio email",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question) != MessageBoxResult.Yes)
-                {
-                    return;
-                }
+                emailResult = await SendQuoteEmailAsync(entry, win);
+            }
+            else if (MessageBox.Show(
+                "L'invio email SMTP non e' abilitato nelle impostazioni.\nVuoi registrare comunque l'invio manualmente?",
+                "Invio email",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return;
             }
 
             await _historyService.UpdateSendInfoAsync(entry.QuoteNumber, win.Result);
@@ -391,6 +389,9 @@ public partial class HistoryWindow : Window
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
+
+            if (win.ShouldOpenWhatsApp)
+                TryOpenWhatsAppMessage(win);
         }
         catch (OperationCanceledException)
         {
@@ -426,6 +427,34 @@ public partial class HistoryWindow : Window
         }, token);
     }
 
+    private void TryOpenWhatsAppMessage(QuoteSendWindow win)
+    {
+        try
+        {
+            OpenWhatsAppMessage(win.WhatsAppPhone, win.WhatsAppMessage);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] Impossibile aprire WhatsApp: {ex}");
+            MessageBox.Show(
+                "Preventivo inviato, ma non sono riuscito ad aprire WhatsApp.",
+                "WhatsApp",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static void OpenWhatsAppMessage(string phone, string message)
+    {
+        string digits = new(phone.Where(char.IsDigit).ToArray());
+        string encodedMessage = Uri.EscapeDataString(message ?? string.Empty);
+        string url = string.IsNullOrWhiteSpace(digits)
+            ? $"https://wa.me/?text={encodedMessage}"
+            : $"https://wa.me/{digits}?text={encodedMessage}";
+
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    }
+
     private async Task<string> ResolvePdfPathForEmailAsync(
         QuoteHistorySummary entry,
         CancellationToken cancellationToken)
@@ -457,17 +486,17 @@ public partial class HistoryWindow : Window
         if (!string.IsNullOrWhiteSpace(entry.SentRecipient))
             return entry.SentRecipient;
 
-        return _vm.AllCustomers
-            .FirstOrDefault(customer => string.Equals(
-                customer.BusinessName,
-                entry.CustomerName,
-                StringComparison.OrdinalIgnoreCase))
-            ?.Email ?? string.Empty;
+        return ResolveCustomer(entry)?.Email ?? string.Empty;
     }
 
-    private static bool IsEmailMethod(string method) =>
-        method.Equals("Email", StringComparison.OrdinalIgnoreCase) ||
-        method.Equals("E-mail", StringComparison.OrdinalIgnoreCase);
+    private string ResolveDefaultWhatsAppPhone(QuoteHistorySummary entry) =>
+        ResolveCustomer(entry)?.Phone ?? string.Empty;
+
+    private Customer? ResolveCustomer(QuoteHistorySummary entry) =>
+        _vm.AllCustomers.FirstOrDefault(customer => string.Equals(
+            customer.BusinessName,
+            entry.CustomerName,
+            StringComparison.OrdinalIgnoreCase));
 
     private static string FormatMailTemplate(string template, QuoteHistorySummary entry)
     {

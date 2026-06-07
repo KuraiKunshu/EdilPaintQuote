@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Invio preventivo"
         Width="560"
-        Height="620"
+        Height="700"
         MinWidth="520"
-        MinHeight="560"
+        MinHeight="620"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="{StaticResource ShellBackgroundBrush}"
@@ -67,43 +67,8 @@
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="22,18">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="14"/>
-                        <ColumnDefinition Width="180"/>
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock Text="Metodo" Style="{StaticResource FieldLabelStyle}"/>
-                        <ComboBox x:Name="CboMethod"
-                                  Height="34"
-                                  Background="{StaticResource WhiteBrush}"
-                                  BorderBrush="{StaticResource ModalFieldBorderBrush}"
-                                  BorderThickness="1"
-                                  IsEditable="True"
-                                  SelectionChanged="OnMethodChanged"
-                                  LostFocus="OnMethodLostFocus">
-                            <ComboBoxItem Content="Email" IsSelected="True"/>
-                            <ComboBoxItem Content="WhatsApp"/>
-                            <ComboBoxItem Content="Telefono"/>
-                            <ComboBoxItem Content="A mano"/>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Data invio" Style="{StaticResource FieldLabelStyle}"/>
-                        <DatePicker x:Name="DpSentDate"
-                                    Height="34"
-                                    Background="{StaticResource WhiteBrush}"
-                                    BorderBrush="{StaticResource ModalFieldBorderBrush}"
-                                    BorderThickness="1"/>
-                    </StackPanel>
-                </Grid>
-
-                <TextBlock Text="Destinatario"
-                           Style="{StaticResource FieldLabelStyle}"
-                           Margin="0,14,0,5"/>
+                <TextBlock Text="Email destinatario"
+                           Style="{StaticResource FieldLabelStyle}"/>
                 <TextBox x:Name="TxtRecipient"
                          Style="{StaticResource FieldTextBoxStyle}"/>
 
@@ -124,6 +89,39 @@
                                    Margin="0,14,0,5"/>
                         <TextBox x:Name="TxtBody"
                                  MinHeight="150"
+                                 Padding="9,7"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalContentAlignment="Top"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Background="{StaticResource WhiteBrush}"
+                                 BorderBrush="{StaticResource ModalFieldBorderBrush}"
+                                 BorderThickness="1"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{StaticResource SectionPanelBackgroundBrush}"
+                        BorderBrush="{StaticResource SubtleBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="14"
+                        Margin="0,16,0,0">
+                    <StackPanel>
+                        <CheckBox x:Name="ChkSendWhatsApp"
+                                  Content="Prepara messaggio WhatsApp"
+                                  FontWeight="SemiBold"
+                                  Foreground="{StaticResource DefaultTextBrush}"
+                                  Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Numero WhatsApp" Style="{StaticResource FieldLabelStyle}"/>
+                        <TextBox x:Name="TxtWhatsAppPhone"
+                                 Style="{StaticResource FieldTextBoxStyle}"/>
+
+                        <TextBlock Text="Messaggio WhatsApp"
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Margin="0,14,0,5"/>
+                        <TextBox x:Name="TxtWhatsAppMessage"
+                                 MinHeight="90"
                                  Padding="9,7"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
