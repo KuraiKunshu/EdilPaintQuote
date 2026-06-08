@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -239,6 +240,59 @@ public partial class SettingsWindow : Window
             MessageBox.Show(
                 $"Impossibile rimuovere la sessione Velux.\n\n{ex.Message}",
                 "Errore sessione Velux",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void OnRunUpdaterClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string? scriptPath = UpdaterLauncherService.ResolveUpdaterScriptPath();
+            if (string.IsNullOrWhiteSpace(scriptPath))
+            {
+                MessageBox.Show(
+                    this,
+                    "Script updater non trovato. Metti Update-EdilPaint.ps1 nella cartella updater accanto al programma o in tools/updater nel progetto.",
+                    "Aggiornamento",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            string settingsPath = Path.Combine(Path.GetDirectoryName(scriptPath)!, "updater-settings.json");
+            if (!File.Exists(settingsPath))
+            {
+                MessageBox.Show(
+                    this,
+                    $"File updater-settings.json non trovato accanto allo script.\n\nPercorso atteso:\n{settingsPath}",
+                    "Aggiornamento",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                this,
+                $"Verrà avviato l'updater e l'applicazione verrà chiusa.\n\nScript:\n{scriptPath}\n\nContinuare?",
+                "Aggiorna programma",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            UpdaterLauncherService.StartUpdater(scriptPath);
+            AppShutdownManager.RequestShutdown();
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"Impossibile avviare l'aggiornamento.\n\n{ex.Message}",
+                "Aggiornamento",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
