@@ -531,7 +531,8 @@ public class LocalJsonStoreService
             EnsureCustomerSyncId(customer);
             var existing = customers.FirstOrDefault(c => SameCustomer(c, customer));
 
-            customer.LastModifiedUtc = DateTime.UtcNow;
+            if (customer.LastModifiedUtc == default)
+                customer.LastModifiedUtc = DateTime.UtcNow;
 
             if (existing != null)
                 customers.Remove(existing);
@@ -556,7 +557,8 @@ public class LocalJsonStoreService
                 SameCustomer(c, customer) ||
                 c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase));
 
-            customer.LastModifiedUtc = DateTime.UtcNow;
+            if (customer.LastModifiedUtc == default)
+                customer.LastModifiedUtc = DateTime.UtcNow;
             customers.Add(customer);
             await SaveCustomersInternalAsync(customers);
         }

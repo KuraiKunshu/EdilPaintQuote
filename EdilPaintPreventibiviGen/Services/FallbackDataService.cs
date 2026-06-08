@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 using EdilPaintPreventibiviGen.Models;
+using Microsoft.Data.SqlClient;
 
 namespace EdilPaintPreventibiviGen.Services;
 
@@ -21,8 +23,10 @@ public class FallbackDataService : IDataService
     private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan DbConnectionAttemptTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan DbStartupWakeupTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan DbInteractiveWakeupTimeout = TimeSpan.FromSeconds(120);
     private static readonly TimeSpan DbWakeupRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DbSchemaInitializationTimeout = TimeSpan.FromSeconds(60);
+    private const int DbSaveRetryCount = 2;
 
 
     // Cache dei numeri preventivo presenti nel DB (query leggera, una sola volta ogni 10 min)
@@ -89,7 +93,12 @@ public class FallbackDataService : IDataService
 
     private async Task EnsureDatabaseReachableAsync(CancellationToken cancellationToken)
     {
-        var deadline = DateTime.UtcNow + DbStartupWakeupTimeout;
+        await EnsureDatabaseReachableAsync(DbStartupWakeupTimeout, cancellationToken);
+    }
+
+    private async Task EnsureDatabaseReachableAsync(TimeSpan wakeupTimeout, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + wakeupTimeout;
         Exception? lastError = null;
         int attempt = 0;
 
@@ -134,7 +143,7 @@ public class FallbackDataService : IDataService
         }
 
         throw new TimeoutException(
-            $"Database SQL non disponibile dopo {DbStartupWakeupTimeout.TotalSeconds:F0}s di attesa. Ultimo errore: {lastError?.Message ?? "nessun dettaglio"}");
+            $"Database SQL non disponibile dopo {wakeupTimeout.TotalSeconds:F0}s di attesa. Ultimo errore: {lastError?.Message ?? "nessun dettaglio"}");
     }
 
     private async Task InitializeDatabaseSchemaAsync(CancellationToken cancellationToken)
@@ -358,8 +367,140 @@ public class FallbackDataService : IDataService
         {
             Debug.WriteLine($"[FallbackDataService] ⚠️⚠️⚠️ DATABASE MARKED AS UNAVAILABLE!");
             Debug.WriteLine($"[FallbackDataService] Reason: {reason}");
+            WriteDatabaseLog($"DATABASE NON DISPONIBILE: {reason}");
             _isDatabaseAvailable = false;
             _databaseUnavailableSince = DateTime.UtcNow;
+        }
+    }
+
+    private void MarkDatabaseAvailable(string reason)
+    {
+        bool wasUnavailable = !_isDatabaseAvailable;
+        _isDatabaseAvailable = true;
+        _databaseUnavailableSince = DateTime.MinValue;
+
+        if (wasUnavailable)
+            WriteDatabaseLog($"DATABASE DISPONIBILE: {reason}");
+    }
+
+    private async Task<bool> TryEnsureDatabaseAvailableAsync(
+        string operation,
+        TimeSpan wakeupTimeout,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await EnsureDatabaseReachableAsync(wakeupTimeout, cancellationToken);
+            MarkDatabaseAvailable(operation);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            HandleDatabaseException(operation, ex);
+            return false;
+        }
+    }
+
+    private void HandleDatabaseException(string operation, Exception ex)
+    {
+        WriteDatabaseLog($"{operation}: {BuildExceptionDetails(ex)}");
+
+        if (IsDatabaseConnectivityException(ex))
+        {
+            SetDatabaseUnavailable($"{operation}: {ex.Message}");
+            return;
+        }
+
+        Debug.WriteLine($"[FallbackDataService] Errore SQL non di connessione ({operation}): {ex.Message}");
+    }
+
+    private static string BuildExceptionDetails(Exception ex)
+    {
+        var parts = new List<string>();
+        for (Exception? current = ex; current != null; current = current.InnerException)
+            parts.Add($"{current.GetType().Name}: {current.Message}");
+
+        return string.Join(" -> ", parts);
+    }
+
+    private static Exception CreateDatabaseRejectedException(string operation, string itemName, Exception ex)
+    {
+        string detail = ex.GetBaseException().Message;
+        return new InvalidOperationException(
+            $"{operation} '{itemName}' non salvato nel database. Il database ha risposto, ma ha rifiutato il salvataggio.\n\nDettaglio SQL: {detail}",
+            ex);
+    }
+
+    private static bool IsDatabaseConnectivityException(Exception ex)
+    {
+        if (ex is TimeoutException)
+            return true;
+
+        if (ex is SqlException sqlException)
+        {
+            foreach (SqlError error in sqlException.Errors)
+            {
+                if (IsTransientSqlError(error.Number))
+                    return true;
+            }
+        }
+
+        return ex.InnerException != null && IsDatabaseConnectivityException(ex.InnerException);
+    }
+
+    private static bool IsTransientSqlError(int number)
+    {
+        return number is
+            -2 or 20 or 64 or 233 or 258 or
+            10053 or 10054 or 10060 or 11001 or
+            40143 or 40197 or 40501 or 40613 or
+            49918 or 49919 or 49920 or
+            10928 or 10929;
+    }
+
+    private static void WriteDatabaseLog(string message)
+    {
+        try
+        {
+            string logDirectory = ResolveDatabaseLogDirectory();
+            Directory.CreateDirectory(logDirectory);
+            string logPath = Path.Combine(logDirectory, $"database-{DateTime.Now:yyyyMMdd}.log");
+            string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
+            File.AppendAllText(logPath, line + Environment.NewLine);
+            Debug.WriteLine("[DB] " + message);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DB] Impossibile scrivere il log database: {ex.Message}");
+        }
+    }
+
+    private static string ResolveDatabaseLogDirectory()
+    {
+        string appLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DatabaseLogs");
+        if (CanWriteToDirectory(appLogDirectory))
+            return appLogDirectory;
+
+        return Path.Combine(LocalApplicationDataService.GetDataDirectoryPath(), "DatabaseLogs");
+    }
+
+    private static bool CanWriteToDirectory(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            string testPath = Path.Combine(directory, ".writetest");
+            File.WriteAllText(testPath, "test");
+            File.Delete(testPath);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
     
@@ -442,11 +583,18 @@ public class FallbackDataService : IDataService
         CancellationToken cancellationToken = default)
 {
     Debug.WriteLine("\n[FallbackDataService] ═══ GetQuoteSummariesAsync START ═══");
-    Debug.WriteLine($"[FallbackDataService] Database available: {IsDatabaseAvailable()}");
+    bool databaseAvailable = IsDatabaseAvailable();
+    Debug.WriteLine($"[FallbackDataService] Database available: {databaseAvailable}");
 
     cancellationToken.ThrowIfCancellationRequested();
 
-    if (IsDatabaseAvailable())
+    if (!databaseAvailable)
+        databaseAvailable = await TryEnsureDatabaseAvailableAsync(
+            "Caricamento storico",
+            DbInteractiveWakeupTimeout,
+            cancellationToken);
+
+    if (databaseAvailable)
     {
         try
         {
@@ -505,7 +653,7 @@ public class FallbackDataService : IDataService
         catch (Exception ex)
         {
             Debug.WriteLine($"[FallbackDataService] ❌ Error: {ex.Message}");
-            SetDatabaseUnavailable(ex.Message);
+            HandleDatabaseException("GetQuoteSummariesAsync", ex);
         }
     }
 
@@ -551,7 +699,14 @@ public class FallbackDataService : IDataService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (IsDatabaseAvailable())
+        bool databaseAvailable = IsDatabaseAvailable();
+        if (!databaseAvailable)
+            databaseAvailable = await TryEnsureDatabaseAvailableAsync(
+                "Ricerca storico",
+                DbInteractiveWakeupTimeout,
+                cancellationToken);
+
+        if (databaseAvailable)
         {
             try
             {
@@ -577,7 +732,7 @@ public class FallbackDataService : IDataService
             }
             catch( Exception ex)
             {
-                SetDatabaseUnavailable(ex.Message);
+                HandleDatabaseException("SearchQuoteSummariesAsync", ex);
             }
         }
 
@@ -708,23 +863,53 @@ public class FallbackDataService : IDataService
 
         await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
 
-        if (IsDatabaseAvailable())
+        try
         {
+            bool savedOnline = await SaveQuoteOnlineWithRetryAsync(lightEntry, cancellationToken);
+            if (savedOnline)
+            {
+                await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
+                quote.LastModifiedUtc = lightEntry.LastModifiedUtc;
+                quote.BaseVersionUtc = lightEntry.BaseVersionUtc;
+                quote.SyncHash = lightEntry.SyncHash;
+            }
+        }
+        catch (QuoteConflictException)
+        {
+            await _localStore.ArchiveQuoteConflictAsync(
+                quote,
+                "Salvataggio completo rifiutato: il database contiene una versione piu' recente.",
+                cancellationToken);
+            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quote.QuoteNumber);
+            if (databaseVersion != null)
+                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+
+            throw;
+        }
+
+        // Invalida le cache dopo ogni salvataggio
+        InvalidateQuoteNumbersCaches();
+    }
+
+    private async Task<bool> SaveQuoteOnlineWithRetryAsync(
+        QuoteHistoryEntry lightEntry,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastError = null;
+
+        for (int attempt = 1; attempt <= DbSaveRetryCount; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
+                await EnsureDatabaseReachableAsync(DbInteractiveWakeupTimeout, cancellationToken);
                 await _sqlService.SaveQuoteAsync(lightEntry, cancellationToken);
-                await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
+                MarkDatabaseAvailable($"Preventivo {lightEntry.QuoteNumber} salvato online.");
+                return true;
             }
             catch (QuoteConflictException)
             {
-                await _localStore.ArchiveQuoteConflictAsync(
-                    quote,
-                    "Salvataggio completo rifiutato: il database contiene una versione piu' recente.",
-                    cancellationToken);
-                var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quote.QuoteNumber);
-                if (databaseVersion != null)
-                    await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-
                 throw;
             }
             catch (OperationCanceledException)
@@ -733,13 +918,24 @@ public class FallbackDataService : IDataService
             }
             catch (Exception ex)
             {
-                SetDatabaseUnavailable(ex.Message);
-                Debug.WriteLine($"[FallbackDataService] Could not save to DB: {ex.Message}");
+                lastError = ex;
+                WriteDatabaseLog($"SaveQuoteAsync tentativo {attempt}/{DbSaveRetryCount} per {lightEntry.QuoteNumber}: {ex.GetType().Name}: {ex.Message}");
+
+                if (!IsDatabaseConnectivityException(ex))
+                {
+                    Debug.WriteLine($"[FallbackDataService] Salvataggio SQL non riuscito ma DB non marcato offline: {ex.Message}");
+                    return false;
+                }
+
+                if (attempt < DbSaveRetryCount)
+                    await Task.Delay(DbWakeupRetryDelay, cancellationToken);
             }
         }
 
-        // Invalida le cache dopo ogni salvataggio
-        InvalidateQuoteNumbersCaches();
+        if (lastError != null)
+            SetDatabaseUnavailable($"SaveQuoteAsync {lightEntry.QuoteNumber}: {lastError.Message}");
+
+        return false;
     }
 
     public async Task DeleteQuoteAsync(string quoteNumber)
@@ -898,49 +1094,96 @@ public class FallbackDataService : IDataService
 
     public async Task<Customer> AddCustomerAsync(Customer customer, CancellationToken cancellationToken = default)
     {
+        NormalizeCustomerForSave(customer);
+
         if (customer.SyncId == Guid.Empty)
             customer.SyncId = Guid.NewGuid();
 
         customer.LastModifiedUtc = DateTime.UtcNow;
-        await _localStore.SaveOrUpdateCustomerAsync(customer);
+        bool databaseAvailable = IsDatabaseAvailable();
+        if (!databaseAvailable)
+            databaseAvailable = await TryEnsureDatabaseAvailableAsync(
+                "Salvataggio cliente",
+                DbInteractiveWakeupTimeout,
+                cancellationToken);
 
-        if (IsDatabaseAvailable())
+        if (databaseAvailable)
         {
             try
             {
-                return await _sqlService.AddCustomerAsync(customer, cancellationToken);
+                var saved = await _sqlService.AddCustomerAsync(customer, cancellationToken);
+                MarkDatabaseAvailable($"Cliente {saved.BusinessName} salvato online.");
+                await _localStore.BulkUpdateCustomersAsync([saved], cancellationToken);
+                return saved;
+            }
+            catch (Exception ex) when (IsDatabaseConnectivityException(ex))
+            {
+                Debug.WriteLine($"[FallbackDataService] AddCustomerAsync DB non raggiungibile: {ex.Message}");
+                HandleDatabaseException("AddCustomerAsync", ex);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[FallbackDataService] ❌ AddCustomerAsync DB FAILED: {ex.Message}");
                 Debug.WriteLine($"[FallbackDataService] StackTrace: {ex.StackTrace}");
-                SetDatabaseUnavailable(ex.Message);
+                HandleDatabaseException("AddCustomerAsync", ex);
+                throw CreateDatabaseRejectedException("Cliente", customer.BusinessName, ex);
                 // Non blocca — il cliente è già salvato nel JSON locale
             }
         }
 
+        await _localStore.SaveOrUpdateCustomerAsync(customer);
+        WriteDatabaseLog($"Cliente salvato solo localmente: {customer.BusinessName}");
         return customer;
     }
 
     public async Task<Customer> UpdateCustomerAsync(string originalBusinessName, Customer customer)
     {
-        customer.LastModifiedUtc = DateTime.UtcNow;
-        await _localStore.UpdateCustomerAsync(originalBusinessName, customer);
+        NormalizeCustomerForSave(customer);
 
-        if (IsDatabaseAvailable())
+        customer.LastModifiedUtc = DateTime.UtcNow;
+        bool databaseAvailable = IsDatabaseAvailable();
+        if (!databaseAvailable)
+            databaseAvailable = await TryEnsureDatabaseAvailableAsync(
+                "Aggiornamento cliente",
+                DbInteractiveWakeupTimeout,
+                CancellationToken.None);
+
+        if (databaseAvailable)
         {
             try
             {
-                return await _sqlService.UpdateCustomerAsync(originalBusinessName, customer);
+                var saved = await _sqlService.UpdateCustomerAsync(originalBusinessName, customer);
+                MarkDatabaseAvailable($"Cliente {saved.BusinessName} aggiornato online.");
+                await _localStore.BulkUpdateCustomersAsync([saved]);
+                return saved;
+            }
+            catch (Exception ex) when (IsDatabaseConnectivityException(ex))
+            {
+                Debug.WriteLine($"[FallbackDataService] UpdateCustomerAsync DB non raggiungibile: {ex.Message}");
+                HandleDatabaseException("UpdateCustomerAsync", ex);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[FallbackDataService] UpdateCustomerAsync DB FAILED: {ex.Message}");
-                SetDatabaseUnavailable(ex.Message);
+                HandleDatabaseException("UpdateCustomerAsync", ex);
+                throw CreateDatabaseRejectedException("Cliente", customer.BusinessName, ex);
             }
         }
 
+        await _localStore.UpdateCustomerAsync(originalBusinessName, customer);
+        WriteDatabaseLog($"Cliente aggiornato solo localmente: {customer.BusinessName}");
         return customer;
+    }
+
+    private static void NormalizeCustomerForSave(Customer customer)
+    {
+        customer.BusinessName = (customer.BusinessName ?? string.Empty).Trim();
+        customer.Address = customer.Address?.Trim() ?? string.Empty;
+        customer.Email = customer.Email?.Trim() ?? string.Empty;
+        customer.Phone = customer.Phone?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(customer.BusinessName))
+            throw new InvalidOperationException("Impossibile salvare un cliente senza ragione sociale.");
     }
     
     public async Task DeleteCustomerAsync(Customer customer)

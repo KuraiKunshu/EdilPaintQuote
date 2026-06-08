@@ -506,6 +506,23 @@ public class SyncService
             var deletedDbCustomers = await _sqlService.GetDeletedCustomersAsync(cancellationToken);
             var jsonCustomers = await _localStore.LoadCustomersAsync(cancellationToken);
 
+            dbCustomers = dbCustomers
+                .Where(c => !string.IsNullOrWhiteSpace(c.BusinessName))
+                .ToList();
+            deletedDbCustomers = deletedDbCustomers
+                .Where(c => !string.IsNullOrWhiteSpace(c.BusinessName))
+                .ToList();
+
+            var blankLocalCustomers = jsonCustomers
+                .Where(c => string.IsNullOrWhiteSpace(c.BusinessName))
+                .ToList();
+            if (blankLocalCustomers.Count > 0)
+            {
+                await _localStore.DeleteCustomersAsync(blankLocalCustomers, cancellationToken);
+                jsonCustomers.RemoveAll(c => string.IsNullOrWhiteSpace(c.BusinessName));
+                Debug.WriteLine($"[Sync] Rimossi {blankLocalCustomers.Count} clienti locali senza ragione sociale.");
+            }
+
             Debug.WriteLine($"[Sync] 🗄️ DB customers: {dbCustomers.Count}");
             Debug.WriteLine($"[Sync] 📂 JSON customers: {jsonCustomers.Count}");
 
@@ -612,7 +629,10 @@ public class SyncService
                 cancellationToken.ThrowIfCancellationRequested();
                 try { await _sqlService.AddCustomerAsync(c, cancellationToken); }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { Debug.WriteLine($"[Sync] DB customer error {c.BusinessName}: {ex.Message}"); }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Sync] DB customer error {c.BusinessName}: {ex.Message} | Inner: {ex.GetBaseException().Message}");
+                }
             }
 
             Debug.WriteLine($"[Sync] ═══ CUSTOMERS SYNC END: synced={synced} ═══\n");
