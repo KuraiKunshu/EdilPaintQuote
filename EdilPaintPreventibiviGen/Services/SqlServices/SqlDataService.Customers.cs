@@ -26,6 +26,8 @@ public partial class SqlDataService
         Customer customer,
         CancellationToken cancellationToken = default)
     {
+        NormalizeCustomerForSave(customer);
+
         await using var db = AppDbContextFactory.Create();
         if (customer.SyncId == Guid.Empty)
             customer.SyncId = Guid.NewGuid();
@@ -37,6 +39,7 @@ public partial class SqlDataService
         if (existing != null)
         {
             // Aggiorna i dati esistenti
+            existing.BusinessName = customer.BusinessName;
             existing.Address = customer.Address;
             existing.Email = customer.Email;
             existing.Phone = customer.Phone;
@@ -58,6 +61,8 @@ public partial class SqlDataService
 
     public async Task<Customer> UpdateCustomerAsync(string originalBusinessName, Customer customer)
     {
+        NormalizeCustomerForSave(customer);
+
         await using var db = AppDbContextFactory.Create();
         if (customer.SyncId == Guid.Empty)
             customer.SyncId = Guid.NewGuid();
@@ -87,6 +92,20 @@ public partial class SqlDataService
 
         await db.SaveChangesAsync();
         return entity.ToModel();
+    }
+
+    private static void NormalizeCustomerForSave(Customer customer)
+    {
+        customer.BusinessName = (customer.BusinessName ?? string.Empty).Trim();
+        customer.Address = customer.Address?.Trim() ?? string.Empty;
+        customer.Email = customer.Email?.Trim() ?? string.Empty;
+        customer.Phone = customer.Phone?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(customer.BusinessName))
+            throw new InvalidOperationException("Impossibile salvare un cliente senza ragione sociale.");
+
+        if (customer.LastModifiedUtc == default)
+            customer.LastModifiedUtc = DateTime.UtcNow;
     }
 
     public Task DeleteCustomerAsync(Customer customer) =>

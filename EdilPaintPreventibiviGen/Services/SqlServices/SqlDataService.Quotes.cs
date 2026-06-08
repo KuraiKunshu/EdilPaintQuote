@@ -808,20 +808,14 @@ public partial class SqlDataService
 
             try
             {
-                CustomerEntity? customer = null;
-                CustomerEntity? referenceCustomer = null;
-
-                if (!string.IsNullOrWhiteSpace(quote.CustomerName))
-                {
-                    customer = await db.Customers
-                        .FirstOrDefaultAsync(x => x.BusinessName == quote.CustomerName, cancellationToken);
-                }
-
-                if (!string.IsNullOrWhiteSpace(quote.ReferenceName))
-                {
-                    referenceCustomer = await db.Customers
-                        .FirstOrDefaultAsync(x => x.BusinessName == quote.ReferenceName, cancellationToken);
-                }
+                CustomerEntity? customer = await GetOrCreateCustomerForQuoteAsync(
+                    db,
+                    quote.CustomerName,
+                    cancellationToken);
+                CustomerEntity? referenceCustomer = await GetOrCreateCustomerForQuoteAsync(
+                    db,
+                    quote.ReferenceName,
+                    cancellationToken);
 
                 var existing = await db.Quotes
                     .IgnoreQueryFilters()
@@ -982,6 +976,40 @@ public partial class SqlDataService
                 throw;
             }
         });
+    }
+
+    private static async Task<CustomerEntity?> GetOrCreateCustomerForQuoteAsync(
+        AppDbContext db,
+        string? businessName,
+        CancellationToken cancellationToken)
+    {
+        businessName = (businessName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(businessName))
+            return null;
+
+        var customer = await db.Customers
+            .FirstOrDefaultAsync(x => x.BusinessName == businessName, cancellationToken);
+
+        if (customer != null)
+        {
+            if (customer.IsDeleted)
+            {
+                customer.IsDeleted = false;
+                customer.LastModifiedUtc = DateTime.UtcNow;
+            }
+
+            return customer;
+        }
+
+        customer = new CustomerEntity
+        {
+            SyncId = Guid.NewGuid(),
+            BusinessName = businessName,
+            LastModifiedUtc = DateTime.UtcNow,
+            IsDeleted = false
+        };
+        db.Customers.Add(customer);
+        return customer;
     }
 
     private static CostAllocations? DeserializeCostAllocations(string? json)

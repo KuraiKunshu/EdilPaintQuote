@@ -39,11 +39,23 @@ public partial class SqlDataService
 
     private static async Task EnsureLegacySchemaCompatibilityAsync(AppDbContext db, CancellationToken cancellationToken)
     {
+        await EnsureIdDefaultGeneratorAsync(db, "Customers", cancellationToken);
+        await EnsureIdDefaultGeneratorAsync(db, "CompanySettings", cancellationToken);
+        await EnsureIdDefaultGeneratorAsync(db, "LaborCatalog", cancellationToken);
+        await EnsureIdDefaultGeneratorAsync(db, "PersonalMaterials", cancellationToken);
+        await EnsureIdDefaultGeneratorAsync(db, "Quotes", cancellationToken);
+        await EnsureIdDefaultGeneratorAsync(db, "QuoteMaterials", cancellationToken);
+        await EnsureIdDefaultGeneratorAsync(db, "QuoteLabors", cancellationToken);
+
         await EnsureColumnAsync(db, "Quotes", "LastModifiedUtc",
             "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "SyncHash", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LastModifiedUtc",
             "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Customers", "BusinessName", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Customers", "Address", "NVARCHAR(500) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Customers", "Email", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Customers", "Phone", "NVARCHAR(100) NOT NULL", cancellationToken);
         await EnsureCustomerSyncIdentityAsync(db, cancellationToken);
         await EnsureColumnAsync(db, "Customers", "IsDeleted", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
@@ -75,6 +87,77 @@ public partial class SqlDataService
     IF COL_LENGTH(N'[dbo].[{tableName}]', N'{columnName}') IS NULL
     BEGIN
         ALTER TABLE [dbo].[{tableName}] ADD [{columnName}] {columnDefinition};
+    END
+    """;
+
+        return db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private static Task EnsureIdDefaultGeneratorAsync(
+        AppDbContext db,
+        string tableName,
+        CancellationToken cancellationToken)
+    {
+        string sequenceName = $"{tableName}_Id_Seq";
+        string defaultName = $"DF_{tableName}_Id_Auto";
+        string sql = $"""
+    IF OBJECT_ID(N'[dbo].[{tableName}]', N'U') IS NOT NULL
+       AND COL_LENGTH(N'[dbo].[{tableName}]', N'Id') IS NOT NULL
+       AND EXISTS (
+           SELECT 1
+           FROM sys.columns
+           WHERE object_id = OBJECT_ID(N'[dbo].[{tableName}]')
+             AND name = N'Id'
+             AND is_identity = 0
+       )
+       AND NOT EXISTS (
+           SELECT 1
+           FROM sys.default_constraints dc
+           INNER JOIN sys.columns c
+               ON c.object_id = dc.parent_object_id
+              AND c.column_id = dc.parent_column_id
+           WHERE dc.parent_object_id = OBJECT_ID(N'[dbo].[{tableName}]')
+             AND c.name = N'Id'
+       )
+    BEGIN
+        DECLARE @nextId BIGINT;
+        SELECT @nextId = ISNULL(MAX(CONVERT(BIGINT, [Id])), 0) + 1
+        FROM [dbo].[{tableName}] WITH (TABLOCKX);
+
+        IF OBJECT_ID(N'[dbo].[{sequenceName}]', N'SO') IS NULL
+        BEGIN
+            DECLARE @createSequenceSql NVARCHAR(MAX) =
+                N'CREATE SEQUENCE [dbo].[{sequenceName}] AS INT START WITH ' + CAST(@nextId AS NVARCHAR(20)) + N' INCREMENT BY 1;';
+            EXEC(@createSequenceSql);
+        END
+        ELSE
+        BEGIN
+            DECLARE @restartSequenceSql NVARCHAR(MAX) =
+                N'ALTER SEQUENCE [dbo].[{sequenceName}] RESTART WITH ' + CAST(@nextId AS NVARCHAR(20)) + N';';
+            EXEC(@restartSequenceSql);
+        END
+
+        ALTER TABLE [dbo].[{tableName}]
+        ADD CONSTRAINT [{defaultName}]
+        DEFAULT (NEXT VALUE FOR [dbo].[{sequenceName}]) FOR [Id];
+    END
+    """;
+
+        return db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private static Task EnsureTextColumnDefinitionAsync(
+        AppDbContext db,
+        string tableName,
+        string columnName,
+        string columnDefinition,
+        CancellationToken cancellationToken)
+    {
+        string sql = $"""
+    IF COL_LENGTH(N'[dbo].[{tableName}]', N'{columnName}') IS NOT NULL
+    BEGIN
+        UPDATE [dbo].[{tableName}] SET [{columnName}] = N'' WHERE [{columnName}] IS NULL;
+        ALTER TABLE [dbo].[{tableName}] ALTER COLUMN [{columnName}] {columnDefinition};
     END
     """;
 
