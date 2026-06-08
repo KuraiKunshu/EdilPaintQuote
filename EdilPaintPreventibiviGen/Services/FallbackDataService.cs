@@ -18,8 +18,10 @@ public class FallbackDataService : IDataService
     private readonly LocalDeletionOutboxService _deletionOutbox;
     private bool _isDatabaseAvailable = true;
     private DateTime _databaseUnavailableSince = DateTime.MinValue;
-    private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromMinutes(2);
-    private static readonly TimeSpan DbConnectionTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan DbConnectionAttemptTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan DbStartupWakeupTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan DbWakeupRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DbSchemaInitializationTimeout = TimeSpan.FromSeconds(60);
 
 
@@ -27,9 +29,16 @@ public class FallbackDataService : IDataService
     private HashSet<string>? _dbQuoteNumbersCache;
     private DateTime _dbQuoteNumbersCacheTime = DateTime.MinValue;
 
+    // Cache dei metadati preventivo usati per capire se il pallino sync e' davvero verde/rosso.
+    private Dictionary<string, QuoteMetadata>? _dbQuoteMetadataCache;
+    private DateTime _dbQuoteMetadataCacheTime = DateTime.MinValue;
+
     // Cache dei numeri preventivo presenti nel JSON locale (una sola lettura ogni 10 min)
     private HashSet<string>? _localQuoteNumbersCache;
     private DateTime _localQuoteNumbersCacheTime = DateTime.MinValue;
+
+    private Dictionary<string, QuoteMetadata>? _localQuoteMetadataCache;
+    private DateTime _localQuoteMetadataCacheTime = DateTime.MinValue;
 
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
 
@@ -61,8 +70,13 @@ public class FallbackDataService : IDataService
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             SetDatabaseUnavailable(
-                $"Timeout inizializzazione SQL. Connessione: {DbConnectionTimeout.TotalSeconds:F0}s; schema: {DbSchemaInitializationTimeout.TotalSeconds:F0}s.");
+                $"Timeout inizializzazione SQL. Risveglio: {DbStartupWakeupTimeout.TotalSeconds:F0}s; schema: {DbSchemaInitializationTimeout.TotalSeconds:F0}s.");
             Debug.WriteLine("[FallbackDataService] Database initialization timed out. Using local fallback.");
+        }
+        catch (TimeoutException ex)
+        {
+            SetDatabaseUnavailable(ex.Message);
+            Debug.WriteLine($"[FallbackDataService] Database wake-up timeout: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -75,11 +89,52 @@ public class FallbackDataService : IDataService
 
     private async Task EnsureDatabaseReachableAsync(CancellationToken cancellationToken)
     {
-        using var timeoutCts = new CancellationTokenSource(DbConnectionTimeout);
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var deadline = DateTime.UtcNow + DbStartupWakeupTimeout;
+        Exception? lastError = null;
+        int attempt = 0;
 
-        if (!await _sqlService.CanConnectAsync(linkedCts.Token))
-            throw new InvalidOperationException("Database SQL non raggiungibile.");
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            attempt++;
+
+            using var attemptCts = new CancellationTokenSource(DbConnectionAttemptTimeout);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, attemptCts.Token);
+
+            try
+            {
+                Debug.WriteLine($"[FallbackDataService] Tentativo connessione SQL #{attempt}...");
+                if (await _sqlService.CanConnectAsync(linkedCts.Token))
+                {
+                    Debug.WriteLine($"[FallbackDataService] SQL raggiungibile al tentativo #{attempt}.");
+                    return;
+                }
+
+                lastError = new InvalidOperationException("Database SQL non raggiungibile.");
+                Debug.WriteLine($"[FallbackDataService] Tentativo SQL #{attempt} fallito: CanConnect=false.");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                lastError = new TimeoutException($"Tentativo SQL #{attempt} scaduto dopo {DbConnectionAttemptTimeout.TotalSeconds:F0}s.");
+                Debug.WriteLine($"[FallbackDataService] {lastError.Message}");
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                Debug.WriteLine($"[FallbackDataService] Tentativo SQL #{attempt} fallito: {ex.Message}");
+            }
+
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+                break;
+
+            var delay = remaining < DbWakeupRetryDelay ? remaining : DbWakeupRetryDelay;
+            if (delay > TimeSpan.Zero)
+                await Task.Delay(delay, cancellationToken);
+        }
+
+        throw new TimeoutException(
+            $"Database SQL non disponibile dopo {DbStartupWakeupTimeout.TotalSeconds:F0}s di attesa. Ultimo errore: {lastError?.Message ?? "nessun dettaglio"}");
     }
 
     private async Task InitializeDatabaseSchemaAsync(CancellationToken cancellationToken)
@@ -140,6 +195,56 @@ public class FallbackDataService : IDataService
         return _localQuoteNumbersCache;
     }
 
+    private async Task<Dictionary<string, QuoteMetadata>> GetDbQuoteMetadataCachedAsync(CancellationToken cancellationToken)
+    {
+        if (_dbQuoteMetadataCache == null || DateTime.UtcNow - _dbQuoteMetadataCacheTime > CacheDuration)
+        {
+            if (!IsDatabaseAvailable())
+                return new Dictionary<string, QuoteMetadata>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                _dbQuoteMetadataCache = await _sqlService.GetQuoteMetadataAsync(cancellationToken);
+                _dbQuoteMetadataCacheTime = DateTime.UtcNow;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FallbackDataService] DB metadata cache unavailable: {ex.Message}");
+                _dbQuoteMetadataCache = new Dictionary<string, QuoteMetadata>(StringComparer.OrdinalIgnoreCase);
+                _dbQuoteMetadataCacheTime = DateTime.UtcNow;
+            }
+        }
+
+        return _dbQuoteMetadataCache;
+    }
+
+    private async Task<Dictionary<string, QuoteMetadata>> GetLocalQuoteMetadataCachedAsync(CancellationToken cancellationToken)
+    {
+        if (_localQuoteMetadataCache == null || DateTime.UtcNow - _localQuoteMetadataCacheTime > CacheDuration)
+        {
+            var localEntries = await _localStore.LoadHistoryAsync(cancellationToken);
+            _localQuoteMetadataCache = localEntries
+                .GroupBy(q => q.QuoteNumber, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(q => q.LastModifiedUtc).First())
+                .ToDictionary(
+                    q => q.QuoteNumber,
+                    q => new QuoteMetadata
+                    {
+                        QuoteNumber = q.QuoteNumber,
+                        LastModifiedUtc = q.LastModifiedUtc,
+                        SyncHash = q.SyncHash
+                    },
+                    StringComparer.OrdinalIgnoreCase);
+            _localQuoteMetadataCacheTime = DateTime.UtcNow;
+        }
+
+        return _localQuoteMetadataCache;
+    }
+
     
     /// <summary>
     /// Invalida entrambe le cache (chiamare dopo SaveQuoteAsync / DeleteQuoteAsync).
@@ -148,6 +253,8 @@ public class FallbackDataService : IDataService
     {
         _dbQuoteNumbersCache = null;
         _localQuoteNumbersCache = null;
+        _dbQuoteMetadataCache = null;
+        _localQuoteMetadataCache = null;
     }
 
     /// <summary>
@@ -173,6 +280,77 @@ public class FallbackDataService : IDataService
         }
 
         return status;
+    }
+
+    private static SyncStatus ResolveSyncStatus(
+        string quoteNumber,
+        IReadOnlyDictionary<string, QuoteMetadata> dbMetadata,
+        IReadOnlyDictionary<string, QuoteMetadata> localMetadata)
+    {
+        bool inDb = dbMetadata.TryGetValue(quoteNumber, out var dbQuote);
+        bool inLocal = localMetadata.TryGetValue(quoteNumber, out var localQuote);
+
+        return (inDb, inLocal) switch
+        {
+            (true, false) => SyncStatus.OnlineOnly,
+            (false, true) => SyncStatus.LocalOnly,
+            (true, true) when string.Equals(dbQuote!.SyncHash, localQuote!.SyncHash, StringComparison.Ordinal) =>
+                SyncStatus.Synced,
+            (true, true) when Math.Abs((localQuote!.LastModifiedUtc - dbQuote!.LastModifiedUtc).TotalSeconds) <= 2 =>
+                SyncStatus.Synced,
+            (true, true) when localQuote!.LastModifiedUtc > dbQuote!.LastModifiedUtc =>
+                SyncStatus.LocalOnly,
+            (true, true) => SyncStatus.OnlineOnly,
+            _ => SyncStatus.LocalOnly
+        };
+    }
+
+    private static void EnsureDbMetadataForDisplayedSummaries(
+        IEnumerable<QuoteHistorySummary> summaries,
+        IDictionary<string, QuoteMetadata> dbMetadata)
+    {
+        foreach (var summary in summaries)
+        {
+            if (dbMetadata.ContainsKey(summary.QuoteNumber))
+                continue;
+
+            dbMetadata[summary.QuoteNumber] = new QuoteMetadata
+            {
+                QuoteNumber = summary.QuoteNumber,
+                LastModifiedUtc = DateTime.MaxValue,
+                SyncHash = string.Empty
+            };
+        }
+    }
+
+    private async Task ApplySyncStatusAsync(
+        IEnumerable<QuoteHistorySummary> summaries,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var summaryList = summaries as IList<QuoteHistorySummary> ?? summaries.ToList();
+            var dbMetadata = await GetDbQuoteMetadataCachedAsync(cancellationToken);
+            var localMetadata = await GetLocalQuoteMetadataCachedAsync(cancellationToken);
+            EnsureDbMetadataForDisplayedSummaries(summaryList, dbMetadata);
+
+            foreach (var q in summaryList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbMetadata, localMetadata);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[FallbackDataService] Sync status metadata unavailable: {ex.Message}");
+
+            foreach (var q in summaries)
+                q.SyncStatus = SyncStatus.OnlineOnly;
+        }
     }
     private void SetDatabaseUnavailable(string reason)
     {
@@ -280,8 +458,11 @@ public class FallbackDataService : IDataService
 
             // 1 query DB per tutti i numeri (cachata) + 1 lettura JSON (cachata)
             Debug.WriteLine("[FallbackDataService] 🔑 Getting cached quote numbers...");
-            var dbAllNumbers = await GetDbQuoteNumbersCachedAsync();
-            var localNumbers = await GetLocalQuoteNumbersCachedAsync();
+            var dbMetadata = await GetDbQuoteMetadataCachedAsync(cancellationToken);
+            var localMetadata = await GetLocalQuoteMetadataCachedAsync(cancellationToken);
+            EnsureDbMetadataForDisplayedSummaries(dbQuotes, dbMetadata);
+            var dbAllNumbers = new HashSet<string>(dbMetadata.Keys, StringComparer.OrdinalIgnoreCase);
+            var localNumbers = new HashSet<string>(localMetadata.Keys, StringComparer.OrdinalIgnoreCase);
 
             Debug.WriteLine($"[FallbackDataService] 📊 Cache status:");
             Debug.WriteLine($"[FallbackDataService]    - DB quote numbers in cache: {dbAllNumbers.Count}");
@@ -306,7 +487,7 @@ public class FallbackDataService : IDataService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var oldStatus = q.SyncStatus;
-                q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbAllNumbers, localNumbers);
+                q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbMetadata, localMetadata);
                 
                 if (q.SyncStatus != SyncStatus.Synced)
                 {
@@ -378,13 +559,14 @@ public class FallbackDataService : IDataService
                 var dbQuotes = await _sqlService.SearchQuoteSummariesAsync(searchText, take, cancellationToken);
 
                 // Riusa le cache — nessuna ulteriore lettura su disco o DB
-                var dbAllNumbers = await GetDbQuoteNumbersCachedAsync();
-                var localNumbers = await GetLocalQuoteNumbersCachedAsync();
+                var dbMetadata = await GetDbQuoteMetadataCachedAsync(cancellationToken);
+                var localMetadata = await GetLocalQuoteMetadataCachedAsync(cancellationToken);
+                EnsureDbMetadataForDisplayedSummaries(dbQuotes, dbMetadata);
 
                 foreach (var q in dbQuotes)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbAllNumbers, localNumbers);
+                    q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbMetadata, localMetadata);
                 }
 
                 return dbQuotes;

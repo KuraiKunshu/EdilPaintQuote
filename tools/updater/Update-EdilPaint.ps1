@@ -89,6 +89,7 @@ $logPath = Expand-ConfiguredPath ([string](Get-Setting -Name "LogPath" -DefaultV
 $statePath = Join-Path $scriptRoot "state"
 $publishPath = Join-Path $scriptRoot "publish"
 $deployedCommitFile = Join-Path $statePath "deployed-commit.txt"
+$sourceGitSafeDirectory = [System.IO.Path]::GetFullPath($sourcePath).Replace("\", "/")
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
 
@@ -124,6 +125,18 @@ function Get-ExternalOutput {
     }
 
     return (($output | Out-String).Trim())
+}
+
+function Invoke-Git {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+
+    Invoke-External git -c "safe.directory=$sourceGitSafeDirectory" @Arguments
+}
+
+function Get-GitOutput {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+
+    return Get-ExternalOutput git -c "safe.directory=$sourceGitSafeDirectory" @Arguments
 }
 
 function Test-Tool {
@@ -194,13 +207,13 @@ try {
 
         New-Item -ItemType Directory -Path (Split-Path -Parent $sourcePath) -Force | Out-Null
         Write-Log "Clono repository in $sourcePath"
-        Invoke-External git clone --branch $branch --single-branch $repositoryUrl $sourcePath
+        Invoke-Git clone --branch $branch --single-branch $repositoryUrl $sourcePath
     }
 
-    Invoke-External git -C $sourcePath remote set-url origin $repositoryUrl
-    Invoke-External git -C $sourcePath fetch origin $branch
+    Invoke-Git -C $sourcePath remote set-url origin $repositoryUrl
+    Invoke-Git -C $sourcePath fetch origin $branch
 
-    $remoteCommit = Get-ExternalOutput git -C $sourcePath rev-parse "origin/$branch"
+    $remoteCommit = Get-GitOutput -C $sourcePath rev-parse "origin/$branch"
     $installedExe = Join-Path $installPath "$processName.exe"
     $deployedCommit = ""
     if (Test-Path -LiteralPath $deployedCommitFile) {
@@ -218,12 +231,12 @@ try {
     }
 
     Write-Log "Aggiornamento trovato: $remoteCommit"
-    $currentBranch = Get-ExternalOutput git -C $sourcePath rev-parse --abbrev-ref HEAD
+    $currentBranch = Get-GitOutput -C $sourcePath rev-parse --abbrev-ref HEAD
     if ($currentBranch -ne $branch) {
-        Invoke-External git -C $sourcePath switch $branch
+        Invoke-Git -C $sourcePath switch $branch
     }
 
-    Invoke-External git -C $sourcePath pull --ff-only origin $branch
+    Invoke-Git -C $sourcePath pull --ff-only origin $branch
 
     $solutionFullPath = Join-Path $sourcePath $solutionPath
     $projectFullPath = Join-Path $sourcePath $projectPath
