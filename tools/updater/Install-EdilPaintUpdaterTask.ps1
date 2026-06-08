@@ -65,15 +65,69 @@ $taskSettings = New-ScheduledTaskSettingsSet `
     -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
 
-Register-ScheduledTask `
-    -TaskName $TaskName `
-    -Action $action `
-    -Trigger $trigger `
-    -Principal $principal `
-    -Settings $taskSettings `
-    -Description "Controlla GitHub e aggiorna EdilPaint Preventivi quando l'utente accede a Windows." `
-    -Force | Out-Null
+function Get-StartupShortcutPath {
+    $startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
+    New-Item -ItemType Directory -Path $startupFolder -Force | Out-Null
+    return Join-Path $startupFolder "$TaskName.lnk"
+}
 
-Write-Host "Attivita pianificata creata: $TaskName"
+function Remove-StartupFallback {
+    $shortcutPath = Get-StartupShortcutPath
+    $cmdPath = [System.IO.Path]::ChangeExtension($shortcutPath, ".cmd")
+
+    foreach ($path in @($shortcutPath, $cmdPath)) {
+        if (Test-Path -LiteralPath $path) {
+            Remove-Item -LiteralPath $path -Force
+        }
+    }
+}
+
+function New-StartupFallback {
+    $shortcutPath = Get-StartupShortcutPath
+    $cmdPath = [System.IO.Path]::ChangeExtension($shortcutPath, ".cmd")
+
+    try {
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = "powershell.exe"
+        $shortcut.Arguments = $actionArgument
+        $shortcut.WorkingDirectory = $UpdaterPath
+        $shortcut.WindowStyle = 7
+        $shortcut.Description = "Controlla GitHub e aggiorna EdilPaint Preventivi quando l'utente accede a Windows."
+        $shortcut.Save()
+
+        if (Test-Path -LiteralPath $cmdPath) {
+            Remove-Item -LiteralPath $cmdPath -Force
+        }
+
+        Write-Host "Accesso task pianificata negato: creato avvio automatico utente: $shortcutPath"
+        return
+    }
+    catch {
+        $command = "@echo off`r`npowershell.exe $actionArgument`r`n"
+        Set-Content -LiteralPath $cmdPath -Value $command -Encoding ASCII
+        Write-Host "Accesso task pianificata negato: creato avvio automatico utente: $cmdPath"
+    }
+}
+
+try {
+    Register-ScheduledTask `
+        -TaskName $TaskName `
+        -Action $action `
+        -Trigger $trigger `
+        -Principal $principal `
+        -Settings $taskSettings `
+        -Description "Controlla GitHub e aggiorna EdilPaint Preventivi quando l'utente accede a Windows." `
+        -Force `
+        -ErrorAction Stop | Out-Null
+
+    Remove-StartupFallback
+    Write-Host "Attivita pianificata creata: $TaskName"
+}
+catch {
+    Write-Host "Impossibile creare la task pianificata: $($_.Exception.Message)"
+    New-StartupFallback
+}
+
 Write-Host "Script: $targetScript"
 Write-Host "Impostazioni: $settingsPath"

@@ -279,7 +279,9 @@ public class LocalJsonStoreService
             var existing = history.FirstOrDefault(q =>
                 q.QuoteNumber.Equals(localEntry.QuoteNumber, StringComparison.OrdinalIgnoreCase));
 
-            localEntry.LastModifiedUtc = DateTime.UtcNow;
+            if (localEntry.LastModifiedUtc == default)
+                localEntry.LastModifiedUtc = DateTime.UtcNow;
+
             localEntry.SyncHash = ComputeQuoteHash(localEntry);
 
             if (existing != null)
