@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace EdilPaintPreventibiviGen.Services;
 
@@ -33,16 +34,15 @@ public sealed class AppSettingsService
 			: new JsonObject();
 
 		var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-		root["ConnectionStrings"] = new JsonObject
+		root.Remove("ConnectionStrings");
+		root["Database"] = new JsonObject
 		{
-			["DefaultConnection"] = new JsonObject
-			{
-				["ConnectionString"] = SecretProtectionService.Protect(Database.ConnectionString),
-				["Server"] = SecretProtectionService.Protect(Database.Server),
-				["Database"] = SecretProtectionService.Protect(Database.Database),
-				["Username"] = SecretProtectionService.Protect(Database.Username),
-				["Password"] = SecretProtectionService.Protect(Database.Password)
-			}
+			["Provider"] = Database.Provider,
+			["Server"] = SecretProtectionService.Protect(Database.Server),
+			["Port"] = Database.Port,
+			["DatabaseName"] = SecretProtectionService.Protect(Database.Database),
+			["Username"] = SecretProtectionService.Protect(Database.Username),
+			["Password"] = SecretProtectionService.Protect(Database.Password)
 		};
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
@@ -68,43 +68,42 @@ public sealed class AppSettingsService
 
 	private static DatabaseSettingsModel LoadDatabaseSettings(IConfiguration configuration)
 	{
-		var section = configuration.GetSection("ConnectionStrings:DefaultConnection");
+		var section = configuration.GetSection("Database");
+		if (!section.GetChildren().Any())
+			section = configuration.GetSection("ConnectionStrings:DefaultConnection");
+
 		if (section.GetChildren().Any())
 		{
 			try
 			{
+				string provider = DatabaseSettingsModel.NormalizeProvider(section["Provider"]);
 				string server = SecretProtectionService.Unprotect(section["Server"] ?? string.Empty);
-				string database = SecretProtectionService.Unprotect(section["Database"] ?? string.Empty);
+				int? port = TryReadPort(section["Port"]);
+				string database = SecretProtectionService.Unprotect(
+					section["DatabaseName"] ??
+					section["Database"] ??
+					string.Empty);
 				string username = SecretProtectionService.Unprotect(section["Username"] ?? string.Empty);
 				string password = SecretProtectionService.Unprotect(section["Password"] ?? string.Empty);
-				string connectionString = SecretProtectionService.Unprotect(section["ConnectionString"] ?? string.Empty);
+				string sectionLegacyConnectionString = SecretProtectionService.Unprotect(section["ConnectionString"] ?? string.Empty);
 
 				if (string.IsNullOrWhiteSpace(server) &&
 					string.IsNullOrWhiteSpace(database) &&
 					string.IsNullOrWhiteSpace(username) &&
 					string.IsNullOrWhiteSpace(password) &&
-					string.IsNullOrWhiteSpace(connectionString))
+					string.IsNullOrWhiteSpace(sectionLegacyConnectionString))
 				{
-					return new DatabaseSettingsModel();
+					return new DatabaseSettingsModel { Provider = provider, Port = port };
 				}
 
-				if (string.IsNullOrWhiteSpace(connectionString))
-				{
-					var legacyBuilder = new SqlConnectionStringBuilder
-					{
-						DataSource = server,
-						InitialCatalog = database,
-						UserID = username,
-						Password = password
-					};
-
-					connectionString = legacyBuilder.ConnectionString;
-				}
+				if (!string.IsNullOrWhiteSpace(sectionLegacyConnectionString))
+					ReadLegacyConnectionString(provider, sectionLegacyConnectionString, ref server, ref port, ref database, ref username, ref password);
 
 				return new DatabaseSettingsModel
 				{
-					ConnectionString = connectionString,
+					Provider = provider,
 					Server = server,
+					Port = port,
 					Database = database,
 					Username = username,
 					Password = password
@@ -122,9 +121,25 @@ public sealed class AppSettingsService
 
 		try
 		{
+			string connectionString = SecretProtectionService.Unprotect(legacyConnectionString);
+			string provider = LooksLikePostgreSqlConnectionString(connectionString)
+				? DatabaseSettingsModel.PostgreSqlProvider
+				: DatabaseSettingsModel.SqlServerProvider;
+			string server = string.Empty;
+			int? port = null;
+			string database = string.Empty;
+			string username = string.Empty;
+			string password = string.Empty;
+			ReadLegacyConnectionString(provider, connectionString, ref server, ref port, ref database, ref username, ref password);
+
 			return new DatabaseSettingsModel
 			{
-				ConnectionString = SecretProtectionService.Unprotect(legacyConnectionString)
+				Provider = provider,
+				Server = server,
+				Port = port,
+				Database = database,
+				Username = username,
+				Password = password
 			};
 		}
 		catch (InvalidOperationException)
@@ -154,6 +169,76 @@ public sealed class AppSettingsService
 
 		settings.Normalize();
 		return settings;
+	}
+
+	private static int? TryReadPort(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+			return null;
+
+		return int.TryParse(value, out int port) && port > 0 && port <= 65535
+			? port
+			: null;
+	}
+
+	private static void ReadLegacyConnectionString(
+		string provider,
+		string connectionString,
+		ref string server,
+		ref int? port,
+		ref string database,
+		ref string username,
+		ref string password)
+	{
+		if (DatabaseSettingsModel.IsPostgreSqlProvider(provider) || LooksLikePostgreSqlConnectionString(connectionString))
+		{
+			var builder = new NpgsqlConnectionStringBuilder(connectionString);
+			if (string.IsNullOrWhiteSpace(server))
+				server = builder.Host ?? string.Empty;
+			if (port is null && builder.Port > 0)
+				port = builder.Port;
+			if (string.IsNullOrWhiteSpace(database))
+				database = builder.Database ?? string.Empty;
+			if (string.IsNullOrWhiteSpace(username))
+				username = builder.Username ?? string.Empty;
+			if (string.IsNullOrWhiteSpace(password))
+				password = builder.Password ?? string.Empty;
+			return;
+		}
+
+		var sqlBuilder = new SqlConnectionStringBuilder(connectionString);
+		if (string.IsNullOrWhiteSpace(server))
+		{
+			(server, port) = SplitSqlServerAndPort(sqlBuilder.DataSource);
+		}
+
+		if (string.IsNullOrWhiteSpace(database))
+			database = sqlBuilder.InitialCatalog ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(username))
+			username = sqlBuilder.UserID ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(password))
+			password = sqlBuilder.Password ?? string.Empty;
+	}
+
+	private static bool LooksLikePostgreSqlConnectionString(string connectionString)
+		=> connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+		   connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+		   connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase);
+
+	private static (string Server, int? Port) SplitSqlServerAndPort(string dataSource)
+	{
+		if (string.IsNullOrWhiteSpace(dataSource))
+			return (string.Empty, null);
+
+		string value = dataSource.Trim();
+		int commaIndex = value.LastIndexOf(',');
+		if (commaIndex <= 0 || commaIndex == value.Length - 1)
+			return (value, null);
+
+		string possiblePort = value[(commaIndex + 1)..];
+		return int.TryParse(possiblePort, out int port) && port > 0 && port <= 65535
+			? (value[..commaIndex], port)
+			: (value, null);
 	}
 }
 
@@ -304,37 +389,55 @@ public sealed class MailSettingsModel
 
 public sealed class DatabaseSettingsModel
 {
-	public string ConnectionString { get; set; } = string.Empty;
+	public const string SqlServerProvider = "SqlServer";
+	public const string PostgreSqlProvider = "PostgreSql";
+	public static readonly string[] AvailableProviders = [SqlServerProvider, PostgreSqlProvider];
+
+	public string Provider { get; set; } = SqlServerProvider;
 	public string Server { get; set; } = string.Empty;
+	public int? Port { get; set; }
 	public string Database { get; set; } = string.Empty;
 	public string Username { get; set; } = string.Empty;
 	public string Password { get; set; } = string.Empty;
 	public bool RequiresCredentialReset { get; set; }
 
 	public bool IsConfigured =>
-		!string.IsNullOrWhiteSpace(ConnectionString) ||
 		!string.IsNullOrWhiteSpace(Server) ||
 		!string.IsNullOrWhiteSpace(Database) ||
 		!string.IsNullOrWhiteSpace(Username) ||
 		!string.IsNullOrWhiteSpace(Password);
 
+	public static string NormalizeProvider(string? provider)
+	{
+		if (string.Equals(provider, PostgreSqlProvider, StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(provider, "Postgres", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(provider, "PostgreSQL", StringComparison.OrdinalIgnoreCase))
+		{
+			return PostgreSqlProvider;
+		}
+
+		return SqlServerProvider;
+	}
+
+	public static bool IsPostgreSqlProvider(string? provider)
+		=> string.Equals(NormalizeProvider(provider), PostgreSqlProvider, StringComparison.Ordinal);
+
+	public bool UsesPostgreSql => IsPostgreSqlProvider(Provider);
+
 	public string BuildConnectionString()
+		=> UsesPostgreSql ? BuildPostgreSqlConnectionString() : BuildSqlServerConnectionString();
+
+	private string BuildSqlServerConnectionString()
 	{
 		if (!IsConfigured)
-			throw new InvalidOperationException("Connection string SQL non configurata. Inseriscila dalla schermata Impostazioni.");
+			throw new InvalidOperationException("Connessione SQL non configurata. Inserisci server, database, user e password dalla schermata Impostazioni.");
 
-		SqlConnectionStringBuilder builder;
-		try
-		{
-			builder = new SqlConnectionStringBuilder(ConnectionString ?? string.Empty);
-		}
-		catch (ArgumentException ex)
-		{
-			throw new InvalidOperationException("La connection string SQL non e' valida.", ex);
-		}
+		var builder = new SqlConnectionStringBuilder();
 
 		if (!string.IsNullOrWhiteSpace(Server))
-			builder.DataSource = Server;
+			builder.DataSource = Port is > 0 && !Server.Contains(',', StringComparison.Ordinal)
+				? $"{Server},{Port.Value}"
+				: Server;
 		if (!string.IsNullOrWhiteSpace(Database))
 			builder.InitialCatalog = Database;
 		if (!string.IsNullOrWhiteSpace(Username))
@@ -352,6 +455,36 @@ public sealed class DatabaseSettingsModel
 			builder.TrustServerCertificate = false;
 		if (!builder.ShouldSerialize("Connect Timeout"))
 			builder.ConnectTimeout = 30;
+
+		return builder.ConnectionString;
+	}
+
+	private string BuildPostgreSqlConnectionString()
+	{
+		if (!IsConfigured)
+			throw new InvalidOperationException("Connessione PostgreSQL non configurata. Inserisci host, porta, database, user e password dalla schermata Impostazioni.");
+
+		var builder = new NpgsqlConnectionStringBuilder();
+
+		if (!string.IsNullOrWhiteSpace(Server))
+			builder.Host = Server;
+		if (Port is > 0)
+			builder.Port = Port.Value;
+		if (!string.IsNullOrWhiteSpace(Database))
+			builder.Database = Database;
+		if (!string.IsNullOrWhiteSpace(Username))
+			builder.Username = Username;
+		if (!string.IsNullOrWhiteSpace(Password))
+			builder.Password = Password;
+
+		if (builder.Port <= 0)
+			builder.Port = 5432;
+		if (builder.Timeout <= 0)
+			builder.Timeout = 30;
+		if (builder.CommandTimeout <= 0)
+			builder.CommandTimeout = 30;
+		if (builder.SslMode == SslMode.Prefer)
+			builder.SslMode = SslMode.Require;
 
 		return builder.ConnectionString;
 	}

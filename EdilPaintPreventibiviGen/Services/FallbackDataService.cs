@@ -6,6 +6,7 @@ using System.IO;
 using System.Threading.Tasks;
 using EdilPaintPreventibiviGen.Models;
 using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace EdilPaintPreventibiviGen.Services;
 
@@ -79,13 +80,14 @@ public class FallbackDataService : IDataService
         }
         catch (TimeoutException ex)
         {
-            SetDatabaseUnavailable(ex.Message);
+            HandleDatabaseException("InitializeAsync", ex);
             Debug.WriteLine($"[FallbackDataService] Database wake-up timeout: {ex.Message}");
         }
         catch (Exception ex)
         {
-            SetDatabaseUnavailable(ex.Message);
+            HandleDatabaseException("InitializeAsync", ex);
             Debug.WriteLine($"[FallbackDataService] ❌ Database initialization FAILED: {ex.Message}");
+            SetDatabaseUnavailable($"InitializeAsync: {ex.GetBaseException().Message}");
             Debug.WriteLine($"[FallbackDataService] StackTrace: {ex.StackTrace}");
             Debug.WriteLine("[FallbackDataService] ⚠️ Will use local JSON fallback");
         }
@@ -174,7 +176,7 @@ public class FallbackDataService : IDataService
                 }
                 catch( Exception ex)
                 {
-                    SetDatabaseUnavailable(ex.Message);
+                    HandleDatabaseException("GetDbQuoteNumbersCachedAsync", ex);
                     _dbQuoteNumbersCache = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 }
             }
@@ -449,6 +451,9 @@ public class FallbackDataService : IDataService
             }
         }
 
+        if (ex is NpgsqlException npgsqlException)
+            return npgsqlException.IsTransient;
+
         return ex.InnerException != null && IsDatabaseConnectivityException(ex.InnerException);
     }
 
@@ -558,7 +563,7 @@ public class FallbackDataService : IDataService
             {
                 Debug.WriteLine($"[FallbackDataService] ❌ SQL FAILED: {ex.Message}");
                 Debug.WriteLine($"[FallbackDataService] StackTrace: {ex.StackTrace}");
-                SetDatabaseUnavailable(ex.Message);
+                HandleDatabaseException("GetQuotesAsync", ex);
             }
         }
 
@@ -571,7 +576,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { return await _sqlService.GetQuotesAsync(take); }
-            catch(Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch(Exception ex) { HandleDatabaseException("GetQuotesAsync(take)", ex); }
         }
 
         var all = await _localStore.LoadHistoryAsync();
@@ -783,7 +788,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { return await _sqlService.GetQuoteByNumberAsync(quoteNumber); }
-            catch(Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch(Exception ex) { HandleDatabaseException("GetQuoteByNumberAsync", ex); }
         }
 
         var localQuote = await _localStore.GetQuoteByNumberAsync(quoteNumber);
@@ -950,7 +955,7 @@ public class FallbackDataService : IDataService
                 await _sqlService.DeleteQuoteAsync(quoteNumber);
                 await _deletionOutbox.RemoveQuoteAsync(quoteNumber);
             }
-            catch(Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch(Exception ex) { HandleDatabaseException("DeleteQuoteAsync", ex); }
         }
 
         // Invalida le cache dopo ogni eliminazione
@@ -978,7 +983,7 @@ public class FallbackDataService : IDataService
         }
         catch (Exception ex)
         {
-            SetDatabaseUnavailable(ex.Message);
+            HandleDatabaseException("UpdateQuoteNotesAsync", ex);
         }
     }
 
@@ -1003,7 +1008,7 @@ public class FallbackDataService : IDataService
         }
         catch (Exception ex)
         {
-            SetDatabaseUnavailable(ex.Message);
+            HandleDatabaseException("UpdateQuoteStatusAsync", ex);
         }
     }
 
@@ -1033,7 +1038,7 @@ public class FallbackDataService : IDataService
         }
         catch (Exception ex)
         {
-            SetDatabaseUnavailable(ex.Message);
+            HandleDatabaseException("UpdateQuoteSendInfoAsync", ex);
         }
     }
 
@@ -1063,7 +1068,7 @@ public class FallbackDataService : IDataService
         }
         catch (Exception ex)
         {
-            SetDatabaseUnavailable(ex.Message);
+            HandleDatabaseException("RegisterQuoteReminderAsync", ex);
         }
     }
 
@@ -1072,7 +1077,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { return await _sqlService.GetAllQuoteNumbersAsync(); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("GetAllQuoteNumbersAsync", ex); }
         }
 
         return await GetLocalQuoteNumbersCachedAsync();
@@ -1087,7 +1092,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { return await _sqlService.GetCustomersAsync(cancellationToken); }
-            catch(Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch(Exception ex) { HandleDatabaseException("GetCustomersAsync", ex); }
         }
         return await _localStore.LoadCustomersAsync(cancellationToken);
     }
@@ -1198,7 +1203,7 @@ public class FallbackDataService : IDataService
                 await _sqlService.DeleteCustomerAsync(customer.SyncId, customer.BusinessName);
                 await _deletionOutbox.RemoveCustomerAsync(customer.SyncId, customer.BusinessName);
             }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("DeleteCustomerAsync", ex); }
         }
     }
 
@@ -1224,7 +1229,7 @@ public class FallbackDataService : IDataService
 
                 return company;
             }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("GetCompanyAsync", ex); }
         }
 
         return await _localStore.LoadCompanyAsync();
@@ -1237,7 +1242,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { await _sqlService.SaveCompanyAsync(company, selectedLogo); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("SaveCompanyAsync", ex); }
         }
     }
 
@@ -1251,7 +1256,7 @@ public class FallbackDataService : IDataService
                 await _localStore.SaveLaborCatalogAsync(labors);
                 return labors;
             }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("GetLaborCatalogAsync", ex); }
         }
 
         return await _localStore.LoadLaborCatalogAsync();
@@ -1265,7 +1270,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { await _sqlService.SaveLaborCatalogAsync(laborList); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("SaveLaborCatalogAsync", ex); }
         }
     }
 
@@ -1279,7 +1284,7 @@ public class FallbackDataService : IDataService
                 await _localStore.SavePersonalMaterialsAsync(materials);
                 return materials;
             }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("GetPersonalMaterialsAsync", ex); }
         }
 
         return await _localStore.LoadPersonalMaterialsAsync();
@@ -1293,7 +1298,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { await _sqlService.SavePersonalMaterialsAsync(materialList); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("SavePersonalMaterialsAsync", ex); }
         }
     }
 
@@ -1302,7 +1307,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { return await _sqlService.GetNextQuoteNumberAsync(); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("GetNextQuoteNumberAsync", ex); }
         }
 
         throw new InvalidOperationException("Database non disponibile: impossibile assegnare un numero preventivo ufficiale. Riprova quando la connessione e' disponibile.");
@@ -1313,7 +1318,7 @@ public class FallbackDataService : IDataService
         if (IsDatabaseAvailable())
         {
             try { return await _sqlService.IsDatabaseEmptyAsync(); }
-            catch (Exception ex) { SetDatabaseUnavailable(ex.Message); }
+            catch (Exception ex) { HandleDatabaseException("IsDatabaseEmptyAsync", ex); }
         }
 
         var localHistory = await _localStore.LoadHistoryAsync();
@@ -1330,7 +1335,7 @@ public class FallbackDataService : IDataService
             }
             catch( Exception ex)
             {
-                SetDatabaseUnavailable(ex.Message);
+                HandleDatabaseException("GetQuoteMetadataAsync", ex);
             }
         }
 
@@ -1362,7 +1367,7 @@ public class FallbackDataService : IDataService
             }
             catch( Exception ex)
             {
-                SetDatabaseUnavailable(ex.Message);
+                HandleDatabaseException("GetQuotesByNumbersAsync", ex);
             }
         }
 

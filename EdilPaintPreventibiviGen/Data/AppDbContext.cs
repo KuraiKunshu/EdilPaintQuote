@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => x.SyncId).IsUnique();
 
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.SyncId).IsRequired();
             entity.Property(x => x.BusinessName).HasMaxLength(250).IsRequired();
             entity.Property(x => x.Address).HasMaxLength(500);
@@ -40,12 +41,12 @@ public class AppDbContext : DbContext
             entity.ToTable("CompanySettings");
             entity.HasKey(x => x.Id);
 
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.Nome).HasMaxLength(250);
             entity.Property(x => x.Indirizzo).HasMaxLength(500);
             entity.Property(x => x.Piva).HasMaxLength(50);
             entity.Property(x => x.Email).HasMaxLength(250);
             entity.Property(x => x.SelectedLogo).HasMaxLength(500);
-            entity.Property(x => x.LogosJson).HasColumnType("nvarchar(max)");
             entity.Property(x => x.PaymentTerms).HasColumnName("TerminiPagamento");
         });
 
@@ -54,8 +55,8 @@ public class AppDbContext : DbContext
             entity.ToTable("LaborCatalog");
             entity.HasKey(x => x.Id);
 
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
-            entity.Property(x => x.Description).HasMaxLength(2000);
         });
 
         modelBuilder.Entity<PersonalMaterialEntity>(entity =>
@@ -63,8 +64,8 @@ public class AppDbContext : DbContext
             entity.ToTable("PersonalMaterials");
             entity.HasKey(x => x.Id);
 
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
-            entity.Property(x => x.Description).HasMaxLength(2000);
         });
 
         modelBuilder.Entity<QuoteEntity>(entity =>
@@ -73,21 +74,19 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.HasQueryFilter(x => !x.IsDeleted);
             
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.HasIndex(x => x.QuoteNumber).IsUnique();
             entity.HasIndex(x => x.Date);
 
             entity.Property(x => x.QuoteNumber).HasMaxLength(50).IsRequired();
             entity.Property(x => x.PdfPath).HasMaxLength(1000);
-            entity.Property(x => x.PaymentTerms).HasMaxLength(4000);
             entity.Property(x => x.IvaType).HasMaxLength(50).IsRequired();
-            entity.Property(x => x.Notes).HasMaxLength(4000);
             entity.Property(x => x.CreatedByDevice).HasMaxLength(120);
             entity.Property(x => x.LastModifiedByDevice).HasMaxLength(120);
             entity.Property(x => x.SentMethod).HasMaxLength(80);
             entity.Property(x => x.SentRecipient).HasMaxLength(250);
             entity.Property(x => x.SentByDevice).HasMaxLength(120);
             entity.Property(x => x.LastReminderByDevice).HasMaxLength(120);
-            entity.Property(x => x.EventsJson).HasColumnType("nvarchar(max)");
 
             entity.HasOne(x => x.Customer)
                 .WithMany(x => x.QuotesAsCustomer)
@@ -106,8 +105,8 @@ public class AppDbContext : DbContext
             entity.ToTable("QuoteMaterials");
             entity.HasKey(x => x.Id);
 
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
-            entity.Property(x => x.Description).HasMaxLength(2000);
 
             entity.HasOne(x => x.Quote)
                 .WithMany(x => x.Materials)
@@ -120,8 +119,8 @@ public class AppDbContext : DbContext
             entity.ToTable("QuoteLabors");
             entity.HasKey(x => x.Id);
 
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
-            entity.Property(x => x.Description).HasMaxLength(2000);
 
             entity.HasOne(x => x.Quote)
                 .WithMany(x => x.Labors)

@@ -66,16 +66,14 @@ public static class AppSettingsFileService
 
         var settings = new
         {
-            ConnectionStrings = new
+            Database = new
             {
-                DefaultConnection = new
-                {
-                    ConnectionString = string.Empty,
-                    Server = string.Empty,
-                    Database = string.Empty,
-                    Username = string.Empty,
-                    Password = string.Empty
-                }
+                Provider = DatabaseSettingsModel.SqlServerProvider,
+                Server = string.Empty,
+                Port = (int?)null,
+                DatabaseName = string.Empty,
+                Username = string.Empty,
+                Password = string.Empty
             },
             App = new
             {
