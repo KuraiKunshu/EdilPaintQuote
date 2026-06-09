@@ -10,7 +10,8 @@ public partial class SqlDataService
         await using var db = AppDbContextFactory.Create();
 
         await db.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureLegacySchemaCompatibilityAsync(db, cancellationToken);
+        if (db.Database.IsSqlServer())
+            await EnsureLegacySchemaCompatibilityAsync(db, cancellationToken);
 
         if (!await db.CompanySettings.AnyAsync(cancellationToken))
         {
@@ -47,22 +48,83 @@ public partial class SqlDataService
         await EnsureIdDefaultGeneratorAsync(db, "QuoteMaterials", cancellationToken);
         await EnsureIdDefaultGeneratorAsync(db, "QuoteLabors", cancellationToken);
 
-        await EnsureColumnAsync(db, "Quotes", "LastModifiedUtc",
-            "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
-        await EnsureColumnAsync(db, "Quotes", "SyncHash", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureCompanySettingsSchemaAsync(db, cancellationToken);
+        await EnsureCustomerSchemaAsync(db, cancellationToken);
+        await EnsureCatalogSchemaAsync(db, cancellationToken);
+        await EnsureQuoteSchemaAsync(db, cancellationToken);
+        await EnsureQuoteDetailSchemaAsync(db, cancellationToken);
+    }
+
+    private static async Task EnsureCompanySettingsSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        await EnsureColumnAsync(db, "CompanySettings", "Nome", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "Indirizzo", "NVARCHAR(500) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "Piva", "NVARCHAR(50) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "Email", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "SelectedLogo", "NVARCHAR(500) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "LogosJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "LogoIndex", "INT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "Counter", "INT NOT NULL DEFAULT 1", cancellationToken);
+        await EnsureColumnAsync(db, "CompanySettings", "TerminiPagamento", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+
+        await EnsureTextColumnDefinitionAsync(db, "CompanySettings", "Nome", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "CompanySettings", "Indirizzo", "NVARCHAR(500) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "CompanySettings", "Piva", "NVARCHAR(50) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "CompanySettings", "Email", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "CompanySettings", "SelectedLogo", "NVARCHAR(500) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "CompanySettings", "LogosJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "CompanySettings", "TerminiPagamento", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+    }
+
+    private static async Task EnsureCustomerSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        await EnsureColumnAsync(db, "Customers", "BusinessName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "Address", "NVARCHAR(500) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "Email", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "Phone", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LastModifiedUtc",
             "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "IsDeleted", "BIT NOT NULL DEFAULT 0", cancellationToken);
+
         await EnsureTextColumnDefinitionAsync(db, "Customers", "BusinessName", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Customers", "Address", "NVARCHAR(500) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Customers", "Email", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Customers", "Phone", "NVARCHAR(100) NOT NULL", cancellationToken);
         await EnsureCustomerSyncIdentityAsync(db, cancellationToken);
-        await EnsureColumnAsync(db, "Customers", "IsDeleted", "BIT NOT NULL DEFAULT 0", cancellationToken);
+    }
+
+    private static async Task EnsureCatalogSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        await EnsureColumnAsync(db, "LaborCatalog", "Name", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "LaborCatalog", "Description", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "LaborCatalog", "UnitPrice", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "LaborCatalog", "Name", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "LaborCatalog", "Description", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+
+        await EnsureColumnAsync(db, "PersonalMaterials", "Name", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "PersonalMaterials", "Description", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "PersonalMaterials", "UnitPrice", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "PersonalMaterials", "IsSignificant", "BIT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "PersonalMaterials", "Name", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "PersonalMaterials", "Description", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+    }
+
+    private static async Task EnsureQuoteSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        await EnsureColumnAsync(db, "Quotes", "PdfPath", "NVARCHAR(1000) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "PaymentTerms", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "IvaType", "NVARCHAR(50) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "Notes", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "IsJointVenture", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "PartnerCompanyName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "CostAllocationsJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "LastModifiedUtc",
+            "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "SyncHash", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "IsDeleted", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "CreatedByDevice", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "LastModifiedByDevice", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
@@ -74,6 +136,45 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Quotes", "ReminderCount", "INT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "LastReminderByDevice", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "EventsJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+
+        await EnsureQuoteNumberColumnDefinitionAsync(db, cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "PdfPath", "NVARCHAR(1000) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "PaymentTerms", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "IvaType", "NVARCHAR(50) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "Notes", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "PartnerCompanyName", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "CostAllocationsJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "SyncHash", "NVARCHAR(100) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "CreatedByDevice", "NVARCHAR(120) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "LastModifiedByDevice", "NVARCHAR(120) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "SentMethod", "NVARCHAR(80) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "SentRecipient", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "SentByDevice", "NVARCHAR(120) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "LastReminderByDevice", "NVARCHAR(120) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "EventsJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+    }
+
+    private static async Task EnsureQuoteDetailSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        await EnsureQuoteLineSchemaAsync(db, "QuoteMaterials", cancellationToken);
+        await EnsureQuoteLineSchemaAsync(db, "QuoteLabors", cancellationToken);
+    }
+
+    private static async Task EnsureQuoteLineSchemaAsync(
+        AppDbContext db,
+        string tableName,
+        CancellationToken cancellationToken)
+    {
+        await EnsureColumnAsync(db, tableName, "Name", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, tableName, "Description", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, tableName, "UnitPrice", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, tableName, "Quantity", "INT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, tableName, "Discount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, tableName, "IsSignificant", "BIT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, tableName, "SortOrder", "INT NOT NULL DEFAULT 0", cancellationToken);
+
+        await EnsureTextColumnDefinitionAsync(db, tableName, "Name", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, tableName, "Description", "NVARCHAR(MAX) NOT NULL", cancellationToken);
     }
 
     private static Task EnsureColumnAsync(
@@ -110,19 +211,28 @@ public partial class SqlDataService
              AND name = N'Id'
              AND is_identity = 0
        )
-       AND NOT EXISTS (
-           SELECT 1
-           FROM sys.default_constraints dc
-           INNER JOIN sys.columns c
-               ON c.object_id = dc.parent_object_id
-              AND c.column_id = dc.parent_column_id
-           WHERE dc.parent_object_id = OBJECT_ID(N'[dbo].[{tableName}]')
-             AND c.name = N'Id'
-       )
     BEGIN
         DECLARE @nextId BIGINT;
+        DECLARE @defaultConstraintName SYSNAME;
+        DECLARE @dropDefaultSql NVARCHAR(MAX);
+
         SELECT @nextId = ISNULL(MAX(CONVERT(BIGINT, [Id])), 0) + 1
         FROM [dbo].[{tableName}] WITH (TABLOCKX);
+
+        SELECT @defaultConstraintName = dc.name
+        FROM sys.default_constraints dc
+        INNER JOIN sys.columns c
+            ON c.object_id = dc.parent_object_id
+           AND c.column_id = dc.parent_column_id
+        WHERE dc.parent_object_id = OBJECT_ID(N'[dbo].[{tableName}]')
+          AND c.name = N'Id';
+
+        IF @defaultConstraintName IS NOT NULL
+        BEGIN
+            SET @dropDefaultSql =
+                N'ALTER TABLE [dbo].[{tableName}] DROP CONSTRAINT [' + REPLACE(@defaultConstraintName, N']', N']]') + N'];';
+            EXEC(@dropDefaultSql);
+        END
 
         IF OBJECT_ID(N'[dbo].[{sequenceName}]', N'SO') IS NULL
         BEGIN
@@ -164,6 +274,24 @@ public partial class SqlDataService
         return db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
     }
 
+    private static Task EnsureQuoteNumberColumnDefinitionAsync(
+        AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+    IF COL_LENGTH(N'[dbo].[Quotes]', N'QuoteNumber') IS NOT NULL
+    BEGIN
+        UPDATE [dbo].[Quotes]
+        SET [QuoteNumber] = N'RECOVERED-' + CONVERT(NVARCHAR(20), [Id])
+        WHERE [QuoteNumber] IS NULL OR LTRIM(RTRIM([QuoteNumber])) = N'';
+
+        ALTER TABLE [dbo].[Quotes] ALTER COLUMN [QuoteNumber] NVARCHAR(50) NOT NULL;
+    END
+    """;
+
+        return db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
     private static async Task EnsureCustomerSyncIdentityAsync(AppDbContext db, CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlRawAsync("""
@@ -178,6 +306,27 @@ public partial class SqlDataService
      """, cancellationToken);
 
         await db.Database.ExecuteSqlRawAsync("""
+     UPDATE [dbo].[Customers]
+     SET [SyncId] = NEWID()
+     WHERE [SyncId] = '00000000-0000-0000-0000-000000000000';
+     """, cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("""
+     ;WITH DuplicateSyncIds AS
+     (
+         SELECT [Id],
+                ROW_NUMBER() OVER (PARTITION BY [SyncId] ORDER BY [Id]) AS RowNumber
+         FROM [dbo].[Customers]
+         WHERE [SyncId] IS NOT NULL
+     )
+     UPDATE c
+     SET [SyncId] = NEWID()
+     FROM [dbo].[Customers] c
+     INNER JOIN DuplicateSyncIds d ON d.[Id] = c.[Id]
+     WHERE d.RowNumber > 1;
+     """, cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("""
      IF EXISTS (
          SELECT 1 FROM sys.columns
          WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
@@ -186,6 +335,18 @@ public partial class SqlDataService
      )
      BEGIN
          ALTER TABLE [dbo].[Customers] ALTER COLUMN [SyncId] UNIQUEIDENTIFIER NOT NULL;
+     END
+     """, cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("""
+     IF EXISTS (
+         SELECT 1 FROM sys.indexes
+         WHERE object_id = OBJECT_ID(N'[dbo].[Customers]')
+           AND name = 'IX_Customers_SyncId'
+           AND is_unique = 0
+     )
+     BEGIN
+         DROP INDEX [IX_Customers_SyncId] ON [dbo].[Customers];
      END
      """, cancellationToken);
 

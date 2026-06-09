@@ -126,24 +126,34 @@
                                            Foreground="{StaticResource DefaultTextBrush}"
                                            Margin="0,0,0,12"/>
 
-                                <TextBlock Style="{StaticResource LabelStyle}" Text="Connection string"/>
-                                <TextBox x:Name="TxtDatabaseConnectionString"
-                                         Height="78"
-                                         MinHeight="78"
-                                         Padding="9,7"
-                                         AcceptsReturn="True"
-                                         TextWrapping="Wrap"
-                                         VerticalContentAlignment="Top"
-                                         VerticalScrollBarVisibility="Auto"/>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="120"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Tipo database"/>
+                                        <ComboBox x:Name="CmbDatabaseProvider"
+                                                  Height="34"
+                                                  Background="{StaticResource WhiteBrush}"
+                                                  BorderBrush="{StaticResource ModalFieldBorderBrush}"
+                                                  BorderThickness="1"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Porta"/>
+                                        <TextBox x:Name="TxtDatabasePort"/>
+                                    </StackPanel>
+                                </Grid>
 
-                                <Grid Margin="0,12,0,0">
+                                <Grid Margin="0,0,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="14"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Server"/>
+                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Server / host"/>
                                         <TextBox x:Name="TxtDatabaseServer"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
@@ -169,7 +179,7 @@
                                 </Grid>
 
                                 <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="I quattro campi separati sovrascrivono i valori presenti nella connection string. Tutti i valori vengono salvati cifrati per questo utente Windows. Le opzioni di sicurezza mancanti vengono aggiunte dal programma al momento della connessione."/>
+                                           Text="Per Neon/PostgreSQL usa porta 5432 salvo indicazioni diverse. Tutti i valori sensibili vengono salvati cifrati per questo utente Windows."/>
                             </StackPanel>
                         </Border>
 

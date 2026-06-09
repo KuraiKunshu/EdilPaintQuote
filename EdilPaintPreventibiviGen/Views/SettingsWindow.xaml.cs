@@ -14,6 +14,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        CmbDatabaseProvider.ItemsSource = DatabaseSettingsModel.AvailableProviders;
         CmbPdfTemplate.ItemsSource = PdfTemplateSettingsModel.AvailableTemplates;
         LoadSettings();
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
@@ -27,8 +28,11 @@ public partial class SettingsWindow : Window
         var database = App.AppSettings.Database;
         var mail = App.AppSettings.Mail;
 
-        TxtDatabaseConnectionString.Text = database.ConnectionString;
+        CmbDatabaseProvider.SelectedItem = DatabaseSettingsModel.AvailableProviders.Contains(database.Provider)
+            ? database.Provider
+            : DatabaseSettingsModel.SqlServerProvider;
         TxtDatabaseServer.Text = database.Server;
+        TxtDatabasePort.Text = database.Port?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         TxtDatabaseName.Text = database.Database;
         TxtDatabaseUsername.Text = database.Username;
         TxtDatabasePassword.Password = database.Password;
@@ -104,8 +108,26 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        string databaseConnectionString = TxtDatabaseConnectionString.Text.Trim();
+        string databaseProvider = CmbDatabaseProvider.SelectedItem?.ToString() ?? DatabaseSettingsModel.SqlServerProvider;
         string databaseServer = TxtDatabaseServer.Text.Trim();
+        int? databasePort = null;
+        if (!string.IsNullOrWhiteSpace(TxtDatabasePort.Text))
+        {
+            if (!int.TryParse(TxtDatabasePort.Text, out int parsedDatabasePort) ||
+                parsedDatabasePort <= 0 ||
+                parsedDatabasePort > 65535)
+            {
+                MessageBox.Show(
+                    "La porta del database deve essere un numero valido tra 1 e 65535.",
+                    "Impostazioni non valide",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            databasePort = parsedDatabasePort;
+        }
+
         string databaseName = TxtDatabaseName.Text.Trim();
         string databaseUsername = TxtDatabaseUsername.Text.Trim();
         string databasePassword = TxtDatabasePassword.Password;
@@ -136,8 +158,9 @@ public partial class SettingsWindow : Window
             var database = App.AppSettings.Database;
             var mail = App.AppSettings.Mail;
 
-            database.ConnectionString = databaseConnectionString;
+            database.Provider = DatabaseSettingsModel.NormalizeProvider(databaseProvider);
             database.Server = databaseServer;
+            database.Port = databasePort;
             database.Database = databaseName;
             database.Username = databaseUsername;
             database.Password = databasePassword;

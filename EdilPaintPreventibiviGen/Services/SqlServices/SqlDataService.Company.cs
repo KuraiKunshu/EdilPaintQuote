@@ -56,13 +56,30 @@ public partial class SqlDataService
     {
         await using var db = AppDbContextFactory.Create();
 
-        // UPDATE atomico: incrementa e restituisce il nuovo valore in un'unica operazione SQL
-        // Questo evita race condition tra piu' PC che chiamano contemporaneamente.
-        var result = await db.Database.SqlQueryRaw<int>("""
-                                                        UPDATE TOP(1) [dbo].[CompanySettings]
-                                                        SET [Counter] = [Counter] + 1
-                                                        OUTPUT INSERTED.[Counter]
-                                                        """).ToListAsync();
+        // UPDATE atomico: incrementa e restituisce il nuovo valore in un'unica operazione SQL.
+        // La sintassi cambia tra SQL Server e PostgreSQL, quindi teniamo separati i due dialetti.
+        var result = db.Database.IsNpgsql()
+            ? await db.Database.SqlQueryRaw<int>("""
+                                                UPDATE "CompanySettings"
+                                                SET "Counter" = "Counter" + 1
+                                                WHERE "Id" = (
+                                                    SELECT "Id"
+                                                    FROM "CompanySettings"
+                                                    ORDER BY "Id"
+                                                    LIMIT 1
+                                                )
+                                                RETURNING "Counter"
+                                                """).ToListAsync()
+            : await db.Database.SqlQueryRaw<int>("""
+                                                UPDATE [dbo].[CompanySettings]
+                                                SET [Counter] = [Counter] + 1
+                                                OUTPUT INSERTED.[Counter]
+                                                WHERE [Id] = (
+                                                    SELECT TOP(1) [Id]
+                                                    FROM [dbo].[CompanySettings]
+                                                    ORDER BY [Id]
+                                                )
+                                                """).ToListAsync();
 
         if (result.Count > 0)
             return result[0];
