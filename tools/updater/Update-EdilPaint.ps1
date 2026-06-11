@@ -1,5 +1,6 @@
 param(
-    [string]$SettingsPath = (Join-Path $PSScriptRoot "updater-settings.json")
+    [string]$SettingsPath = (Join-Path $PSScriptRoot "updater-settings.json"),
+    [int]$WindowCloseDelaySeconds = 0
 )
 
 Set-StrictMode -Version Latest
@@ -9,6 +10,7 @@ $defaultRepositoryUrl = "https://github.com/KuraiKunshu/EdilPaintQuote.git"
 $defaultBranch = "main"
 $defaultProjectPath = "EdilPaintPreventibiviGen\EdilPaintPreventibiviGen.csproj"
 $defaultSolutionPath = "EdilPaintPreventibiviGen.sln"
+$defaultTestProjectPath = "EdilPaintPreventibiviGen.Tests\EdilPaintPreventibiviGen.Tests.csproj"
 $defaultProcessName = "EdilPaintPreventibiviGen"
 $scriptRoot = Split-Path -Parent $SettingsPath
 if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
@@ -40,6 +42,7 @@ function New-DefaultSettingsFile {
         InstallPath = ""
         ProjectPath = $defaultProjectPath
         SolutionPath = $defaultSolutionPath
+        TestProjectPath = $defaultTestProjectPath
         Configuration = "Release"
         RunTests = $true
         ProcessName = $defaultProcessName
@@ -50,11 +53,23 @@ function New-DefaultSettingsFile {
     $settings | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
+function Exit-Updater {
+    param([int]$Code)
+
+    if ($WindowCloseDelaySeconds -gt 0) {
+        Write-Host ""
+        Write-Host "La finestra si chiudera' tra $WindowCloseDelaySeconds secondi..."
+        Start-Sleep -Seconds $WindowCloseDelaySeconds
+    }
+
+    exit $Code
+}
+
 if (-not (Test-Path -LiteralPath $SettingsPath)) {
     New-DefaultSettingsFile -Path $SettingsPath
     Write-Host "Creato file impostazioni: $SettingsPath"
     Write-Host "Imposta InstallPath e rilancia lo script."
-    exit 1
+    Exit-Updater 1
 }
 
 $settings = Get-Content -LiteralPath $SettingsPath -Raw | ConvertFrom-Json
@@ -81,6 +96,7 @@ $sourcePath = Expand-ConfiguredPath ([string](Get-Setting -Name "SourcePath" -De
 $installPath = Expand-ConfiguredPath ([string](Get-Setting -Name "InstallPath" -DefaultValue ""))
 $projectPath = [string](Get-Setting -Name "ProjectPath" -DefaultValue $defaultProjectPath)
 $solutionPath = [string](Get-Setting -Name "SolutionPath" -DefaultValue $defaultSolutionPath)
+$testProjectPath = [string](Get-Setting -Name "TestProjectPath" -DefaultValue $defaultTestProjectPath)
 $configuration = [string](Get-Setting -Name "Configuration" -DefaultValue "Release")
 $runTests = [System.Convert]::ToBoolean((Get-Setting -Name "RunTests" -DefaultValue $true))
 $processName = [string](Get-Setting -Name "ProcessName" -DefaultValue $defaultProcessName)
@@ -222,12 +238,12 @@ try {
 
     if ($deployedCommit -eq $remoteCommit -and (Test-Path -LiteralPath $installedExe)) {
         Write-Log "Nessun aggiornamento disponibile."
-        exit 0
+        Exit-Updater 0
     }
 
     if (Test-ApplicationRunning -Name $processName) {
         Write-Log "Programma aperto: salto aggiornamento per non sovrascrivere file in uso."
-        exit 0
+        Exit-Updater 0
     }
 
     Write-Log "Aggiornamento trovato: $remoteCommit"
@@ -238,15 +254,24 @@ try {
 
     Invoke-Git -C $sourcePath pull --ff-only origin $branch
 
-    $solutionFullPath = Join-Path $sourcePath $solutionPath
     $projectFullPath = Join-Path $sourcePath $projectPath
+    $testProjectFullPath = Join-Path $sourcePath $testProjectPath
+
+    if (-not (Test-Path -LiteralPath $projectFullPath)) {
+        throw "ProjectPath non trovato: $projectFullPath"
+    }
 
     Write-Log "Ripristino pacchetti."
-    Invoke-External dotnet restore $solutionFullPath
+    Invoke-External dotnet restore $projectFullPath
 
     if ($runTests) {
-        Write-Log "Eseguo test."
-        Invoke-External dotnet test $solutionFullPath --configuration $configuration --no-restore
+        if (Test-Path -LiteralPath $testProjectFullPath) {
+            Write-Log "Eseguo test."
+            Invoke-External dotnet test $testProjectFullPath --configuration $configuration
+        }
+        else {
+            Write-Log "TestProjectPath non trovato: salto test ($testProjectFullPath)."
+        }
     }
 
     if (Test-Path -LiteralPath $publishPath) {
@@ -259,7 +284,7 @@ try {
 
     if (Test-ApplicationRunning -Name $processName) {
         Write-Log "Programma aperto dopo la build: salto copia file. Riprovero' al prossimo login."
-        exit 0
+        Exit-Updater 0
     }
 
     Write-Log "Copio file in $installPath"
@@ -269,9 +294,9 @@ try {
     Set-Content -LiteralPath $deployedCommitFile -Value $remoteCommit -Encoding UTF8
 
     Write-Log "Aggiornamento completato."
-    exit 0
+    Exit-Updater 0
 }
 catch {
     Write-Log "ERRORE: $($_.Exception.Message)"
-    exit 1
+    Exit-Updater 1
 }

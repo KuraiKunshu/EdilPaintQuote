@@ -29,7 +29,7 @@ public static class UpdaterLauncherService
         return null;
     }
 
-    public static void StartUpdater(string scriptPath)
+    public static void StartUpdater(string scriptPath, int windowCloseDelaySeconds = 0)
     {
         if (string.IsNullOrWhiteSpace(scriptPath) || !File.Exists(scriptPath))
             throw new FileNotFoundException("Script updater non trovato.", scriptPath);
@@ -38,10 +38,14 @@ public static class UpdaterLauncherService
         if (string.IsNullOrWhiteSpace(workingDirectory))
             workingDirectory = AppContext.BaseDirectory;
 
+        string arguments = $"-NoProfile -ExecutionPolicy Bypass -File {QuoteArgument(scriptPath)}";
+        if (windowCloseDelaySeconds > 0)
+            arguments += $" -WindowCloseDelaySeconds {windowCloseDelaySeconds}";
+
         var process = Process.Start(new ProcessStartInfo
         {
             FileName = "powershell.exe",
-            Arguments = $"-NoProfile -ExecutionPolicy Bypass -File {QuoteArgument(scriptPath)}",
+            Arguments = arguments,
             WorkingDirectory = workingDirectory,
             UseShellExecute = true,
             WindowStyle = ProcessWindowStyle.Normal

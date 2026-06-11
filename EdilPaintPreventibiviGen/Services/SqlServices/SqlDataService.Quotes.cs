@@ -444,11 +444,11 @@ public partial class SqlDataService
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            string term = searchText.Trim();
+            string term = searchText.Trim().ToLower();
             query = query.Where(x =>
-                x.QuoteNumber.Contains(term) ||
-                (x.Customer != null && x.Customer.BusinessName.Contains(term)) ||
-                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.Contains(term)));
+                x.QuoteNumber.ToLower().Contains(term) ||
+                (x.Customer != null && x.Customer.BusinessName.ToLower().Contains(term)) ||
+                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)));
         }
 
         return await query
@@ -497,10 +497,11 @@ public partial class SqlDataService
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
+            string term = searchText.Trim().ToLower();
             query = query.Where(x =>
-                x.QuoteNumber.Contains(searchText) ||
-                (x.Customer != null && x.Customer.BusinessName.Contains(searchText)) ||
-                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.Contains(searchText)));
+                x.QuoteNumber.ToLower().Contains(term) ||
+                (x.Customer != null && x.Customer.BusinessName.ToLower().Contains(term)) ||
+                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)));
         }
 
         return await query
