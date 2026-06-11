@@ -306,7 +306,7 @@ public partial class SettingsWindow : Window
             if (result != MessageBoxResult.Yes)
                 return;
 
-            UpdaterLauncherService.StartUpdater(scriptPath);
+            UpdaterLauncherService.StartUpdater(scriptPath, windowCloseDelaySeconds: 10);
             AppShutdownManager.RequestShutdown();
             Application.Current.Shutdown();
         }

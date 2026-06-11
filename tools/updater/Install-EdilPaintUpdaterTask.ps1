@@ -41,6 +41,7 @@ if (-not (Test-Path -LiteralPath $settingsPath) -or $OverwriteSettings) {
         InstallPath = $InstallPath
         ProjectPath = "EdilPaintPreventibiviGen\EdilPaintPreventibiviGen.csproj"
         SolutionPath = "EdilPaintPreventibiviGen.sln"
+        TestProjectPath = "EdilPaintPreventibiviGen.Tests\EdilPaintPreventibiviGen.Tests.csproj"
         Configuration = "Release"
         RunTests = [bool]$RunTests
         ProcessName = "EdilPaintPreventibiviGen"
