@@ -72,6 +72,12 @@
                 <TextBox x:Name="TxtRecipient"
                          Style="{StaticResource FieldTextBoxStyle}"/>
 
+                <TextBlock Text="Email in copia"
+                           Style="{StaticResource FieldLabelStyle}"
+                           Margin="0,12,0,5"/>
+                <TextBox x:Name="TxtCcRecipients"
+                         Style="{StaticResource FieldTextBoxStyle}"/>
+
                 <Border x:Name="EmailFieldsPanel"
                         Background="{StaticResource SectionPanelBackgroundBrush}"
                         BorderBrush="{StaticResource SubtleBorderBrush}"

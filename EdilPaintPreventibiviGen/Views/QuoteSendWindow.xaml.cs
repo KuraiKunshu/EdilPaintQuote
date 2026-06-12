@@ -7,6 +7,8 @@ namespace EdilPaintPreventibiviGen.Views;
 public partial class QuoteSendWindow : Window
 {
     public QuoteSendInfo Result { get; private set; } = new();
+    public string PrimaryEmailRecipient => TxtRecipient.Text.Trim();
+    public string EmailCcRecipients => TxtCcRecipients.Text.Trim();
     public string EmailSubject => TxtSubject.Text.Trim();
     public string EmailBody => TxtBody.Text;
     public bool ShouldOpenWhatsApp => ChkSendWhatsApp.IsChecked == true;
@@ -26,9 +28,14 @@ public partial class QuoteSendWindow : Window
         TxtQuoteSubtitle.Text = string.IsNullOrWhiteSpace(summary.ReferenceName)
             ? summary.CustomerName
             : $"{summary.CustomerName} - Rif. {summary.ReferenceName}";
-        TxtRecipient.Text = string.IsNullOrWhiteSpace(summary.SentRecipient)
+        string rawRecipients = string.IsNullOrWhiteSpace(summary.SentRecipient)
             ? defaultRecipient
             : summary.SentRecipient;
+        var recipientSplit = EmailAddressParser.SplitPrimaryAndCopies(rawRecipients);
+        TxtRecipient.Text = string.IsNullOrWhiteSpace(recipientSplit.PrimaryRecipient)
+            ? rawRecipients.Trim()
+            : recipientSplit.PrimaryRecipient;
+        TxtCcRecipients.Text = EmailAddressParser.Join(recipientSplit.CopyRecipients);
         TxtSubject.Text = defaultSubject;
         TxtBody.Text = defaultBody;
         TxtWhatsAppPhone.Text = defaultWhatsAppPhone;
@@ -41,10 +48,12 @@ public partial class QuoteSendWindow : Window
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(TxtRecipient.Text))
+        var recipients = EmailAddressParser.ExtractEmails(TxtRecipient.Text);
+        var copyRecipients = EmailAddressParser.ExtractEmails(TxtCcRecipients.Text);
+        if (recipients.Count == 0)
         {
             MessageBox.Show(
-                "Inserisci un destinatario email prima di procedere.",
+                "Inserisci un destinatario email valido prima di procedere.",
                 "Invio preventivo",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -52,11 +61,21 @@ public partial class QuoteSendWindow : Window
             return;
         }
 
+        string primaryRecipient = recipients[0];
+        var normalizedCopies = recipients
+            .Skip(1)
+            .Concat(copyRecipients)
+            .Where(x => !string.Equals(x, primaryRecipient, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        TxtRecipient.Text = primaryRecipient;
+        TxtCcRecipients.Text = EmailAddressParser.Join(normalizedCopies);
+
         Result = new QuoteSendInfo
         {
             SentAtUtc = DateTime.UtcNow,
             Method = "Email",
-            Recipient = TxtRecipient.Text.Trim(),
+            Recipient = EmailAddressParser.Join(new[] { primaryRecipient }.Concat(normalizedCopies)),
             DeviceName = DeviceNameService.GetCurrentDeviceName()
         };
 

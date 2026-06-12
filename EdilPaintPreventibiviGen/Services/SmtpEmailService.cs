@@ -9,6 +9,7 @@ namespace EdilPaintPreventibiviGen.Services;
 public sealed class SmtpEmailRequest
 {
     public string Recipient { get; set; } = string.Empty;
+    public string CcRecipients { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public string AttachmentPath { get; set; } = string.Empty;
@@ -59,15 +60,21 @@ public sealed class SmtpEmailService
             var recipients = ParseRecipients(request.Recipient);
             if (recipients.Count == 0)
                 throw new InvalidOperationException("Destinatario email non valido.");
+            var ccRecipients = ParseRecipients(request.CcRecipients)
+                .Where(cc => recipients.All(to => !string.Equals(to.Address, cc.Address, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            var smtpRecipients = recipients.Concat(ccRecipients).ToList();
 
             var attachmentInfo = new FileInfo(request.AttachmentPath);
             debugLog.Write($"SMTP: server={_settings.SmtpServer}, port={_settings.Port}, ssl={_settings.UseSsl}.");
             debugLog.Write($"Mittente: {from.Address}");
             debugLog.Write($"Destinatari: {string.Join(", ", recipients.Select(r => r.Address))}");
+            if (ccRecipients.Count > 0)
+                debugLog.Write($"CC: {string.Join(", ", ccRecipients.Select(r => r.Address))}");
             debugLog.Write($"Oggetto: {request.Subject}");
             debugLog.Write($"Allegato: {attachmentInfo.FullName} ({FormatBytes(attachmentInfo.Length)})");
 
-            string message = await BuildMimeMessageAsync(from, recipients, request, messageId, token);
+            string message = await BuildMimeMessageAsync(from, recipients, ccRecipients, request, messageId, token);
 
             using var client = new TcpClient();
             client.SendTimeout = (int)SendTimeout.TotalMilliseconds;
@@ -104,7 +111,7 @@ public sealed class SmtpEmailService
                 await SendCommandAsync(reader, writer, debugLog, ToBase64(_settings.Password), token, 235, "AUTH password <redacted>");
                 await SendCommandAsync(reader, writer, debugLog, $"MAIL FROM:<{from.Address}>", token, 250);
 
-                foreach (var recipient in recipients)
+                foreach (var recipient in smtpRecipients)
                     await SendCommandAsync(reader, writer, debugLog, $"RCPT TO:<{recipient.Address}>", token, [250, 251]);
 
                 await SendCommandAsync(reader, writer, debugLog, "DATA", token, 354);
@@ -147,15 +154,13 @@ public sealed class SmtpEmailService
 
     private static List<MailAddress> ParseRecipients(string recipients)
     {
-        return recipients
-            .Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(address => new MailAddress(address))
-            .ToList();
+        return EmailAddressParser.ToMailAddresses(recipients);
     }
 
     private static async Task<string> BuildMimeMessageAsync(
         MailAddress from,
         IReadOnlyList<MailAddress> recipients,
+        IReadOnlyList<MailAddress> ccRecipients,
         SmtpEmailRequest request,
         string messageId,
         CancellationToken cancellationToken)
@@ -168,6 +173,8 @@ public sealed class SmtpEmailService
         sb.AppendLine($"From: {FormatMailbox(from)}");
         sb.AppendLine($"Reply-To: {FormatMailbox(from)}");
         sb.AppendLine($"To: {string.Join(", ", recipients.Select(FormatMailbox))}");
+        if (ccRecipients.Count > 0)
+            sb.AppendLine($"Cc: {string.Join(", ", ccRecipients.Select(FormatMailbox))}");
         sb.AppendLine($"Subject: {EncodeHeader(request.Subject)}");
         sb.AppendLine($"Date: {DateTimeOffset.Now:R}");
         sb.AppendLine($"Message-ID: {messageId}");

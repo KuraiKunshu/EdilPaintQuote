@@ -256,9 +256,35 @@ public partial class MainViewModel
 
     private void RememberPersistedQuote(QuoteHistoryEntry entry)
     {
+        var persistedVersion = entry.BaseVersionUtc != default
+            ? entry.BaseVersionUtc
+            : entry.LastModifiedUtc;
+
+        if (persistedVersion != default)
+            entry.BaseVersionUtc = persistedVersion;
+
         _isEditingExistingQuote = true;
         _loadedQuoteDate = entry.Date;
-        _loadedQuoteBaseVersionUtc = entry.BaseVersionUtc;
+        _loadedQuoteBaseVersionUtc = persistedVersion;
+
+        var historyEntry = History.FirstOrDefault(x => x.QuoteNumber == entry.QuoteNumber);
+        if (historyEntry != null)
+            RefreshPersistedQuoteMetadata(historyEntry, entry, persistedVersion);
+    }
+
+    private static void RefreshPersistedQuoteMetadata(
+        QuoteHistoryEntry target,
+        QuoteHistoryEntry source,
+        DateTime persistedVersion)
+    {
+        if (source.LastModifiedUtc != default)
+            target.LastModifiedUtc = source.LastModifiedUtc;
+
+        if (persistedVersion != default)
+            target.BaseVersionUtc = persistedVersion;
+
+        target.SyncHash = source.SyncHash;
+        target.LastModifiedByDevice = source.LastModifiedByDevice;
     }
 
     private async Task SaveAttachmentsToFileSystemAsync(string pdfPath, string quoteNumber)
