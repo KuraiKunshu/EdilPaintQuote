@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 namespace EdilPaintPreventibiviGen.Services;
 public partial class SqlDataService
 {
+    private static readonly TimeSpan QuoteConflictTimestampTolerance = TimeSpan.FromSeconds(2);
+
     public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
@@ -830,7 +832,7 @@ public partial class SqlDataService
                         throw new QuoteConflictException(quote.QuoteNumber);
 
                     if (quote.BaseVersionUtc != default &&
-                        existing.LastModifiedUtc > quote.BaseVersionUtc.AddMilliseconds(1))
+                        existing.LastModifiedUtc > quote.BaseVersionUtc.Add(QuoteConflictTimestampTolerance))
                     {
                         throw new QuoteConflictException(quote.QuoteNumber);
                     }

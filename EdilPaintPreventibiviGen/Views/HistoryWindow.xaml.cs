@@ -420,7 +420,8 @@ public partial class HistoryWindow : Window
         var service = new SmtpEmailService(App.AppSettings.Mail);
         return await service.SendAsync(new SmtpEmailRequest
         {
-            Recipient = win.Result.Recipient,
+            Recipient = win.PrimaryEmailRecipient,
+            CcRecipients = win.EmailCcRecipients,
             Subject = win.EmailSubject,
             Body = win.EmailBody,
             AttachmentPath = pdfPath

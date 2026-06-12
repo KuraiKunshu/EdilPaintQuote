@@ -181,6 +181,16 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public void EmailParserSplitsFirstRecipientAndCopies()
+    {
+        var split = EmailAddressParser.SplitPrimaryAndCopies(
+            " info@example.com / amministrazione@example.it, tecnico@example.it non valida / info@example.com ");
+
+        Assert.Equal("info@example.com", split.PrimaryRecipient);
+        Assert.Equal(["amministrazione@example.it", "tecnico@example.it"], split.CopyRecipients);
+    }
+
+    [Fact]
     public void CollaborationMarginUsesTaxableAmount()
     {
         var context = new CostsPdfContext
