@@ -20,7 +20,7 @@
 
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0"
-                            ResizeBorderThickness="26"
+                            ResizeBorderThickness="8"
                             CornerRadius="0"
                             GlassFrameThickness="0"/>
     </shell:WindowChrome.WindowChrome>
@@ -57,7 +57,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid Background="{StaticResource TransparentBrush}" Margin="18">
+    <Grid Background="{StaticResource TransparentBrush}">
         <Border Background="{StaticResource RowBackgroundBrush}"
                 CornerRadius="16"
                 BorderBrush="{StaticResource WindowShadowBorderBrush}"

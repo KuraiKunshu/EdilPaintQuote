@@ -36,7 +36,9 @@ public partial class SentOpenQuotesWindow : Window
         _isRefreshing = true;
         Cursor = System.Windows.Input.Cursors.Wait;
         TxtSubtitle.Text = "Caricamento preventivi inviati negli ultimi 2 mesi...";
-        TxtEmpty.Visibility = Visibility.Collapsed;
+        TxtCountBadge.Text = "...";
+        TxtPeriod.Text = string.Empty;
+        EmptyPanel.Visibility = Visibility.Collapsed;
 
         try
         {
@@ -45,8 +47,10 @@ public partial class SentOpenQuotesWindow : Window
             token.ThrowIfCancellationRequested();
 
             GridQuotes.ItemsSource = summaries;
-            TxtSubtitle.Text = $"{summaries.Count} preventivi trovati. Sono esclusi confermati, finiti, archiviati e rifiutati.";
-            TxtEmpty.Visibility = summaries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            TxtCountBadge.Text = summaries.Count.ToString();
+            TxtSubtitle.Text = "Sono esclusi confermati, finiti, archiviati e rifiutati.";
+            TxtPeriod.Text = $"Dal {sinceUtc.ToLocalTime():dd/MM/yyyy} a oggi";
+            EmptyPanel.Visibility = summaries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (OperationCanceledException)
         {

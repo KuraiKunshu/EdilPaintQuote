@@ -3,11 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:EdilPaintPreventibiviGen.Converters"
         Title="Preventivi inviati aperti"
-        Width="1040"
-        Height="620"
-        MinWidth="820"
-        MinHeight="480"
-        MaxWidth="1320"
+        Width="1180"
+        Height="680"
+        MinWidth="960"
+        MinHeight="540"
+        MaxWidth="1380"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource ShellBackgroundBrush}"
         Icon="pack://application:,,,/Assets/Windowsicon/main.ico">
@@ -16,50 +16,202 @@
         <converters:SyncStatusToTooltipConverter x:Key="SyncStatusToTooltipConverter"/>
 
         <Style x:Key="ActionButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="MinWidth" Value="92"/>
+            <Setter Property="Padding" Value="16,6"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
+        <Style x:Key="HeaderMetricStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,7"/>
+        </Style>
+
         <Style x:Key="GridHeaderStyle" TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="{StaticResource PanelBackgroundBrush}"/>
+            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="8,7"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="12,9"/>
             <Setter Property="BorderBrush" Value="{StaticResource DataGridLineBrush}"/>
-            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
 
         <Style x:Key="GridCellStyle" TargetType="DataGridCell">
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="BorderBrush" Value="{StaticResource DataGridLineBrush}"/>
-            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="GridRowStyle" TargetType="DataGridRow">
+            <Setter Property="MinHeight" Value="58"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DataGridLineBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Style.Triggers>
+                <Trigger Property="AlternationIndex" Value="1">
+                    <Setter Property="Background" Value="{StaticResource PanelBackgroundBrush}"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SearchResultHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SearchResultSelectedBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PrimaryTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="SecondaryTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="BadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="StatusBadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource StatusFinalizzatoBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="Spedito">
+                    <Setter Property="Background" Value="{StaticResource StatusSpeditoBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusSpeditoSelectedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Confermato">
+                    <Setter Property="Background" Value="{StaticResource StatusConfermatoBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusConfermatoSelectedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Finito">
+                    <Setter Property="Background" Value="{StaticResource StatusFinitoBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusFinitoSelectedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Rifiutato">
+                    <Setter Property="Background" Value="{StaticResource StatusRifiutatoBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusRifiutatoSelectedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Bozza">
+                    <Setter Property="Background" Value="{StaticResource StatusBozzaBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusBozzaSelectedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="DaInviare">
+                    <Setter Property="Background" Value="{StaticResource StatusDaInviareBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusDaInviareSelectedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="DaSollecitare">
+                    <Setter Property="Background" Value="{StaticResource StatusDaSollecitareBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusDaSollecitareSelectedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Archiviato">
+                    <Setter Property="Background" Value="{StaticResource StatusArchiviatoBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource StatusArchiviatoSelectedBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SoftBadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="8,5"/>
+        </Style>
+
+        <Style x:Key="DiscountBadgeStyle" TargetType="Border" BasedOn="{StaticResource SoftBadgeStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasDiscount}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource WarningPanelBackgroundBrush}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource WarningPanelBorderBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
     </Window.Resources>
 
     <DockPanel Margin="18">
-        <Grid DockPanel.Dock="Top" Margin="0,0,0,14">
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource SubtleBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16"
+                Margin="0,0,0,14">
+            <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel>
-                <TextBlock Text="Preventivi inviati aperti"
-                           FontSize="23"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource DefaultTextBrush}"/>
-                <TextBlock x:Name="TxtSubtitle"
-                           Margin="0,4,0,0"
-                           Foreground="{StaticResource MutedTextBrush}"
-                           FontSize="12"/>
-            </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Border Style="{StaticResource HeaderMetricStyle}">
+                        <StackPanel>
+                            <TextBlock x:Name="TxtCountBadge"
+                                       Text="..."
+                                       FontSize="22"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource DangerRedBrush}"/>
+                            <TextBlock Text="aperti"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedTextBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="Preventivi inviati aperti"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource DefaultTextBrush}"/>
+                        <TextBlock x:Name="TxtSubtitle"
+                                   Margin="0,4,0,0"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="12"/>
+                    </StackPanel>
+                </Grid>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Content="Aggiorna"
                         Style="{StaticResource ActionButtonStyle}"
                         Background="{StaticResource DiagnosticsButtonBrush}"
@@ -70,58 +222,177 @@
                         Background="{StaticResource SettingsButtonBrush}"
                         Click="OnCloseClick"/>
             </StackPanel>
-        </Grid>
+            </Grid>
+        </Border>
 
         <Border Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource SubtleBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
-                Padding="12">
+                Padding="0">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Margin="14,12,14,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Elenco preventivi"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource DefaultTextBrush}"/>
+                    <TextBlock Grid.Column="1"
+                               x:Name="TxtPeriod"
+                               FontSize="12"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
                 <DataGrid x:Name="GridQuotes"
+                          Grid.Row="1"
                           AutoGenerateColumns="False"
                           CanUserAddRows="False"
                           CanUserDeleteRows="False"
                           IsReadOnly="True"
                           HeadersVisibility="Column"
-                          GridLinesVisibility="Horizontal"
+                          GridLinesVisibility="None"
                           SelectionMode="Single"
-                          RowHeight="38"
-                          AlternatingRowBackground="{StaticResource PanelBackgroundBrush}"
+                          AlternationCount="2"
+                          RowHeight="58"
+                          Margin="14,0,14,14"
                           Background="{StaticResource SurfaceBrush}"
                           BorderBrush="{StaticResource DataGridBorderBrush}"
                           BorderThickness="1"
                           ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
-                          CellStyle="{StaticResource GridCellStyle}">
+                          CellStyle="{StaticResource GridCellStyle}"
+                          RowStyle="{StaticResource GridRowStyle}"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="" Width="34">
+                        <DataGridTemplateColumn Header="Preventivo" Width="135">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Ellipse Width="10"
-                                             Height="10"
-                                             Fill="{Binding SyncStatus, Converter={StaticResource SyncStatusToColorConverter}}"
-                                             ToolTip="{Binding SyncStatus, Converter={StaticResource SyncStatusToTooltipConverter}}"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="10"
+                                                 Height="10"
+                                                 Margin="0,0,9,0"
+                                                 VerticalAlignment="Center"
+                                                 Fill="{Binding SyncStatus, Converter={StaticResource SyncStatusToColorConverter}}"
+                                                 ToolTip="{Binding SyncStatus, Converter={StaticResource SyncStatusToTooltipConverter}}"/>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding QuoteNumber}"
+                                                       Style="{StaticResource PrimaryTextStyle}"
+                                                       ToolTip="{Binding QuoteNumber}"/>
+                                            <TextBlock Text="{Binding CreatedDateDisplay}"
+                                                       Style="{StaticResource SecondaryTextStyle}"
+                                                       Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="N." Binding="{Binding QuoteNumber}" Width="95"/>
-                        <DataGridTextColumn Header="Cliente / riferimento" Binding="{Binding CustomerReferenceDisplay}" Width="2*"/>
-                        <DataGridTextColumn Header="Totale" Binding="{Binding TotalDisplay}" Width="90"/>
-                        <DataGridTextColumn Header="Sconti" Binding="{Binding DiscountDisplay}" Width="130"/>
-                        <DataGridTextColumn Header="IVA" Binding="{Binding IvaDisplay}" Width="80"/>
-                        <DataGridTextColumn Header="Stato" Binding="{Binding Status}" Width="110"/>
-                        <DataGridTextColumn Header="Ultimo invio" Binding="{Binding SentDateDisplay}" Width="115"/>
-                        <DataGridTextColumn Header="Destinatario" Binding="{Binding SentRecipient}" Width="1.4*"/>
+
+                        <DataGridTemplateColumn Header="Cliente / riferimento" Width="2.5*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding CustomerName}"
+                                                   Style="{StaticResource PrimaryTextStyle}"
+                                                   ToolTip="{Binding CustomerName}"/>
+                                        <TextBlock Text="{Binding ReferenceName}"
+                                                   Style="{StaticResource SecondaryTextStyle}"
+                                                   Margin="0,3,0,0"
+                                                   ToolTip="{Binding ReferenceName}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="Totale / sconti" Width="155">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding TotalDisplay, StringFormat={}€ {0}}"
+                                                   Style="{StaticResource PrimaryTextStyle}"
+                                                   HorizontalAlignment="Right"/>
+                                        <Border Style="{StaticResource DiscountBadgeStyle}"
+                                                Margin="0,4,0,0"
+                                                HorizontalAlignment="Right">
+                                            <TextBlock Text="{Binding DiscountDisplay}"
+                                                       Style="{StaticResource BadgeTextStyle}"
+                                                       Foreground="{StaticResource DefaultTextBrush}"/>
+                                        </Border>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="IVA" Width="78">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource SoftBadgeStyle}">
+                                        <TextBlock Text="{Binding IvaDisplay}"
+                                                   Style="{StaticResource BadgeTextStyle}"
+                                                   Foreground="{StaticResource DefaultTextBrush}"/>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="Stato" Width="118">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource StatusBadgeStyle}">
+                                        <TextBlock Text="{Binding Status}"
+                                                   Style="{StaticResource BadgeTextStyle}"
+                                                   Foreground="{StaticResource DefaultTextBrush}"/>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="Invio / destinatario" Width="1.8*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding SentDateDisplay}"
+                                                   Style="{StaticResource PrimaryTextStyle}"/>
+                                        <TextBlock Text="{Binding SentRecipient}"
+                                                   Style="{StaticResource SecondaryTextStyle}"
+                                                   Margin="0,3,0,0"
+                                                   ToolTip="{Binding SentRecipient}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
 
-                <TextBlock x:Name="TxtEmpty"
-                           Text="Nessun preventivo inviato aperto negli ultimi 2 mesi."
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource MutedTextBrush}"
-                           FontSize="15"
-                           Visibility="Collapsed"/>
+                <Border x:Name="EmptyPanel"
+                        Grid.Row="1"
+                        Background="{StaticResource SectionPanelBackgroundBrush}"
+                        BorderBrush="{StaticResource SubtleBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="24"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="Nessun preventivo aperto"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource DefaultTextBrush}"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Non ci sono preventivi inviati ancora aperti negli ultimi 2 mesi."
+                                   Margin="0,6,0,0"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
     </DockPanel>
