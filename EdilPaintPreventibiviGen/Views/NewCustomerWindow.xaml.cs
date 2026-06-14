@@ -14,6 +14,7 @@ public partial class NewCustomerWindow : Window
     public NewCustomerWindow(Customer? existingCustomer = null)
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
 
         _existingCustomer = existingCustomer;
 

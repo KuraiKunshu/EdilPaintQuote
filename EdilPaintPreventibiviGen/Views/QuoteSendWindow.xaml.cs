@@ -24,6 +24,7 @@ public partial class QuoteSendWindow : Window
         string defaultWhatsAppMessage = "")
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         TxtQuoteTitle.Text = $"Preventivo n. {summary.QuoteNumber}";
         TxtQuoteSubtitle.Text = string.IsNullOrWhiteSpace(summary.ReferenceName)
             ? summary.CustomerName

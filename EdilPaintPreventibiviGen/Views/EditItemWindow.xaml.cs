@@ -13,6 +13,7 @@ public partial class EditItemWindow : Window
     public EditItemWindow(Item item)
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         _item = item;
         
         TxtName.Text = _item.Name;

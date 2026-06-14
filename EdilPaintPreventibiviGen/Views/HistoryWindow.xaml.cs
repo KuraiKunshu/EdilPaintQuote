@@ -35,6 +35,7 @@ public partial class HistoryWindow : Window
     public HistoryWindow(MainViewModel vm)
     {
         InitializeComponent();
+        WindowResizeBehavior.PreventMaximizedState(this);
 
         _vm = vm;
         _historyService = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
@@ -267,6 +268,7 @@ public partial class HistoryWindow : Window
             _loadedQuoteNumbers.Add(summary.QuoteNumber);
         }
         GridHistory.ItemsSource = _vm.HistorySummaries;
+        GridHistory.SelectedIndex = _vm.HistorySummaries.Count > 0 ? 0 : -1;
     }
 
     private void OnFilterChanged(object sender, EventArgs e)
@@ -510,47 +512,6 @@ public partial class HistoryWindow : Window
             .Replace("{Total}", entry.Total.ToString("N2", CultureInfo.GetCultureInfo("it-IT")), StringComparison.OrdinalIgnoreCase);
     }
 
-    private async void OnReminderClick(object sender, RoutedEventArgs e)
-    {
-        if (!TryGetSummary(sender, out var entry)) return;
-
-        await RegisterReminderAsync(entry);
-    }
-
-    private async Task RegisterReminderAsync(QuoteHistorySummary entry)
-    {
-        if (MessageBox.Show($"Registrare un sollecito per il preventivo n. {entry.QuoteNumber}?",
-                "Sollecito", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-            return;
-
-        var reminder = new QuoteReminderInfo
-        {
-            ReminderAtUtc = DateTime.UtcNow,
-            DeviceName = DeviceNameService.GetCurrentDeviceName()
-        };
-
-        try
-        {
-            Mouse.OverrideCursor = Cursors.Wait;
-            await _historyService.RegisterReminderAsync(entry.QuoteNumber, reminder);
-            entry.Status = QuoteStatus.Spedito;
-            entry.LastReminderAtUtc = reminder.ReminderAtUtc;
-            entry.ReminderCount += 1;
-            entry.LastReminderByDevice = reminder.DeviceName;
-            entry.LastModifiedByDevice = reminder.DeviceName;
-            ApplyLocalFilters();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Errore durante il salvataggio del sollecito: {ex.Message}",
-                "Sollecito", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        finally
-        {
-            Mouse.OverrideCursor = null;
-        }
-    }
-
     private async void OnStatusChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isLoadingHistory) return;
@@ -747,13 +708,11 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateDisabledMenuItem($"IVA: {entry.IvaDisplay}"));
         menu.Items.Add(CreateDisabledMenuItem($"Sconti: {entry.DiscountDisplay}"));
         menu.Items.Add(CreateDisabledMenuItem($"Invio: {entry.SentDisplay}"));
-        menu.Items.Add(CreateDisabledMenuItem($"Solleciti: {entry.ReminderDisplay}"));
         menu.Items.Add(CreateDisabledMenuItem($"PC: {BlankToDash(entry.LastModifiedByDevice)}"));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Copia in nuovo preventivo", async () => await CopyPastQuoteAsync(entry)));
         menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
-        menu.Items.Add(CreateMenuItem("Registra sollecito", async () => await RegisterReminderAsync(entry)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));
 

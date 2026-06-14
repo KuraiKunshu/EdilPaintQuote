@@ -75,8 +75,8 @@
                 </Border>
                 <Border Style="{StaticResource TileStyle}">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource TileLabelStyle}" Text="Da sollecitare"/>
-                        <TextBlock x:Name="TxtToRemind" Style="{StaticResource TileValueStyle}"/>
+                        <TextBlock Style="{StaticResource TileLabelStyle}" Text="Preventivi inviati"/>
+                        <TextBlock x:Name="TxtSentQuotes" Style="{StaticResource TileValueStyle}"/>
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource TileStyle}">
@@ -138,12 +138,12 @@
                 <Border Grid.Column="1" Style="{StaticResource TileStyle}" Margin="0,0,0,12">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top"
-                                   Text="Preventivi da seguire"
+                                   Text="Ultimi invii"
                                    FontSize="16"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource DefaultTextBrush}"
                                    Margin="0,0,0,12"/>
-                        <DataGrid x:Name="GridReminders"
+                        <DataGrid x:Name="GridSentQuotes"
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True"
                                   CanUserAddRows="False"
@@ -152,8 +152,8 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="N." Binding="{Binding QuoteNumber}" Width="90"/>
                                 <DataGridTextColumn Header="Cliente" Binding="{Binding CustomerName}" Width="*"/>
-                                <DataGridTextColumn Header="Invio" Binding="{Binding SentDisplay}" Width="130"/>
-                                <DataGridTextColumn Header="Solleciti" Binding="{Binding ReminderDisplay}" Width="150"/>
+                                <DataGridTextColumn Header="Ultimo invio" Binding="{Binding SentDateDisplay}" Width="130"/>
+                                <DataGridTextColumn Header="Destinatario" Binding="{Binding SentRecipient}" Width="170"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>

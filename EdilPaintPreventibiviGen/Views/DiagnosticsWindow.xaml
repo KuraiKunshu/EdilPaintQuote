@@ -1,17 +1,26 @@
 <Window x:Class="EdilPaintPreventibiviGen.Views.DiagnosticsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Diagnostica"
         Width="860"
         Height="760"
         MinWidth="780"
-        MinHeight="660"
+        MinHeight="560"
+        MaxWidth="1180"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         AllowsTransparency="True"
         Background="{StaticResource TransparentBrush}"
         Icon="pack://application:,,,/Assets/Windowsicon/main.png">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="26"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"/>
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <Style x:Key="HeaderButtonStyle" TargetType="Button">

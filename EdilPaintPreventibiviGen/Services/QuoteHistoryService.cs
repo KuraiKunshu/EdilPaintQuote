@@ -7,6 +7,14 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public sealed class QuoteHistoryService
 {
+    private static readonly HashSet<QuoteStatus> SentOpenExcludedStatuses =
+    [
+        QuoteStatus.Confermato,
+        QuoteStatus.Finito,
+        QuoteStatus.Archiviato,
+        QuoteStatus.Rifiutato
+    ];
+
     private readonly IDataService _dataService;
     private readonly StoragePathService _storagePathService;
 
@@ -39,6 +47,23 @@ public sealed class QuoteHistoryService
         CancellationToken cancellationToken = default)
     {
         return await _dataService.SearchQuoteSummariesAsync(text, take, cancellationToken);
+    }
+
+    public async Task<List<QuoteHistorySummary>> LoadSentOpenSummariesAsync(
+        DateTime sinceUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dataService.GetSentOpenQuoteSummariesAsync(sinceUtc, cancellationToken);
+    }
+
+    public static bool IsSentOpenWithin(
+        DateTime? sentAtUtc,
+        QuoteStatus status,
+        DateTime sinceUtc)
+    {
+        return sentAtUtc.HasValue &&
+               sentAtUtc.Value.ToUniversalTime() >= sinceUtc.ToUniversalTime() &&
+               !SentOpenExcludedStatuses.Contains(status);
     }
     
     public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber)

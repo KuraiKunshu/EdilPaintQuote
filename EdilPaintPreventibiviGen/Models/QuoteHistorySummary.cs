@@ -45,13 +45,13 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     public string CustomerName
     {
         get => _customerName;
-        set { _customerName = value; OnPropertyChanged(); }
+        set { _customerName = value; OnPropertyChanged(); OnPropertyChanged(nameof(CustomerReferenceDisplay)); }
     }
 
     public string ReferenceName
     {
         get => _referenceName;
-        set { _referenceName = value; OnPropertyChanged(); }
+        set { _referenceName = value; OnPropertyChanged(); OnPropertyChanged(nameof(CustomerReferenceDisplay)); }
     }
 
     public string PdfPath
@@ -63,7 +63,7 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     public decimal Total
     {
         get => _total;
-        set { _total = value; OnPropertyChanged(); }
+        set { _total = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalDisplay)); }
     }
 
     public string IvaType
@@ -108,7 +108,41 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         }
     }
 
-    public string IvaDisplay => string.IsNullOrWhiteSpace(IvaType) ? "-" : IvaType;
+    public string IvaDisplay
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(IvaType))
+                return "-";
+
+            string compact = IvaType
+                .Trim()
+                .Replace(" ", string.Empty)
+                .Replace("%", string.Empty)
+                .ToUpperInvariant();
+
+            if (compact.Contains("10+22", StringComparison.Ordinal) ||
+                compact.Contains("10/22", StringComparison.Ordinal) ||
+                (compact.Contains("10", StringComparison.Ordinal) && compact.Contains("22", StringComparison.Ordinal)))
+            {
+                return "10+22";
+            }
+
+            if (compact.Contains("22", StringComparison.Ordinal))
+                return "22%";
+
+            if (compact.Contains("10", StringComparison.Ordinal))
+                return "10%";
+
+            if (compact.Contains("ESCLUSA", StringComparison.Ordinal) ||
+                compact.Contains("NOIVA", StringComparison.Ordinal))
+            {
+                return "Esclusa";
+            }
+
+            return IvaType.Trim();
+        }
+    }
 
     public bool HasDiscount => Math.Abs(MaterialDiscount) > 0.001 || Math.Abs(LaborDiscount) > 0.001;
 
@@ -134,6 +168,18 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         }
     }
 
+    public string TotalDisplay => $"{Total:N2}";
+
+    public string CreatedDateDisplay => Date.ToLocalTime().ToString("dd/MM/yyyy");
+
+    public string SentDateDisplay => SentAtUtc.HasValue
+        ? SentAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy")
+        : "Non inviato";
+
+    public string CustomerReferenceDisplay => string.IsNullOrWhiteSpace(ReferenceName)
+        ? CustomerName
+        : $"{CustomerName} - Rif. {ReferenceName}";
+
     public QuoteStatus Status
     {
         get => _status;
@@ -141,7 +187,6 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         {
             _status = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(ShouldRemind));
         }
     }
 
@@ -199,6 +244,7 @@ public class QuoteHistorySummary : INotifyPropertyChanged
             _sentAtUtc = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(SentDisplay));
+            OnPropertyChanged(nameof(SentDateDisplay));
             OnPropertyChanged(nameof(IsSent));
         }
     }
@@ -228,15 +274,13 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         {
             _lastReminderAtUtc = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(ReminderDisplay));
-            OnPropertyChanged(nameof(ShouldRemind));
         }
     }
 
     public int ReminderCount
     {
         get => _reminderCount;
-        set { _reminderCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(ReminderDisplay)); }
+        set { _reminderCount = value; OnPropertyChanged(); }
     }
 
     public string LastReminderByDevice
@@ -247,19 +291,9 @@ public class QuoteHistorySummary : INotifyPropertyChanged
 
     public bool IsSent => SentAtUtc.HasValue;
 
-    public bool ShouldRemind =>
-        Status == QuoteStatus.Spedito &&
-        SentAtUtc.HasValue &&
-        DateTime.UtcNow - SentAtUtc.Value.ToUniversalTime() >= TimeSpan.FromDays(7) &&
-        (!LastReminderAtUtc.HasValue || DateTime.UtcNow - LastReminderAtUtc.Value.ToUniversalTime() >= TimeSpan.FromDays(7));
-
     public string SentDisplay => SentAtUtc.HasValue
-        ? "Email inviata"
+        ? $"Inviato il {SentAtUtc.Value.ToLocalTime():dd/MM/yyyy}"
         : "Non inviato";
-
-    public string ReminderDisplay => ReminderCount <= 0
-        ? "Mai"
-        : $"{ReminderCount} solleciti, ultimo {LastReminderAtUtc?.ToLocalTime():dd/MM/yyyy}";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

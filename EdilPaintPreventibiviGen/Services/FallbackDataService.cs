@@ -697,6 +697,82 @@ public class FallbackDataService : IDataService
         .ToList();
 }
 
+    public async Task<List<QuoteHistorySummary>> GetSentOpenQuoteSummariesAsync(
+        DateTime sinceUtc,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        bool databaseAvailable = IsDatabaseAvailable();
+        if (!databaseAvailable)
+            databaseAvailable = await TryEnsureDatabaseAvailableAsync(
+                "Preventivi inviati aperti",
+                DbInteractiveWakeupTimeout,
+                cancellationToken);
+
+        if (databaseAvailable)
+        {
+            try
+            {
+                var dbQuotes = await _sqlService.GetSentOpenQuoteSummariesAsync(sinceUtc, cancellationToken);
+                var dbMetadata = await GetDbQuoteMetadataCachedAsync(cancellationToken);
+                var localMetadata = await GetLocalQuoteMetadataCachedAsync(cancellationToken);
+                EnsureDbMetadataForDisplayedSummaries(dbQuotes, dbMetadata);
+
+                foreach (var q in dbQuotes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    q.SyncStatus = ResolveSyncStatus(q.QuoteNumber, dbMetadata, localMetadata);
+                }
+
+                return dbQuotes;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                HandleDatabaseException("GetSentOpenQuoteSummariesAsync", ex);
+            }
+        }
+
+        var localQuotes = await _localStore.LoadHistoryAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return localQuotes
+            .Where(q => QuoteHistoryService.IsSentOpenWithin(q.SentAtUtc, q.Status, sinceUtc))
+            .OrderByDescending(q => q.SentAtUtc)
+            .ThenByDescending(q => q.Date)
+            .Select(q => new QuoteHistorySummary
+            {
+                QuoteNumber = q.QuoteNumber,
+                Date = q.Date,
+                CustomerName = q.CustomerName,
+                ReferenceName = q.ReferenceName,
+                PdfPath = q.PdfPath,
+                Total = (decimal)q.Total,
+                IvaType = q.IvaType,
+                MaterialDiscount = q.MaterialDiscount,
+                LaborDiscount = q.LaborDiscount,
+                Status = q.Status,
+                Notes = q.Notes,
+                IsJointVenture = q.IsJointVenture,
+                PartnerCompanyName = q.PartnerCompanyName,
+                CreatedByDevice = q.CreatedByDevice,
+                LastModifiedByDevice = q.LastModifiedByDevice,
+                SentAtUtc = q.SentAtUtc,
+                SentMethod = q.SentMethod,
+                SentRecipient = q.SentRecipient,
+                SentByDevice = q.SentByDevice,
+                LastReminderAtUtc = q.LastReminderAtUtc,
+                ReminderCount = q.ReminderCount,
+                LastReminderByDevice = q.LastReminderByDevice,
+                SyncStatus = SyncStatus.LocalOnly
+            })
+            .ToList();
+    }
+
     public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
         string searchText,
         int take,

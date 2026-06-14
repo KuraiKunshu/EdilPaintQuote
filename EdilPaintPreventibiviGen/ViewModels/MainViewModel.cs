@@ -112,7 +112,10 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public ObservableCollection<CostAllocationItem> AdditionalCosts { get; } = new();
     public IReadOnlyList<Item> PersonalMaterialsView => _personalMaterials;
 
-    public IEnumerable<QuoteStatus> StatusOptions => Enum.GetValues(typeof(QuoteStatus)).Cast<QuoteStatus>();
+    public IEnumerable<QuoteStatus> StatusOptions => Enum
+        .GetValues(typeof(QuoteStatus))
+        .Cast<QuoteStatus>()
+        .Where(status => status != QuoteStatus.DaSollecitare);
     #endregion
 
     #region Constructor

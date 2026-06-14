@@ -15,6 +15,7 @@ public partial class DiagnosticsWindow : Window
     public DiagnosticsWindow()
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         Loaded += (_, _) => RefreshSnapshot();
         PreviewKeyDown += DiagnosticsWindow_PreviewKeyDown;
     }

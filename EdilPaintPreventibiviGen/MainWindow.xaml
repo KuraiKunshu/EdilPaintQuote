@@ -310,16 +310,11 @@
                             Background="{StaticResource DiagnosticsButtonBrush}"
                             Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                             Click="OnOpenDashboardClick"/>
-                    <Button Content="PDF"
-                            Width="60" Height="30" Margin="0,0,8,0"
-                            Background="{StaticResource LocalMaterialsButtonBrush}"
+                    <Button Content="Inviati aperti"
+                            Width="115" Height="30" Margin="0,0,8,0"
+                            Background="{StaticResource HistoryButtonBrush}"
                             Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
-                            Click="OnOpenPdfAuditClick"/>
-                    <Button Content="Diagnostica"
-                            Width="95" Height="30" Margin="0,0,8,0"
-                            Background="{StaticResource DiagnosticsButtonBrush}"
-                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
-                            Click="OnOpenDiagnosticsClick"/>
+                            Click="OnOpenSentOpenQuotesClick"/>
                     <Button Content="Impostazioni"
                             Width="105" Height="30"
                             Background="{StaticResource SettingsButtonBrush}"

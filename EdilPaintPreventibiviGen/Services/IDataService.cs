@@ -27,6 +27,9 @@ public interface IDataService
     Task<List<QuoteHistoryEntry>> GetQuotesAsync();
     Task<List<QuoteHistoryEntry>> GetQuotesAsync(int take);
     Task<List<QuoteHistorySummary>> GetQuoteSummariesAsync(int take, CancellationToken cancellationToken = default);
+    Task<List<QuoteHistorySummary>> GetSentOpenQuoteSummariesAsync(
+        DateTime sinceUtc,
+        CancellationToken cancellationToken = default);
     Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
         string searchText,
         int take,

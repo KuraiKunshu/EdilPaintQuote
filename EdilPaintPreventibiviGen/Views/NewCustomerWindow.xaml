@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         RenderOptions.BitmapScalingMode="HighQuality"
         Icon="pack://application:,,,/Assets/Windowsicon/contatti.png"
@@ -10,12 +11,20 @@
         Width="560"
         Height="610"
         MinWidth="560"
-        MinHeight="610"
+        MinHeight="500"
+        MaxWidth="760"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         AllowsTransparency="True"
         Background="{StaticResource TransparentBrush}">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="26"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"/>
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <Style TargetType="TextBox">

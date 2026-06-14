@@ -41,7 +41,7 @@ public partial class DashboardWindow : Window
 
         TxtSubtitle.Text = $"PC: {DeviceNameService.GetCurrentDeviceName()}";
         TxtTotalQuotes.Text = "...";
-        TxtToRemind.Text = "...";
+        TxtSentQuotes.Text = "...";
         TxtPdfIssues.Text = "...";
         TxtDraftState.Text = "...";
         _isRefreshing = true;
@@ -67,9 +67,9 @@ public partial class DashboardWindow : Window
                 token);
             token.ThrowIfCancellationRequested();
 
-            var toRemind = summaries
-                .Where(x => x.ShouldRemind || x.Status == QuoteStatus.DaSollecitare)
-                .OrderBy(x => x.SentAtUtc ?? x.Date.DateTime)
+            var sentQuotes = summaries
+                .Where(x => x.SentAtUtc.HasValue)
+                .OrderByDescending(x => x.SentAtUtc)
                 .ToList();
 
             var draftTask = _draftService.LoadAsync(token);
@@ -86,10 +86,10 @@ public partial class DashboardWindow : Window
             TxtTotalQuotes.Text = summaries.Count >= summaryTake
                 ? $"{summaries.Count}+"
                 : summaries.Count.ToString();
-            TxtToRemind.Text = toRemind.Count.ToString();
+            TxtSentQuotes.Text = sentQuotes.Count.ToString();
             TxtPdfIssues.Text = pdfIssues.Count.ToString();
             TxtDraftState.Text = draft == null ? "Nessuna" : draft.LastModifiedUtc.ToLocalTime().ToString("dd/MM HH:mm");
-            GridReminders.ItemsSource = toRemind.Take(100).ToList();
+            GridSentQuotes.ItemsSource = sentQuotes.Take(100).ToList();
         }
         catch (OperationCanceledException)
         {

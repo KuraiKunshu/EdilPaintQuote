@@ -17,6 +17,7 @@ public partial class SelectCustomerWindow : Window
     public SelectCustomerWindow(MainViewModel vm)
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
 
         _vm = vm;
         _vm.ApplyCustomerFilter(string.Empty);

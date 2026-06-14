@@ -5,19 +5,28 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:models="clr-namespace:EdilPaintPreventibiviGen.Models"
         xmlns:converters="clr-namespace:EdilPaintPreventibiviGen.Converters"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         RenderOptions.BitmapScalingMode="HighQuality"
         Icon="pack://application:,,,/Assets/Windowsicon/storico.png"
         Title="Storico Preventivi"
         Width="1220"
         Height="760"
-        MinWidth="1220"
-        MinHeight="760"
+        MinWidth="1080"
+        MinHeight="640"
+        MaxWidth="1540"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         AllowsTransparency="True"
         Background="{StaticResource TransparentBrush}">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="26"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"/>
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <converters:SyncStatusToColorConverter x:Key="SyncStatusToColorConverter"/>
@@ -128,6 +137,38 @@
             <Setter Property="Foreground" Value="{StaticResource DangerRedBrush}"/>
         </Style>
 
+        <Style x:Key="DetailActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="MinWidth" Value="118"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{StaticResource NeutralButtonBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource NeutralButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource NeutralButtonTextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="DetailDangerButtonStyle" TargetType="Button" BasedOn="{StaticResource DetailActionButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource DangerSoftBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DangerSoftBorderBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DangerRedBrush}"/>
+        </Style>
+
+        <Style x:Key="DetailCaptionStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="DetailValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
         <Style x:Key="ModernHistoryGridStyle" TargetType="DataGrid">
             <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource DataGridBorderBrush}"/>
@@ -136,7 +177,7 @@
             <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource DataGridLineBrush}"/>
             <Setter Property="VerticalGridLinesBrush" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="RowHeight" Value="48"/>
+            <Setter Property="RowHeight" Value="62"/>
             <Setter Property="ColumnHeaderHeight" Value="42"/>
             <Setter Property="AutoGenerateColumns" Value="False"/>
             <Setter Property="CanUserAddRows" Value="False"/>
@@ -191,7 +232,7 @@
         </Style>
 
         <Style TargetType="DataGridRow">
-            <Setter Property="MinHeight" Value="48"/>
+            <Setter Property="MinHeight" Value="62"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -204,7 +245,7 @@
                         <Condition Binding="{Binding Status}" Value="Finalizzato"/>
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}"/>
+                    <Setter Property="Background" Value="{StaticResource StatusFinalizzatoSelectedBrush}"/>
                     <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
 
@@ -216,7 +257,7 @@
                         <Condition Binding="{Binding Status}" Value="Spedito"/>
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="{StaticResource WarningYellowBrush}"/>
+                    <Setter Property="Background" Value="{StaticResource StatusSpeditoSelectedBrush}"/>
                     <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
                 </MultiDataTrigger>
 
@@ -228,7 +269,7 @@
                         <Condition Binding="{Binding Status}" Value="Confermato"/>
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="{StaticResource PurpleBrush}"/>
+                    <Setter Property="Background" Value="{StaticResource StatusConfermatoSelectedBrush}"/>
                     <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
 
@@ -240,7 +281,7 @@
                         <Condition Binding="{Binding Status}" Value="Finito"/>
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="{StaticResource SuccessGreenBrush}"/>
+                    <Setter Property="Background" Value="{StaticResource StatusFinitoSelectedBrush}"/>
                     <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
 
@@ -252,7 +293,55 @@
                         <Condition Binding="{Binding Status}" Value="Rifiutato"/>
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="{StaticResource DangerRedBrush}"/>
+                    <Setter Property="Background" Value="{StaticResource StatusRifiutatoSelectedBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                </MultiDataTrigger>
+
+                <DataTrigger Binding="{Binding Status}" Value="Bozza">
+                    <Setter Property="Background" Value="{StaticResource StatusBozzaBrush}"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Status}" Value="Bozza"/>
+                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{StaticResource StatusBozzaSelectedBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                </MultiDataTrigger>
+
+                <DataTrigger Binding="{Binding Status}" Value="DaInviare">
+                    <Setter Property="Background" Value="{StaticResource StatusDaInviareBrush}"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Status}" Value="DaInviare"/>
+                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{StaticResource StatusDaInviareSelectedBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                </MultiDataTrigger>
+
+                <DataTrigger Binding="{Binding Status}" Value="DaSollecitare">
+                    <Setter Property="Background" Value="{StaticResource StatusDaSollecitareBrush}"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Status}" Value="DaSollecitare"/>
+                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{StaticResource StatusDaSollecitareSelectedBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource BlackBrush}"/>
+                </MultiDataTrigger>
+
+                <DataTrigger Binding="{Binding Status}" Value="Archiviato">
+                    <Setter Property="Background" Value="{StaticResource StatusArchiviatoBrush}"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Status}" Value="Archiviato"/>
+                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{StaticResource StatusArchiviatoSelectedBrush}"/>
                     <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                 </MultiDataTrigger>
             </Style.Triggers>
@@ -406,7 +495,6 @@
                                 <ComboBoxItem Content="Rifiutato"/>
                                 <ComboBoxItem Content="Bozza"/>
                                 <ComboBoxItem Content="DaInviare"/>
-                                <ComboBoxItem Content="DaSollecitare"/>
                                 <ComboBoxItem Content="Archiviato"/>
                             </ComboBox>
                         </Grid>
@@ -454,7 +542,13 @@
                         CornerRadius="10"
                         Padding="0">
                     <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="318"/>
+                        </Grid.ColumnDefinitions>
                         <DataGrid x:Name="GridHistory"
+                                  Grid.Column="0"
                                   ItemsSource="{Binding HistoryView}"
                                   Style="{StaticResource ModernHistoryGridStyle}"
                                   IsReadOnly="False"
@@ -479,17 +573,14 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Preventivo" Width="120">
+                            <DataGridTemplateColumn Header="N. preventivo" Width="118">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel HorizontalAlignment="Center">
                                             <TextBlock Text="{Binding QuoteNumber}"
                                                        FontWeight="SemiBold"
-                                                       HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Date, StringFormat=dd/MM/yyyy}"
-                                                       FontSize="11"
-                                                       Foreground="{StaticResource MutedTextBrush}"
-                                                       HorizontalAlignment="Center"/>
+                                                       HorizontalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -513,32 +604,19 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTextColumn Header="Totale"
-                                                Binding="{Binding Total, StringFormat={}{0:N2}}"
-                                                IsReadOnly="True"
-                                                Width="100">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="HorizontalAlignment" Value="Right"/>
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-
-                            <DataGridTemplateColumn Header="IVA / sconti" Width="145">
+                            <DataGridTemplateColumn Header="Totale / sconti" Width="140">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel HorizontalAlignment="Stretch" Margin="4,0">
-                                            <TextBlock Text="{Binding IvaDisplay}"
+                                            <TextBlock Text="{Binding TotalDisplay}"
                                                        FontWeight="SemiBold"
-                                                       HorizontalAlignment="Center"
+                                                       HorizontalAlignment="Right"
                                                        TextTrimming="CharacterEllipsis"
-                                                       ToolTip="{Binding IvaDisplay}"/>
+                                                       ToolTip="{Binding TotalDisplay}"/>
                                             <TextBlock Text="{Binding DiscountDisplay}"
                                                        FontSize="11"
                                                        Foreground="{StaticResource MutedTextBrush}"
-                                                       HorizontalAlignment="Center"
+                                                       HorizontalAlignment="Right"
                                                        Margin="0,2,0,0"
                                                        TextTrimming="CharacterEllipsis"
                                                        ToolTip="{Binding DiscountDisplay}"/>
@@ -547,7 +625,26 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Stato" Width="135">
+                            <DataGridTemplateColumn Header="IVA" Width="82">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource SectionPanelBackgroundBrush}"
+                                                BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Padding="8,4"
+                                                HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding IvaDisplay}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding IvaType}"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="Stato" Width="124">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <ComboBox ItemsSource="{Binding DataContext.StatusOptions, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -561,7 +658,25 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Azioni" Width="220">
+                            <DataGridTemplateColumn Header="Date" Width="122">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding CreatedDateDisplay}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="12"
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding SentDateDisplay}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="Azioni" Width="220" Visibility="Collapsed">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -670,10 +785,6 @@
                                                     Style="{StaticResource HistoryIconButtonStyle}"
                                                     Click="OnSendQuoteClick"
                                                     ToolTip="Registra invio"/>
-                                            <Button Content="Sol"
-                                                    Style="{StaticResource HistoryIconButtonStyle}"
-                                                    Click="OnReminderClick"
-                                                    ToolTip="Registra sollecito"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -796,7 +907,147 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
+
+                        <Border Grid.Column="2"
+                                Background="{StaticResource SectionPanelBackgroundBrush}"
+                                BorderBrush="{StaticResource SubtleBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="16"
+                                DataContext="{Binding SelectedItem, ElementName=GridHistory}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="Dettaglio preventivo"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource DefaultTextBrush}"/>
+                                    <TextBlock Text="{Binding QuoteNumber, TargetNullValue=Seleziona una riga}"
+                                               Margin="0,4,0,0"
+                                               FontSize="22"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource DefaultTextBrush}"/>
+                                    <TextBlock Text="{Binding CustomerReferenceDisplay}"
+                                               Margin="0,2,0,14"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               TextWrapping="Wrap"/>
+
+                                    <WrapPanel Margin="0,0,0,8">
+                                        <Button Content="Apri PDF"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnOpenPastQuotePdfClick"/>
+                                        <Button Content="Modifica"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnEditPastQuoteClick"/>
+                                        <Button Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnNotesClick"
+                                                Content="{Binding}">
+                                            <Button.ContentTemplate>
+                                                <DataTemplate DataType="{x:Type models:QuoteHistorySummary}">
+                                                    <Grid Width="88">
+                                                        <TextBlock Text="Note"
+                                                                   HorizontalAlignment="Center"/>
+                                                        <Ellipse Width="9"
+                                                                 Height="9"
+                                                                 Fill="{StaticResource NotificationRedBrush}"
+                                                                 HorizontalAlignment="Right"
+                                                                 VerticalAlignment="Top"
+                                                                 Margin="0,-1,8,0">
+                                                            <Ellipse.Style>
+                                                                <Style TargetType="Ellipse">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasNotes}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Ellipse.Style>
+                                                        </Ellipse>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </Button.ContentTemplate>
+                                        </Button>
+                                        <Button Content="Invia"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnSendQuoteClick"/>
+                                        <Button Content="Cartella"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnOpenCustomerFolderClick"/>
+                                        <Button Content="Copia"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnCopyPastQuoteClick"/>
+                                        <Button Content="Elimina"
+                                                Style="{StaticResource DetailDangerButtonStyle}"
+                                                Click="OnDeletePastQuoteClick"/>
+                                    </WrapPanel>
+
+                                    <Separator Margin="0,4,0,14"/>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="16"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="14"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="14"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="14"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="14"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="0">
+                                            <TextBlock Text="Totale" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding TotalDisplay}" Style="{StaticResource DetailValueStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="2">
+                                            <TextBlock Text="IVA" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding IvaDisplay}" Style="{StaticResource DetailValueStyle}" ToolTip="{Binding IvaType}"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="2" Grid.Column="0">
+                                            <TextBlock Text="Sconti" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding DiscountDisplay}" Style="{StaticResource DetailValueStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="2">
+                                            <TextBlock Text="Stato" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding Status}" Style="{StaticResource DetailValueStyle}"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="4" Grid.Column="0">
+                                            <TextBlock Text="Creazione" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding CreatedDateDisplay}" Style="{StaticResource DetailValueStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="4" Grid.Column="2">
+                                            <TextBlock Text="Invio" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding SentDateDisplay}" Style="{StaticResource DetailValueStyle}"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3">
+                                            <TextBlock Text="Destinatario" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding SentRecipient, TargetNullValue=-}" Style="{StaticResource DetailValueStyle}" ToolTip="{Binding SentRecipient}"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="8" Grid.Column="0">
+                                            <TextBlock Text="Inviato da" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding SentByDevice}" Style="{StaticResource DetailValueStyle}" ToolTip="{Binding SentByDevice}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="8" Grid.Column="2">
+                                            <TextBlock Text="PC" Style="{StaticResource DetailCaptionStyle}"/>
+                                            <TextBlock Text="{Binding LastModifiedByDevice}" Style="{StaticResource DetailValueStyle}" ToolTip="{Binding LastModifiedByDevice}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
                         <Border x:Name="LoadingOverlay"
+                                Grid.ColumnSpan="3"
                                 Background="{StaticResource OverlayBackdropBrush}"
                                 Visibility="Collapsed"
                                 CornerRadius="10">
@@ -826,7 +1077,7 @@
                             Style="{StaticResource FooterButtonStyle}"
                             Content="Chiudi"
                             Click="OnCloseClick"
-                            Background="{StaticResource MutedTextBrush}"
+                            Background="{StaticResource SettingsButtonBrush}"
                             FontWeight="Bold"/>
                 </Grid>
             </Grid>

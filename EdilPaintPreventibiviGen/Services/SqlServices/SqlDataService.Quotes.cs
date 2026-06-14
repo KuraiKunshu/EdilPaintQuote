@@ -432,6 +432,58 @@ public partial class SqlDataService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<QuoteHistorySummary>> GetSentOpenQuoteSummariesAsync(
+        DateTime sinceUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+
+        QuoteStatus[] excludedStatuses =
+        [
+            QuoteStatus.Confermato,
+            QuoteStatus.Finito,
+            QuoteStatus.Archiviato,
+            QuoteStatus.Rifiutato
+        ];
+
+        return await db.Quotes
+            .AsNoTracking()
+            .Include(x => x.Customer)
+            .Include(x => x.ReferenceCustomer)
+            .Where(x =>
+                x.SentAtUtc.HasValue &&
+                x.SentAtUtc.Value >= sinceUtc &&
+                !excludedStatuses.Contains(x.Status))
+            .OrderByDescending(x => x.SentAtUtc)
+            .ThenByDescending(x => x.Date)
+            .Select(x => new QuoteHistorySummary
+            {
+                QuoteNumber = x.QuoteNumber,
+                Date = x.Date,
+                CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
+                ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                PdfPath = x.PdfPath,
+                Total = (decimal)x.Total,
+                IvaType = x.IvaType,
+                MaterialDiscount = x.MaterialDiscount,
+                LaborDiscount = x.LaborDiscount,
+                Status = x.Status,
+                Notes = x.Notes,
+                IsJointVenture = x.IsJointVenture,
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
         string searchText,
         int take,

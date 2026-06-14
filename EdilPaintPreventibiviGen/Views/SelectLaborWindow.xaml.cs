@@ -17,6 +17,7 @@ public partial class SelectLaborWindow : Window
     public SelectLaborWindow(MainViewModel vm)
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         _vm = vm;
         FilterList(string.Empty);
         PreviewKeyDown += SelectLaborWindow_PreviewKeyDown;

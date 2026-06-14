@@ -10,6 +10,7 @@ public partial class NotesWindow : Window
     public NotesWindow(string initialNotes)
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
 
         TxtNotes.Text = initialNotes ?? string.Empty;
         ResultNotes = string.Empty;

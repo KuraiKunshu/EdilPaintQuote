@@ -49,6 +49,42 @@ public sealed class RegressionTests
         Assert.Equal(366d, totals.TotaleGenerale);
     }
 
+    [Theory]
+    [InlineData("RC 10%+22%", "10+22")]
+    [InlineData("10% + 22%", "10+22")]
+    [InlineData("22%", "22%")]
+    [InlineData("esclusa", "Esclusa")]
+    public void HistorySummaryNormalizesIvaDisplay(string ivaType, string expectedDisplay)
+    {
+        var summary = new QuoteHistorySummary { IvaType = ivaType };
+
+        Assert.Equal(expectedDisplay, summary.IvaDisplay);
+    }
+
+    [Theory]
+    [InlineData(QuoteStatus.Spedito, true)]
+    [InlineData(QuoteStatus.Finalizzato, true)]
+    [InlineData(QuoteStatus.Confermato, false)]
+    [InlineData(QuoteStatus.Finito, false)]
+    [InlineData(QuoteStatus.Archiviato, false)]
+    [InlineData(QuoteStatus.Rifiutato, false)]
+    public void SentOpenFilterExcludesClosedStatuses(QuoteStatus status, bool expected)
+    {
+        DateTime sinceUtc = DateTime.UtcNow.AddMonths(-2);
+        DateTime sentAtUtc = DateTime.UtcNow.AddDays(-5);
+
+        Assert.Equal(expected, QuoteHistoryService.IsSentOpenWithin(sentAtUtc, status, sinceUtc));
+    }
+
+    [Fact]
+    public void SentOpenFilterExcludesOldOrUnsentQuotes()
+    {
+        DateTime sinceUtc = DateTime.UtcNow.AddMonths(-2);
+
+        Assert.False(QuoteHistoryService.IsSentOpenWithin(null, QuoteStatus.Spedito, sinceUtc));
+        Assert.False(QuoteHistoryService.IsSentOpenWithin(DateTime.UtcNow.AddMonths(-3), QuoteStatus.Spedito, sinceUtc));
+    }
+
     [Fact]
     public void ExcludedVatDoesNotAddTax()
     {

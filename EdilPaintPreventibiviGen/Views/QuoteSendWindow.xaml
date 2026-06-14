@@ -6,8 +6,9 @@
         Height="700"
         MinWidth="520"
         MinHeight="620"
+        MaxWidth="860"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="CanResize"
         Background="{StaticResource ShellBackgroundBrush}"
         Icon="pack://application:,,,/Assets/Windowsicon/main.ico">
 

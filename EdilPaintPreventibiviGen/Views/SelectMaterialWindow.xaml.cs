@@ -17,6 +17,7 @@ public partial class SelectMaterialWindow : Window
     public SelectMaterialWindow(MainViewModel vm)
     {
         InitializeComponent();
+        EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         _vm = vm;
         FilterList(string.Empty);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
