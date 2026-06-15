@@ -264,6 +264,22 @@ public sealed class RegressionTests
             async () => await service.SearchProductsAsync("test", cts.Token));
     }
 
+    [Fact]
+    public void SmtpDebugLogWritesToPrimaryMailLogsFolder()
+    {
+        var log = new SmtpEmailDebugLog();
+        string marker = "test-log-" + Guid.NewGuid().ToString("N");
+
+        log.Write(marker);
+
+        Assert.StartsWith(
+            Path.Combine(LocalApplicationDataService.GetDataDirectoryPath(), "MailLogs"),
+            log.FilePath,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(log.FilePath));
+        Assert.Contains(marker, File.ReadAllText(log.FilePath));
+    }
+
     private static string CreateTemporaryTestPath() =>
         Path.Combine(Path.GetTempPath(), "EdilPaintPreventivi.Tests", Guid.NewGuid().ToString("N"));
 

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Linq;
 using EdilPaintPreventibiviGen.ViewModels;
 using EdilPaintPreventibiviGen.Views;
@@ -25,11 +26,13 @@ public partial class MainWindow : Window
     private bool _isAutosavingDraft;
     private bool _isCloseConfirmed;
     private bool _isCloseCleanupRunning;
+    private bool _isInitializingMainWindowScale;
     
     #region Constructor
     public MainWindow()
     {
         InitializeComponent();
+        InitializeMainWindowScale();
         var vm = new MainViewModel();
         DataContext = vm;
         Loaded += async (_, _) =>
@@ -42,6 +45,7 @@ public partial class MainWindow : Window
     public MainWindow(MainViewModel vm)
     {
         InitializeComponent();
+        InitializeMainWindowScale();
         DataContext = vm;
         Loaded += async (_, _) =>
         {
@@ -50,6 +54,48 @@ public partial class MainWindow : Window
         };
     }
     #endregion
+
+    private void InitializeMainWindowScale()
+    {
+        _isInitializingMainWindowScale = true;
+        try
+        {
+            double scale = App.AppSettings?.App.GetEffectiveMainWindowScale() ?? 1.0;
+            ApplyMainWindowScale(scale);
+            SldMainWindowScale.Value = scale;
+            SldMainWindowScale.ValueChanged -= OnMainWindowScaleChanged;
+            SldMainWindowScale.ValueChanged += OnMainWindowScaleChanged;
+        }
+        finally
+        {
+            _isInitializingMainWindowScale = false;
+        }
+    }
+
+    private void ApplyMainWindowScale(double scale)
+    {
+        scale = Math.Clamp(scale, 0.8, 1.1);
+        MainWindowScaleTransform.ScaleX = scale;
+        MainWindowScaleTransform.ScaleY = scale;
+        TxtMainWindowScale.Text = $"{scale:P0}";
+    }
+
+    private void OnMainWindowScaleChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        double scale = Math.Clamp(e.NewValue, 0.8, 1.1);
+        ApplyMainWindowScale(scale);
+
+        if (_isInitializingMainWindowScale || App.AppSettings == null)
+            return;
+
+        App.AppSettings.App.MainWindowScale = scale;
+        App.AppSettings.Save();
+    }
+
+    private void OnResetMainWindowScaleClick(object sender, RoutedEventArgs e)
+    {
+        SldMainWindowScale.Value = 1.0;
+    }
     
     #region Window events
     private void Window_Closing(object sender, CancelEventArgs e)
@@ -130,6 +176,7 @@ public partial class MainWindow : Window
             {
                 try
                 {
+                    CommitPendingGridEdits();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
                     await vm.SaveDraftAsync(cts.Token);
                 }
@@ -196,6 +243,7 @@ public partial class MainWindow : Window
         _isAutosavingDraft = true;
         try
         {
+            CommitPendingGridEdits();
             await vm.SaveDraftAsync(cancellationToken);
         }
         catch (OperationCanceledException)
@@ -210,6 +258,41 @@ public partial class MainWindow : Window
         {
             _isAutosavingDraft = false;
         }
+    }
+
+    private void CommitPendingGridEdits()
+    {
+        try
+        {
+            CommitFocusedTextBinding();
+
+            foreach (var grid in GetEditableDataGrids())
+            {
+                grid.CommitEdit(DataGridEditingUnit.Cell, true);
+                grid.CommitEdit(DataGridEditingUnit.Row, true);
+            }
+
+            (DataContext as MainViewModel)?.CalculateTotals();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[CommitPendingGridEdits] Commit modifiche griglia non riuscito: {ex.Message}");
+        }
+    }
+
+    private IEnumerable<DataGrid> GetEditableDataGrids()
+    {
+        yield return GridMaterials;
+        yield return GridLabors;
+        yield return GridOurCosts;
+        yield return GridPartnerCosts;
+        yield return GridAdditionalCosts;
+    }
+
+    private static void CommitFocusedTextBinding()
+    {
+        if (Keyboard.FocusedElement is TextBox textBox)
+            textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
     }
 
     private async Task PromptDraftRecoveryAsync(MainViewModel vm)
@@ -414,8 +497,17 @@ public partial class MainWindow : Window
             vm.ResetQuote();
         }
     }
-    private void OnGeneratePdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GeneratePdf();
-    private void OnGenerateCostsPdfClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.GenerateCostsPdf();
+    private void OnGeneratePdfClick(object sender, RoutedEventArgs e)
+    {
+        CommitPendingGridEdits();
+        (DataContext as MainViewModel)?.GeneratePdf();
+    }
+
+    private void OnGenerateCostsPdfClick(object sender, RoutedEventArgs e)
+    {
+        CommitPendingGridEdits();
+        (DataContext as MainViewModel)?.GenerateCostsPdf();
+    }
     private void OnOpenHistoryClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is MainViewModel vm)

@@ -286,7 +286,11 @@
         </Style>
     </Window.Resources>
 
-    <DockPanel Margin="15">
+    <DockPanel x:Name="MainContentPanel" Margin="15">
+        <DockPanel.LayoutTransform>
+            <ScaleTransform x:Name="MainWindowScaleTransform" ScaleX="1" ScaleY="1"/>
+        </DockPanel.LayoutTransform>
+
         <Border DockPanel.Dock="Top"
                 Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource SubtleBorderBrush}"
@@ -305,6 +309,43 @@
                            Foreground="{StaticResource DefaultTextBrush}"
                            VerticalAlignment="Center"/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Border Background="{StaticResource SectionPanelBackgroundBrush}"
+                            BorderBrush="{StaticResource SubtleBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="7"
+                            Padding="8,3"
+                            Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Zoom"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource DefaultTextBrush}"/>
+                            <Slider x:Name="SldMainWindowScale"
+                                    Width="92"
+                                    Minimum="0.8"
+                                    Maximum="1.1"
+                                    TickFrequency="0.05"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtMainWindowScale"
+                                       Width="38"
+                                       Margin="6,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{StaticResource MutedTextBrush}"/>
+                            <Button Content="100%"
+                                    Width="46"
+                                    Height="24"
+                                    Margin="6,0,0,0"
+                                    Padding="4,0"
+                                    FontSize="11"
+                                    Background="{StaticResource WhiteBrush}"
+                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                    Click="OnResetMainWindowScaleClick"/>
+                        </StackPanel>
+                    </Border>
                     <Button Content="Dashboard"
                             Width="105" Height="30" Margin="0,0,8,0"
                             Background="{StaticResource DiagnosticsButtonBrush}"
@@ -528,7 +569,7 @@
                                   CellStyle="{StaticResource CostDataGridCellStyle}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Descrizione"
-                                                    Binding="{Binding Description, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="*">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
@@ -538,7 +579,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Header="€"
-                                                    Binding="{Binding Amount, StringFormat=N2, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Amount, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="65">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
@@ -548,7 +589,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Header="Note"
-                                                    Binding="{Binding Notes, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="90"/>
                                 <DataGridTemplateColumn Width="26">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -588,7 +629,7 @@
                                   CellStyle="{StaticResource CostDataGridCellStyle}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Descrizione"
-                                                    Binding="{Binding Description, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="*">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
@@ -598,7 +639,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Header="€"
-                                                    Binding="{Binding Amount, StringFormat=N2, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Amount, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="65">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
@@ -608,7 +649,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Header="Note"
-                                                    Binding="{Binding Notes, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="90"/>
                                 <DataGridTemplateColumn Width="26">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -648,7 +689,7 @@
                                   CellStyle="{StaticResource CostDataGridCellStyle}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Descrizione"
-                                                    Binding="{Binding Description, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="*">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
@@ -658,7 +699,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Header="€"
-                                                    Binding="{Binding Amount, StringFormat=N2, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Amount, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="65">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
@@ -668,7 +709,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Header="Note"
-                                                    Binding="{Binding Notes, UpdateSourceTrigger=LostFocus}"
+                                                    Binding="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     Width="90"/>
                                 <DataGridTemplateColumn Width="26">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -926,7 +967,8 @@
 
                     <!-- Materiali -->
                     <GroupBox Grid.Column="0" Header="Materiali" Margin="0,5,5,5">
-                        <DataGrid ItemsSource="{Binding Materials}"
+                        <DataGrid x:Name="GridMaterials"
+                                  ItemsSource="{Binding Materials}"
                                   AllowDrop="True"
                                   PreviewMouseLeftButtonDown="DataGrid_PreviewMouseLeftButtonDown"
                                   PreviewMouseMove="DataGrid_PreviewMouseMove"
@@ -989,9 +1031,9 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity}" Width="50"/>
-                                <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount}" Width="50"/>
-                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, StringFormat=N2}" Width="100"/>
+                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
                                 <DataGridTextColumn Header="Totale" Binding="{Binding TotalPrice, StringFormat=N2}" IsReadOnly="True" Width="100"/>
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -1008,7 +1050,8 @@
 
                     <!-- Lavorazioni -->
                     <GroupBox Grid.Column="1" Header="Lavorazioni" Margin="5,5,0,5">
-                        <DataGrid ItemsSource="{Binding Labors}"
+                        <DataGrid x:Name="GridLabors"
+                                  ItemsSource="{Binding Labors}"
                                   AllowDrop="True"
                                   PreviewMouseLeftButtonDown="DataGrid_PreviewMouseLeftButtonDown"
                                   PreviewMouseMove="DataGrid_PreviewMouseMove"
@@ -1071,9 +1114,9 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity}" Width="50"/>
-                                <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount}" Width="50"/>
-                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, StringFormat=N2}" Width="100"/>
+                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
                                 <DataGridTextColumn Header="Totale" Binding="{Binding TotalPrice, StringFormat=N2}" IsReadOnly="True" Width="100"/>
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>

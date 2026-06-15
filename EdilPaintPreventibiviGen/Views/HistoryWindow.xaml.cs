@@ -397,18 +397,51 @@ public partial class HistoryWindow : Window
         }
         catch (OperationCanceledException)
         {
-            MessageBox.Show("Invio email annullato o interrotto per timeout.",
-                "Invio preventivo", MessageBoxButton.OK, MessageBoxImage.Information);
+            string logPath = SmtpEmailDebugLog.WriteFailure(
+                $"Invio preventivo {entry.QuoteNumber} annullato o interrotto per timeout.",
+                new TimeoutException("Timeout invio email."));
+            ShowSendFailureMessage(logPath, "Invio email annullato o interrotto per timeout.");
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[SendQuote] Errore invio/salvataggio: {ex}");
-            MessageBox.Show("Preventivo non inviato. Controlla il log SMTP per i dettagli.",
-                "Invio preventivo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            string logPath = SmtpEmailDebugLog.WriteFailure(
+                $"Preventivo {entry.QuoteNumber} non inviato.",
+                ex);
+            ShowSendFailureMessage(logPath, ex.GetBaseException().Message);
         }
         finally
         {
             Mouse.OverrideCursor = null;
+        }
+    }
+
+    private static void ShowSendFailureMessage(string logPath, string detail)
+    {
+        string message =
+            "Preventivo non inviato.\n\n" +
+            $"{detail}\n\n" +
+            $"Log SMTP:\n{logPath}\n\n" +
+            "Vuoi aprire la cartella dei log?";
+
+        if (MessageBox.Show(
+                message,
+                "Invio preventivo",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            string? directory = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] Impossibile aprire cartella log SMTP: {ex.Message}");
         }
     }
 
@@ -480,8 +513,122 @@ public partial class HistoryWindow : Window
         if (!string.IsNullOrWhiteSpace(foundPath) && File.Exists(foundPath))
             return foundPath;
 
+        string regeneratedPath = await RegeneratePdfForEmailAsync(fullEntry, expectedPath, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(regeneratedPath) && File.Exists(regeneratedPath))
+            return regeneratedPath;
+
         throw new InvalidOperationException(
-            $"PDF del preventivo n. {entry.QuoteNumber} non trovato. Apri o rigenera prima il PDF del preventivo.");
+            $"PDF del preventivo n. {entry.QuoteNumber} non trovato e rigenerazione automatica non riuscita.");
+    }
+
+    private async Task<string> RegeneratePdfForEmailAsync(
+        QuoteHistoryEntry fullEntry,
+        string expectedPath,
+        CancellationToken cancellationToken)
+    {
+        if (!App.AppSettings.App.GeneratePDF)
+            throw new InvalidOperationException(
+                $"PDF del preventivo n. {fullEntry.QuoteNumber} non trovato e generazione PDF disabilitata nelle impostazioni.");
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
+        Directory.CreateDirectory(tempRoot);
+        string tempPath = Path.Combine(tempRoot, Path.GetFileName(expectedPath));
+
+        var company = await App.DataService.GetCompanyAsync() ?? new Company();
+        var context = new PdfGenerationContext
+        {
+            QuoteNumber = fullEntry.QuoteNumber,
+            Date = fullEntry.Date,
+            PaymentTerms = fullEntry.PaymentTerms,
+            IvaType = fullEntry.IvaType,
+            CustomerName = fullEntry.CustomerName,
+            ReferenceName = fullEntry.ReferenceName,
+            SelectedLogo = ResolveLogoForPdf(company),
+            MaterialDiscount = fullEntry.MaterialDiscount,
+            LaborDiscount = fullEntry.LaborDiscount,
+            Materials = fullEntry.Materials.ToList(),
+            Labors = fullEntry.Labors.ToList(),
+            Imponibile = fullEntry.Imponibile,
+            Total = fullEntry.Total,
+            Attachments = fullEntry.Attachments
+                .Where(attachment => attachment.Content.Length > 0)
+                .Select(attachment => new StoredFile
+                {
+                    FileName = attachment.FileName,
+                    ContentType = attachment.ContentType,
+                    Content = attachment.Content,
+                    ImportedAt = attachment.ImportedAt
+                })
+                .ToList(),
+            AllCustomers = _vm.AllCustomers.ToList(),
+            PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
+            PdfNotesTitle = App.AppSettings.PdfTemplate.NotesTitle,
+            PdfFooterText = App.AppSettings.PdfTemplate.FooterText,
+            PdfSignatureText = App.AppSettings.PdfTemplate.SignatureText,
+            PdfShowTemplateName = App.AppSettings.PdfTemplate.ShowTemplateName
+        };
+
+        new PdfService().GenerateQuoteFromContext(context, company, tempPath);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        TryCopyRegeneratedPdf(tempPath, expectedPath);
+
+        if (File.Exists(expectedPath))
+            return expectedPath;
+
+        if (File.Exists(tempPath))
+            return tempPath;
+
+        var refreshedEntry = await _historyService.GetQuoteByNumberAsync(fullEntry.QuoteNumber);
+        if (refreshedEntry != null)
+        {
+            string officialPath = await _historyService.EnsureOfficialPdfExistsAsync(refreshedEntry, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(officialPath) && File.Exists(officialPath))
+                return officialPath;
+
+            if (!string.IsNullOrWhiteSpace(refreshedEntry.PdfPath) && File.Exists(refreshedEntry.PdfPath))
+                return refreshedEntry.PdfPath;
+
+            string? foundPath = _historyService.FindPdfByQuoteNumber(refreshedEntry);
+            if (!string.IsNullOrWhiteSpace(foundPath) && File.Exists(foundPath))
+                return foundPath;
+        }
+
+        return string.Empty;
+    }
+
+    private string ResolveLogoForPdf(Company company)
+    {
+        if (!string.IsNullOrWhiteSpace(_vm.SelectedLogo))
+            return _vm.SelectedLogo;
+
+        if (company.Logo.Count == 0)
+            return string.Empty;
+
+        int index = company.Logo_index >= 0 && company.Logo_index < company.Logo.Count
+            ? company.Logo_index
+            : 0;
+
+        return company.Logo[index];
+    }
+
+    private static void TryCopyRegeneratedPdf(string tempPath, string expectedPath)
+    {
+        try
+        {
+            string? targetFolder = Path.GetDirectoryName(expectedPath);
+            if (!string.IsNullOrWhiteSpace(targetFolder))
+                Directory.CreateDirectory(targetFolder);
+
+            File.Copy(tempPath, expectedPath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] PDF rigenerato solo in temporaneo, copia su destinazione non riuscita: {ex.Message}");
+        }
     }
 
     private string ResolveDefaultRecipient(QuoteHistorySummary entry)

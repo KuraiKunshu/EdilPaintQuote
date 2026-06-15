@@ -251,8 +251,17 @@ public sealed class AppSettingsServiceModel
 	public bool IsSilentStartup { get; set; } = true;
 	public bool UseVeluxLogin { get; set; }
 	public int NumberOfQuote { get; set; } = 100;
+	public double MainWindowScale { get; set; } = 1.0;
 	public string TempPath { get; set; } = string.Empty;
 	public string DeviceName { get; set; } = string.Empty;
+
+	public double GetEffectiveMainWindowScale()
+	{
+		if (double.IsNaN(MainWindowScale) || double.IsInfinity(MainWindowScale))
+			return 1.0;
+
+		return Math.Clamp(MainWindowScale, 0.8, 1.1);
+	}
 
 	public string GetEffectiveDeviceName()
 	{

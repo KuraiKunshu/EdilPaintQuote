@@ -7,14 +7,14 @@ namespace EdilPaintPreventibiviGen.Services;
 public sealed class SmtpEmailDebugLog
 {
     private static readonly object FileSync = new();
+    private readonly List<string> _filePaths;
 
     public string FilePath { get; }
 
     public SmtpEmailDebugLog()
     {
-        string logDirectory = ResolveLogDirectory();
-        Directory.CreateDirectory(logDirectory);
-        FilePath = Path.Combine(logDirectory, $"smtp-{DateTime.Now:yyyyMMdd}.log");
+        _filePaths = ResolveLogFilePaths();
+        FilePath = _filePaths[0];
     }
 
     public void Separator()
@@ -31,7 +31,11 @@ public sealed class SmtpEmailDebugLog
         {
             lock (FileSync)
             {
-                File.AppendAllText(FilePath, line + Environment.NewLine, Encoding.UTF8);
+                foreach (string filePath in _filePaths)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+                    File.AppendAllText(filePath, line + Environment.NewLine, Encoding.UTF8);
+                }
             }
         }
         catch (Exception ex)
@@ -40,13 +44,40 @@ public sealed class SmtpEmailDebugLog
         }
     }
 
-    private static string ResolveLogDirectory()
+    public static string WriteFailure(string context, Exception exception)
     {
+        var log = new SmtpEmailDebugLog();
+        log.Separator();
+        log.Write(context);
+        log.Write($"ERRORE: {exception.GetType().Name}: {exception.Message}");
+        if (exception.InnerException != null)
+            log.Write($"INNER: {exception.InnerException.GetType().Name}: {exception.InnerException.Message}");
+
+        return log.FilePath;
+    }
+
+    public static string GetPrimaryLogDirectory() =>
+        Path.Combine(LocalApplicationDataService.GetDataDirectoryPath(), "MailLogs");
+
+    private static List<string> ResolveLogFilePaths()
+    {
+        string fileName = $"smtp-{DateTime.Now:yyyyMMdd}.log";
+        string primaryDirectory = GetPrimaryLogDirectory();
+        Directory.CreateDirectory(primaryDirectory);
+        var paths = new List<string>
+        {
+            Path.Combine(primaryDirectory, fileName)
+        };
+
         string appLogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MailLogs");
         if (CanWriteToDirectory(appLogDirectory))
-            return appLogDirectory;
+        {
+            string appLogPath = Path.Combine(appLogDirectory, fileName);
+            if (!paths.Contains(appLogPath, StringComparer.OrdinalIgnoreCase))
+                paths.Add(appLogPath);
+        }
 
-        return Path.Combine(LocalApplicationDataService.GetDataDirectoryPath(), "MailLogs");
+        return paths;
     }
 
     private static bool CanWriteToDirectory(string directory)
