@@ -498,22 +498,8 @@ public partial class HistoryWindow : Window
         var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber)
             ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
 
-        string officialPath = await _historyService.EnsureOfficialPdfExistsAsync(fullEntry, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(officialPath) && File.Exists(officialPath))
-            return officialPath;
-
-        if (!string.IsNullOrWhiteSpace(fullEntry.PdfPath) && File.Exists(fullEntry.PdfPath))
-            return fullEntry.PdfPath;
-
         string expectedPath = _historyService.GetExpectedPdfPath(fullEntry);
-        if (File.Exists(expectedPath))
-            return expectedPath;
-
-        string? foundPath = _historyService.FindPdfByQuoteNumber(fullEntry);
-        if (!string.IsNullOrWhiteSpace(foundPath) && File.Exists(foundPath))
-            return foundPath;
-
-        string regeneratedPath = await RegeneratePdfForEmailAsync(fullEntry, expectedPath, cancellationToken);
+        string regeneratedPath = await RegeneratePdfFromHistoryAsync(fullEntry, expectedPath, cancellationToken);
         if (!string.IsNullOrWhiteSpace(regeneratedPath) && File.Exists(regeneratedPath))
             return regeneratedPath;
 
@@ -521,7 +507,7 @@ public partial class HistoryWindow : Window
             $"PDF del preventivo n. {entry.QuoteNumber} non trovato e rigenerazione automatica non riuscita.");
     }
 
-    private async Task<string> RegeneratePdfForEmailAsync(
+    private async Task<string> RegeneratePdfFromHistoryAsync(
         QuoteHistoryEntry fullEntry,
         string expectedPath,
         CancellationToken cancellationToken)
@@ -627,7 +613,7 @@ public partial class HistoryWindow : Window
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[SendQuote] PDF rigenerato solo in temporaneo, copia su destinazione non riuscita: {ex.Message}");
+            Debug.WriteLine($"[QuotePdf] PDF rigenerato solo in temporaneo, copia su destinazione non riuscita: {ex.Message}");
         }
     }
 
@@ -738,58 +724,18 @@ public partial class HistoryWindow : Window
             if (fullEntry == null) return;
 
             string expectedPath = _historyService.GetExpectedPdfPath(fullEntry);
+            string pathToOpen = await RegeneratePdfFromHistoryAsync(
+                fullEntry,
+                expectedPath,
+                AppShutdownManager.ShutdownToken);
 
-            // Prima fonte: PDF ufficiale salvato nel DB. Se il file locale e' diverso, viene riscritto.
-            var officialPath = await _historyService.EnsureOfficialPdfExistsAsync(fullEntry);
-            if (!string.IsNullOrWhiteSpace(officialPath) && File.Exists(officialPath))
-            {
-                Process.Start(new ProcessStartInfo { FileName = officialPath, UseShellExecute = true });
-                return;
-            }
-
-            // Fallback: usa eventuali file locali solo se il DB non contiene ancora il PDF ufficiale.
-            if (!string.IsNullOrWhiteSpace(fullEntry.PdfPath) && File.Exists(fullEntry.PdfPath))
-            {
-                Process.Start(new ProcessStartInfo { FileName = fullEntry.PdfPath, UseShellExecute = true });
-                return;
-            }
-
-            if (File.Exists(expectedPath))
-            {
-                Process.Start(new ProcessStartInfo { FileName = expectedPath, UseShellExecute = true });
-                return;
-            }
-
-            var foundPath = _historyService.FindPdfByQuoteNumber(fullEntry);
-            if (!string.IsNullOrWhiteSpace(foundPath) && File.Exists(foundPath))
-            {
-                Process.Start(new ProcessStartInfo { FileName = foundPath, UseShellExecute = true });
-                return;
-            }
-
-            if (MessageBox.Show(
-                    $"Il file PDF del preventivo n. {entry.QuoteNumber} non e' stato trovato nel DB ne' nella cartella condivisa.\nVuoi rigenerarlo con i dati originali?",
-                    "File non trovato", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
-
-            _vm.LoadQuoteFromHistory(fullEntry, isEdit: true);
-
-            await _vm.GeneratePdfAsync(
-                incrementCounter: false,
-                openAfterGeneration: false,
-                specificDate: fullEntry.Date,
-                forceTargetPath: expectedPath);
-
-            var regeneratedOfficialPath = await _historyService.EnsureOfficialPdfExistsAsync(fullEntry);
-            var pathToOpen = !string.IsNullOrWhiteSpace(regeneratedOfficialPath) ? regeneratedOfficialPath : expectedPath;
-
-            if (File.Exists(pathToOpen))
+            if (!string.IsNullOrWhiteSpace(pathToOpen) && File.Exists(pathToOpen))
             {
                 Process.Start(new ProcessStartInfo { FileName = pathToOpen, UseShellExecute = true });
             }
             else
             {
-                MessageBox.Show("Il PDF e' stato rigenerato ma non e' stato possibile aprirlo automaticamente.",
+                MessageBox.Show("Il PDF non e' stato rigenerato, quindi non posso aprire una versione affidabile.",
                     "Avviso", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
