@@ -676,6 +676,36 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
+                            <DataGridTemplateColumn Header="" Width="46">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource NotificationRedBrush}"
+                                                BorderThickness="0,0,3,0"
+                                                Padding="0,0,7,0"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"
+                                                ToolTip="Note presenti">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Hidden"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasNotes}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="Note"
+                                                       Foreground="{StaticResource NotificationRedBrush}"
+                                                       FontSize="10"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
                             <DataGridTemplateColumn Header="Azioni" Width="220" Visibility="Collapsed">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -940,33 +970,7 @@
                                                 Click="OnEditPastQuoteClick"/>
                                         <Button Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnNotesClick"
-                                                Content="{Binding}">
-                                            <Button.ContentTemplate>
-                                                <DataTemplate DataType="{x:Type models:QuoteHistorySummary}">
-                                                    <Grid Width="88">
-                                                        <TextBlock Text="Note"
-                                                                   HorizontalAlignment="Center"/>
-                                                        <Ellipse Width="9"
-                                                                 Height="9"
-                                                                 Fill="{StaticResource NotificationRedBrush}"
-                                                                 HorizontalAlignment="Right"
-                                                                 VerticalAlignment="Top"
-                                                                 Margin="0,-1,8,0">
-                                                            <Ellipse.Style>
-                                                                <Style TargetType="Ellipse">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding HasNotes}" Value="True">
-                                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Ellipse.Style>
-                                                        </Ellipse>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </Button.ContentTemplate>
-                                        </Button>
+                                                Content="Note"/>
                                         <Button Content="Invia"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnSendQuoteClick"/>

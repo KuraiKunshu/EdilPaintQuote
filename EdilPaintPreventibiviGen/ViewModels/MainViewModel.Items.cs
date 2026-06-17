@@ -51,10 +51,16 @@ public partial class MainViewModel
 
         Materials.Add(newItem);
 
-        bool alreadyInCatalog = _personalMaterials.Any(m =>
+        bool isVeluxMaterial = SelectedCatalogMaterial != null &&
+            !SelectedCatalogMaterial.Id.StartsWith("LOCAL_", StringComparison.OrdinalIgnoreCase);
+        var existingCatalogMaterial = _personalMaterials.FirstOrDefault(m =>
             m.Name.Equals(newItem.Name, StringComparison.OrdinalIgnoreCase));
 
-        if (!alreadyInCatalog &&
+        if (existingCatalogMaterial != null)
+        {
+            UpdateExistingLocalMaterialFromVelux(existingCatalogMaterial, newItem, isVeluxMaterial);
+        }
+        else if (
             MessageBox.Show(
                 $"Il materiale '{newItem.Name}' non è ancora presente nell'anagrafica.\n\nVuoi aggiungerlo ai materiali locali?",
                 "Nuovo materiale",
@@ -75,6 +81,26 @@ public partial class MainViewModel
         }
 
         ResetInputs();
+    }
+
+    private void UpdateExistingLocalMaterialFromVelux(
+        Item existingCatalogMaterial,
+        Item veluxMaterial,
+        bool isVeluxMaterial)
+    {
+        if (!isVeluxMaterial)
+            return;
+
+        if (Math.Abs(existingCatalogMaterial.UnitPrice - veluxMaterial.UnitPrice) < 0.001)
+            return;
+
+        Debug.WriteLine(
+            $"[Velux] Aggiorno prezzo materiale locale '{existingCatalogMaterial.Name}': {existingCatalogMaterial.UnitPrice:N2} -> {veluxMaterial.UnitPrice:N2}");
+
+        existingCatalogMaterial.Description = veluxMaterial.Description;
+        existingCatalogMaterial.UnitPrice = veluxMaterial.UnitPrice;
+        existingCatalogMaterial.IsSignificant = veluxMaterial.IsSignificant;
+        SavePersonalMaterials();
     }
 
     public void AddLabor()
@@ -126,13 +152,11 @@ public partial class MainViewModel
                 InputName = localItem.Name;
                 InputDescription = localItem.Description;
                 InputValue = localItem.UnitPrice;
-                InputQuantity = 1;
                 IsSignificant = localItem.IsSignificant;
 
                 OnPropertyChanged(nameof(InputName));
                 OnPropertyChanged(nameof(InputDescription));
                 OnPropertyChanged(nameof(InputValue));
-                OnPropertyChanged(nameof(InputQuantity));
                 OnPropertyChanged(nameof(IsSignificant));
                 return;
             }
@@ -162,13 +186,11 @@ public partial class MainViewModel
             InputName = details.Name;
             InputDescription = details.Description;
             InputValue = details.UnitPrice;
-            InputQuantity = 1;
             IsSignificant = IsMaterialSignificant(details.Name);
 
             OnPropertyChanged(nameof(InputName));
             OnPropertyChanged(nameof(InputDescription));
             OnPropertyChanged(nameof(InputValue));
-            OnPropertyChanged(nameof(InputQuantity));
             OnPropertyChanged(nameof(IsSignificant));
         }
     }
