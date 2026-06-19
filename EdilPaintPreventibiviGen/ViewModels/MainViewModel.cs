@@ -28,6 +28,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly StoragePathService _storagePathService = StoragePathService.Instance;
     private readonly QuoteCalculator _quoteCalculator = new();
     private readonly QuoteHistoryService _quoteHistoryService;
+    private readonly SemaphoreSlim _draftSaveLock = new(1, 1);
     #endregion
 
     #region Data Collections
@@ -69,6 +70,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _partnerCompanyName = string.Empty;
     private DateTime? _loadedQuoteDate;
     private DateTime _loadedQuoteBaseVersionUtc;
+    private string _lastSharedDraftContentHash = string.Empty;
     #endregion
 
     #region Input Fields
@@ -139,6 +141,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         _veluxDetailsCts = null;
         _veluxService.OnLoginRequired -= HandleVeluxLogin;
         _veluxService.Dispose();
+        _draftSaveLock.Dispose();
     }
 
     private static Brush GetCustomerSelectionBrush(bool hasCustomer) =>

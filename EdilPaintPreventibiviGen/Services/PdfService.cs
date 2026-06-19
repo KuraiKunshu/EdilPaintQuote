@@ -251,7 +251,10 @@ public class PdfService
                                     text.Line($"{item.UnitPrice:N2} €");
                                     double totalDiscount = item.Discount + ctx.MaterialDiscount;
                                     if (totalDiscount > 0)
-                                        text.Line($"(-{totalDiscount}%)").FontSize(8).FontColor(PdfPalette.GreyMedium);
+                                        text.Line($"SCONTO -{totalDiscount:0.##}%")
+                                            .FontSize(9)
+                                            .Bold()
+                                            .FontColor(PdfPalette.RedDarken2);
                                 });
                                 table.Cell().Element(RowStyle).AlignRight().Text($"{item.TotalPrice * (1 - ctx.MaterialDiscount / 100):N2} €");
                                 static IContainer RowStyle(IContainer c) => c.BorderBottom(0.5f).BorderColor(PdfPalette.GreyLighten3).PaddingVertical(5);
@@ -292,7 +295,10 @@ public class PdfService
                                     double totalDiscount = item.Discount + ctx.LaborDiscount;
                                     text.Line($"{item.UnitPrice:N2} €");
                                     if (totalDiscount > 0)
-                                        text.Line($"(-{totalDiscount}%)").FontSize(8).FontColor(PdfPalette.GreyMedium);
+                                        text.Line($"SCONTO -{totalDiscount:0.##}%")
+                                            .FontSize(9)
+                                            .Bold()
+                                            .FontColor(PdfPalette.RedDarken2);
                                 });
                                 table.Cell().Element(RowStyle).AlignRight().Text($"{item.TotalPrice * (1 - ctx.LaborDiscount / 100):N2} €");
                                 static IContainer RowStyle(IContainer c) => c.BorderBottom(0.5f).BorderColor(PdfPalette.GreyLighten3).PaddingVertical(5);

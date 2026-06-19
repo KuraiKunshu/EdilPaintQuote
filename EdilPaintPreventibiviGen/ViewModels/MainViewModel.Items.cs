@@ -81,6 +81,7 @@ public partial class MainViewModel
         }
 
         ResetInputs();
+        _ = SaveDraftAsync();
     }
 
     private void UpdateExistingLocalMaterialFromVelux(
@@ -119,6 +120,7 @@ public partial class MainViewModel
         });
 
         ResetInputs();
+        _ = SaveDraftAsync();
     }
 
     private void ResetInputs()

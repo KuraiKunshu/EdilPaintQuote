@@ -184,6 +184,36 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public async Task DraftKeepsExistingQuoteConcurrencyMetadata()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            var service = new LocalDraftService(temporaryPath);
+            DateTime baseVersion = DateTime.UtcNow.AddMinutes(-2);
+            var draft = new QuoteHistoryEntry
+            {
+                QuoteNumber = "PREV/EDIT",
+                Date = DateTime.Today,
+                CustomerName = "Cliente test",
+                BaseVersionUtc = baseVersion,
+                IsEditingExistingQuoteDraft = true
+            };
+
+            await service.SaveAsync(draft);
+            var restored = await service.LoadAsync();
+
+            Assert.NotNull(restored);
+            Assert.True(restored.IsEditingExistingQuoteDraft);
+            Assert.Equal(baseVersion, restored.BaseVersionUtc);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
     public async Task CustomerRenameKeepsStableIdentity()
     {
         string temporaryPath = CreateTemporaryTestPath();

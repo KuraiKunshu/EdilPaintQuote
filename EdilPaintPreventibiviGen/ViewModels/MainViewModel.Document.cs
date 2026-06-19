@@ -40,6 +40,7 @@ public partial class MainViewModel
         _hasPersistedCurrentQuote = false;
         _loadedQuoteDate = null;
         _loadedQuoteBaseVersionUtc = default;
+        _lastSharedDraftContentHash = string.Empty;
 
         _materialDiscount = 0;
         _laborDiscount = 0;
@@ -353,6 +354,7 @@ public partial class MainViewModel
         _hasPersistedCurrentQuote = isEdit;
         _loadedQuoteDate = entry.Date;
         _loadedQuoteBaseVersionUtc = entry.BaseVersionUtc;
+        _lastSharedDraftContentHash = string.Empty;
         if (isEdit)
             QuoteNumber = entry.QuoteNumber;
 

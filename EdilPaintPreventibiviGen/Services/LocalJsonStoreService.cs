@@ -754,6 +754,7 @@ public class LocalJsonStoreService
             AdditionalCosts = entry.AdditionalCosts,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
+            IsEditingExistingQuoteDraft = entry.IsEditingExistingQuoteDraft,
             SyncHash = entry.SyncHash,
             PdfFile = entry.PdfFile == null ? null : new StoredFile
             {

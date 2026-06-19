@@ -908,6 +908,7 @@ public class FallbackDataService : IDataService
             Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
+            IsEditingExistingQuoteDraft = entry.IsEditingExistingQuoteDraft,
             SyncHash = entry.SyncHash,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,

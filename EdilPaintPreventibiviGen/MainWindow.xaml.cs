@@ -317,7 +317,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            await vm.DiscardDraftAsync();
+            await vm.DiscardCurrentWorkAsync();
             vm.ResetQuote();
         }
     }
@@ -493,7 +493,7 @@ public partial class MainWindow : Window
 
         if (DataContext is MainViewModel vm)
         {
-            await vm.DiscardDraftAsync();
+            await vm.DiscardCurrentWorkAsync();
             vm.ResetQuote();
         }
     }

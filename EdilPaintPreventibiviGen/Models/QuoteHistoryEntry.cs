@@ -90,4 +90,9 @@ public class QuoteHistoryEntry
 
 	[JsonPropertyName("baseVersionUtc")]
 	public DateTime BaseVersionUtc { get; set; }
+
+	// Solo per la bozza locale: permette di riprendere in sicurezza la modifica
+	// di un preventivo esistente mantenendo il controllo di concorrenza.
+	[JsonPropertyName("isEditingExistingQuoteDraft")]
+	public bool IsEditingExistingQuoteDraft { get; set; }
 }

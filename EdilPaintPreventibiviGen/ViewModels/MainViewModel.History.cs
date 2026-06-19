@@ -115,7 +115,9 @@ public partial class MainViewModel
             if (existingEntry != null)
             {
                 entry.Date = existingEntry.Date;
-                entry.Status = existingEntry.Status;
+                entry.Status = existingEntry.Status == QuoteStatus.Bozza
+                    ? QuoteStatus.Finalizzato
+                    : existingEntry.Status;
                 entry.Notes = existingEntry.Notes;
                 entry.CreatedByDevice = existingEntry.CreatedByDevice;
                 entry.LastModifiedByDevice = existingEntry.LastModifiedByDevice;
@@ -127,7 +129,10 @@ public partial class MainViewModel
                 entry.ReminderCount = existingEntry.ReminderCount;
                 entry.LastReminderByDevice = existingEntry.LastReminderByDevice;
                 entry.Events = existingEntry.Events.ToList();
-                entry.BaseVersionUtc = existingEntry.BaseVersionUtc;
+                // La versione caricata quando e' iniziata la modifica e' quella
+                // autorevole. Una voce History locale puo' essere piu' vecchia.
+                if (entry.BaseVersionUtc == default)
+                    entry.BaseVersionUtc = existingEntry.BaseVersionUtc;
 
                 existingEntry.CustomerName = entry.CustomerName;
                 existingEntry.ReferenceName = entry.ReferenceName;
@@ -178,7 +183,9 @@ public partial class MainViewModel
             if (existing != null)
             {
                 entry.Date = existing.Date;
-                entry.Status = existing.Status;
+                entry.Status = existing.Status == QuoteStatus.Bozza
+                    ? QuoteStatus.Finalizzato
+                    : existing.Status;
                 entry.Notes = existing.Notes;
                 entry.CreatedByDevice = existing.CreatedByDevice;
                 entry.LastModifiedByDevice = existing.LastModifiedByDevice;
@@ -190,7 +197,10 @@ public partial class MainViewModel
                 entry.ReminderCount = existing.ReminderCount;
                 entry.LastReminderByDevice = existing.LastReminderByDevice;
                 entry.Events = existing.Events.ToList();
-                entry.BaseVersionUtc = existing.BaseVersionUtc;
+                // Non sostituire la versione di partenza con quella letta subito
+                // prima del salvataggio: annullerebbe il controllo multi-PC.
+                if (entry.BaseVersionUtc == default)
+                    entry.BaseVersionUtc = existing.BaseVersionUtc;
             }
         }
         catch (Exception ex)
@@ -360,6 +370,7 @@ public partial class MainViewModel
             Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
+            IsEditingExistingQuoteDraft = entry.IsEditingExistingQuoteDraft,
             SyncHash = entry.SyncHash,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,

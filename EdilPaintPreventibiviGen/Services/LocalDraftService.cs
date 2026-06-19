@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Text.Json;
 using EdilPaintPreventibiviGen.Models;
 
@@ -30,8 +31,9 @@ public sealed class LocalDraftService
             string json = await File.ReadAllTextAsync(_draftPath, cancellationToken);
             return JsonSerializer.Deserialize<QuoteHistoryEntry>(json, JsonOptions);
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"[Draft] Impossibile leggere '{_draftPath}': {ex}");
             return null;
         }
     }

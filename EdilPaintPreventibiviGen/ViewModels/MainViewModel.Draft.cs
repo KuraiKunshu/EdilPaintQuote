@@ -15,8 +15,12 @@ public partial class MainViewModel
 
     public async Task SaveDraftAsync(CancellationToken cancellationToken = default)
     {
+        bool lockTaken = false;
         try
         {
+            await _draftSaveLock.WaitAsync(cancellationToken);
+            lockTaken = true;
+
             if (_isGeneratingPdf || _isGeneratingCostsPdf)
                 return;
 
@@ -26,7 +30,35 @@ public partial class MainViewModel
                 return;
             }
 
-            await _draftService.SaveAsync(CreateDraftEntry(), cancellationToken);
+            var draft = CreateDraftEntry();
+
+            // Il file locale viene sempre aggiornato per primo: resta disponibile
+            // anche quando il database cloud e' temporaneamente irraggiungibile.
+            await _draftService.SaveAsync(draft, cancellationToken);
+
+            if (SelectedCustomer == null || !_dataService.CanSynchronize)
+                return;
+
+            if (!_isEditingExistingQuote)
+            {
+                int nextNumber = await _dataService.GetNextQuoteNumberAsync();
+                QuoteNumber = nextNumber.ToString();
+                draft.QuoteNumber = QuoteNumber;
+                await _draftService.SaveAsync(draft, cancellationToken);
+            }
+
+            string contentHash = QuoteSyncHashService.Compute(draft);
+            if (string.Equals(contentHash, _lastSharedDraftContentHash, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await SaveSharedDraftAsync(draft, cancellationToken);
+            if (draft.BaseVersionUtc != default)
+            {
+                _lastSharedDraftContentHash = contentHash;
+                await _draftService.SaveAsync(draft, cancellationToken);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -36,10 +68,32 @@ public partial class MainViewModel
         {
             Debug.WriteLine($"[Draft] Salvataggio bozza non riuscito: {ex.Message}");
         }
+        finally
+        {
+            if (lockTaken)
+                _draftSaveLock.Release();
+        }
     }
 
     public Task DiscardDraftAsync(CancellationToken cancellationToken = default) =>
         _draftService.DeleteAsync(cancellationToken);
+
+    public async Task DiscardCurrentWorkAsync(CancellationToken cancellationToken = default)
+    {
+        var draft = await _draftService.LoadAsync(cancellationToken);
+        await _draftService.DeleteAsync(cancellationToken);
+
+        if (draft is not { IsEditingExistingQuoteDraft: true } ||
+            string.IsNullOrWhiteSpace(draft.QuoteNumber) ||
+            !_dataService.CanSynchronize)
+        {
+            return;
+        }
+
+        var stored = await _dataService.GetQuoteByNumberAsync(draft.QuoteNumber);
+        if (stored?.Status == QuoteStatus.Bozza)
+            await _dataService.DeleteQuoteAsync(draft.QuoteNumber);
+    }
 
     public void ApplyDraft(QuoteHistoryEntry draft)
     {
@@ -98,10 +152,15 @@ public partial class MainViewModel
         foreach (var cost in draft.AdditionalCosts)
             AdditionalCosts.Add(CloneCost(cost));
 
-        _isEditingExistingQuote = false;
-        _hasPersistedCurrentQuote = false;
-        _loadedQuoteDate = null;
-        _loadedQuoteBaseVersionUtc = default;
+        bool resumesExistingQuote = draft.IsEditingExistingQuoteDraft &&
+                                    draft.BaseVersionUtc != default;
+        _isEditingExistingQuote = resumesExistingQuote;
+        _hasPersistedCurrentQuote = resumesExistingQuote;
+        _loadedQuoteDate = resumesExistingQuote ? draft.Date : null;
+        _loadedQuoteBaseVersionUtc = resumesExistingQuote
+            ? draft.BaseVersionUtc
+            : default;
+        _lastSharedDraftContentHash = string.Empty;
 
         UpdateItemSortOrders();
         CalculateTotals();
@@ -125,6 +184,10 @@ public partial class MainViewModel
             LaborDiscount = LaborDiscount,
             Total = TotaleGenerale,
             Status = QuoteStatus.Bozza,
+            BaseVersionUtc = _isEditingExistingQuote
+                ? _loadedQuoteBaseVersionUtc
+                : default,
+            IsEditingExistingQuoteDraft = _isEditingExistingQuote,
             CreatedByDevice = deviceName,
             LastModifiedByDevice = deviceName,
             IsJointVenture = IsJointVenture,
@@ -139,17 +202,57 @@ public partial class MainViewModel
                 Content = a.Content,
                 ImportedAt = DateTime.UtcNow
             }).ToList(),
-            Events =
-            [
-                new QuoteEventEntry
-                {
-                    CreatedAtUtc = DateTime.UtcNow,
-                    DeviceName = deviceName,
-                    EventType = "bozza",
-                    Description = "Bozza autosalvata"
-                }
-            ]
+            Events = []
         };
+    }
+
+    private async Task SaveSharedDraftAsync(
+        QuoteHistoryEntry draft,
+        CancellationToken cancellationToken)
+    {
+        QuoteHistoryEntry? existing = await _dataService.GetQuoteByNumberAsync(draft.QuoteNumber);
+        if (existing != null)
+        {
+            draft.Date = existing.Date;
+            draft.PdfPath = existing.PdfPath;
+            draft.Notes = existing.Notes;
+            draft.Status = existing.Status;
+            draft.CreatedByDevice = existing.CreatedByDevice;
+            draft.SentAtUtc = existing.SentAtUtc;
+            draft.SentMethod = existing.SentMethod;
+            draft.SentRecipient = existing.SentRecipient;
+            draft.SentByDevice = existing.SentByDevice;
+            draft.LastReminderAtUtc = existing.LastReminderAtUtc;
+            draft.ReminderCount = existing.ReminderCount;
+            draft.LastReminderByDevice = existing.LastReminderByDevice;
+            draft.Events = existing.Events.ToList();
+
+            // Mantiene la versione dalla quale l'utente ha iniziato a lavorare.
+            // Non usiamo il timestamp appena letto, altrimenti perderemmo il
+            // controllo sulle modifiche concorrenti degli altri PC.
+            if (draft.BaseVersionUtc == default)
+                draft.BaseVersionUtc = _loadedQuoteBaseVersionUtc;
+        }
+        else
+        {
+            draft.Status = QuoteStatus.Bozza;
+        }
+
+        draft.Events.Add(new QuoteEventEntry
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            DeviceName = DeviceNameService.GetCurrentDeviceName(),
+            EventType = "bozza",
+            Description = "Bozza condivisa aggiornata"
+        });
+
+        await _dataService.SaveQuoteAsync(draft, cancellationToken);
+
+        _isEditingExistingQuote = true;
+        _hasPersistedCurrentQuote = true;
+        _loadedQuoteDate = draft.Date;
+        _loadedQuoteBaseVersionUtc = draft.BaseVersionUtc;
+        draft.IsEditingExistingQuoteDraft = true;
     }
 
     private bool HasDraftContent()
