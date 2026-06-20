@@ -974,6 +974,9 @@
                                         <Button Content="Invia"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnSendQuoteClick"/>
+                                        <Button Content="Certificato posa"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnGenerateInstallationCertificateClick"/>
                                         <Button Content="Cartella"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnOpenCustomerFolderClick"/>

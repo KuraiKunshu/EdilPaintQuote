@@ -180,45 +180,66 @@ public class PdfService
 
                     row.RelativeItem().Column(col =>
                     {
-                        col.Item().AlignRight().Text("PREVENTIVO").FontSize(templateStyle.TitleFontSize).ExtraBold().FontColor(templateStyle.TitleColor);
-                        col.Item().AlignRight().Text($"n. {ctx.QuoteNumber}").FontSize(16).Bold();
+                        col.Item().AlignRight().Text("PREVENTIVO")
+                            .FontSize(templateStyle.TitleFontSize + 2).ExtraBold().FontColor(PdfPalette.GreyDarken3);
+                        col.Item().PaddingTop(3).AlignRight().Width(220)
+                            .LineHorizontal(1.2f).LineColor(templateStyle.AccentColor);
+                        col.Item().PaddingTop(7).AlignRight().Text($"N. {ctx.QuoteNumber}")
+                            .FontSize(16).ExtraBold().FontColor(templateStyle.AccentColor);
                         if (ctx.PdfShowTemplateName)
                             col.Item().AlignRight().Text($"Template: {ctx.PdfTemplateName}").FontSize(8).FontColor(PdfPalette.GreyMedium);
 
                         var dataScadenza = ctx.Date.AddMonths(1).AddDays(15);
-                        col.Item().AlignRight().Text(ctx.Date.ToString("dd MMMM yyyy")).FontSize(10).Italic();
-                        col.Item().AlignRight().Text($"Valido fino al: {dataScadenza:dd/MM/yyyy}").FontSize(9).FontColor(PdfPalette.GreyMedium);
-
-                        if (customer != null)
-                        {
-                            col.Item().PaddingTop(20).AlignRight().Column(custCol =>
-                            {
-                                custCol.Item().Text("Spettabile").FontSize(8).Italic().FontColor(PdfPalette.GreyMedium);
-                                custCol.Item().Text(customer.BusinessName).Bold().FontSize(12);
-                                custCol.Item().Text(customer.Address).FontSize(10);
-                                if (!string.IsNullOrWhiteSpace(customer.Phone))
-                                    custCol.Item().Text($"Tel: {customer.Phone}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
-                                if (!string.IsNullOrWhiteSpace(customer.Email))
-                                    custCol.Item().Text($"Mail: {customer.Email}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
-
-                                if (reference != null)
-                                {
-                                    custCol.Item().PaddingTop(10).Text("Riferimento:").FontSize(8).Italic().FontColor(PdfPalette.GreyMedium);
-                                    custCol.Item().Text(reference.BusinessName).Bold().FontSize(11).FontColor(templateStyle.AccentColor);
-                                    custCol.Item().Text(reference.Address).FontSize(9);
-                                    if (!string.IsNullOrWhiteSpace(reference.Phone))
-                                        custCol.Item().Text($"Tel: {reference.Phone}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
-                                    if (!string.IsNullOrWhiteSpace(reference.Email))
-                                        custCol.Item().Text($"Mail: {reference.Email}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
-                                }
-                            });
-                        }
+                        col.Item().PaddingTop(5).AlignRight().Text($"Data: {ctx.Date:dd/MM/yyyy}")
+                            .FontSize(9).FontColor(PdfPalette.GreyDarken2);
+                        col.Item().AlignRight().Text($"Validita': {dataScadenza:dd/MM/yyyy}")
+                            .FontSize(9).FontColor(PdfPalette.GreyDarken2);
                     });
                 });
                 #endregion
 
                 page.Content().PaddingVertical(25).Column(col =>
                 {
+                    if (customer != null)
+                    {
+                        col.Item().PaddingBottom(22).BorderLeft(4).BorderColor(templateStyle.AccentColor)
+                            .Background(PdfPalette.GreyLighten3).Padding(13).Row(clientRow =>
+                            {
+                                clientRow.RelativeItem().Column(custCol =>
+                                {
+                                    custCol.Item().Text("SPETTABILE")
+                                        .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                    custCol.Item().PaddingTop(2).Text(customer.BusinessName)
+                                        .Bold().FontSize(12).FontColor(PdfPalette.GreyDarken3);
+                                    if (!string.IsNullOrWhiteSpace(customer.Address))
+                                        custCol.Item().Text(customer.Address).FontSize(9);
+                                    if (!string.IsNullOrWhiteSpace(customer.Phone))
+                                        custCol.Item().Text($"Tel: {customer.Phone}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                    if (!string.IsNullOrWhiteSpace(customer.Email))
+                                        custCol.Item().Text($"Mail: {customer.Email}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                });
+
+                                if (reference != null)
+                                {
+                                    clientRow.ConstantItem(18);
+                                    clientRow.RelativeItem().BorderLeft(1).BorderColor(PdfPalette.GreyLighten1)
+                                        .PaddingLeft(14).Column(refCol =>
+                                        {
+                                            refCol.Item().Text("RIFERIMENTO")
+                                                .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                            refCol.Item().PaddingTop(2).Text(reference.BusinessName)
+                                                .Bold().FontSize(11).FontColor(templateStyle.AccentColor);
+                                            if (!string.IsNullOrWhiteSpace(reference.Address))
+                                                refCol.Item().Text(reference.Address).FontSize(9);
+                                            if (!string.IsNullOrWhiteSpace(reference.Phone))
+                                                refCol.Item().Text($"Tel: {reference.Phone}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                            if (!string.IsNullOrWhiteSpace(reference.Email))
+                                                refCol.Item().Text($"Mail: {reference.Email}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                        });
+                                }
+                            });
+                    }
+
                     #region Materiali
                     if (ctx.Materials.Count > 0)
                     {
@@ -231,6 +252,18 @@ public class PdfService
                             {
                                 columns.RelativeColumn(3); columns.ConstantColumn(40);
                                 columns.ConstantColumn(80); columns.ConstantColumn(80);
+                            });
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(TableHeaderStyle).Text("Descrizione").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignCenter().Text("Q.ta'").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignRight().Text("Prezzo unit.").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignRight().Text("Totale").SemiBold();
+
+                                static IContainer TableHeaderStyle(IContainer c) =>
+                                    c.Background(PdfPalette.GreyLighten3)
+                                        .PaddingVertical(6)
+                                        .PaddingHorizontal(5);
                             });
                             foreach (var item in ctx.Materials)
                             {
@@ -276,6 +309,18 @@ public class PdfService
                                 columns.RelativeColumn(3); columns.ConstantColumn(40);
                                 columns.ConstantColumn(80); columns.ConstantColumn(80);
                             });
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(TableHeaderStyle).Text("Descrizione").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignCenter().Text("Q.ta'").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignRight().Text("Prezzo unit.").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignRight().Text("Totale").SemiBold();
+
+                                static IContainer TableHeaderStyle(IContainer c) =>
+                                    c.Background(PdfPalette.GreyLighten3)
+                                        .PaddingVertical(6)
+                                        .PaddingHorizontal(5);
+                            });
                             foreach (var item in ctx.Labors)
                             {
                                 table.Cell().Element(RowStyle).Column(c =>
@@ -312,12 +357,25 @@ public class PdfService
                         #region Note
                         row.RelativeItem().PaddingRight(30).Column(noteCol =>
                         {
-                            noteCol.Item().Text(ctx.PdfNotesTitle).FontSize(9).Bold();
-                            noteCol.Item().PaddingTop(5).PaddingBottom(15).Text(ctx.PaymentTerms).FontSize(9).LineHeight(1.2f);
+                            noteCol.Item().Text(ctx.PdfNotesTitle).FontSize(9).Bold().FontColor(templateStyle.AccentColor);
+                            noteCol.Item().PaddingTop(5).Text(ctx.PaymentTerms).FontSize(9).LineHeight(1.2f);
+                            noteCol.Item().PaddingTop(18).Text(ctx.PdfSignatureText)
+                                .FontSize(9).SemiBold().FontColor(PdfPalette.GreyDarken2);
+                            noteCol.Item().PaddingTop(8).Row(signatureRow =>
+                            {
+                                signatureRow.RelativeItem().BorderBottom(1)
+                                    .BorderColor(PdfPalette.GreyDarken1).Height(14);
+                                signatureRow.ConstantItem(18);
+                                signatureRow.RelativeItem().BorderBottom(1)
+                                    .BorderColor(PdfPalette.GreyDarken1).Height(14);
+                            });
+                            noteCol.Item().PaddingTop(4).Text("Luogo e data")
+                                .FontSize(8).FontColor(PdfPalette.GreyMedium);
                         });
                         #endregion
 
-                        row.ConstantItem(230).Column(totCol =>
+                        row.ConstantItem(230).BorderLeft(3).BorderColor(templateStyle.AccentColor)
+                            .Background(PdfPalette.GreyLighten3).Padding(12).Column(totCol =>
                         {
                             bool hasDiscount = (ctx.MaterialDiscount + ctx.LaborDiscount) > 0;
 
@@ -325,9 +383,9 @@ public class PdfService
                             {
                                 case "RC 10%+22%":
                                     if (totals.Imponibile10 > 0)
-                                        totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile al 10%:"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile10:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.GreenDarken1); });
+                                        totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile al 10%:"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile10:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.RedDarken2); });
                                     if (totals.Imponibile22 > 0)
-                                        totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile al 22%:"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile22:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.GreenDarken1); });
+                                        totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile al 22%:"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile22:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.RedDarken2); });
                                     totCol.Item().PaddingVertical(2).LineHorizontal(0.5f).LineColor(PdfPalette.GreyLighten2);
                                     if (totals.Iva10 > 0)
                                         totCol.Item().Row(r => { r.RelativeItem().Text("IVA al 10%:"); r.RelativeItem().AlignRight().Text($"{totals.Iva10:N2} €"); });
@@ -335,42 +393,30 @@ public class PdfService
                                         totCol.Item().Row(r => { r.RelativeItem().Text("IVA al 22%:"); r.RelativeItem().AlignRight().Text($"{totals.Iva22:N2} €"); });
                                     break;
                                 case "10%":
-                                    totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile Totale:"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.GreenDarken1); });
+                                    totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile Totale:"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.RedDarken2); });
                                     totCol.Item().PaddingVertical(2).LineHorizontal(0.5f).LineColor(PdfPalette.GreyLighten2);
                                     totCol.Item().Row(r => { r.RelativeItem().Text($"IVA ({ctx.IvaType}):"); r.RelativeItem().AlignRight().Text($"{totals.IvaTotale:N2} €"); });
                                     break;
                                 case "22%":
-                                    totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile Totale (22%):"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile22:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.GreenDarken1); });
+                                    totCol.Item().Row(r => { r.RelativeItem().Text("Imponibile Totale (22%):"); var t = r.RelativeItem().AlignRight().Text($"{totals.Imponibile22:N2} €"); if (hasDiscount) t.FontColor(PdfPalette.RedDarken2); });
                                     totCol.Item().PaddingVertical(2).LineHorizontal(0.5f).LineColor(PdfPalette.GreyLighten2);
                                     totCol.Item().Row(r => { r.RelativeItem().Text("IVA al 22%:"); r.RelativeItem().AlignRight().Text($"{totals.Iva22:N2} €"); });
                                     break;
                             }
 
                             string totaleText = QuoteCalculator.NormalizeIvaType(ctx.IvaType) == "esclusa"
-                                ? "TOTALE PREVENTIVO (IVA esclusa):"
-                                : "TOTALE PREVENTIVO (IVA inclusa):";
+                                ? "TOTALE PREVENTIVO - IVA esclusa"
+                                : "TOTALE PREVENTIVO - IVA inclusa";
 
-                            totCol.Item().PaddingTop(5).BorderTop(1).Row(r =>
+                            totCol.Item().PaddingTop(7).BorderTop(1).Column(total =>
                             {
-                                r.RelativeItem().Text(totaleText).Bold().FontSize(12);
-                                r.RelativeItem().AlignRight().Text($"{totals.TotaleGenerale:N2} €").Bold().FontSize(12).FontColor(PdfPalette.GreenMedium);
+                                total.Item().Text(totaleText).ExtraBold().FontSize(9).FontColor(PdfPalette.GreyDarken3);
+                                total.Item().PaddingTop(3).AlignRight().Text($"{totals.TotaleGenerale:N2} €")
+                                    .ExtraBold().FontSize(15).FontColor(templateStyle.AccentColor);
                             });
                         });
                     });
 
-                    #region Firma
-                    col.Item().PaddingTop(20).EnsureSpace(80).Column(firmaCol =>
-                    {
-                        firmaCol.Item().PaddingBottom(6).Text(ctx.PdfSignatureText).FontSize(9).SemiBold().FontColor(PdfPalette.GreyDarken2);
-                        firmaCol.Item().PaddingTop(18).Row(row =>
-                        {
-                            row.RelativeItem().BorderBottom(1).BorderColor(PdfPalette.GreyDarken1).Height(18);
-                            row.ConstantItem(20);
-                            row.RelativeItem().BorderBottom(1).BorderColor(PdfPalette.GreyDarken1).Height(18);
-                        });
-                        firmaCol.Item().PaddingTop(4).Text("Luogo e data").FontSize(8).FontColor(PdfPalette.GreyMedium);
-                    });
-                    #endregion
                 });
 
                 page.Footer().Column(col =>
@@ -384,6 +430,242 @@ public class PdfService
                 });
             });
         }).GeneratePdf(filePath);
+    }
+
+    public void GenerateInstallationCertificate(
+        InstallationCertificateContext ctx,
+        Company company,
+        string filePath)
+    {
+        if (ctx.Materials.Count == 0)
+            throw new InvalidOperationException("Il preventivo non contiene materiali da certificare.");
+
+        QuestPDF.Settings.License = LicenseType.Community;
+        var templateStyle = PdfTemplateStyle.Resolve(ctx.PdfTemplateName);
+        var customer = ctx.AllCustomers.FirstOrDefault(c =>
+            string.Equals(c.BusinessName, ctx.CustomerName, StringComparison.OrdinalIgnoreCase));
+        string assetsPath = ResolveAssetsDirectory();
+        string logoPath = string.IsNullOrWhiteSpace(ctx.SelectedLogo)
+            ? string.Empty
+            : Path.Combine(assetsPath, ctx.SelectedLogo);
+        string stampPath = ResolveStampPath(assetsPath);
+
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(templateStyle.MarginCm, Unit.Centimetre);
+                page.PageColor(PdfPalette.White);
+                page.DefaultTextStyle(x => x.FontSize(templateStyle.BodyFontSize).FontFamily("Segoe UI"));
+
+                page.Header().ShowOnce().Row(row =>
+                {
+                    row.RelativeItem().Column(col =>
+                    {
+                        if (File.Exists(logoPath))
+                            col.Item().Height(60).Image(Image.FromFile(logoPath)).FitHeight();
+                        else
+                            col.Item().Height(60);
+
+                        col.Item().PaddingTop(10).Text(company.Nome)
+                            .FontSize(14).Bold().FontColor(templateStyle.AccentColor);
+                        col.Item().Text(company.Indirizzo).FontSize(9).FontColor(PdfPalette.GreyDarken2);
+                        col.Item().Text($"P.IVA: {company.Piva}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
+                        col.Item().Text($"Email: {company.Email}").FontSize(9).FontColor(PdfPalette.GreyDarken2);
+                    });
+
+                    row.RelativeItem().Column(col =>
+                    {
+                        col.Item().AlignRight().Text("CERTIFICATO")
+                            .FontSize(templateStyle.TitleFontSize + 2).ExtraBold().FontColor(PdfPalette.GreyDarken3);
+                        col.Item().PaddingTop(3).AlignRight().Text("DI CORRETTA POSA IN OPERA")
+                            .FontSize(13).ExtraBold().FontColor(templateStyle.AccentColor);
+                        col.Item().PaddingTop(5).AlignRight().Width(245)
+                            .LineHorizontal(1.2f).LineColor(templateStyle.AccentColor);
+                        col.Item().PaddingTop(7).AlignRight().Text($"Rif. preventivo n. {ctx.QuoteNumber}")
+                            .FontSize(10).SemiBold();
+                    });
+                });
+
+                page.Content().PaddingVertical(25).Column(col =>
+                {
+                    col.Spacing(12);
+
+                    col.Item().Row(section =>
+                    {
+                        section.ConstantItem(26).Height(22).Background(templateStyle.AccentColor)
+                            .AlignCenter().AlignMiddle().Text("01").FontSize(9).Bold().FontColor(PdfPalette.White);
+                        section.RelativeItem().PaddingLeft(9).AlignMiddle().Text("DATI DELL'INTERVENTO")
+                            .FontSize(10).ExtraBold().FontColor(PdfPalette.GreyDarken3);
+                    });
+
+                    col.Item().BorderLeft(4).BorderColor(templateStyle.AccentColor)
+                        .Background(PdfPalette.GreyLighten3).Padding(14).Row(info =>
+                        {
+                            info.RelativeItem().Column(clientInfo =>
+                            {
+                                clientInfo.Spacing(5);
+                                clientInfo.Item().Text("COMMITTENTE")
+                                    .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                clientInfo.Item().Text(ctx.CustomerName)
+                                    .FontSize(11).Bold().FontColor(PdfPalette.GreyDarken3);
+                                if (!string.IsNullOrWhiteSpace(customer?.Address))
+                                    clientInfo.Item().Text(customer.Address).FontSize(9);
+                                if (!string.IsNullOrWhiteSpace(ctx.ReferenceName))
+                                {
+                                    clientInfo.Item().PaddingTop(5).Text("RIFERIMENTO")
+                                        .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                    clientInfo.Item().Text(ctx.ReferenceName)
+                                        .FontSize(10).Bold().FontColor(templateStyle.AccentColor);
+                                }
+                            });
+
+                            info.ConstantItem(20);
+                            info.RelativeItem().BorderLeft(1).BorderColor(PdfPalette.GreyLighten1)
+                                .PaddingLeft(14).Column(workInfo =>
+                            {
+                                workInfo.Spacing(5);
+                                workInfo.Item().Text("CANTIERE PRESSO")
+                                    .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                workInfo.Item().Text(ctx.WorkSite)
+                                    .FontSize(10).Bold().FontColor(PdfPalette.GreyDarken3);
+                                workInfo.Item().PaddingTop(5).Text("DATA DI FINE LAVORI")
+                                    .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                workInfo.Item().Text(ctx.CompletionDate.ToString("dd/MM/yyyy"))
+                                    .FontSize(10).Bold();
+                            });
+                        });
+
+                    col.Item().PaddingTop(2).Row(section =>
+                    {
+                        section.ConstantItem(26).Height(22).Background(templateStyle.AccentColor)
+                            .AlignCenter().AlignMiddle().Text("02").FontSize(9).Bold().FontColor(PdfPalette.White);
+                        section.RelativeItem().PaddingLeft(9).AlignMiddle().Text("DICHIARAZIONE")
+                            .FontSize(10).ExtraBold().FontColor(PdfPalette.GreyDarken3);
+                    });
+
+                    col.Item().Border(1).BorderColor(PdfPalette.GreyLighten1).Padding(14).Column(declaration =>
+                    {
+                        declaration.Item().AlignCenter().Text("DICHIARA E CERTIFICA")
+                            .FontSize(12).ExtraBold().FontColor(templateStyle.AccentColor);
+                        declaration.Item().PaddingTop(4).AlignCenter().Width(150)
+                            .LineHorizontal(1).LineColor(templateStyle.AccentColor);
+                        declaration.Item().PaddingTop(10).Text(text =>
+                        {
+                            text.Span("La sottoscritta impresa ");
+                            text.Span(company.Nome).Bold();
+                            text.Span(", con riferimento ai lavori eseguiti presso il cantiere sopra indicato, certifica che i materiali elencati nel presente documento sono stati posati in opera ");
+                            text.Span("a regola d'arte").Bold();
+                            text.Span(", nel rispetto delle indicazioni dei produttori e delle norme tecniche applicabili.");
+                        });
+                    });
+
+                    col.Item().PaddingTop(2).Row(section =>
+                    {
+                        section.ConstantItem(26).Height(22).Background(templateStyle.AccentColor)
+                            .AlignCenter().AlignMiddle().Text("03").FontSize(9).Bold().FontColor(PdfPalette.White);
+                        section.RelativeItem().PaddingLeft(9).AlignMiddle().Text("MATERIALI POSATI")
+                            .FontSize(10).ExtraBold().FontColor(PdfPalette.GreyDarken3);
+                    });
+
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(4);
+                            columns.ConstantColumn(58);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Background(PdfPalette.GreyLighten3).Padding(7)
+                                .Text("Materiale / descrizione").SemiBold();
+                            header.Cell().Background(PdfPalette.GreyLighten3).Padding(7).AlignCenter()
+                                .Text("Quantita'").SemiBold();
+                        });
+
+                        foreach (var material in ctx.Materials.OrderBy(m => m.SortOrder))
+                        {
+                            table.Cell().Element(MaterialRow).Column(materialCol =>
+                            {
+                                materialCol.Item().Text(material.Name).SemiBold();
+                                if (!string.IsNullOrWhiteSpace(material.Description))
+                                    materialCol.Item().Text(material.Description)
+                                        .FontSize(8).FontColor(PdfPalette.GreyDarken1);
+                            });
+                            table.Cell().Element(MaterialRow).AlignCenter().AlignMiddle()
+                                .Text(material.Quantity.ToString());
+                        }
+
+                        static IContainer MaterialRow(IContainer container) =>
+                            container.BorderBottom(0.5f)
+                                .BorderColor(PdfPalette.GreyLighten2)
+                                .PaddingVertical(7)
+                                .PaddingHorizontal(5);
+                    });
+
+                    col.Item().PaddingTop(8).AlignRight().Width(255).Column(signature =>
+                    {
+                        signature.Item().AlignCenter().Text("Timbro e firma della ditta")
+                            .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken2);
+                        if (File.Exists(stampPath))
+                            signature.Item().PaddingTop(3).Height(52)
+                                .Image(Image.FromFile(stampPath)).FitArea();
+                        else
+                            signature.Item().PaddingTop(45).LineHorizontal(0.7f)
+                                .LineColor(PdfPalette.GreyDarken1);
+                    });
+                });
+
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    string footer = string.IsNullOrWhiteSpace(ctx.FooterText)
+                        ? $"{company.Nome} - {company.Piva}"
+                        : ctx.FooterText;
+                    text.Span(footer + "  |  ").FontSize(8).FontColor(PdfPalette.GreyMedium);
+                    text.CurrentPageNumber().FontSize(8).FontColor(PdfPalette.GreyMedium);
+                    text.Span(" / ").FontSize(8).FontColor(PdfPalette.GreyMedium);
+                    text.TotalPages().FontSize(8).FontColor(PdfPalette.GreyMedium);
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
+    private static string ResolveAssetsDirectory()
+    {
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string[] candidates =
+        [
+            Path.Combine(baseDir, "Assets"),
+            Path.Combine(baseDir, "assets"),
+            Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Assets")),
+            Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "assets"))
+        ];
+
+        return candidates.FirstOrDefault(Directory.Exists) ?? candidates[0];
+    }
+
+    private static string ResolveStampPath(string assetsPath)
+    {
+        if (!Directory.Exists(assetsPath))
+            return string.Empty;
+
+        string[] preferredNames = ["timbro.png", "timbro.jpeg", "timbro.jpg"];
+        var files = Directory.EnumerateFiles(assetsPath).ToList();
+        foreach (string preferredName in preferredNames)
+        {
+            string? preferred = files.FirstOrDefault(path =>
+                string.Equals(Path.GetFileName(path), preferredName, StringComparison.OrdinalIgnoreCase));
+            if (preferred != null)
+                return preferred;
+        }
+
+        return files.FirstOrDefault(path =>
+                   Path.GetFileNameWithoutExtension(path).StartsWith("Timbro", StringComparison.OrdinalIgnoreCase) &&
+                   new[] { ".png", ".jpg", ".jpeg" }.Contains(
+                       Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+               ?? string.Empty;
     }
 
     /// <summary>

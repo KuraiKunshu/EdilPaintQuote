@@ -748,6 +748,134 @@ public partial class HistoryWindow : Window
             Mouse.OverrideCursor = null;
         }
     }
+
+    private async void OnGenerateInstallationCertificateClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await GenerateInstallationCertificateAsync(entry);
+    }
+
+    private async Task GenerateInstallationCertificateAsync(QuoteHistorySummary entry)
+    {
+        var inputWindow = new InstallationCertificateWindow(entry) { Owner = this };
+        if (inputWindow.ShowDialog() != true)
+            return;
+
+        string? temporaryPath = null;
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+
+            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber)
+                ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
+            var materials = fullEntry.Materials
+                .Where(material => !string.IsNullOrWhiteSpace(material.Name) && material.Quantity > 0)
+                .OrderBy(material => material.SortOrder)
+                .ToList();
+            if (materials.Count == 0)
+                throw new InvalidOperationException("Il preventivo non contiene materiali da inserire nel certificato.");
+
+            var company = await App.DataService.GetCompanyAsync() ?? new Company();
+            string expectedPath = StoragePathService.Instance.BuildInstallationCertificatePdfPath(
+                fullEntry.CustomerName,
+                fullEntry.QuoteNumber,
+                string.IsNullOrWhiteSpace(fullEntry.ReferenceName) ? null : fullEntry.ReferenceName);
+
+            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
+            Directory.CreateDirectory(tempRoot);
+            temporaryPath = Path.Combine(
+                tempRoot,
+                $"{Guid.NewGuid():N}_{Path.GetFileName(expectedPath)}");
+
+            var context = new InstallationCertificateContext
+            {
+                QuoteNumber = fullEntry.QuoteNumber,
+                CompletionDate = inputWindow.CompletionDate,
+                WorkSite = ResolveCertificateWorkSite(fullEntry, inputWindow.WorkSite),
+                CustomerName = fullEntry.CustomerName,
+                ReferenceName = fullEntry.ReferenceName,
+                SelectedLogo = ResolveLogoForPdf(company),
+                Materials = materials,
+                AllCustomers = _vm.AllCustomers.ToList(),
+                PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
+                FooterText = App.AppSettings.PdfTemplate.FooterText
+            };
+
+            new PdfService().GenerateInstallationCertificate(context, company, temporaryPath);
+
+            string pathToOpen = temporaryPath;
+            try
+            {
+                string? targetFolder = Path.GetDirectoryName(expectedPath);
+                if (!string.IsNullOrWhiteSpace(targetFolder))
+                    Directory.CreateDirectory(targetFolder);
+
+                File.Copy(temporaryPath, expectedPath, overwrite: true);
+                pathToOpen = expectedPath;
+                File.Delete(temporaryPath);
+                temporaryPath = null;
+            }
+            catch (Exception copyEx)
+            {
+                Debug.WriteLine($"[InstallationCertificate] Copia nella cartella cliente non riuscita: {copyEx.Message}");
+                MessageBox.Show(
+                    $"La cartella condivisa non e' disponibile. Il certificato e' stato generato temporaneamente qui:\n\n{temporaryPath}",
+                    "Certificato generato",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            OpenFolderAndSelectFile(pathToOpen);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Impossibile generare il certificato di corretta posa.\n\n{ex.Message}",
+                "Errore certificato",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+    }
+
+    private string ResolveCertificateWorkSite(QuoteHistoryEntry entry, string enteredWorkSite)
+    {
+        if (!string.IsNullOrWhiteSpace(enteredWorkSite))
+            return enteredWorkSite.Trim();
+
+        string addressOwner = !string.IsNullOrWhiteSpace(entry.ReferenceName)
+            ? entry.ReferenceName
+            : entry.CustomerName;
+        string address = _vm.AllCustomers.FirstOrDefault(customer =>
+                string.Equals(customer.BusinessName?.Trim(), addressOwner.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?.Address?.Trim() ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(address))
+            return address;
+
+        string subject = !string.IsNullOrWhiteSpace(entry.ReferenceName)
+            ? $"il riferimento '{entry.ReferenceName}'"
+            : $"il cliente '{entry.CustomerName}'";
+        throw new InvalidOperationException(
+            $"Il campo 'Cantiere presso' e' vuoto e {subject} non ha un indirizzo salvato.");
+    }
+
+    private static void OpenFolderAndSelectFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Certificato generato non trovato.", filePath);
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"/select,\"{Path.GetFullPath(filePath)}\"",
+            UseShellExecute = true
+        });
+    }
     
     private async void OnOpenCustomerFolderClick(object sender, RoutedEventArgs e)
     {
@@ -806,6 +934,7 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateMenuItem("Copia in nuovo preventivo", async () => await CopyPastQuoteAsync(entry)));
         menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));
 

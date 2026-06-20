@@ -50,6 +50,10 @@
         <Content Include="Assets\roto.png">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <None Remove="Assets\Timbro*.*" />
+        <Content Include="Assets\Timbro*.*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
         <None Remove="Assets\Windowsicon\storico.png" />
         <Resource Include="Assets\Windowsicon\storico.png">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
