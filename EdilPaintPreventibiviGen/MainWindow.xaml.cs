@@ -544,10 +544,11 @@ public partial class MainWindow : Window
             win.ShowDialog();
         }
     }
-    private void OnNewCustomerClick(object sender, RoutedEventArgs e){
+    private async void OnNewCustomerClick(object sender, RoutedEventArgs e)
+    {
         var win = new NewCustomerWindow { Owner = this }; 
-        if (win.ShowDialog() == true && win.NewCustomer != null) 
-            (DataContext as MainViewModel)?.AddNewCustomer(win.NewCustomer);
+        if (win.ShowDialog() == true && win.NewCustomer != null && DataContext is MainViewModel vm)
+            await vm.AddNewCustomerAsync(win.NewCustomer);
     }
     private void OnEditCustomerClick(object sender, RoutedEventArgs e)
     {

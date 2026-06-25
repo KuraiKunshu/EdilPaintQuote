@@ -195,17 +195,31 @@ public partial class MainViewModel
         }
     }
 
-    public void AddNewCustomer(Customer c) => _ = AddNewCustomerAsync(c);
-
-    private async Task AddNewCustomerAsync(Customer c)
+    public async Task AddNewCustomerAsync(Customer c)
     {
         try
         {
             var savedCustomer = await _dataService.AddCustomerAsync(c);
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                AllCustomers.Add(savedCustomer);
-                _allCustomers.Add(savedCustomer);
+                ApplySavedCustomerToCollections(c.BusinessName, savedCustomer);
+                SelectedCustomer = AllCustomers.FirstOrDefault(customer =>
+                    customer.SyncId != Guid.Empty && customer.SyncId == savedCustomer.SyncId)
+                    ?? AllCustomers.FirstOrDefault(customer =>
+                        customer.BusinessName.Equals(savedCustomer.BusinessName, StringComparison.OrdinalIgnoreCase))
+                    ?? savedCustomer;
+                ApplyCustomerFilter(_customerSearchText);
+                ApplySecondCustomerFilter(_secondCustomerSearchText);
+            });
+
+            await RefreshSharedDataAsync();
+
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                SelectedCustomer = AllCustomers.FirstOrDefault(customer =>
+                    customer.SyncId != Guid.Empty && customer.SyncId == savedCustomer.SyncId)
+                    ?? AllCustomers.FirstOrDefault(customer =>
+                        customer.BusinessName.Equals(savedCustomer.BusinessName, StringComparison.OrdinalIgnoreCase));
                 ApplyCustomerFilter(_customerSearchText);
                 ApplySecondCustomerFilter(_secondCustomerSearchText);
             });
