@@ -5,6 +5,7 @@ namespace EdilPaintPreventibiviGen.Models;
 
 public class Item : INotifyPropertyChanged
 {
+    public int PersistentId { get; set; }
     private string _name = string.Empty;
     private string _description = string.Empty;
     private double _unitPrice;

@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<QuoteEntity> Quotes => Set<QuoteEntity>();
     public DbSet<QuoteMaterialEntity> QuoteMaterials => Set<QuoteMaterialEntity>();
     public DbSet<QuoteLaborEntity> QuoteLabors => Set<QuoteLaborEntity>();
+    public DbSet<QuoteAttachmentEntity> QuoteAttachments => Set<QuoteAttachmentEntity>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
@@ -79,6 +80,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => x.Date);
 
             entity.Property(x => x.QuoteNumber).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
             entity.Property(x => x.PdfPath).HasMaxLength(1000);
             entity.Property(x => x.IvaType).HasMaxLength(50).IsRequired();
             entity.Property(x => x.CreatedByDevice).HasMaxLength(120);
@@ -124,6 +126,20 @@ public class AppDbContext : DbContext
 
             entity.HasOne(x => x.Quote)
                 .WithMany(x => x.Labors)
+                .HasForeignKey(x => x.QuoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<QuoteAttachmentEntity>(entity =>
+        {
+            entity.ToTable("QuoteAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedOnAdd();
+            entity.Property(x => x.FileName).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Content).IsRequired();
+            entity.HasOne(x => x.Quote)
+                .WithMany(x => x.Attachments)
                 .HasForeignKey(x => x.QuoteId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

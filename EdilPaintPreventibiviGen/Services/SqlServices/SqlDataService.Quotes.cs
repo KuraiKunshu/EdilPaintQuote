@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 namespace EdilPaintPreventibiviGen.Services;
 public partial class SqlDataService
 {
-    private static readonly TimeSpan QuoteConflictTimestampTolerance = TimeSpan.FromSeconds(2);
 
     public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default)
     {
@@ -21,7 +20,8 @@ public partial class SqlDataService
             {
                 QuoteNumber = q.QuoteNumber,
                 LastModifiedUtc = q.LastModifiedUtc,
-                SyncHash = q.SyncHash
+                SyncHash = q.SyncHash,
+                Revision = q.Revision
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -73,6 +73,7 @@ public partial class SqlDataService
                 x.LastReminderByDevice,
                 x.EventsJson,
                 x.LastModifiedUtc,
+                x.Revision,
                 x.IsJointVenture,
                 x.PartnerCompanyName,
                 x.CostAllocationsJson,
@@ -140,6 +141,8 @@ public partial class SqlDataService
                 AdditionalCosts = costs?.AdditionalCosts ?? [],
                 LastModifiedUtc = x.LastModifiedUtc,
                 BaseVersionUtc = x.LastModifiedUtc,
+                Revision = x.Revision,
+                BaseRevision = x.Revision,
                 Materials = x.Materials,
                 Labors = x.Labors
             };
@@ -214,6 +217,8 @@ public partial class SqlDataService
             Events = DeserializeQuoteEvents(x.EventsJson),
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
+            Revision = x.Revision,
+            BaseRevision = x.Revision,
             SyncHash = x.SyncHash,
             IsJointVenture = x.IsJointVenture,
             PartnerCompanyName = x.PartnerCompanyName,
@@ -241,7 +246,8 @@ public partial class SqlDataService
                 SortOrder = l.SortOrder
             }).ToList(),
             PdfFile = null,
-            Attachments = []
+            Attachments = [],
+            HasCompleteAttachmentSnapshot = false
         }).ToList();
     }
 
@@ -291,6 +297,8 @@ public partial class SqlDataService
             AdditionalCosts = DeserializeCostAllocations(x.CostAllocationsJson)?.AdditionalCosts ?? new(),
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
+            Revision = x.Revision,
+            BaseRevision = x.Revision,
             Total = x.Total,
             Status = x.Status,
             CreatedByDevice = x.CreatedByDevice,
@@ -324,7 +332,8 @@ public partial class SqlDataService
                 SortOrder = l.SortOrder
             }).ToList(),
             PdfFile = null,
-            Attachments = []
+            Attachments = [],
+            HasCompleteAttachmentSnapshot = false
         }).ToList();
     }
 
@@ -367,6 +376,11 @@ public partial class SqlDataService
             ReminderCount = x.ReminderCount,
             LastReminderByDevice = x.LastReminderByDevice,
             Events = DeserializeQuoteEvents(x.EventsJson),
+            LastModifiedUtc = x.LastModifiedUtc,
+            BaseVersionUtc = x.LastModifiedUtc,
+            Revision = x.Revision,
+            BaseRevision = x.Revision,
+            SyncHash = x.SyncHash,
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
                 Name = m.Name,
@@ -610,6 +624,7 @@ public partial class SqlDataService
             .Include(x => x.ReferenceCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
+            .Include(x => x.Attachments)
             .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber);
 
         if (q == null) return null;
@@ -641,6 +656,8 @@ public partial class SqlDataService
             Events = DeserializeQuoteEvents(q.EventsJson),
             LastModifiedUtc = q.LastModifiedUtc,
             BaseVersionUtc = q.LastModifiedUtc,
+            Revision = q.Revision,
+            BaseRevision = q.Revision,
             SyncHash = q.SyncHash,
             IsJointVenture = q.IsJointVenture,
             PartnerCompanyName = q.PartnerCompanyName,
@@ -660,7 +677,8 @@ public partial class SqlDataService
                 SortOrder = l.SortOrder
             }).ToList(),
             PdfFile = null,
-            Attachments = []
+            Attachments = q.Attachments.Select(ToStoredFile).ToList(),
+            HasCompleteAttachmentSnapshot = true
         };
     }
 
@@ -681,6 +699,7 @@ public partial class SqlDataService
                 {
                     existing.IsDeleted = true;
                     existing.LastModifiedUtc = DateTime.UtcNow;
+                    existing.Revision += 1;
                     await db.SaveChangesAsync();
                 }
                 await transaction.CommitAsync();
@@ -786,6 +805,7 @@ public partial class SqlDataService
 
         update(quote);
         quote.LastModifiedUtc = DateTime.UtcNow;
+        quote.Revision += 1;
         await db.SaveChangesAsync(cancellationToken);
 
         var snapshot = (await GetQuoteSyncSnapshotsAsync([quoteNumber], cancellationToken)).Single();
@@ -822,6 +842,9 @@ public partial class SqlDataService
             Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
+            Revision = entry.Revision,
+            BaseRevision = entry.BaseRevision,
+            HasPendingDatabaseWrite = entry.HasPendingDatabaseWrite,
             SyncHash = entry.SyncHash,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,
@@ -876,6 +899,7 @@ public partial class SqlDataService
                     .IgnoreQueryFilters()
                     .Include(x => x.Materials)
                     .Include(x => x.Labors)
+                    .Include(x => x.Attachments)
                     .FirstOrDefaultAsync(x => x.QuoteNumber == quote.QuoteNumber, cancellationToken);
 
                 if (existing != null)
@@ -883,8 +907,7 @@ public partial class SqlDataService
                     if (existing.IsDeleted)
                         throw new QuoteConflictException(quote.QuoteNumber);
 
-                    if (quote.BaseVersionUtc != default &&
-                        existing.LastModifiedUtc > quote.BaseVersionUtc.Add(QuoteConflictTimestampTolerance))
+                    if (quote.BaseRevision > 0 && existing.Revision != quote.BaseRevision)
                     {
                         throw new QuoteConflictException(quote.QuoteNumber);
                     }
@@ -913,6 +936,7 @@ public partial class SqlDataService
                     existing.LastReminderByDevice = quote.LastReminderByDevice;
                     existing.EventsJson = SerializeQuoteEvents(quote.Events);
                     existing.LastModifiedUtc = savedAtUtc;
+                    existing.Revision += 1;
                     existing.SyncHash = quote.SyncHash;
                     
                     existing.IsJointVenture = quote.IsJointVenture;
@@ -928,6 +952,8 @@ public partial class SqlDataService
                     // Rimuovi e ricrea i dettagli
                     db.QuoteMaterials.RemoveRange(existing.Materials);
                     db.QuoteLabors.RemoveRange(existing.Labors);
+                    if (quote.HasCompleteAttachmentSnapshot)
+                        db.QuoteAttachments.RemoveRange(existing.Attachments);
 
                     existing.Materials = quote.Materials.Select(m => new QuoteMaterialEntity
                     {
@@ -951,8 +977,13 @@ public partial class SqlDataService
                         SortOrder = l.SortOrder
                     }).ToList();
 
+                    if (quote.HasCompleteAttachmentSnapshot)
+                        existing.Attachments = quote.Attachments.Select(ToAttachmentEntity).ToList();
+
                     quote.LastModifiedUtc = savedAtUtc;
                     quote.BaseVersionUtc = savedAtUtc;
+                    quote.Revision = existing.Revision;
+                    quote.BaseRevision = existing.Revision;
                 }
                 else
                 {
@@ -984,6 +1015,7 @@ public partial class SqlDataService
                         LastReminderByDevice = quote.LastReminderByDevice,
                         EventsJson = SerializeQuoteEvents(quote.Events),
                         LastModifiedUtc = savedAtUtc,
+                        Revision = 1,
                         SyncHash = quote.SyncHash,
                         IsJointVenture = quote.IsJointVenture,
                         PartnerCompanyName = quote.PartnerCompanyName,
@@ -1014,16 +1046,24 @@ public partial class SqlDataService
                             Discount = l.Discount,
                             IsSignificant = l.IsSignificant,
                             SortOrder = l.SortOrder
-                        }).ToList()
+                        }).ToList(),
+                        Attachments = quote.Attachments.Select(ToAttachmentEntity).ToList()
                     };
 
                     db.Quotes.Add(entity);
                     quote.LastModifiedUtc = savedAtUtc;
                     quote.BaseVersionUtc = savedAtUtc;
+                    quote.Revision = 1;
+                    quote.BaseRevision = 1;
                 }
 
                 await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                await transaction.RollbackAsync();
+                throw new QuoteConflictException(quote.QuoteNumber);
             }
             catch
             {
@@ -1032,6 +1072,22 @@ public partial class SqlDataService
             }
         });
     }
+
+    private static StoredFile ToStoredFile(QuoteAttachmentEntity attachment) => new()
+    {
+        FileName = attachment.FileName,
+        ContentType = attachment.ContentType,
+        Content = attachment.Content,
+        ImportedAt = attachment.ImportedAtUtc
+    };
+
+    private static QuoteAttachmentEntity ToAttachmentEntity(StoredFile attachment) => new()
+    {
+        FileName = System.IO.Path.GetFileName(attachment.FileName),
+        ContentType = attachment.ContentType,
+        Content = attachment.Content,
+        ImportedAtUtc = attachment.ImportedAt == default ? DateTime.UtcNow : attachment.ImportedAt.ToUniversalTime()
+    };
 
     private static async Task<CustomerEntity?> GetOrCreateCustomerForQuoteAsync(
         AppDbContext db,

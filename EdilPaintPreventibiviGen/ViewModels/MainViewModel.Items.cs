@@ -26,10 +26,32 @@ public partial class MainViewModel
         SavePersonalMaterials();
     }
 
-    public void RemovePersonalMaterial(Item item)
+    public async Task RemovePersonalMaterialAsync(Item item)
     {
-        _personalMaterials.Remove(item);
-        SavePersonalMaterials();
+        try
+        {
+            await _dataService.DeletePersonalMaterialAsync(item);
+            _personalMaterials.Remove(item);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Materiale non eliminato", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    public async Task RemoveCatalogLaborAsync(Item item)
+    {
+        try
+        {
+            await _dataService.DeleteLaborCatalogItemAsync(item);
+            AllCatalogLabors.Remove(item);
+            _allCatalogLabors.RemoveAll(x => x.PersistentId == item.PersistentId ||
+                x.Name.Equals(item.Name, StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Lavorazione non eliminata", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     public void SavePersonalMaterialsPublic() => SavePersonalMaterials();

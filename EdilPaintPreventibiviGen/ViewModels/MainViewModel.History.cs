@@ -88,6 +88,7 @@ public partial class MainViewModel
             Status = QuoteStatus.Finalizzato,
             LastModifiedUtc = DateTime.UtcNow,
             BaseVersionUtc = _isEditingExistingQuote ? _loadedQuoteBaseVersionUtc : default,
+            BaseRevision = _isEditingExistingQuote ? _loadedQuoteBaseRevision : 0,
             IsJointVenture = IsJointVenture,
             PartnerCompanyName = PartnerCompanyName,
             OurCosts = OurCosts.ToList(),
@@ -98,7 +99,7 @@ public partial class MainViewModel
             {
                 FileName = a.FileName,
                 ContentType = a.ContentType,
-                Content = [],
+                Content = a.Content,
                 ImportedAt = DateTime.Now
             }).ToList(),
             HasCompleteAttachmentSnapshot = true
@@ -133,6 +134,8 @@ public partial class MainViewModel
                 // autorevole. Una voce History locale puo' essere piu' vecchia.
                 if (entry.BaseVersionUtc == default)
                     entry.BaseVersionUtc = existingEntry.BaseVersionUtc;
+                if (entry.BaseRevision == 0)
+                    entry.BaseRevision = existingEntry.BaseRevision;
 
                 existingEntry.CustomerName = entry.CustomerName;
                 existingEntry.ReferenceName = entry.ReferenceName;
@@ -201,6 +204,8 @@ public partial class MainViewModel
                 // prima del salvataggio: annullerebbe il controllo multi-PC.
                 if (entry.BaseVersionUtc == default)
                     entry.BaseVersionUtc = existing.BaseVersionUtc;
+                if (entry.BaseRevision == 0)
+                    entry.BaseRevision = existing.BaseRevision;
             }
         }
         catch (Exception ex)
@@ -276,6 +281,7 @@ public partial class MainViewModel
         _isEditingExistingQuote = true;
         _loadedQuoteDate = entry.Date;
         _loadedQuoteBaseVersionUtc = persistedVersion;
+        _loadedQuoteBaseRevision = entry.BaseRevision;
 
         var historyEntry = History.FirstOrDefault(x => x.QuoteNumber == entry.QuoteNumber);
         if (historyEntry != null)
@@ -294,6 +300,8 @@ public partial class MainViewModel
             target.BaseVersionUtc = persistedVersion;
 
         target.SyncHash = source.SyncHash;
+        target.Revision = source.Revision;
+        target.BaseRevision = source.BaseRevision;
         target.LastModifiedByDevice = source.LastModifiedByDevice;
     }
 
@@ -370,6 +378,9 @@ public partial class MainViewModel
             Events = entry.Events.ToList(),
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
+            Revision = entry.Revision,
+            BaseRevision = entry.BaseRevision,
+            HasPendingDatabaseWrite = entry.HasPendingDatabaseWrite,
             IsEditingExistingQuoteDraft = entry.IsEditingExistingQuoteDraft,
             SyncHash = entry.SyncHash,
             IsJointVenture = entry.IsJointVenture,

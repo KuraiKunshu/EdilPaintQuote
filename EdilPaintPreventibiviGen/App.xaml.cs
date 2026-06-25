@@ -65,6 +65,7 @@ public partial class App : Application
                 sqlService, localStore, quotePatchOutbox, deletionOutbox);
             SyncService = new SyncService(
                 DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox);
+            SyncService.SyncCompleted += OnSyncCompleted;
 
             var loadingWindow = new LoadingWindow
             {
@@ -92,7 +93,7 @@ public partial class App : Application
                 }
 
                 await SetLoadingStatusAsync(loadingWindow, "3/5 - Sincronizzazione dati...");
-                _ = RunStartupSyncAsync(shutdownToken);
+                await RunStartupSyncAsync(shutdownToken);
 
                 await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
                 MainVm = new MainViewModel();
@@ -197,6 +198,24 @@ public partial class App : Application
                 Debug.WriteLine($"[STARTUP] Sync error: {ex.Message}");
             }
         }, token);
+    }
+
+    private static async void OnSyncCompleted(object? sender, EventArgs e)
+    {
+        if (MainVm == null || _isShuttingDown)
+            return;
+
+        try
+        {
+            await MainVm.RefreshSharedDataAsync(_shutdownCts?.Token ?? CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Sync] Aggiornamento raccolte UI non riuscito: {ex.Message}");
+        }
     }
 
     private static Task RunStartupPdfGenerationAsync(CancellationToken token)

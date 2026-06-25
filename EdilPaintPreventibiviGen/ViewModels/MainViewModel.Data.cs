@@ -24,6 +24,54 @@ public partial class MainViewModel
     #region Data Loading & Saving
     public Task InitializeAsync() => LoadDataAsync();
 
+    public async Task RefreshSharedDataAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await _sharedDataRefreshLock.WaitAsync(0, cancellationToken))
+            return;
+
+        try
+        {
+            var customers = await _dataService.GetCustomersAsync(cancellationToken);
+            var labors = await _dataService.GetLaborCatalogAsync();
+            var personalMaterials = await _dataService.GetPersonalMaterialsAsync();
+            Guid? selectedCustomerId = SelectedCustomer?.SyncId;
+            Guid? selectedReferenceId = SelectedSecondCustomer?.SyncId;
+
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                _allCustomers = customers.ToList();
+                AllCustomers.Clear();
+                foreach (var customer in _allCustomers)
+                    AllCustomers.Add(customer);
+
+                _selectedCustomer = FindCustomerById(selectedCustomerId);
+                _selectedSecondCustomer = FindCustomerById(selectedReferenceId);
+                CustomerBorderBrush = GetCustomerSelectionBrush(_selectedCustomer != null);
+                SecondCustomerBorderBrush = GetCustomerSelectionBrush(_selectedSecondCustomer != null);
+                OnPropertyChanged(nameof(SelectedCustomer));
+                OnPropertyChanged(nameof(SelectedSecondCustomer));
+                ApplyCustomerFilter(_customerSearchText);
+                ApplySecondCustomerFilter(_secondCustomerSearchText);
+
+                _allCatalogLabors = labors.ToList();
+                AllCatalogLabors.Clear();
+                foreach (var labor in _allCatalogLabors)
+                    AllCatalogLabors.Add(labor);
+                ApplyLaborFilter(_laborSearchText);
+
+                _personalMaterials = personalMaterials;
+            });
+        }
+        finally
+        {
+            _sharedDataRefreshLock.Release();
+        }
+    }
+
+    private Customer? FindCustomerById(Guid? syncId) => syncId.HasValue
+        ? AllCustomers.FirstOrDefault(x => x.SyncId == syncId.Value)
+        : null;
+
     private async Task LoadDataAsync()
     {
         try
@@ -90,6 +138,8 @@ public partial class MainViewModel
         catch (Exception ex)
         {
             Debug.WriteLine($"[SaveLaborsAsync] Error: {ex.Message}");
+            MessageBox.Show(ex.Message, "Catalogo non salvato", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await RefreshSharedDataAsync();
         }
     }
 
@@ -134,7 +184,12 @@ public partial class MainViewModel
     private async Task SavePersonalMaterialsAsync()
     {
         try { await _dataService.SavePersonalMaterialsAsync(_personalMaterials); }
-        catch (Exception ex) { Debug.WriteLine($"[SAVE PERSONAL MATERIALS] Error: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SAVE PERSONAL MATERIALS] Error: {ex.Message}");
+            MessageBox.Show(ex.Message, "Materiali non salvati", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await RefreshSharedDataAsync();
+        }
     }
 
     public void AddNewCustomer(Customer c) => _ = AddNewCustomerAsync(c);
@@ -172,45 +227,61 @@ public partial class MainViewModel
         if (existing != null)
         {
             updated.SyncId = existing.SyncId;
-            existing.BusinessName = updated.BusinessName;
-            existing.Address = updated.Address;
-            existing.Email = updated.Email;
-            existing.Phone = updated.Phone;
-            existing.MaterialDiscount = updated.MaterialDiscount;
-            existing.LaborDiscount = updated.LaborDiscount;
         }
 
-        var existingInAll = _allCustomers.FirstOrDefault(c => ReferenceEquals(c, updated))
-            ?? _allCustomers.FirstOrDefault(c =>
-                c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase))
-            ?? _allCustomers.FirstOrDefault(c =>
-                c.BusinessName.Equals(updated.BusinessName, StringComparison.OrdinalIgnoreCase));
-
-        if (existingInAll != null)
-        {
-            existingInAll.BusinessName = updated.BusinessName;
-            existingInAll.Address = updated.Address;
-            existingInAll.Email = updated.Email;
-            existingInAll.Phone = updated.Phone;
-            existingInAll.MaterialDiscount = updated.MaterialDiscount;
-            existingInAll.LaborDiscount = updated.LaborDiscount;
-        }
-
-        OnPropertyChanged(nameof(SelectedCustomer));
-        OnPropertyChanged(nameof(SelectedSecondCustomer));
-        ApplyCustomerFilter(_customerSearchText);
-        ApplySecondCustomerFilter(_secondCustomerSearchText);
         _ = UpdateCustomerSafeAsync(originalBusinessName, updated);
     }
 
     private async Task UpdateCustomerSafeAsync(string originalBusinessName, Customer updated)
     {
-        try { await _dataService.UpdateCustomerAsync(originalBusinessName, updated); }
+        try
+        {
+            var saved = await _dataService.UpdateCustomerAsync(originalBusinessName, updated);
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                ApplySavedCustomerToCollections(originalBusinessName, saved);
+                OnPropertyChanged(nameof(SelectedCustomer));
+                OnPropertyChanged(nameof(SelectedSecondCustomer));
+                ApplyCustomerFilter(_customerSearchText);
+                ApplySecondCustomerFilter(_secondCustomerSearchText);
+            });
+        }
         catch (Exception ex)
         {
             MessageBox.Show($"Errore durante il salvataggio del cliente.\n\n{ex.Message}",
                 "Errore salvataggio", MessageBoxButton.OK, MessageBoxImage.Error);
+            await RefreshSharedDataAsync();
         }
+    }
+
+    private void ApplySavedCustomerToCollections(string originalBusinessName, Customer saved)
+    {
+        ApplySavedCustomer(AllCustomers, originalBusinessName, saved);
+        ApplySavedCustomer(_allCustomers, originalBusinessName, saved);
+    }
+
+    private static void ApplySavedCustomer(IList<Customer> customers, string originalBusinessName, Customer saved)
+    {
+        var existing = customers.FirstOrDefault(c => c.SyncId != Guid.Empty && c.SyncId == saved.SyncId)
+            ?? customers.FirstOrDefault(c => c.BusinessName.Equals(originalBusinessName, StringComparison.OrdinalIgnoreCase))
+            ?? customers.FirstOrDefault(c => c.BusinessName.Equals(saved.BusinessName, StringComparison.OrdinalIgnoreCase));
+
+        if (existing == null)
+        {
+            customers.Add(saved);
+            return;
+        }
+
+        existing.SyncId = saved.SyncId;
+        existing.BusinessName = saved.BusinessName;
+        existing.Address = saved.Address;
+        existing.Email = saved.Email;
+        existing.Phone = saved.Phone;
+        existing.MaterialDiscount = saved.MaterialDiscount;
+        existing.LaborDiscount = saved.LaborDiscount;
+        existing.LastModifiedUtc = saved.LastModifiedUtc;
+        existing.BaseVersionUtc = saved.BaseVersionUtc;
+        existing.HasPendingDatabaseWrite = saved.HasPendingDatabaseWrite;
     }
 
     #endregion

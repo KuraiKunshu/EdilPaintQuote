@@ -18,7 +18,9 @@ public static class EntityModelMapper
             Phone = entity.Phone,
             MaterialDiscount = entity.MaterialDiscount,
             LaborDiscount = entity.LaborDiscount,
-            LastModifiedUtc = entity.LastModifiedUtc
+            LastModifiedUtc = entity.LastModifiedUtc,
+            BaseVersionUtc = entity.LastModifiedUtc,
+            HasPendingDatabaseWrite = false
         };
     }
 
@@ -74,6 +76,7 @@ public static class EntityModelMapper
     {
         return new Item
         {
+            PersistentId = entity.Id,
             Name = entity.Name,
             Description = entity.Description,
             UnitPrice = entity.UnitPrice,
@@ -86,6 +89,7 @@ public static class EntityModelMapper
     {
         return new PersonalMaterialEntity
         {
+            Id = model.PersistentId,
             Name = model.Name,
             Description = model.Description,
             UnitPrice = model.UnitPrice,
@@ -97,6 +101,7 @@ public static class EntityModelMapper
     {
         return new Item
         {
+            PersistentId = entity.Id,
             Name = entity.Name,
             Description = entity.Description,
             UnitPrice = entity.UnitPrice,
@@ -108,6 +113,7 @@ public static class EntityModelMapper
     {
         return new LaborCatalogEntity
         {
+            Id = model.PersistentId,
             Name = model.Name,
             Description = model.Description,
             UnitPrice = model.UnitPrice
@@ -162,6 +168,8 @@ public static class EntityModelMapper
             AdditionalCosts = costAlloc?.AdditionalCosts ?? new(),
             LastModifiedUtc = entity.LastModifiedUtc,
             BaseVersionUtc = entity.LastModifiedUtc,
+            Revision = entity.Revision,
+            BaseRevision = entity.Revision,
             SyncHash = entity.SyncHash,
             Materials = entity.Materials
                 .OrderBy(m => m.SortOrder)

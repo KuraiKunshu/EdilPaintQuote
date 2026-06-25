@@ -754,6 +754,9 @@ public class LocalJsonStoreService
             AdditionalCosts = entry.AdditionalCosts,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
+            Revision = entry.Revision,
+            BaseRevision = entry.BaseRevision,
+            HasPendingDatabaseWrite = entry.HasPendingDatabaseWrite,
             IsEditingExistingQuoteDraft = entry.IsEditingExistingQuoteDraft,
             SyncHash = entry.SyncHash,
             PdfFile = entry.PdfFile == null ? null : new StoredFile
@@ -769,7 +772,8 @@ public class LocalJsonStoreService
                 ContentType = a.ContentType,
                 Content = [],
                 ImportedAt = a.ImportedAt
-            }).ToList()
+            }).ToList(),
+            HasCompleteAttachmentSnapshot = entry.HasCompleteAttachmentSnapshot
         };
     }
 

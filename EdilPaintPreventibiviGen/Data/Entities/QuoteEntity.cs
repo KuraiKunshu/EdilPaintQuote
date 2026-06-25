@@ -45,9 +45,11 @@ public class QuoteEntity
 	public string CostAllocationsJson { get; set; } = string.Empty;
 	
 	public DateTime LastModifiedUtc { get; set; } = DateTime.UtcNow;
+	public long Revision { get; set; }
 	public string SyncHash { get; set; } = string.Empty;
 	public bool IsDeleted { get; set; }
 	
 	public ICollection<QuoteMaterialEntity> Materials { get; set; } = new List<QuoteMaterialEntity>();
 	public ICollection<QuoteLaborEntity> Labors { get; set; } = new List<QuoteLaborEntity>();
+	public ICollection<QuoteAttachmentEntity> Attachments { get; set; } = new List<QuoteAttachmentEntity>();
 }

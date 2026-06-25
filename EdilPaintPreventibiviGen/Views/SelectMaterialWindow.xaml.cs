@@ -107,7 +107,7 @@ public partial class SelectMaterialWindow : Window
         FilterList(TxtSearch.Text);
     }
 
-    private void OnDeleteMaterialClick(object sender, RoutedEventArgs e)
+    private async void OnDeleteMaterialClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is Item item)
         {
@@ -120,7 +120,7 @@ public partial class SelectMaterialWindow : Window
             if (result != MessageBoxResult.Yes)
                 return;
 
-            _vm.RemovePersonalMaterial(item);
+            await _vm.RemovePersonalMaterialAsync(item);
             ResetInputs();
             FilterList(TxtSearch.Text);
         }

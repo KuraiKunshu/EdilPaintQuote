@@ -197,6 +197,9 @@ public sealed class RegressionTests
                 Date = DateTime.Today,
                 CustomerName = "Cliente test",
                 BaseVersionUtc = baseVersion,
+                Revision = 7,
+                BaseRevision = 7,
+                HasPendingDatabaseWrite = true,
                 IsEditingExistingQuoteDraft = true
             };
 
@@ -206,6 +209,9 @@ public sealed class RegressionTests
             Assert.NotNull(restored);
             Assert.True(restored.IsEditingExistingQuoteDraft);
             Assert.Equal(baseVersion, restored.BaseVersionUtc);
+            Assert.Equal(7, restored.Revision);
+            Assert.Equal(7, restored.BaseRevision);
+            Assert.True(restored.HasPendingDatabaseWrite);
         }
         finally
         {
@@ -292,6 +298,54 @@ public sealed class RegressionTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await service.SearchProductsAsync("test", cts.Token));
+    }
+
+    [Fact]
+    public async Task PendingCustomerWriteSurvivesLocalRoundTrip()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            var store = new LocalJsonStoreService(temporaryPath);
+            DateTime baseVersion = DateTime.UtcNow.AddMinutes(-1);
+            var customer = new Customer
+            {
+                SyncId = Guid.NewGuid(),
+                BusinessName = "Cliente offline",
+                BaseVersionUtc = baseVersion,
+                HasPendingDatabaseWrite = true
+            };
+
+            await store.SaveOrUpdateCustomerAsync(customer);
+            var restored = Assert.Single(await store.LoadCustomersAsync());
+
+            Assert.True(restored.HasPendingDatabaseWrite);
+            Assert.Equal(baseVersion, restored.BaseVersionUtc);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
+    public async Task CatalogPersistentIdSurvivesLocalRoundTrip()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            var store = new LocalJsonStoreService(temporaryPath);
+            await store.SavePersonalMaterialsAsync([
+                new Item { PersistentId = 42, Name = "Materiale condiviso", UnitPrice = 12.5 }
+            ]);
+
+            var restored = Assert.Single(await store.LoadPersonalMaterialsAsync());
+            Assert.Equal(42, restored.PersistentId);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
     }
 
     [Fact]

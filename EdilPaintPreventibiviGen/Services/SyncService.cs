@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,6 +13,7 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public class SyncService
 {
+    public event EventHandler? SyncCompleted;
     private readonly IDataService _dataService;
     private readonly LocalJsonStoreService _localStore;
     private readonly SqlDataService _sqlService;
@@ -119,6 +121,7 @@ public class SyncService
             _lastSyncTime = DateTime.UtcNow;
             result.EndTime = DateTime.UtcNow;
             UpdateSyncStatus(result.EndTime, $"Completata: preventivi {result.QuotesSynced}, clienti {result.CustomersSynced}, conflitti {result.QuotesConflicts + result.CustomersConflicts}.");
+            SyncCompleted?.Invoke(this, EventArgs.Empty);
 
             Debug.WriteLine($"║ SYNC COMPLETED in {result.Duration.TotalSeconds:F2}s");
             Debug.WriteLine($"║ Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
@@ -222,6 +225,7 @@ public class SyncService
 
                 if (jsonDict.TryGetValue(key, out var jsonQuote))
                 {
+                    HydratePendingAttachments(jsonQuote);
                     quotesPendingDbUpdate.Add(jsonQuote);
                     synced++;
                 }
@@ -235,8 +239,6 @@ public class SyncService
                 cancellationToken);
 
             var keysNeedingDbLoad = new List<string>();
-            int loggedConflicts = 0;
-
             foreach (var key in inBoth)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -250,49 +252,29 @@ public class SyncService
                 if (!string.IsNullOrEmpty(dbMeta.SyncHash) &&
                     !string.IsNullOrEmpty(jsonQuote.SyncHash) &&
                     dbMeta.SyncHash == jsonQuote.SyncHash)
-                    continue;
-
-                var timeDiff = (jsonQuote.LastModifiedUtc - dbMeta.LastModifiedUtc).TotalSeconds;
-                if (Math.Abs(timeDiff) <= 60)
                 {
-                    conflicts++;
-                    if (loggedConflicts < 10)
-                        Debug.WriteLine($"[Sync] Quote {key}: contenuto diverso con timestamp ravvicinati ({timeDiff:F1}s). Uso la versione piu' recente.");
-
-                    loggedConflicts++;
-
-                    if (jsonQuote.LastModifiedUtc > dbMeta.LastModifiedUtc)
-                    {
-                        var dbVersion = (await _sqlService.GetQuotesByNumbersAsync([key], cancellationToken))
-                            .FirstOrDefault();
-                        if (dbVersion != null)
-                            await _localStore.ArchiveQuoteConflictAsync(
-                                dbVersion,
-                                "Versione SQL archiviata prima di applicare una modifica locale ravvicinata.",
-                                cancellationToken);
-                    }
-                    else
-                    {
-                        await _localStore.ArchiveQuoteConflictAsync(
-                            jsonQuote,
-                            "Versione locale archiviata prima di applicare la versione SQL ravvicinata.",
-                            cancellationToken);
-                    }
+                    if (jsonQuote.HasPendingDatabaseWrite)
+                        keysNeedingDbLoad.Add(key);
+                    continue;
                 }
 
-                if (dbMeta.LastModifiedUtc == DateTime.MinValue || jsonQuote.LastModifiedUtc > dbMeta.LastModifiedUtc)
+                if (jsonQuote.HasPendingDatabaseWrite &&
+                    jsonQuote.BaseRevision > 0 &&
+                    jsonQuote.BaseRevision == dbMeta.Revision)
                 {
+                    HydratePendingAttachments(jsonQuote);
                     quotesPendingDbUpdate.Add(jsonQuote);
                     synced++;
+                    continue;
                 }
-                else
-                {
-                    keysNeedingDbLoad.Add(key);
-                }
-            }
 
-            if (loggedConflicts > 10)
-                Debug.WriteLine($"[Sync] Altri {loggedConflicts - 10} conflitti ravvicinati omessi dal log.");
+                conflicts++;
+                await _localStore.ArchiveQuoteConflictAsync(
+                    jsonQuote,
+                    "Versione locale archiviata: per un preventivo gia' presente il database e' autorevole.",
+                    cancellationToken);
+                keysNeedingDbLoad.Add(key);
+            }
 
             if (keysNeedingDbLoad.Count > 0)
             {
@@ -316,6 +298,7 @@ public class SyncService
                         cancellationToken.ThrowIfCancellationRequested();
 
                         await _sqlService.SaveQuoteAsync(q, cancellationToken);
+                        q.HasPendingDatabaseWrite = false;
                         await _localStore.BulkUpdateQuotesAsync([q], cancellationToken);
                     }
                     catch (QuoteConflictException ex)
@@ -394,6 +377,13 @@ public class SyncService
                 continue;
 
             normalizedKeys.Add(key);
+
+            if (jsonQuote.HasPendingDatabaseWrite)
+            {
+                dbSnapshot.HasPendingDatabaseWrite = false;
+                quotesPendingJsonUpdate.Add(dbSnapshot);
+                continue;
+            }
 
             if (!string.Equals(jsonQuote.SyncHash, jsonCanonicalHash, StringComparison.Ordinal))
             {
@@ -587,23 +577,21 @@ public class SyncService
                     }
                     else if (inDb && inJson)
                     {
-                        if (dbCustomer!.LastModifiedUtc > jsonCustomer!.LastModifiedUtc)
-                        {
-                            toUpdateInJson.Add(dbCustomer);
-                            synced++;
-                            Debug.WriteLine($"[Sync] ✅ Customer {key}: DB più recente → aggiornato JSON");
-                        }
-                        else if (jsonCustomer.LastModifiedUtc > dbCustomer.LastModifiedUtc)
+                        bool pendingCanBeApplied = jsonCustomer!.HasPendingDatabaseWrite &&
+                            (jsonCustomer.BaseVersionUtc == default ||
+                             jsonCustomer.BaseVersionUtc == dbCustomer!.LastModifiedUtc);
+
+                        if (pendingCanBeApplied)
                         {
                             toUpdateInDb.Add(jsonCustomer);
-                            synced++;
-                            Debug.WriteLine($"[Sync] ✅ Customer {key}: JSON più recente → aggiornato DB");
                         }
                         else
                         {
-                            // Stesso timestamp — solo se manca nel JSON, aggiorna
-                            // nessuna azione necessaria
+                            toUpdateInJson.Add(dbCustomer!);
+                            if (!CustomersHaveSameContent(dbCustomer!, jsonCustomer))
+                                conflicts++;
                         }
+                        synced++;
                     }
                 }
                 catch (OperationCanceledException)
@@ -616,23 +604,27 @@ public class SyncService
                 }
             }
 
-            // Scrivi il JSON UNA SOLA VOLTA con tutti i clienti aggiornati
-            if (toUpdateInJson.Count > 0)
-            {
-                Debug.WriteLine($"[Sync] 📂 Writing {toUpdateInJson.Count} customers to JSON (batch)...");
-                await _localStore.BulkUpdateCustomersAsync(toUpdateInJson, cancellationToken);
-            }
-
             // Scrivi nel DB in sequenza (già ottimizzato lato SQL)
             foreach (var c in toUpdateInDb)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                try { await _sqlService.AddCustomerAsync(c, cancellationToken); }
+                try
+                {
+                    var saved = await _sqlService.AddCustomerAsync(c, cancellationToken);
+                    saved.HasPendingDatabaseWrite = false;
+                    toUpdateInJson.Add(saved);
+                }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[Sync] DB customer error {c.BusinessName}: {ex.Message} | Inner: {ex.GetBaseException().Message}");
                 }
+            }
+
+            if (toUpdateInJson.Count > 0)
+            {
+                Debug.WriteLine($"[Sync] 📂 Writing {toUpdateInJson.Count} customers to JSON (batch)...");
+                await _localStore.BulkUpdateCustomersAsync(toUpdateInJson, cancellationToken);
             }
 
             Debug.WriteLine($"[Sync] ═══ CUSTOMERS SYNC END: synced={synced} ═══\n");
@@ -648,6 +640,63 @@ public class SyncService
 
         return (synced, conflicts);
     }
+
+    private static bool CustomersHaveSameContent(Customer left, Customer right) =>
+        string.Equals(left.BusinessName, right.BusinessName, StringComparison.Ordinal) &&
+        string.Equals(left.Address, right.Address, StringComparison.Ordinal) &&
+        string.Equals(left.Email, right.Email, StringComparison.Ordinal) &&
+        string.Equals(left.Phone, right.Phone, StringComparison.Ordinal) &&
+        left.MaterialDiscount.Equals(right.MaterialDiscount) &&
+        left.LaborDiscount.Equals(right.LaborDiscount);
+
+    private static void HydratePendingAttachments(QuoteHistoryEntry quote)
+    {
+        if (!quote.HasCompleteAttachmentSnapshot || quote.Attachments.Count == 0)
+            return;
+
+        try
+        {
+            string? parent = Path.GetDirectoryName(quote.PdfPath);
+            if (string.IsNullOrWhiteSpace(parent))
+            {
+                quote.HasCompleteAttachmentSnapshot = false;
+                return;
+            }
+
+            string directory = Path.Combine(parent, "Allegati_" + quote.QuoteNumber);
+            if (!Directory.Exists(directory))
+            {
+                quote.HasCompleteAttachmentSnapshot = false;
+                return;
+            }
+
+            quote.Attachments = Directory.EnumerateFiles(directory)
+                .Select(path => new StoredFile
+                {
+                    FileName = Path.GetFileName(path),
+                    ContentType = GetAttachmentContentType(path),
+                    Content = File.ReadAllBytes(path),
+                    ImportedAt = File.GetLastWriteTimeUtc(path)
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            quote.HasCompleteAttachmentSnapshot = false;
+            Debug.WriteLine($"[Sync] Allegati locali non caricabili per {quote.QuoteNumber}: {ex.Message}");
+        }
+    }
+
+    private static string GetAttachmentContentType(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".bmp" => "image/bmp",
+            ".gif" => "image/gif",
+            _ => "application/octet-stream"
+        };
 }
 
 public class SyncResult

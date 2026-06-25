@@ -20,8 +20,10 @@ public interface IDataService
     // Catalog
     Task<List<Item>> GetLaborCatalogAsync();
     Task SaveLaborCatalogAsync(IEnumerable<Item> labors);
+    Task DeleteLaborCatalogItemAsync(Item labor, CancellationToken cancellationToken = default);
     Task<List<Item>> GetPersonalMaterialsAsync();
     Task SavePersonalMaterialsAsync(IEnumerable<Item> materials);
+    Task DeletePersonalMaterialAsync(Item material, CancellationToken cancellationToken = default);
     
     // Quotes
     Task<List<QuoteHistoryEntry>> GetQuotesAsync();
@@ -55,4 +57,6 @@ public class QuoteMetadata
     public string QuoteNumber { get; set; } = string.Empty;
     public DateTime LastModifiedUtc { get; set; }
     public string SyncHash { get; set; } = string.Empty;
+    public long Revision { get; set; }
+    public bool HasPendingDatabaseWrite { get; set; }
 }

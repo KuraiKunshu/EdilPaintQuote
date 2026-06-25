@@ -78,7 +78,7 @@ public class QuoteHistoryEntry
 	//------------------
 	public StoredFile? PdfFile { get; set; }
 	public List<StoredFile> Attachments { get; set; } = new();
-	[JsonIgnore]
+	[JsonPropertyName("hasCompleteAttachmentSnapshot")]
 	public bool HasCompleteAttachmentSnapshot { get; set; }
 
 	// Metadati di sincronizzazione
@@ -90,6 +90,15 @@ public class QuoteHistoryEntry
 
 	[JsonPropertyName("baseVersionUtc")]
 	public DateTime BaseVersionUtc { get; set; }
+
+	[JsonPropertyName("revision")]
+	public long Revision { get; set; }
+
+	[JsonPropertyName("baseRevision")]
+	public long BaseRevision { get; set; }
+
+	[JsonPropertyName("hasPendingDatabaseWrite")]
+	public bool HasPendingDatabaseWrite { get; set; }
 
 	// Solo per la bozza locale: permette di riprendere in sicurezza la modifica
 	// di un preventivo esistente mantenendo il controllo di concorrenza.

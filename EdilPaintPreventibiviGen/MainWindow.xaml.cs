@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private bool _isCloseConfirmed;
     private bool _isCloseCleanupRunning;
     private bool _isInitializingMainWindowScale;
+    private DateTime _lastSharedDataRefreshUtc = DateTime.MinValue;
+    private bool _isMainWindowLoaded;
     
     #region Constructor
     public MainWindow()
@@ -35,11 +37,13 @@ public partial class MainWindow : Window
         InitializeMainWindowScale();
         var vm = new MainViewModel();
         DataContext = vm;
+        Activated += OnMainWindowActivated;
         Loaded += async (_, _) =>
         {
             await vm.InitializeAsync();
             await PromptDraftRecoveryAsync(vm);
             StartDraftAutosave();
+            _isMainWindowLoaded = true;
         };
     }
     public MainWindow(MainViewModel vm)
@@ -47,13 +51,36 @@ public partial class MainWindow : Window
         InitializeComponent();
         InitializeMainWindowScale();
         DataContext = vm;
+        Activated += OnMainWindowActivated;
         Loaded += async (_, _) =>
         {
             await PromptDraftRecoveryAsync(vm);
             StartDraftAutosave();
+            _isMainWindowLoaded = true;
         };
     }
     #endregion
+
+    private async void OnMainWindowActivated(object? sender, EventArgs e)
+    {
+        if (!_isMainWindowLoaded ||
+            DateTime.UtcNow - _lastSharedDataRefreshUtc < TimeSpan.FromSeconds(15) ||
+            DataContext is not MainViewModel vm)
+            return;
+
+        _lastSharedDataRefreshUtc = DateTime.UtcNow;
+        try
+        {
+            await vm.RefreshSharedDataAsync(AppShutdownManager.ShutdownToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Refresh] Aggiornamento dati condivisi non riuscito: {ex.Message}");
+        }
+    }
 
     private void InitializeMainWindowScale()
     {
@@ -177,7 +204,7 @@ public partial class MainWindow : Window
                 try
                 {
                     CommitPendingGridEdits();
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                     await vm.SaveDraftAsync(cts.Token);
                 }
                 catch (OperationCanceledException)
@@ -206,7 +233,7 @@ public partial class MainWindow : Window
         _draftAutosaveCts = AppShutdownManager.CreateLinkedTokenSource();
         _draftAutosaveTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(25)
+            Interval = TimeSpan.FromSeconds(3)
         };
         _draftAutosaveTimer.Tick += OnDraftAutosaveTick;
         _draftAutosaveTimer.Start();

@@ -29,6 +29,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly QuoteCalculator _quoteCalculator = new();
     private readonly QuoteHistoryService _quoteHistoryService;
     private readonly SemaphoreSlim _draftSaveLock = new(1, 1);
+    private readonly SemaphoreSlim _sharedDataRefreshLock = new(1, 1);
     #endregion
 
     #region Data Collections
@@ -70,6 +71,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _partnerCompanyName = string.Empty;
     private DateTime? _loadedQuoteDate;
     private DateTime _loadedQuoteBaseVersionUtc;
+    private long _loadedQuoteBaseRevision;
     private string _lastSharedDraftContentHash = string.Empty;
     #endregion
 
@@ -93,6 +95,20 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     #region UI Feedback
     private Brush _customerBorderBrush = GetCustomerSelectionBrush(false);
     private Brush _secondCustomerBorderBrush = GetCustomerSelectionBrush(false);
+    private string _draftSyncStatus = string.Empty;
+    private bool _hasDraftSyncError;
+
+    public string DraftSyncStatus
+    {
+        get => _draftSyncStatus;
+        private set { _draftSyncStatus = value; OnPropertyChanged(); }
+    }
+
+    public bool HasDraftSyncError
+    {
+        get => _hasDraftSyncError;
+        private set { _hasDraftSyncError = value; OnPropertyChanged(); }
+    }
     #endregion
 
     #region Collections & Views
@@ -142,6 +158,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         _veluxService.OnLoginRequired -= HandleVeluxLogin;
         _veluxService.Dispose();
         _draftSaveLock.Dispose();
+        _sharedDataRefreshLock.Dispose();
     }
 
     private static Brush GetCustomerSelectionBrush(bool hasCustomer) =>

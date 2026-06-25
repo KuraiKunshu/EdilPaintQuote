@@ -27,6 +27,8 @@ public partial class MainViewModel
             if (!HasDraftContent())
             {
                 await _draftService.DeleteAsync(cancellationToken);
+                DraftSyncStatus = string.Empty;
+                HasDraftSyncError = false;
                 return;
             }
 
@@ -36,8 +38,19 @@ public partial class MainViewModel
             // anche quando il database cloud e' temporaneamente irraggiungibile.
             await _draftService.SaveAsync(draft, cancellationToken);
 
-            if (SelectedCustomer == null || !_dataService.CanSynchronize)
+            if (SelectedCustomer == null)
+            {
+                DraftSyncStatus = "Bozza locale: seleziona un cliente per condividerla";
+                HasDraftSyncError = false;
                 return;
+            }
+
+            if (!_dataService.CanSynchronize)
+            {
+                DraftSyncStatus = "Bozza salvata solo su questo PC: database non disponibile";
+                HasDraftSyncError = true;
+                return;
+            }
 
             if (!_isEditingExistingQuote)
             {
@@ -54,11 +67,13 @@ public partial class MainViewModel
             }
 
             await SaveSharedDraftAsync(draft, cancellationToken);
-            if (draft.BaseVersionUtc != default)
+            if (draft.BaseRevision > 0)
             {
                 _lastSharedDraftContentHash = contentHash;
                 await _draftService.SaveAsync(draft, cancellationToken);
             }
+            DraftSyncStatus = $"Bozza condivisa alle {DateTime.Now:HH:mm:ss}";
+            HasDraftSyncError = false;
         }
         catch (OperationCanceledException)
         {
@@ -67,6 +82,8 @@ public partial class MainViewModel
         catch (Exception ex)
         {
             Debug.WriteLine($"[Draft] Salvataggio bozza non riuscito: {ex.Message}");
+            DraftSyncStatus = "Bozza non condivisa: " + ex.Message;
+            HasDraftSyncError = true;
         }
         finally
         {
@@ -153,13 +170,14 @@ public partial class MainViewModel
             AdditionalCosts.Add(CloneCost(cost));
 
         bool resumesExistingQuote = draft.IsEditingExistingQuoteDraft &&
-                                    draft.BaseVersionUtc != default;
+                                    (draft.BaseRevision > 0 || draft.BaseVersionUtc != default);
         _isEditingExistingQuote = resumesExistingQuote;
         _hasPersistedCurrentQuote = resumesExistingQuote;
         _loadedQuoteDate = resumesExistingQuote ? draft.Date : null;
         _loadedQuoteBaseVersionUtc = resumesExistingQuote
             ? draft.BaseVersionUtc
             : default;
+        _loadedQuoteBaseRevision = resumesExistingQuote ? draft.BaseRevision : 0;
         _lastSharedDraftContentHash = string.Empty;
 
         UpdateItemSortOrders();
@@ -187,6 +205,7 @@ public partial class MainViewModel
             BaseVersionUtc = _isEditingExistingQuote
                 ? _loadedQuoteBaseVersionUtc
                 : default,
+            BaseRevision = _isEditingExistingQuote ? _loadedQuoteBaseRevision : 0,
             IsEditingExistingQuoteDraft = _isEditingExistingQuote,
             CreatedByDevice = deviceName,
             LastModifiedByDevice = deviceName,
@@ -202,6 +221,7 @@ public partial class MainViewModel
                 Content = a.Content,
                 ImportedAt = DateTime.UtcNow
             }).ToList(),
+            HasCompleteAttachmentSnapshot = true,
             Events = []
         };
     }
@@ -232,6 +252,8 @@ public partial class MainViewModel
             // controllo sulle modifiche concorrenti degli altri PC.
             if (draft.BaseVersionUtc == default)
                 draft.BaseVersionUtc = _loadedQuoteBaseVersionUtc;
+            if (draft.BaseRevision == 0)
+                draft.BaseRevision = _loadedQuoteBaseRevision;
         }
         else
         {
@@ -252,6 +274,7 @@ public partial class MainViewModel
         _hasPersistedCurrentQuote = true;
         _loadedQuoteDate = draft.Date;
         _loadedQuoteBaseVersionUtc = draft.BaseVersionUtc;
+        _loadedQuoteBaseRevision = draft.BaseRevision;
         draft.IsEditingExistingQuoteDraft = true;
     }
 

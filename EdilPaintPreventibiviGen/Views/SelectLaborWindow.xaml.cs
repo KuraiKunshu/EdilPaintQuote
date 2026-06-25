@@ -112,7 +112,7 @@ public partial class SelectLaborWindow : Window
         FilterList(TxtSearch.Text);
     }
 
-    private void OnDeleteLaborClick(object sender, RoutedEventArgs e)
+    private async void OnDeleteLaborClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is Item itemToDelete)
         {
@@ -125,8 +125,7 @@ public partial class SelectLaborWindow : Window
             if (result != MessageBoxResult.Yes)
                 return;
 
-            _vm.AllCatalogLabors.Remove(itemToDelete);
-            _vm.SaveLaborsJson();
+            await _vm.RemoveCatalogLaborAsync(itemToDelete);
             ResetInputs();
             FilterList(TxtSearch.Text);
         }

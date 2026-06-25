@@ -790,6 +790,24 @@
                             Click="OnOpenMaterialListClick"/>
                 </StackPanel>
 
+                <TextBlock Grid.Column="1"
+                           Text="{Binding DraftSyncStatus}"
+                           Margin="16,0"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource LightTextBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasDraftSyncError}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource DangerRedBrush}"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
                 <!-- Sconti -->
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal"

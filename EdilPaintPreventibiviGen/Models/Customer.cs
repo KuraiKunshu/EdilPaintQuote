@@ -38,6 +38,12 @@ public class Customer : INotifyPropertyChanged
 	[JsonPropertyName("lastModifiedUtc")]
 	public DateTime LastModifiedUtc { get; set; } = DateTime.UtcNow;
 
+	[JsonPropertyName("baseVersionUtc")]
+	public DateTime BaseVersionUtc { get; set; }
+
+	[JsonPropertyName("hasPendingDatabaseWrite")]
+	public bool HasPendingDatabaseWrite { get; set; }
+
 	[JsonIgnore]
 	public string DisplayName => BusinessName;
 
