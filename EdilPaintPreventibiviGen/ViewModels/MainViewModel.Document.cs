@@ -32,7 +32,7 @@ public partial class MainViewModel
 
         _selectedCustomer = null;
         _selectedSecondCustomer = null;
-        _selectedSiteCustomer = null;
+        _siteAddress = string.Empty;
         _selectedBillingCustomer = null;
         _isSecondCustomerEnabled = false;
         _isSiteCustomerEnabled = false;
@@ -57,7 +57,7 @@ public partial class MainViewModel
 
         OnPropertyChanged(nameof(SelectedCustomer));
         OnPropertyChanged(nameof(SelectedSecondCustomer));
-        OnPropertyChanged(nameof(SelectedSiteCustomer));
+        OnPropertyChanged(nameof(SiteAddress));
         OnPropertyChanged(nameof(SelectedBillingCustomer));
         OnPropertyChanged(nameof(IsSecondCustomerEnabled));
         OnPropertyChanged(nameof(IsSiteCustomerEnabled));
@@ -356,7 +356,7 @@ public partial class MainViewModel
         if (!string.IsNullOrWhiteSpace(entry.SiteName))
         {
             IsSiteCustomerEnabled = true;
-            SelectedSiteCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.SiteName);
+            SiteAddress = entry.SiteName;
         }
 
         if (!string.IsNullOrWhiteSpace(entry.BillingCustomerName))

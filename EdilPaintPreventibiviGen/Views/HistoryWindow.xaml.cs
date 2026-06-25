@@ -849,11 +849,12 @@ public partial class HistoryWindow : Window
         if (!string.IsNullOrWhiteSpace(enteredWorkSite))
             return enteredWorkSite.Trim();
 
-        string addressOwner = !string.IsNullOrWhiteSpace(entry.SiteName)
-            ? entry.SiteName
-            : !string.IsNullOrWhiteSpace(entry.ReferenceName)
-                ? entry.ReferenceName
-                : entry.CustomerName;
+        if (!string.IsNullOrWhiteSpace(entry.SiteName))
+            return entry.SiteName.Trim();
+
+        string addressOwner = !string.IsNullOrWhiteSpace(entry.ReferenceName)
+            ? entry.ReferenceName
+            : entry.CustomerName;
         string address = _vm.AllCustomers.FirstOrDefault(customer =>
                 string.Equals(customer.BusinessName?.Trim(), addressOwner.Trim(), StringComparison.OrdinalIgnoreCase))
             ?.Address?.Trim() ?? string.Empty;
@@ -861,9 +862,7 @@ public partial class HistoryWindow : Window
         if (!string.IsNullOrWhiteSpace(address))
             return address;
 
-        string subject = !string.IsNullOrWhiteSpace(entry.SiteName)
-            ? $"il cantiere '{entry.SiteName}'"
-            : !string.IsNullOrWhiteSpace(entry.ReferenceName)
+        string subject = !string.IsNullOrWhiteSpace(entry.ReferenceName)
                 ? $"il riferimento '{entry.ReferenceName}'"
                 : $"il cliente '{entry.CustomerName}'";
         throw new InvalidOperationException(

@@ -43,7 +43,6 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     #region Selection State
     private Customer? _selectedCustomer;
     private Customer? _selectedSecondCustomer;
-    private Customer? _selectedSiteCustomer;
     private Customer? _selectedBillingCustomer;
     private VeluxResult? _selectedCatalogMaterial;
     private Item? _selectedCatalogLabor;
@@ -53,6 +52,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     #region UI State - Search
     private string _customerSearchText = string.Empty;
     private string _secondCustomerSearchText = string.Empty;
+    private string _siteAddress = string.Empty;
     private string _laborSearchText = string.Empty;
     #endregion
 
@@ -189,7 +189,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             _isSiteCustomerEnabled = value;
             if (!value)
-                SelectedSiteCustomer = null;
+                SiteAddress = string.Empty;
             OnPropertyChanged();
         }
     }
@@ -255,12 +255,15 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    public Customer? SelectedSiteCustomer
+    public string SiteAddress
     {
-        get => _selectedSiteCustomer;
+        get => _siteAddress;
         set
         {
-            _selectedSiteCustomer = value;
+            if (_siteAddress == value)
+                return;
+
+            _siteAddress = value;
             OnPropertyChanged();
         }
     }

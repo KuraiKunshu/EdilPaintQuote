@@ -464,14 +464,15 @@
                             Visibility="{Binding IsSiteCustomerEnabled, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="CANTIERE:" FontSize="10" FontWeight="Bold"
                                Foreground="{StaticResource SecondaryBlueBrush}"/>
-                    <TextBlock Text="{Binding SelectedSiteCustomer.DisplayName}"
-                               FontSize="12" FontWeight="Bold"
-                               TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding SelectedSiteCustomer.DisplayName}"/>
-                    <TextBlock Text="{Binding SelectedSiteCustomer.Address}" FontSize="12" Margin="0,2,0,0"/>
-                    <TextBlock Text="{Binding SelectedSiteCustomer.Email}" FontSize="12"
-                               Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox Text="{Binding SiteAddress, UpdateSourceTrigger=PropertyChanged}"
+                             MinWidth="260"
+                             MaxWidth="360"
+                             MinHeight="28"
+                             Padding="8,5"
+                             Margin="0,3,0,0"
+                             TextWrapping="Wrap"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Indirizzo cantiere"/>
                 </StackPanel>
 
                 <!-- Cliente fatturazione -->
@@ -549,12 +550,6 @@
                                 Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                 Click="OnSelectReferenceClick"
                                 Visibility="{Binding IsSecondCustomerEnabled, Converter={StaticResource BoolToVis}}"/>
-                        <Button Content="SEL. CANTIERE"
-                                Width="110" Height="30" Margin="0,0,5,0"
-                                Background="{StaticResource SelectReferenceButtonBrush}"
-                                Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
-                                Click="OnSelectSiteClick"
-                                Visibility="{Binding IsSiteCustomerEnabled, Converter={StaticResource BoolToVis}}"/>
                         <Button Content="SEL. FATT."
                                 Width="90" Height="30" Margin="0,0,5,0"
                                 Background="{StaticResource SelectReferenceButtonBrush}"

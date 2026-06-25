@@ -513,7 +513,6 @@ public partial class MainWindow : Window
     #region General Handlers
     private void OnSelectCustomerClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Cliente" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedCustomer = win.SelectedResult; } }
     private void OnSelectReferenceClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Riferimento" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedSecondCustomer = win.SelectedResult; } }
-    private void OnSelectSiteClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Cantiere" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedSiteCustomer = win.SelectedResult; } }
     private void OnSelectBillingClick(object sender, RoutedEventArgs e) { if (DataContext is MainViewModel vm) { var win = new SelectCustomerWindow(vm) { Owner = this, Title = "Seleziona Cliente Fatturazione" }; if (win.ShowDialog() == true && win.SelectedResult != null) vm.SelectedBillingCustomer = win.SelectedResult; } }
     private async void OnNewQuoteClick(object sender, RoutedEventArgs e)
     {

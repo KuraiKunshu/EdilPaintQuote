@@ -133,8 +133,7 @@ public partial class MainViewModel
         if (!string.IsNullOrWhiteSpace(draft.SiteName))
         {
             IsSiteCustomerEnabled = true;
-            SelectedSiteCustomer = AllCustomers.FirstOrDefault(c =>
-                c.BusinessName.Equals(draft.SiteName, StringComparison.OrdinalIgnoreCase));
+            SiteAddress = draft.SiteName;
         }
 
         if (!string.IsNullOrWhiteSpace(draft.BillingCustomerName))
@@ -207,7 +206,7 @@ public partial class MainViewModel
             Date = _loadedQuoteDate ?? DateTime.Now,
             CustomerName = SelectedCustomer?.BusinessName ?? string.Empty,
             ReferenceName = IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName ?? string.Empty : string.Empty,
-            SiteName = IsSiteCustomerEnabled ? SelectedSiteCustomer?.BusinessName ?? string.Empty : string.Empty,
+            SiteName = IsSiteCustomerEnabled ? SiteAddress.Trim() : string.Empty,
             BillingCustomerName = IsBillingCustomerEnabled ? SelectedBillingCustomer?.BusinessName ?? string.Empty : string.Empty,
             PaymentTerms = PaymentTerms,
             IvaType = IvaType,
@@ -298,7 +297,7 @@ public partial class MainViewModel
     {
         return SelectedCustomer != null ||
                SelectedSecondCustomer != null ||
-               SelectedSiteCustomer != null ||
+               !string.IsNullOrWhiteSpace(SiteAddress) ||
                SelectedBillingCustomer != null ||
                Materials.Count > 0 ||
                Labors.Count > 0 ||

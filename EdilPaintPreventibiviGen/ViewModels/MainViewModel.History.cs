@@ -75,7 +75,7 @@ public partial class MainViewModel
             Date = quoteDate ?? DateTime.Now,
             CustomerName = SelectedCustomer?.BusinessName ?? "Sconosciuto",
             ReferenceName = IsSecondCustomerEnabled ? (SelectedSecondCustomer?.BusinessName ?? "") : "",
-            SiteName = IsSiteCustomerEnabled ? (SelectedSiteCustomer?.BusinessName ?? "") : "",
+            SiteName = IsSiteCustomerEnabled ? SiteAddress.Trim() : "",
             BillingCustomerName = IsBillingCustomerEnabled ? (SelectedBillingCustomer?.BusinessName ?? "") : "",
             PdfPath = pdfPath,
             PaymentTerms = PaymentTerms,

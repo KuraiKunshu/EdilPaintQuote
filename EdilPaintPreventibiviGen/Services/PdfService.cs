@@ -105,7 +105,7 @@ public class PdfService
             IvaType = vm.IvaType,
             CustomerName = vm.SelectedCustomer?.BusinessName ?? string.Empty,
             ReferenceName = vm.IsSecondCustomerEnabled ? (vm.SelectedSecondCustomer?.BusinessName ?? string.Empty) : string.Empty,
-            SiteName = vm.IsSiteCustomerEnabled ? (vm.SelectedSiteCustomer?.BusinessName ?? string.Empty) : string.Empty,
+            SiteName = vm.IsSiteCustomerEnabled ? vm.SiteAddress.Trim() : string.Empty,
             BillingCustomerName = vm.IsBillingCustomerEnabled ? (vm.SelectedBillingCustomer?.BusinessName ?? string.Empty) : string.Empty,
             SelectedLogo = vm.SelectedLogo,
             MaterialDiscount = vm.MaterialDiscount,
@@ -145,9 +145,7 @@ public class PdfService
         var reference = !string.IsNullOrWhiteSpace(ctx.ReferenceName)
             ? ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.ReferenceName)
             : null;
-        var site = !string.IsNullOrWhiteSpace(ctx.SiteName)
-            ? ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.SiteName)
-            : null;
+        string siteAddress = ctx.SiteName.Trim();
         var billingCustomer = !string.IsNullOrWhiteSpace(ctx.BillingCustomerName)
             ? ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.BillingCustomerName)
             : null;
@@ -236,7 +234,7 @@ public class PdfService
                                     }
                                 });
 
-                                if (reference != null || site != null)
+                                if (reference != null || !string.IsNullOrWhiteSpace(siteAddress))
                                 {
                                     clientRow.ConstantItem(18);
                                     clientRow.RelativeItem().BorderLeft(1).BorderColor(PdfPalette.GreyLighten1)
@@ -256,14 +254,12 @@ public class PdfService
                                                     refCol.Item().Text($"Mail: {reference.Email}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
                                             }
 
-                                            if (site != null)
+                                            if (!string.IsNullOrWhiteSpace(siteAddress))
                                             {
                                                 refCol.Item().PaddingTop(reference == null ? 0 : 8).Text("CANTIERE")
                                                     .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
-                                                refCol.Item().PaddingTop(2).Text(site.BusinessName)
-                                                    .Bold().FontSize(11).FontColor(templateStyle.AccentColor);
-                                                if (!string.IsNullOrWhiteSpace(site.Address))
-                                                    refCol.Item().Text(site.Address).FontSize(9);
+                                                refCol.Item().PaddingTop(2).Text(siteAddress)
+                                                    .FontSize(10).FontColor(PdfPalette.GreyDarken3);
                                             }
                                         });
                                 }
