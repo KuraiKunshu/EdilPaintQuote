@@ -75,6 +75,8 @@ public partial class MainViewModel
             Date = quoteDate ?? DateTime.Now,
             CustomerName = SelectedCustomer?.BusinessName ?? "Sconosciuto",
             ReferenceName = IsSecondCustomerEnabled ? (SelectedSecondCustomer?.BusinessName ?? "") : "",
+            SiteName = IsSiteCustomerEnabled ? (SelectedSiteCustomer?.BusinessName ?? "") : "",
+            BillingCustomerName = IsBillingCustomerEnabled ? (SelectedBillingCustomer?.BusinessName ?? "") : "",
             PdfPath = pdfPath,
             PaymentTerms = PaymentTerms,
             IvaType = IvaType,
@@ -139,6 +141,8 @@ public partial class MainViewModel
 
                 existingEntry.CustomerName = entry.CustomerName;
                 existingEntry.ReferenceName = entry.ReferenceName;
+                existingEntry.SiteName = entry.SiteName;
+                existingEntry.BillingCustomerName = entry.BillingCustomerName;
                 existingEntry.PdfPath = entry.PdfPath;
                 existingEntry.PaymentTerms = entry.PaymentTerms;
                 existingEntry.IvaType = entry.IvaType;
@@ -355,6 +359,8 @@ public partial class MainViewModel
             Date = entry.Date,
             CustomerName = entry.CustomerName,
             ReferenceName = entry.ReferenceName,
+            SiteName = entry.SiteName,
+            BillingCustomerName = entry.BillingCustomerName,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             IvaType = entry.IvaType,

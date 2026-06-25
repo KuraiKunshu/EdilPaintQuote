@@ -726,6 +726,8 @@ public class LocalJsonStoreService
             Date = entry.Date,
             CustomerName = entry.CustomerName,
             ReferenceName = entry.ReferenceName,
+            SiteName = entry.SiteName,
+            BillingCustomerName = entry.BillingCustomerName,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             IvaType = entry.IvaType,

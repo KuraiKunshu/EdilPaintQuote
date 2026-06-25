@@ -142,6 +142,8 @@ public static class EntityModelMapper
             Date = entity.Date,
             CustomerName = entity.Customer?.BusinessName ?? string.Empty,
             ReferenceName = entity.ReferenceCustomer?.BusinessName ?? string.Empty,
+            SiteName = entity.SiteName,
+            BillingCustomerName = entity.BillingCustomerName,
             PdfPath = entity.PdfPath,
             PaymentTerms = entity.PaymentTerms,
             IvaType = entity.IvaType,

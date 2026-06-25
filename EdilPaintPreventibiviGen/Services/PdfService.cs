@@ -105,6 +105,8 @@ public class PdfService
             IvaType = vm.IvaType,
             CustomerName = vm.SelectedCustomer?.BusinessName ?? string.Empty,
             ReferenceName = vm.IsSecondCustomerEnabled ? (vm.SelectedSecondCustomer?.BusinessName ?? string.Empty) : string.Empty,
+            SiteName = vm.IsSiteCustomerEnabled ? (vm.SelectedSiteCustomer?.BusinessName ?? string.Empty) : string.Empty,
+            BillingCustomerName = vm.IsBillingCustomerEnabled ? (vm.SelectedBillingCustomer?.BusinessName ?? string.Empty) : string.Empty,
             SelectedLogo = vm.SelectedLogo,
             MaterialDiscount = vm.MaterialDiscount,
             LaborDiscount = vm.LaborDiscount,
@@ -142,6 +144,12 @@ public class PdfService
         var customer = ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.CustomerName);
         var reference = !string.IsNullOrWhiteSpace(ctx.ReferenceName)
             ? ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.ReferenceName)
+            : null;
+        var site = !string.IsNullOrWhiteSpace(ctx.SiteName)
+            ? ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.SiteName)
+            : null;
+        var billingCustomer = !string.IsNullOrWhiteSpace(ctx.BillingCustomerName)
+            ? ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.BillingCustomerName)
             : null;
 
         var calculator = new QuoteCalculator();
@@ -217,24 +225,46 @@ public class PdfService
                                         custCol.Item().Text($"Tel: {customer.Phone}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
                                     if (!string.IsNullOrWhiteSpace(customer.Email))
                                         custCol.Item().Text($"Mail: {customer.Email}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                    if (billingCustomer != null)
+                                    {
+                                        custCol.Item().PaddingTop(8).Text("CLIENTE FATTURAZIONE")
+                                            .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                        custCol.Item().Text(billingCustomer.BusinessName)
+                                            .Bold().FontSize(10).FontColor(templateStyle.AccentColor);
+                                        if (!string.IsNullOrWhiteSpace(billingCustomer.Address))
+                                            custCol.Item().Text(billingCustomer.Address).FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                    }
                                 });
 
-                                if (reference != null)
+                                if (reference != null || site != null)
                                 {
                                     clientRow.ConstantItem(18);
                                     clientRow.RelativeItem().BorderLeft(1).BorderColor(PdfPalette.GreyLighten1)
                                         .PaddingLeft(14).Column(refCol =>
                                         {
-                                            refCol.Item().Text("RIFERIMENTO")
-                                                .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
-                                            refCol.Item().PaddingTop(2).Text(reference.BusinessName)
-                                                .Bold().FontSize(11).FontColor(templateStyle.AccentColor);
-                                            if (!string.IsNullOrWhiteSpace(reference.Address))
-                                                refCol.Item().Text(reference.Address).FontSize(9);
-                                            if (!string.IsNullOrWhiteSpace(reference.Phone))
-                                                refCol.Item().Text($"Tel: {reference.Phone}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
-                                            if (!string.IsNullOrWhiteSpace(reference.Email))
-                                                refCol.Item().Text($"Mail: {reference.Email}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                            if (reference != null)
+                                            {
+                                                refCol.Item().Text("RIFERIMENTO")
+                                                    .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                                refCol.Item().PaddingTop(2).Text(reference.BusinessName)
+                                                    .Bold().FontSize(11).FontColor(templateStyle.AccentColor);
+                                                if (!string.IsNullOrWhiteSpace(reference.Address))
+                                                    refCol.Item().Text(reference.Address).FontSize(9);
+                                                if (!string.IsNullOrWhiteSpace(reference.Phone))
+                                                    refCol.Item().Text($"Tel: {reference.Phone}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                                if (!string.IsNullOrWhiteSpace(reference.Email))
+                                                    refCol.Item().Text($"Mail: {reference.Email}").FontSize(8).FontColor(PdfPalette.GreyDarken2);
+                                            }
+
+                                            if (site != null)
+                                            {
+                                                refCol.Item().PaddingTop(reference == null ? 0 : 8).Text("CANTIERE")
+                                                    .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                                refCol.Item().PaddingTop(2).Text(site.BusinessName)
+                                                    .Bold().FontSize(11).FontColor(templateStyle.AccentColor);
+                                                if (!string.IsNullOrWhiteSpace(site.Address))
+                                                    refCol.Item().Text(site.Address).FontSize(9);
+                                            }
                                         });
                                 }
                             });

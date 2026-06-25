@@ -10,6 +10,8 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     private DateTimeOffset _date;
     private string _customerName = string.Empty;
     private string _referenceName = string.Empty;
+    private string _siteName = string.Empty;
+    private string _billingCustomerName = string.Empty;
     private string _pdfPath = string.Empty;
     private decimal _total;
     private string _ivaType = string.Empty;
@@ -52,6 +54,18 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     {
         get => _referenceName;
         set { _referenceName = value; OnPropertyChanged(); OnPropertyChanged(nameof(CustomerReferenceDisplay)); }
+    }
+
+    public string SiteName
+    {
+        get => _siteName;
+        set { _siteName = value; OnPropertyChanged(); }
+    }
+
+    public string BillingCustomerName
+    {
+        get => _billingCustomerName;
+        set { _billingCustomerName = value; OnPropertyChanged(); }
     }
 
     public string PdfPath

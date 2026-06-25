@@ -43,6 +43,8 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     #region Selection State
     private Customer? _selectedCustomer;
     private Customer? _selectedSecondCustomer;
+    private Customer? _selectedSiteCustomer;
+    private Customer? _selectedBillingCustomer;
     private VeluxResult? _selectedCatalogMaterial;
     private Item? _selectedCatalogLabor;
     private CancellationTokenSource? _veluxDetailsCts;
@@ -57,6 +59,8 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     #region UI State - Flags
     private bool _isJointVenture;
     private bool _isSecondCustomerEnabled;
+    private bool _isSiteCustomerEnabled;
+    private bool _isBillingCustomerEnabled;
     private bool _isSavingQuoteHistory;
     private bool _isEditingExistingQuote;
     private bool _isGeneratingPdf;
@@ -178,6 +182,30 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    public bool IsSiteCustomerEnabled
+    {
+        get => _isSiteCustomerEnabled;
+        set
+        {
+            _isSiteCustomerEnabled = value;
+            if (!value)
+                SelectedSiteCustomer = null;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsBillingCustomerEnabled
+    {
+        get => _isBillingCustomerEnabled;
+        set
+        {
+            _isBillingCustomerEnabled = value;
+            if (!value)
+                SelectedBillingCustomer = null;
+            OnPropertyChanged();
+        }
+    }
+
     public Brush CustomerBorderBrush
     {
         get => _customerBorderBrush;
@@ -223,6 +251,26 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             _selectedSecondCustomer = value;
             SecondCustomerBorderBrush = GetCustomerSelectionBrush(value != null);
+            OnPropertyChanged();
+        }
+    }
+
+    public Customer? SelectedSiteCustomer
+    {
+        get => _selectedSiteCustomer;
+        set
+        {
+            _selectedSiteCustomer = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public Customer? SelectedBillingCustomer
+    {
+        get => _selectedBillingCustomer;
+        set
+        {
+            _selectedBillingCustomer = value;
             OnPropertyChanged();
         }
     }

@@ -36,6 +36,8 @@ public partial class MainViewModel
             var personalMaterials = await _dataService.GetPersonalMaterialsAsync();
             Guid? selectedCustomerId = SelectedCustomer?.SyncId;
             Guid? selectedReferenceId = SelectedSecondCustomer?.SyncId;
+            Guid? selectedSiteId = SelectedSiteCustomer?.SyncId;
+            Guid? selectedBillingId = SelectedBillingCustomer?.SyncId;
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
@@ -46,10 +48,14 @@ public partial class MainViewModel
 
                 _selectedCustomer = FindCustomerById(selectedCustomerId);
                 _selectedSecondCustomer = FindCustomerById(selectedReferenceId);
+                _selectedSiteCustomer = FindCustomerById(selectedSiteId);
+                _selectedBillingCustomer = FindCustomerById(selectedBillingId);
                 CustomerBorderBrush = GetCustomerSelectionBrush(_selectedCustomer != null);
                 SecondCustomerBorderBrush = GetCustomerSelectionBrush(_selectedSecondCustomer != null);
                 OnPropertyChanged(nameof(SelectedCustomer));
                 OnPropertyChanged(nameof(SelectedSecondCustomer));
+                OnPropertyChanged(nameof(SelectedSiteCustomer));
+                OnPropertyChanged(nameof(SelectedBillingCustomer));
                 ApplyCustomerFilter(_customerSearchText);
                 ApplySecondCustomerFilter(_secondCustomerSearchText);
 

@@ -531,6 +531,8 @@ public partial class HistoryWindow : Window
             IvaType = fullEntry.IvaType,
             CustomerName = fullEntry.CustomerName,
             ReferenceName = fullEntry.ReferenceName,
+            SiteName = fullEntry.SiteName,
+            BillingCustomerName = fullEntry.BillingCustomerName,
             SelectedLogo = ResolveLogoForPdf(company),
             MaterialDiscount = fullEntry.MaterialDiscount,
             LaborDiscount = fullEntry.LaborDiscount,
@@ -847,9 +849,11 @@ public partial class HistoryWindow : Window
         if (!string.IsNullOrWhiteSpace(enteredWorkSite))
             return enteredWorkSite.Trim();
 
-        string addressOwner = !string.IsNullOrWhiteSpace(entry.ReferenceName)
-            ? entry.ReferenceName
-            : entry.CustomerName;
+        string addressOwner = !string.IsNullOrWhiteSpace(entry.SiteName)
+            ? entry.SiteName
+            : !string.IsNullOrWhiteSpace(entry.ReferenceName)
+                ? entry.ReferenceName
+                : entry.CustomerName;
         string address = _vm.AllCustomers.FirstOrDefault(customer =>
                 string.Equals(customer.BusinessName?.Trim(), addressOwner.Trim(), StringComparison.OrdinalIgnoreCase))
             ?.Address?.Trim() ?? string.Empty;
@@ -857,9 +861,11 @@ public partial class HistoryWindow : Window
         if (!string.IsNullOrWhiteSpace(address))
             return address;
 
-        string subject = !string.IsNullOrWhiteSpace(entry.ReferenceName)
-            ? $"il riferimento '{entry.ReferenceName}'"
-            : $"il cliente '{entry.CustomerName}'";
+        string subject = !string.IsNullOrWhiteSpace(entry.SiteName)
+            ? $"il cantiere '{entry.SiteName}'"
+            : !string.IsNullOrWhiteSpace(entry.ReferenceName)
+                ? $"il riferimento '{entry.ReferenceName}'"
+                : $"il cliente '{entry.CustomerName}'";
         throw new InvalidOperationException(
             $"Il campo 'Cantiere presso' e' vuoto e {subject} non ha un indirizzo salvato.");
     }

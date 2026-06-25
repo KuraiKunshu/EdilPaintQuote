@@ -299,6 +299,10 @@
                 Padding="10,8"
                 Margin="0,0,0,8">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -375,6 +379,10 @@
                 Padding="18,12"
                 Margin="0,12,0,0">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="350"/>
                     <ColumnDefinition Width="Auto"/>
@@ -451,6 +459,36 @@
                                Foreground="{StaticResource MutedTextBrush}"/>
                 </StackPanel>
 
+                <!-- Cantiere -->
+                <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,12,10,0"
+                            Visibility="{Binding IsSiteCustomerEnabled, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="CANTIERE:" FontSize="10" FontWeight="Bold"
+                               Foreground="{StaticResource SecondaryBlueBrush}"/>
+                    <TextBlock Text="{Binding SelectedSiteCustomer.DisplayName}"
+                               FontSize="12" FontWeight="Bold"
+                               TextWrapping="Wrap"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding SelectedSiteCustomer.DisplayName}"/>
+                    <TextBlock Text="{Binding SelectedSiteCustomer.Address}" FontSize="12" Margin="0,2,0,0"/>
+                    <TextBlock Text="{Binding SelectedSiteCustomer.Email}" FontSize="12"
+                               Foreground="{StaticResource MutedTextBrush}"/>
+                </StackPanel>
+
+                <!-- Cliente fatturazione -->
+                <StackPanel Grid.Row="1" Grid.Column="3" Grid.ColumnSpan="2" Margin="20,12,10,0"
+                            Visibility="{Binding IsBillingCustomerEnabled, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="FATTURAZIONE:" FontSize="10" FontWeight="Bold"
+                               Foreground="{StaticResource SecondaryBlueBrush}"/>
+                    <TextBlock Text="{Binding SelectedBillingCustomer.DisplayName}"
+                               FontSize="12" FontWeight="Bold"
+                               TextWrapping="Wrap"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding SelectedBillingCustomer.DisplayName}"/>
+                    <TextBlock Text="{Binding SelectedBillingCustomer.Address}" FontSize="12" Margin="0,2,0,0"/>
+                    <TextBlock Text="{Binding SelectedBillingCustomer.Email}" FontSize="12"
+                               Foreground="{StaticResource MutedTextBrush}"/>
+                </StackPanel>
+
                 <!-- Selezione IVA -->
                 <Border Grid.Column="3"
                         Background="{StaticResource WhiteBrush}" Padding="8,4"
@@ -489,6 +527,12 @@
                         <CheckBox Content="riferimento"
                                   VerticalAlignment="Center" Margin="0,0,10,0"
                                   IsChecked="{Binding IsSecondCustomerEnabled}"/>
+                        <CheckBox Content="cantiere"
+                                  VerticalAlignment="Center" Margin="0,0,10,0"
+                                  IsChecked="{Binding IsSiteCustomerEnabled}"/>
+                        <CheckBox Content="fatturazione"
+                                  VerticalAlignment="Center" Margin="0,0,10,0"
+                                  IsChecked="{Binding IsBillingCustomerEnabled}"/>
                         <CheckBox Content="🤝 collaborazione"
                                   VerticalAlignment="Center" Margin="0,0,10,0"
                                   IsChecked="{Binding IsJointVenture}"/>
@@ -505,6 +549,18 @@
                                 Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                                 Click="OnSelectReferenceClick"
                                 Visibility="{Binding IsSecondCustomerEnabled, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="SEL. CANTIERE"
+                                Width="110" Height="30" Margin="0,0,5,0"
+                                Background="{StaticResource SelectReferenceButtonBrush}"
+                                Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                                Click="OnSelectSiteClick"
+                                Visibility="{Binding IsSiteCustomerEnabled, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="SEL. FATT."
+                                Width="90" Height="30" Margin="0,0,5,0"
+                                Background="{StaticResource SelectReferenceButtonBrush}"
+                                Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                                Click="OnSelectBillingClick"
+                                Visibility="{Binding IsBillingCustomerEnabled, Converter={StaticResource BoolToVis}}"/>
                         <Button Content="SEL. CLIENTE"
                                 Width="110" Height="30"
                                 Background="{StaticResource SelectCustomerButtonBrush}"

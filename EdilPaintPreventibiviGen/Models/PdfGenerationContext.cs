@@ -8,6 +8,8 @@ public class PdfGenerationContext
     public string IvaType { get; set; } = string.Empty;
     public string CustomerName { get; set; } = string.Empty;
     public string ReferenceName { get; set; } = string.Empty;
+    public string SiteName { get; set; } = string.Empty;
+    public string BillingCustomerName { get; set; } = string.Empty;
     public string SelectedLogo { get; set; } = string.Empty;
     public double MaterialDiscount { get; set; }
     public double LaborDiscount { get; set; }

@@ -122,6 +122,8 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Quotes", "Notes", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "SiteName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "BillingCustomerName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "IsJointVenture", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "PartnerCompanyName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "CostAllocationsJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
@@ -149,6 +151,8 @@ public partial class SqlDataService
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "PaymentTerms", "NVARCHAR(MAX) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "IvaType", "NVARCHAR(50) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "Notes", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "SiteName", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "BillingCustomerName", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "PartnerCompanyName", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "CostAllocationsJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "SyncHash", "NVARCHAR(100) NOT NULL", cancellationToken);
@@ -188,6 +192,8 @@ public partial class SqlDataService
         CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlRawAsync("""
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "SiteName" character varying(250) NOT NULL DEFAULT '';
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "BillingCustomerName" character varying(250) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "Revision" bigint NOT NULL DEFAULT 0;
         UPDATE "Quotes" SET "Revision" = 1 WHERE "Revision" = 0;
 

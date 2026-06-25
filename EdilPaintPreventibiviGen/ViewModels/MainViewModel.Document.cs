@@ -32,7 +32,11 @@ public partial class MainViewModel
 
         _selectedCustomer = null;
         _selectedSecondCustomer = null;
+        _selectedSiteCustomer = null;
+        _selectedBillingCustomer = null;
         _isSecondCustomerEnabled = false;
+        _isSiteCustomerEnabled = false;
+        _isBillingCustomerEnabled = false;
         _isJointVenture = false;
         _partnerCompanyName = string.Empty;
 
@@ -53,7 +57,11 @@ public partial class MainViewModel
 
         OnPropertyChanged(nameof(SelectedCustomer));
         OnPropertyChanged(nameof(SelectedSecondCustomer));
+        OnPropertyChanged(nameof(SelectedSiteCustomer));
+        OnPropertyChanged(nameof(SelectedBillingCustomer));
         OnPropertyChanged(nameof(IsSecondCustomerEnabled));
+        OnPropertyChanged(nameof(IsSiteCustomerEnabled));
+        OnPropertyChanged(nameof(IsBillingCustomerEnabled));
         OnPropertyChanged(nameof(MaterialDiscount));
         OnPropertyChanged(nameof(LaborDiscount));
         OnPropertyChanged(nameof(IvaType));
@@ -154,6 +162,8 @@ public partial class MainViewModel
                     Date = entry.Date.DateTime,
                     CustomerName = entry.CustomerName,
                     ReferenceName = entry.ReferenceName,
+                    SiteName = entry.SiteName,
+                    BillingCustomerName = entry.BillingCustomerName,
                     PdfPath = entry.PdfPath,
                     IsJointVenture = entry.IsJointVenture
                 };
@@ -341,6 +351,18 @@ public partial class MainViewModel
         {
             IsSecondCustomerEnabled = true;
             SelectedSecondCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.ReferenceName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.SiteName))
+        {
+            IsSiteCustomerEnabled = true;
+            SelectedSiteCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.SiteName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.BillingCustomerName))
+        {
+            IsBillingCustomerEnabled = true;
+            SelectedBillingCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.BillingCustomerName);
         }
 
         PaymentTerms = entry.PaymentTerms;

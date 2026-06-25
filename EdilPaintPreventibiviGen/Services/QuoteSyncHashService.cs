@@ -35,6 +35,8 @@ internal static class QuoteSyncHashService
             entry.Date.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
             entry.CustomerName,
             entry.ReferenceName,
+            entry.SiteName,
+            entry.BillingCustomerName,
             entry.PaymentTerms,
             entry.IvaType,
             entry.Notes,

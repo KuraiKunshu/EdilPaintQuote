@@ -130,6 +130,20 @@ public partial class MainViewModel
                 c.BusinessName.Equals(draft.ReferenceName, StringComparison.OrdinalIgnoreCase));
         }
 
+        if (!string.IsNullOrWhiteSpace(draft.SiteName))
+        {
+            IsSiteCustomerEnabled = true;
+            SelectedSiteCustomer = AllCustomers.FirstOrDefault(c =>
+                c.BusinessName.Equals(draft.SiteName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(draft.BillingCustomerName))
+        {
+            IsBillingCustomerEnabled = true;
+            SelectedBillingCustomer = AllCustomers.FirstOrDefault(c =>
+                c.BusinessName.Equals(draft.BillingCustomerName, StringComparison.OrdinalIgnoreCase));
+        }
+
         PaymentTerms = draft.PaymentTerms;
         IvaType = !string.IsNullOrWhiteSpace(draft.IvaType) ? draft.IvaType : IvaType;
         MaterialDiscount = draft.MaterialDiscount;
@@ -193,6 +207,8 @@ public partial class MainViewModel
             Date = _loadedQuoteDate ?? DateTime.Now,
             CustomerName = SelectedCustomer?.BusinessName ?? string.Empty,
             ReferenceName = IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName ?? string.Empty : string.Empty,
+            SiteName = IsSiteCustomerEnabled ? SelectedSiteCustomer?.BusinessName ?? string.Empty : string.Empty,
+            BillingCustomerName = IsBillingCustomerEnabled ? SelectedBillingCustomer?.BusinessName ?? string.Empty : string.Empty,
             PaymentTerms = PaymentTerms,
             IvaType = IvaType,
             Materials = Materials.Select(CloneItem).ToList(),
@@ -282,6 +298,8 @@ public partial class MainViewModel
     {
         return SelectedCustomer != null ||
                SelectedSecondCustomer != null ||
+               SelectedSiteCustomer != null ||
+               SelectedBillingCustomer != null ||
                Materials.Count > 0 ||
                Labors.Count > 0 ||
                AttachedImages.Count > 0 ||

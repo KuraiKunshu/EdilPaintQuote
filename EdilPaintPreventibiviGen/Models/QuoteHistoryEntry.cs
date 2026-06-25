@@ -45,6 +45,8 @@ public class QuoteHistoryEntry
 	public DateTime Date { get; set; }
 	public string CustomerName { get; set; } = string.Empty;
 	public string ReferenceName { get; set; } = string.Empty;
+	public string SiteName { get; set; } = string.Empty;
+	public string BillingCustomerName { get; set; } = string.Empty;
 	public string PdfPath { get; set; } = string.Empty;
 	public string PaymentTerms { get; set; } = string.Empty;
 	public string IvaType { get; set; } = "esclusa";

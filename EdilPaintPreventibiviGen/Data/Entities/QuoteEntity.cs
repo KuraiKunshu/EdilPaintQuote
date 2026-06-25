@@ -14,6 +14,9 @@ public class QuoteEntity
 	public int? ReferenceCustomerId { get; set; }
 	public CustomerEntity? ReferenceCustomer { get; set; }
 
+	public string SiteName { get; set; } = string.Empty;
+	public string BillingCustomerName { get; set; } = string.Empty;
+
 	public string PdfPath { get; set; } = string.Empty;
 	public string PaymentTerms { get; set; } = string.Empty;
 	public string IvaType { get; set; } = "esclusa";

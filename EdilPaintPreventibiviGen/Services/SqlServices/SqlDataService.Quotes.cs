@@ -54,6 +54,8 @@ public partial class SqlDataService
                 x.Date,
                 CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                x.SiteName,
+                x.BillingCustomerName,
                 x.PaymentTerms,
                 x.IvaType,
                 x.Notes,
@@ -116,6 +118,8 @@ public partial class SqlDataService
                 Date = x.Date,
                 CustomerName = x.CustomerName,
                 ReferenceName = x.ReferenceName,
+                SiteName = x.SiteName,
+                BillingCustomerName = x.BillingCustomerName,
                 PaymentTerms = x.PaymentTerms,
                 IvaType = x.IvaType,
                 Notes = x.Notes,
@@ -196,6 +200,8 @@ public partial class SqlDataService
             Date = x.Date,
             CustomerName = x.Customer?.BusinessName ?? string.Empty,
             ReferenceName = x.ReferenceCustomer?.BusinessName ?? string.Empty,
+            SiteName = x.SiteName,
+            BillingCustomerName = x.BillingCustomerName,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             IvaType = x.IvaType,
@@ -283,6 +289,8 @@ public partial class SqlDataService
             Date = x.Date,
             CustomerName = x.Customer?.BusinessName ?? string.Empty,
             ReferenceName = x.ReferenceCustomer?.BusinessName ?? string.Empty,
+            SiteName = x.SiteName,
+            BillingCustomerName = x.BillingCustomerName,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             IvaType = x.IvaType,
@@ -357,6 +365,8 @@ public partial class SqlDataService
             Date = x.Date,
             CustomerName = x.Customer?.BusinessName ?? string.Empty,
             ReferenceName = x.ReferenceCustomer?.BusinessName ?? string.Empty,
+            SiteName = x.SiteName,
+            BillingCustomerName = x.BillingCustomerName,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             IvaType = x.IvaType,
@@ -424,6 +434,8 @@ public partial class SqlDataService
                 Date = x.Date,
                 CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                SiteName = x.SiteName,
+                BillingCustomerName = x.BillingCustomerName,
                 PdfPath = x.PdfPath,
                 Total = (decimal)x.Total,
                 IvaType = x.IvaType,
@@ -476,6 +488,8 @@ public partial class SqlDataService
                 Date = x.Date,
                 CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                SiteName = x.SiteName,
+                BillingCustomerName = x.BillingCustomerName,
                 PdfPath = x.PdfPath,
                 Total = (decimal)x.Total,
                 IvaType = x.IvaType,
@@ -516,7 +530,9 @@ public partial class SqlDataService
             query = query.Where(x =>
                 x.QuoteNumber.ToLower().Contains(term) ||
                 (x.Customer != null && x.Customer.BusinessName.ToLower().Contains(term)) ||
-                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)));
+                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)) ||
+                x.SiteName.ToLower().Contains(term) ||
+                x.BillingCustomerName.ToLower().Contains(term));
         }
 
         return await query
@@ -528,6 +544,8 @@ public partial class SqlDataService
                 Date = x.Date,
                 CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                SiteName = x.SiteName,
+                BillingCustomerName = x.BillingCustomerName,
                 PdfPath = x.PdfPath,
                 Total = (decimal)x.Total,
                 IvaType = x.IvaType,
@@ -569,7 +587,9 @@ public partial class SqlDataService
             query = query.Where(x =>
                 x.QuoteNumber.ToLower().Contains(term) ||
                 (x.Customer != null && x.Customer.BusinessName.ToLower().Contains(term)) ||
-                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)));
+                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)) ||
+                x.SiteName.ToLower().Contains(term) ||
+                x.BillingCustomerName.ToLower().Contains(term));
         }
 
         return await query
@@ -582,6 +602,8 @@ public partial class SqlDataService
                 Date = x.Date,
                 CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                SiteName = x.SiteName,
+                BillingCustomerName = x.BillingCustomerName,
                 PdfPath = x.PdfPath,
                 Total = (decimal)x.Total,
                 IvaType = x.IvaType,
@@ -635,6 +657,8 @@ public partial class SqlDataService
             Date = q.Date,
             CustomerName = q.Customer?.BusinessName ?? string.Empty,
             ReferenceName = q.ReferenceCustomer?.BusinessName ?? string.Empty,
+            SiteName = q.SiteName,
+            BillingCustomerName = q.BillingCustomerName,
             PdfPath = q.PdfPath,
             PaymentTerms = q.PaymentTerms,
             IvaType = q.IvaType,
@@ -821,6 +845,8 @@ public partial class SqlDataService
             Date = entry.Date,
             CustomerName = entry.CustomerName,
             ReferenceName = entry.ReferenceName,
+            SiteName = entry.SiteName,
+            BillingCustomerName = entry.BillingCustomerName,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             IvaType = entry.IvaType,
@@ -916,6 +942,8 @@ public partial class SqlDataService
                     existing.Date = quote.Date;
                     existing.CustomerId = customer?.Id;
                     existing.ReferenceCustomerId = referenceCustomer?.Id;
+                    existing.SiteName = quote.SiteName;
+                    existing.BillingCustomerName = quote.BillingCustomerName;
                     existing.PdfPath = quote.PdfPath;
                     existing.PaymentTerms = quote.PaymentTerms;
                     existing.IvaType = quote.IvaType;
@@ -995,6 +1023,8 @@ public partial class SqlDataService
                         Date = quote.Date,
                         CustomerId = customer?.Id,
                         ReferenceCustomerId = referenceCustomer?.Id,
+                        SiteName = quote.SiteName,
+                        BillingCustomerName = quote.BillingCustomerName,
                         PdfPath = quote.PdfPath,
                         PaymentTerms = quote.PaymentTerms,
                         IvaType = quote.IvaType,

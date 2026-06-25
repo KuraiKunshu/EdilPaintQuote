@@ -81,6 +81,8 @@ public class AppDbContext : DbContext
 
             entity.Property(x => x.QuoteNumber).HasMaxLength(50).IsRequired();
             entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.SiteName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.BillingCustomerName).HasMaxLength(250).IsRequired();
             entity.Property(x => x.PdfPath).HasMaxLength(1000);
             entity.Property(x => x.IvaType).HasMaxLength(50).IsRequired();
             entity.Property(x => x.CreatedByDevice).HasMaxLength(120);
