@@ -22,6 +22,8 @@ public partial class App : Application
     private const int ShutdownSyncTimeoutSeconds = 2;
     private const int ShutdownBackgroundTimeoutSeconds = 2;
     private const int HardShutdownTimeoutSeconds = 8;
+    private const int StartupSyncQuoteLimit = 150;
+    private static readonly TimeSpan StartupSyncForegroundTimeout = TimeSpan.FromSeconds(12);
     private static System.Timers.Timer? _syncTimer;
     private static CancellationTokenSource? _shutdownCts;
     private static bool _isShuttingDown;
@@ -177,17 +179,21 @@ public partial class App : Application
         }
     }
 
-    private static Task RunStartupSyncAsync(CancellationToken token)
+    private static async Task RunStartupSyncAsync(CancellationToken token)
     {
-        return AppShutdownManager.Track("Startup sync", async operationToken =>
+        var syncWatch = Stopwatch.StartNew();
+        Task syncTask = AppShutdownManager.Track("Startup sync", async operationToken =>
         {
             try
             {
                 if (operationToken.IsCancellationRequested || _isShuttingDown)
                     return;
 
-                var result = await SyncService.SyncAllAsync(force: true, cancellationToken: operationToken);
-                Debug.WriteLine($"[STARTUP] Sync completed: Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
+                var result = await SyncService.SyncAllAsync(
+                    force: true,
+                    take: StartupSyncQuoteLimit,
+                    cancellationToken: operationToken);
+                Debug.WriteLine($"[STARTUP] Sync completed in {syncWatch.Elapsed}: Quotes={result.QuotesSynced}, Customers={result.CustomersSynced}");
             }
             catch (OperationCanceledException)
             {
@@ -198,6 +204,16 @@ public partial class App : Application
                 Debug.WriteLine($"[STARTUP] Sync error: {ex.Message}");
             }
         }, token);
+
+        Task completed = await Task.WhenAny(syncTask, Task.Delay(StartupSyncForegroundTimeout, token));
+        if (completed == syncTask)
+        {
+            await syncTask;
+            return;
+        }
+
+        Debug.WriteLine(
+            $"[STARTUP] Sync ancora in corso dopo {StartupSyncForegroundTimeout.TotalSeconds:F0}s: apertura app, completamento in background.");
     }
 
     private static async void OnSyncCompleted(object? sender, EventArgs e)
