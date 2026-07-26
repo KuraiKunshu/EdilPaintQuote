@@ -137,9 +137,11 @@ public sealed class RegressionTests
         Assert.Contains("Cliente: Cliente Uno", draft.Body);
         Assert.Contains("Preventivo: PREV/42", draft.Body);
         Assert.Contains("Data: 25/07/2026", draft.Body);
-        Assert.Contains("- 2 x Vernice bianca", draft.Body);
-        Assert.Contains("  Confezione da 10 L", draft.Body);
-        Assert.Contains("- 3 x Pennello", draft.Body);
+        Assert.Contains("- Vernice bianca", draft.Body);
+        Assert.Contains("- Pennello", draft.Body);
+        Assert.DoesNotContain("Confezione da 10 L", draft.Body);
+        Assert.DoesNotContain("2 x", draft.Body);
+        Assert.DoesNotContain("3 x", draft.Body);
     }
 
     [Fact]
@@ -155,7 +157,7 @@ public sealed class RegressionTests
         var draft = SupplierOrderMailService.CreateDraft(quote, [], new MailSettingsModel());
 
         Assert.Equal("Ordine Riferimento Cliente Due", draft.Subject);
-        Assert.Equal("- 4 x Silicone", draft.Body);
+        Assert.Equal("- Silicone", draft.Body);
     }
 
     [Fact]

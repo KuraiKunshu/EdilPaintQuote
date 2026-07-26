@@ -129,11 +129,7 @@ public static class SupplierOrderMailService
         else
         {
             foreach (var material in materials)
-            {
-                body.AppendLine($"- {material.Quantity} x {material.Name}");
-                if (!string.IsNullOrWhiteSpace(material.Description))
-                    body.AppendLine($"  {material.Description.Trim()}");
-            }
+                body.AppendLine($"- {material.Name.Trim()}");
         }
 
         return body.ToString().TrimEnd();
