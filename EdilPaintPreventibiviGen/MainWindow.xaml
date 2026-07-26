@@ -328,8 +328,8 @@
                                        Foreground="{StaticResource DefaultTextBrush}"/>
                             <Slider x:Name="SldMainWindowScale"
                                     Width="92"
-                                    Minimum="0.8"
-                                    Maximum="1.1"
+                                    Minimum="0.6"
+                                    Maximum="1.3"
                                     TickFrequency="0.05"
                                     IsSnapToTickEnabled="True"
                                     VerticalAlignment="Center"/>

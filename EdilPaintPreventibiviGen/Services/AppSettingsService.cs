@@ -262,7 +262,7 @@ public sealed class AppSettingsServiceModel
 		if (double.IsNaN(MainWindowScale) || double.IsInfinity(MainWindowScale))
 			return 1.0;
 
-		return Math.Clamp(MainWindowScale, 0.8, 1.1);
+		return Math.Clamp(MainWindowScale, 0.6, 1.3);
 	}
 
 	public string GetEffectiveDeviceName()

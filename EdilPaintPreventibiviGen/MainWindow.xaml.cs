@@ -101,7 +101,7 @@ public partial class MainWindow : Window
 
     private void ApplyMainWindowScale(double scale)
     {
-        scale = Math.Clamp(scale, 0.8, 1.1);
+        scale = Math.Clamp(scale, 0.6, 1.3);
         MainWindowScaleTransform.ScaleX = scale;
         MainWindowScaleTransform.ScaleY = scale;
         TxtMainWindowScale.Text = $"{scale:P0}";
@@ -109,7 +109,7 @@ public partial class MainWindow : Window
 
     private void OnMainWindowScaleChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        double scale = Math.Clamp(e.NewValue, 0.8, 1.1);
+        double scale = Math.Clamp(e.NewValue, 0.6, 1.3);
         ApplyMainWindowScale(scale);
 
         if (_isInitializingMainWindowScale || App.AppSettings == null)
