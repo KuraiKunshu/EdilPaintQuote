@@ -31,6 +31,10 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     private DateTime? _lastReminderAtUtc;
     private int _reminderCount;
     private string _lastReminderByDevice = string.Empty;
+    private string _supplierName = string.Empty;
+    private DateTime? _materialOrderDate;
+    private DateTime? _expectedDeliveryDate;
+    private string _materialStatus = string.Empty;
 
     public string QuoteNumber
     {
@@ -303,11 +307,66 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         set { _lastReminderByDevice = value; OnPropertyChanged(); }
     }
 
+    public string SupplierName
+    {
+        get => _supplierName;
+        set { _supplierName = value; OnPropertyChanged(); OnPropertyChanged(nameof(SupplierDisplay)); }
+    }
+
+    public DateTime? MaterialOrderDate
+    {
+        get => _materialOrderDate;
+        set
+        {
+            _materialOrderDate = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MaterialOrderDateDisplay));
+        }
+    }
+
+    public DateTime? ExpectedDeliveryDate
+    {
+        get => _expectedDeliveryDate;
+        set
+        {
+            _expectedDeliveryDate = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ExpectedDeliveryDateDisplay));
+        }
+    }
+
+    public string MaterialStatus
+    {
+        get => _materialStatus;
+        set
+        {
+            _materialStatus = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MaterialStatusDisplay));
+        }
+    }
+
     public bool IsSent => SentAtUtc.HasValue;
 
     public string SentDisplay => SentAtUtc.HasValue
         ? $"Inviato il {SentAtUtc.Value.ToLocalTime():dd/MM/yyyy}"
         : "Non inviato";
+
+    public string SupplierDisplay => string.IsNullOrWhiteSpace(SupplierName)
+        ? "-"
+        : SupplierName.Trim();
+
+    public string MaterialOrderDateDisplay => MaterialOrderDate.HasValue
+        ? MaterialOrderDate.Value.ToString("dd/MM/yyyy")
+        : "-";
+
+    public string ExpectedDeliveryDateDisplay => ExpectedDeliveryDate.HasValue
+        ? ExpectedDeliveryDate.Value.ToString("dd/MM/yyyy")
+        : "-";
+
+    public string MaterialStatusDisplay => string.IsNullOrWhiteSpace(MaterialStatus)
+        ? "-"
+        : MaterialStatus.Trim();
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

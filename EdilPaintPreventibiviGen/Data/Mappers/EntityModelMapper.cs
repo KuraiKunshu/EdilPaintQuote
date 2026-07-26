@@ -18,6 +18,7 @@ public static class EntityModelMapper
             Phone = entity.Phone,
             MaterialDiscount = entity.MaterialDiscount,
             LaborDiscount = entity.LaborDiscount,
+            IsSupplier = entity.IsSupplier,
             LastModifiedUtc = entity.LastModifiedUtc,
             BaseVersionUtc = entity.LastModifiedUtc,
             HasPendingDatabaseWrite = false
@@ -35,6 +36,7 @@ public static class EntityModelMapper
             Phone = model.Phone,
             MaterialDiscount = model.MaterialDiscount,
             LaborDiscount = model.LaborDiscount,
+            IsSupplier = model.IsSupplier,
             LastModifiedUtc = model.LastModifiedUtc
         };
     }
@@ -163,6 +165,10 @@ public static class EntityModelMapper
             ReminderCount = entity.ReminderCount,
             LastReminderByDevice = entity.LastReminderByDevice,
             Events = events,
+            SupplierName = entity.SupplierName,
+            MaterialOrderDate = entity.MaterialOrderDate,
+            ExpectedDeliveryDate = entity.ExpectedDeliveryDate,
+            MaterialStatus = entity.MaterialStatus,
             IsJointVenture = entity.IsJointVenture,
             PartnerCompanyName = entity.PartnerCompanyName,
             OurCosts = costAlloc?.OurCosts ?? new(),

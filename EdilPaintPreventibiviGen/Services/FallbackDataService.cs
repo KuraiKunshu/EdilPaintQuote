@@ -733,6 +733,53 @@ public class FallbackDataService : IDataService
         throw CreateDatabaseUnavailableException("Preventivi inviati aperti");
     }
 
+    public async Task<List<QuoteHistorySummary>> GetSupplierOrderSummariesAsync(
+        string searchText,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        bool databaseAvailable = IsDatabaseAvailable();
+        if (!databaseAvailable)
+            databaseAvailable = await TryEnsureDatabaseAvailableAsync(
+                "Caricamento ordini fornitori",
+                DbInteractiveWakeupTimeout,
+                cancellationToken);
+
+        if (databaseAvailable)
+        {
+            try
+            {
+                var dbQuotes = await _sqlService.GetSupplierOrderSummariesAsync(
+                    searchText,
+                    take,
+                    cancellationToken);
+                var dbMetadata = await GetDbQuoteMetadataCachedAsync(cancellationToken);
+                var localMetadata = await GetLocalQuoteMetadataCachedAsync(cancellationToken);
+                EnsureDbMetadataForDisplayedSummaries(dbQuotes, dbMetadata);
+
+                foreach (var quote in dbQuotes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    quote.SyncStatus = ResolveSyncStatus(quote.QuoteNumber, dbMetadata, localMetadata);
+                }
+
+                return dbQuotes;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                HandleDatabaseException("GetSupplierOrderSummariesAsync", ex);
+            }
+        }
+
+        throw CreateDatabaseUnavailableException("Caricamento ordini fornitori");
+    }
+
     public async Task<List<QuoteHistorySummary>> SearchQuoteSummariesAsync(
         string searchText,
         int take,
@@ -827,6 +874,10 @@ public class FallbackDataService : IDataService
             ReminderCount = entry.ReminderCount,
             LastReminderByDevice = entry.LastReminderByDevice,
             Events = entry.Events.ToList(),
+            SupplierName = entry.SupplierName,
+            MaterialOrderDate = entry.MaterialOrderDate,
+            ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+            MaterialStatus = entry.MaterialStatus,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             Revision = entry.Revision,
@@ -1077,6 +1128,32 @@ public class FallbackDataService : IDataService
         catch (Exception ex)
         {
             HandleDatabaseException("RegisterQuoteReminderAsync", ex);
+            throw;
+        }
+    }
+
+    public async Task UpdateQuoteSupplierInfoAsync(
+        string quoteNumber,
+        QuoteSupplierInfo supplierInfo,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(supplierInfo.DeviceName))
+            supplierInfo.DeviceName = DeviceNameService.GetCurrentDeviceName();
+
+        await EnsureDatabaseRequiredAsync($"Aggiornamento fornitori preventivo {quoteNumber}", cancellationToken);
+
+        try
+        {
+            await _sqlService.UpdateQuoteSupplierInfoAsync(quoteNumber, supplierInfo, cancellationToken);
+            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
+            if (databaseVersion != null)
+                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.SupplierInfo = null, cancellationToken);
+            InvalidateQuoteNumbersCaches();
+        }
+        catch (Exception ex)
+        {
+            HandleDatabaseException("UpdateQuoteSupplierInfoAsync", ex);
             throw;
         }
     }

@@ -9,7 +9,7 @@
         Icon="pack://application:,,,/Assets/Windowsicon/contatti.png"
         Title="Anagrafica Cliente"
         Width="560"
-        Height="610"
+        Height="660"
         MinWidth="560"
         MinHeight="500"
         MaxWidth="760"
@@ -129,6 +129,8 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="14"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="14"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="20"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
@@ -204,8 +206,21 @@
                             </Grid>
                         </Grid>
 
-                        <!-- Sconti -->
+                        <!-- Tipo contatto -->
                         <Border Grid.Row="6"
+                                Padding="14,11"
+                                CornerRadius="8"
+                                Background="{StaticResource SectionPanelBackgroundBrush}"
+                                BorderBrush="{StaticResource SectionPanelBorderBrush}"
+                                BorderThickness="1">
+                            <CheckBox x:Name="ChkIsSupplier"
+                                      Content="Questo contatto e un fornitore"
+                                      VerticalAlignment="Center"
+                                      FontWeight="SemiBold"/>
+                        </Border>
+
+                        <!-- Sconti -->
+                        <Border Grid.Row="8"
                                 Padding="16"
                                 CornerRadius="12"
                                 Background="{StaticResource SectionPanelBackgroundBrush}"
@@ -272,7 +287,7 @@
                         </Border>
 
                         <!-- Nota -->
-                        <TextBlock Grid.Row="8"
+                        <TextBlock Grid.Row="10"
                                    Text="La ragione sociale è obbligatoria per il salvataggio."
                                    FontSize="12"
                                    Foreground="{StaticResource MutedTextBrush}"/>

@@ -556,10 +556,13 @@ public class PdfService
                                     .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
                                 workInfo.Item().Text(ctx.WorkSite)
                                     .FontSize(10).Bold().FontColor(PdfPalette.GreyDarken3);
-                                workInfo.Item().PaddingTop(5).Text("DATA DI FINE LAVORI")
-                                    .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
-                                workInfo.Item().Text(ctx.CompletionDate.ToString("dd/MM/yyyy"))
-                                    .FontSize(10).Bold();
+                                workInfo.Item().PaddingTop(5).Text(completion =>
+                                {
+                                    completion.Span("Data fine lavori e collaudo: ")
+                                        .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
+                                    completion.Span(ctx.CompletionDate.ToString("dd/MM/yyyy"))
+                                        .FontSize(10).Bold().FontColor(PdfPalette.GreyDarken3);
+                                });
                             });
                         });
 
@@ -585,6 +588,9 @@ public class PdfService
                             text.Span("a regola d'arte").Bold();
                             text.Span(", nel rispetto delle indicazioni dei produttori e delle norme tecniche applicabili.");
                         });
+                        declaration.Item().PaddingTop(10).Text(
+                                "Per mantenere la buona funzionalità dei prodotti, si consiglia di eseguire la manutenzione periodica, come indicato sulle istruzioni d'uso e manutenzione del prodotto.")
+                            .FontSize(9).FontColor(PdfPalette.GreyDarken2);
                     });
 
                     col.Item().PaddingTop(2).Row(section =>

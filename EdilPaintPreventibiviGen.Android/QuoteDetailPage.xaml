@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EdilPaintPreventibiviGen.Android.QuoteDetailPage"
+             BackgroundColor="#F8F3F1"
+             Title="Dettaglio">
+    <ScrollView>
+        <VerticalStackLayout Padding="18"
+                             Spacing="14">
+            <Border StrokeThickness="0"
+                    BackgroundColor="#B3261E"
+                    Padding="14"
+                    StrokeShape="RoundRectangle 8">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="10">
+                        <Label Text="{Binding CustomerName}"
+                               FontSize="24"
+                               FontAttributes="Bold"
+                               TextColor="#FFFFFF"
+                               LineBreakMode="WordWrap"/>
+                        <Label Grid.Column="1"
+                               Text="{Binding StatusText}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#FFFFFF"
+                               BackgroundColor="#7F1D1D"
+                               Padding="8,4"/>
+                    </Grid>
+                    <Label Text="{Binding CustomerReferenceDisplay}"
+                           FontSize="14"
+                           TextColor="#FCEDEA"/>
+                    <Label Text="{Binding Title}"
+                           FontSize="13"
+                           TextColor="#F6C7C0"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Grid ColumnDefinitions="*,*"
+                  RowDefinitions="Auto,Auto"
+                  ColumnSpacing="10"
+                  RowSpacing="10">
+                <Border Stroke="#E6D6D2"
+                        BackgroundColor="#FFFFFF"
+                        Padding="12"
+                        StrokeShape="RoundRectangle 8">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Totale"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#7B6661"/>
+                        <Label Text="{Binding TotalDisplay}"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               TextColor="#B3261E"/>
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Column="1"
+                        Stroke="#E6D6D2"
+                        BackgroundColor="#FFFFFF"
+                        Padding="12"
+                        StrokeShape="RoundRectangle 8">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Imponibile"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#7B6661"/>
+                        <Label Text="{Binding ImponibileDisplay}"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="#221614"/>
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Row="1"
+                        Stroke="#E6D6D2"
+                        BackgroundColor="#FFFFFF"
+                        Padding="12"
+                        StrokeShape="RoundRectangle 8">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Data"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#7B6661"/>
+                        <Label Text="{Binding DateDisplay}"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#221614"/>
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Row="1"
+                        Grid.Column="1"
+                        Stroke="#E6D6D2"
+                        BackgroundColor="#FFFFFF"
+                        Padding="12"
+                        StrokeShape="RoundRectangle 8">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="IVA"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#7B6661"/>
+                        <Label Text="{Binding IvaDisplay}"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#221614"/>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <Border Stroke="#E6D6D2"
+                    BackgroundColor="#FFFFFF"
+                    Padding="12"
+                    StrokeShape="RoundRectangle 8">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Informazioni"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#221614"/>
+                    <Grid ColumnDefinitions="*,*"
+                          RowDefinitions="Auto,Auto,Auto"
+                          ColumnSpacing="12"
+                          RowSpacing="10">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="Sconto materiali" FontSize="12" TextColor="#7B6661"/>
+                            <Label Text="{Binding MaterialDiscountDisplay}" FontAttributes="Bold" TextColor="#221614"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="Sconto lavori" FontSize="12" TextColor="#7B6661"/>
+                            <Label Text="{Binding LaborDiscountDisplay}" FontAttributes="Bold" TextColor="#221614"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2">
+                            <Label Text="Invio" FontSize="12" TextColor="#7B6661"/>
+                            <Label Text="{Binding SentDisplay}" FontAttributes="Bold" TextColor="#221614"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
+                            <Label Text="PC" FontSize="12" TextColor="#7B6661"/>
+                            <Label Text="{Binding LastModifiedByDeviceDisplay}" FontAttributes="Bold" TextColor="#221614"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Grid.ColumnSpan="2" Spacing="2">
+                            <Label Text="Pagamento" FontSize="12" TextColor="#7B6661"/>
+                            <Label Text="{Binding PaymentTermsDisplay}" FontAttributes="Bold" TextColor="#221614"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border x:Name="NotesPanel"
+                    Stroke="#E6D6D2"
+                    BackgroundColor="#FFFFFF"
+                    Padding="12"
+                    StrokeShape="RoundRectangle 8">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Note"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#221614"/>
+                    <Label Text="{Binding Notes}"
+                           FontSize="14"
+                           TextColor="#221614"
+                           LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="Materiali"
+                   FontSize="19"
+                   FontAttributes="Bold"
+                   TextColor="#221614"/>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Materials}"
+                                 Spacing="8">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Border Stroke="#E6D6D2"
+                                BackgroundColor="#FFFFFF"
+                                Padding="12"
+                                StrokeShape="RoundRectangle 8">
+                            <Grid RowDefinitions="Auto,Auto,Auto"
+                                  ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="10"
+                                  RowSpacing="8">
+                                <Label Text="{Binding Name}"
+                                       FontSize="15"
+                                       FontAttributes="Bold"
+                                       TextColor="#221614"
+                                       LineBreakMode="WordWrap"/>
+                                <Label Grid.Column="1"
+                                       Text="{Binding TotalDisplay}"
+                                       FontSize="15"
+                                       FontAttributes="Bold"
+                                       TextColor="#B3261E"/>
+
+                                <Grid Grid.Row="1"
+                                      Grid.ColumnSpan="2"
+                                      ColumnDefinitions="*,*,*"
+                                      ColumnSpacing="8">
+                                    <Border StrokeThickness="0"
+                                            BackgroundColor="#FCEDEA"
+                                            Padding="8"
+                                            StrokeShape="RoundRectangle 6">
+                                        <VerticalStackLayout Spacing="1">
+                                            <Label Text="Qta"
+                                                   FontSize="11"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#7B6661"/>
+                                            <Label Text="{Binding QuantityDisplay}"
+                                                   FontSize="18"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#B3261E"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                    <Border Grid.Column="1"
+                                            StrokeThickness="0"
+                                            BackgroundColor="#FAF7F6"
+                                            Padding="8"
+                                            StrokeShape="RoundRectangle 6">
+                                        <VerticalStackLayout Spacing="1">
+                                            <Label Text="Prezzo"
+                                                   FontSize="11"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#7B6661"/>
+                                            <Label Text="{Binding UnitPriceDisplay}"
+                                                   FontSize="14"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#221614"
+                                                   LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                    <Border Grid.Column="2"
+                                            StrokeThickness="0"
+                                            BackgroundColor="#FAF7F6"
+                                            Padding="8"
+                                            StrokeShape="RoundRectangle 6">
+                                        <VerticalStackLayout Spacing="1">
+                                            <Label Text="Sconto"
+                                                   FontSize="11"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#7B6661"/>
+                                            <Label Text="{Binding DiscountDisplay}"
+                                                   FontSize="14"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#221614"
+                                                   LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </Grid>
+
+                                <Label Grid.Row="2"
+                                       Grid.ColumnSpan="2"
+                                       Text="{Binding DescriptionDisplay}"
+                                       IsVisible="{Binding HasDescription}"
+                                       FontSize="13"
+                                       TextColor="#7B6661"
+                                       LineBreakMode="WordWrap"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Label Text="Lavorazioni"
+                   FontSize="19"
+                   FontAttributes="Bold"
+                   TextColor="#221614"/>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Labors}"
+                                 Spacing="8">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Border Stroke="#E6D6D2"
+                                BackgroundColor="#FFFFFF"
+                                Padding="12"
+                                StrokeShape="RoundRectangle 8">
+                            <Grid RowDefinitions="Auto,Auto,Auto"
+                                  ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="10"
+                                  RowSpacing="8">
+                                <Label Text="{Binding Name}"
+                                       FontSize="15"
+                                       FontAttributes="Bold"
+                                       TextColor="#221614"
+                                       LineBreakMode="WordWrap"/>
+                                <Label Grid.Column="1"
+                                       Text="{Binding TotalDisplay}"
+                                       FontSize="15"
+                                       FontAttributes="Bold"
+                                       TextColor="#B3261E"/>
+
+                                <Grid Grid.Row="1"
+                                      Grid.ColumnSpan="2"
+                                      ColumnDefinitions="*,*,*"
+                                      ColumnSpacing="8">
+                                    <Border StrokeThickness="0"
+                                            BackgroundColor="#FCEDEA"
+                                            Padding="8"
+                                            StrokeShape="RoundRectangle 6">
+                                        <VerticalStackLayout Spacing="1">
+                                            <Label Text="Qta"
+                                                   FontSize="11"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#7B6661"/>
+                                            <Label Text="{Binding QuantityDisplay}"
+                                                   FontSize="18"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#B3261E"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                    <Border Grid.Column="1"
+                                            StrokeThickness="0"
+                                            BackgroundColor="#FAF7F6"
+                                            Padding="8"
+                                            StrokeShape="RoundRectangle 6">
+                                        <VerticalStackLayout Spacing="1">
+                                            <Label Text="Prezzo"
+                                                   FontSize="11"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#7B6661"/>
+                                            <Label Text="{Binding UnitPriceDisplay}"
+                                                   FontSize="14"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#221614"
+                                                   LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                    <Border Grid.Column="2"
+                                            StrokeThickness="0"
+                                            BackgroundColor="#FAF7F6"
+                                            Padding="8"
+                                            StrokeShape="RoundRectangle 6">
+                                        <VerticalStackLayout Spacing="1">
+                                            <Label Text="Sconto"
+                                                   FontSize="11"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#7B6661"/>
+                                            <Label Text="{Binding DiscountDisplay}"
+                                                   FontSize="14"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#221614"
+                                                   LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </Grid>
+
+                                <Label Grid.Row="2"
+                                       Grid.ColumnSpan="2"
+                                       Text="{Binding DescriptionDisplay}"
+                                       IsVisible="{Binding HasDescription}"
+                                       FontSize="13"
+                                       TextColor="#7B6661"
+                                       LineBreakMode="WordWrap"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

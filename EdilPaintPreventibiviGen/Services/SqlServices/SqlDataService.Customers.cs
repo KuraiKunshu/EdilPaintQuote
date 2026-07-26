@@ -45,6 +45,7 @@ public partial class SqlDataService
             existing.Phone = customer.Phone;
             existing.MaterialDiscount = customer.MaterialDiscount;
             existing.LaborDiscount = customer.LaborDiscount;
+            existing.IsSupplier = customer.IsSupplier;
             existing.LastModifiedUtc = customer.LastModifiedUtc;
             existing.SyncId = customer.SyncId;
             existing.IsDeleted = false;
@@ -85,6 +86,7 @@ public partial class SqlDataService
             entity.Phone = customer.Phone;
             entity.MaterialDiscount = customer.MaterialDiscount;
             entity.LaborDiscount = customer.LaborDiscount;
+            entity.IsSupplier = customer.IsSupplier;
             entity.LastModifiedUtc = customer.LastModifiedUtc;
             entity.SyncId = customer.SyncId;
             entity.IsDeleted = false;

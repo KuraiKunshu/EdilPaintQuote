@@ -380,6 +380,21 @@ public class LocalJsonStoreService
             AddEvent(quote, "sollecito", $"Sollecito registrato (n. {quote.ReminderCount})", deviceName, quote.LastReminderAtUtc);
         });
 
+    public Task<QuoteHistoryEntry?> UpdateQuoteSupplierInfoAsync(string quoteNumber, QuoteSupplierInfo supplierInfo) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(supplierInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : supplierInfo.DeviceName.Trim();
+
+            quote.SupplierName = supplierInfo.SupplierName?.Trim() ?? string.Empty;
+            quote.MaterialOrderDate = supplierInfo.MaterialOrderDate;
+            quote.ExpectedDeliveryDate = supplierInfo.ExpectedDeliveryDate;
+            quote.MaterialStatus = supplierInfo.MaterialStatus?.Trim() ?? string.Empty;
+            quote.LastModifiedByDevice = deviceName;
+            AddEvent(quote, "fornitori", "Dati fornitori aggiornati", deviceName);
+        });
+
     public async Task ArchiveQuoteConflictAsync(
         QuoteHistoryEntry entry,
         string reason,
@@ -749,6 +764,10 @@ public class LocalJsonStoreService
             ReminderCount = entry.ReminderCount,
             LastReminderByDevice = entry.LastReminderByDevice,
             Events = entry.Events.ToList(),
+            SupplierName = entry.SupplierName,
+            MaterialOrderDate = entry.MaterialOrderDate,
+            ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+            MaterialStatus = entry.MaterialStatus,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,
             OurCosts = entry.OurCosts,

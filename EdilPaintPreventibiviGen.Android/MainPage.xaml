@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EdilPaintPreventibiviGen.Android.MainPage"
+             BackgroundColor="#F8F3F1"
+             Shell.NavBarIsVisible="False"
+             NavigationPage.HasNavigationBar="False">
+
+    <Grid RowDefinitions="Auto,*"
+          Padding="18,20,18,12"
+          RowSpacing="14">
+        <Grid ColumnDefinitions="*,Auto"
+              ColumnSpacing="12">
+            <VerticalStackLayout Spacing="2">
+                <Label Text="EdilPaint"
+                       FontSize="13"
+                       FontAttributes="Bold"
+                       TextColor="#B3261E"/>
+                <Label Text="Preventivi"
+                       FontSize="30"
+                       FontAttributes="Bold"
+                       TextColor="#221614"/>
+                <Label x:Name="SubtitleLabel"
+                       Text="Connessione a Neon"
+                       FontSize="13"
+                       TextColor="#7B6661"/>
+            </VerticalStackLayout>
+
+            <Button x:Name="ForgetButton"
+                    Grid.Column="1"
+                    Text="Esci"
+                    IsVisible="False"
+                    Clicked="OnForgetCredentialsClicked"
+                    BackgroundColor="#FFFFFF"
+                    BorderColor="#E6D6D2"
+                    BorderWidth="1"
+                    TextColor="#B3261E"
+                    CornerRadius="8"
+                    Padding="12,8"
+                    HorizontalOptions="End"
+                    VerticalOptions="Center"
+                    WidthRequest="72"
+                    HeightRequest="46"/>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <ScrollView x:Name="SetupPanel">
+                <VerticalStackLayout Spacing="14">
+                    <Border Stroke="#E6D6D2"
+                            StrokeThickness="1"
+                            BackgroundColor="#FFFFFF"
+                            Padding="14"
+                            StrokeShape="RoundRectangle 8">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="Accesso Neon"
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="#221614"/>
+                            <Label Text="La connection string viene salvata nel Keystore Android."
+                                   FontSize="13"
+                                   TextColor="#7B6661"/>
+                            <Entry x:Name="ConnectionStringEntry"
+                                   Placeholder="postgresql://utente:password@host/neondb?sslmode=require"
+                                   Keyboard="Url"
+                                   ClearButtonVisibility="WhileEditing"
+                                   TextColor="#221614"/>
+                            <Button Text="Salva e accedi"
+                                    Clicked="OnSaveCredentialsClicked"
+                                    BackgroundColor="#B3261E"
+                                    TextColor="#FFFFFF"
+                                    CornerRadius="8"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <Grid x:Name="QuotesPanel"
+                  IsVisible="False"
+                  RowDefinitions="Auto,Auto,*"
+                  RowSpacing="10">
+                <SearchBar x:Name="SearchBox"
+                           Placeholder="Cerca cliente o numero"
+                           SearchButtonPressed="OnSearchRequested"
+                           TextChanged="OnSearchTextChanged"
+                           BackgroundColor="#FFFFFF"
+                           TextColor="#221614"
+                           PlaceholderColor="#7B6661"/>
+
+                <Grid Grid.Row="1"
+                      ColumnDefinitions="*,Auto"
+                      ColumnSpacing="10">
+                    <Picker x:Name="StatusPicker"
+                            Title="Tutti gli stati"
+                            SelectedIndexChanged="OnStatusChanged"
+                            BackgroundColor="#FFFFFF"
+                            TextColor="#221614"/>
+                    <Button Grid.Column="1"
+                            Text="Aggiorna"
+                            Clicked="OnRefreshClicked"
+                            BackgroundColor="#FFFFFF"
+                            BorderColor="#E6D6D2"
+                            BorderWidth="1"
+                            TextColor="#B3261E"
+                            CornerRadius="8"/>
+                </Grid>
+
+                <RefreshView Grid.Row="2"
+                             x:Name="Refresh"
+                             Refreshing="OnRefreshViewRefreshing">
+                    <CollectionView x:Name="QuoteList"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnQuoteSelected">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Stroke="#E6D6D2"
+                                        StrokeThickness="1"
+                                        BackgroundColor="#FFFFFF"
+                                        Margin="0,0,0,12"
+                                        Padding="14"
+                                        StrokeShape="RoundRectangle 8">
+                                    <Grid RowDefinitions="Auto,Auto,Auto"
+                                          ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="12"
+                                          RowSpacing="6">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{Binding CustomerName}"
+                                                   FontSize="19"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#221614"
+                                                   LineBreakMode="TailTruncation"/>
+                                            <Label Text="{Binding ReferenceDisplay}"
+                                                   FontSize="14"
+                                                   TextColor="#7B6661"
+                                                   LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+
+                                        <Label Grid.Column="1"
+                                               Text="{Binding TotalDisplay}"
+                                               FontSize="17"
+                                               FontAttributes="Bold"
+                                               TextColor="#B3261E"
+                                               HorizontalTextAlignment="End"/>
+
+                                        <Label Grid.Row="1"
+                                               Text="{Binding QuoteMetaDisplay}"
+                                               FontSize="12"
+                                               TextColor="#7B6661"/>
+
+                                        <Border Grid.Row="1"
+                                                Grid.Column="1"
+                                                StrokeThickness="0"
+                                                BackgroundColor="#FCEDEA"
+                                                Padding="8,3"
+                                                HorizontalOptions="End"
+                                                StrokeShape="RoundRectangle 10">
+                                            <Label Text="{Binding StatusText}"
+                                                   FontSize="12"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#B3261E"/>
+                                        </Border>
+
+                                        <BoxView Grid.Row="2"
+                                                 Grid.ColumnSpan="2"
+                                                 HeightRequest="1"
+                                                 Color="#F0DFDB"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </RefreshView>
+            </Grid>
+
+            <ActivityIndicator x:Name="Busy"
+                               IsVisible="False"
+                               IsRunning="False"
+                               Color="#B3261E"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center"/>
+        </Grid>
+    </Grid>
+</ContentPage>

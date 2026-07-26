@@ -601,6 +601,15 @@ public partial class MainWindow : Window
         win.ShowDialog();
     }
 
+    private void OnOpenSuppliersClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            var win = new SuppliersWindow(vm) { Owner = this };
+            win.ShowDialog();
+        }
+    }
+
     private void OnEditRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item) { var win = new EditItemWindow(item) { Owner = this }; if (win.ShowDialog() == true) (DataContext as MainViewModel)?.CalculateTotals(); } }
     private void OnDeleteRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item && DataContext is MainViewModel vm) { if (vm.Materials.Contains(item)) vm.Materials.Remove(item); else if (vm.Labors.Contains(item)) vm.Labors.Remove(item); vm.UpdateItemSortOrders(); vm.CalculateTotals(); } }
     private void OnLaborSearchChanged(object sender, TextChangedEventArgs e) 

@@ -74,6 +74,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _paymentTerms = string.Empty;
     private string _partnerCompanyName = string.Empty;
     private DateTime? _loadedQuoteDate;
+    private string _loadedQuotePdfPath = string.Empty;
     private DateTime _loadedQuoteBaseVersionUtc;
     private long _loadedQuoteBaseRevision;
     private string _lastSharedDraftContentHash = string.Empty;

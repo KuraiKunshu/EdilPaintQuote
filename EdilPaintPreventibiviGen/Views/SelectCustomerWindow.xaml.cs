@@ -11,18 +11,21 @@ public partial class SelectCustomerWindow : Window
     #region Fields
     public Customer? SelectedResult { get; private set; }
     private readonly MainViewModel _vm;
+    private readonly bool _suppliersOnly;
+    private string _searchText = string.Empty;
     #endregion
 
     #region Constructor
-    public SelectCustomerWindow(MainViewModel vm)
+    public SelectCustomerWindow(MainViewModel vm, bool suppliersOnly = false)
     {
         InitializeComponent();
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
 
         _vm = vm;
-        _vm.ApplyCustomerFilter(string.Empty);
+        _suppliersOnly = suppliersOnly;
 
-        GridResults.ItemsSource = _vm.FilteredCustomers;
+        ConfigureMode();
+        RefreshResults();
         Loaded += SelectCustomerWindow_Loaded;
         PreviewKeyDown += SelectCustomerWindow_PreviewKeyDown;
         Closed += SelectCustomerWindow_Closed;
@@ -38,7 +41,6 @@ public partial class SelectCustomerWindow : Window
 
     private void SelectCustomerWindow_Closed(object? sender, System.EventArgs e)
     {
-        _vm.ApplyCustomerFilter(string.Empty);
         TxtSearch.Text = string.Empty;
     }
 
@@ -65,7 +67,8 @@ public partial class SelectCustomerWindow : Window
     {
         if (sender is TextBox tb)
         {
-            _vm.ApplyCustomerFilter(tb.Text);
+            _searchText = tb.Text;
+            RefreshResults();
             tb.CaretIndex = tb.Text.Length;
         }
     }
@@ -74,12 +77,22 @@ public partial class SelectCustomerWindow : Window
     {
         if (GridResults.SelectedItem is Customer c)
         {
+            if (_suppliersOnly && !c.IsSupplier)
+            {
+                MessageBox.Show(
+                    "Contrassegna prima il contatto come fornitore.",
+                    "Fornitore non abilitato",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
             SelectedResult = c;
             DialogResult = true;
             Close();
         }
     }
-    private void OnDeleteCustomerClick(object sender, RoutedEventArgs e)
+    private async void OnDeleteCustomerClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.DataContext is not Customer customer)
             return;
@@ -92,8 +105,8 @@ public partial class SelectCustomerWindow : Window
 
         if (result == MessageBoxResult.Yes)
         {
-            _vm.DeleteCustomer(customer);
-            _vm.ApplyCustomerFilter(TxtSearch.Text);
+            await _vm.DeleteCustomerAsync(customer);
+            RefreshResults();
         }
     }
 
@@ -111,14 +124,58 @@ public partial class SelectCustomerWindow : Window
             {
                 if (editWin.NewCustomer != null)
                     _vm.UpdateCustomer(originalBusinessName, editWin.NewCustomer);
-                _vm.ApplyCustomerFilter(TxtSearch.Text);
+                RefreshResults();
             }
         }
+    }
+
+    private void OnSupplierFlagClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox checkBox || checkBox.DataContext is not Customer customer)
+            return;
+
+        customer.IsSupplier = checkBox.IsChecked == true;
+        _vm.UpdateCustomer(customer.BusinessName, customer);
+
+        if (_suppliersOnly && ChkShowAllCustomers.IsChecked != true)
+        {
+            Dispatcher.BeginInvoke(RefreshResults);
+        }
+    }
+
+    private void OnShowAllCustomersChanged(object sender, RoutedEventArgs e)
+    {
+        RefreshResults();
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void ConfigureMode()
+    {
+        if (!_suppliersOnly)
+            return;
+
+        Title = "Seleziona fornitore";
+        TxtHeaderTitle.Text = "Anagrafica fornitori";
+        TxtHeaderSubtitle.Text = "Seleziona o modifica un fornitore esistente";
+        TxtSearchLabel.Text = "Ricerca veloce fornitore";
+        BtnSelect.Content = "Seleziona fornitore";
+        ChkShowAllCustomers.Visibility = Visibility.Visible;
+    }
+
+    private void RefreshResults()
+    {
+        IEnumerable<Customer> customers = _vm.AllCustomers;
+        if (_suppliersOnly && ChkShowAllCustomers.IsChecked != true)
+            customers = customers.Where(customer => customer.IsSupplier);
+
+        GridResults.ItemsSource = customers
+            .Where(customer => customer.ContainsText(_searchText))
+            .OrderBy(customer => customer.BusinessName)
+            .ToList();
     }
     #endregion
 }

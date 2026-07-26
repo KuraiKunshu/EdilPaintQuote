@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using EdilPaintPreventibiviGen.Models;
@@ -26,17 +27,42 @@ public partial class InstallationCertificateWindow : Window
 
     private void OnGenerateClick(object sender, RoutedEventArgs e)
     {
-        if (!DpCompletionDate.SelectedDate.HasValue)
+        if (!TryReadCompletionDate(out var completionDate))
         {
-            MessageBox.Show("Seleziona la data di fine lavori.",
+            MessageBox.Show("Seleziona una data di fine lavori valida.",
                 "Certificato corretta posa", MessageBoxButton.OK, MessageBoxImage.Information);
             DpCompletionDate.Focus();
             return;
         }
 
-        CompletionDate = DpCompletionDate.SelectedDate.Value.Date;
+        CompletionDate = completionDate;
         WorkSite = TxtWorkSite.Text.Trim();
         DialogResult = true;
+    }
+
+    private bool TryReadCompletionDate(out DateTime completionDate)
+    {
+        string typedDate = DpCompletionDate.Text.Trim();
+        if (!string.IsNullOrWhiteSpace(typedDate) &&
+            DateTime.TryParse(
+                typedDate,
+                CultureInfo.GetCultureInfo("it-IT"),
+                DateTimeStyles.AssumeLocal,
+                out completionDate))
+        {
+            completionDate = completionDate.Date;
+            DpCompletionDate.SelectedDate = completionDate;
+            return true;
+        }
+
+        if (DpCompletionDate.SelectedDate.HasValue)
+        {
+            completionDate = DpCompletionDate.SelectedDate.Value.Date;
+            return true;
+        }
+
+        completionDate = default;
+        return false;
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e) => DialogResult = false;

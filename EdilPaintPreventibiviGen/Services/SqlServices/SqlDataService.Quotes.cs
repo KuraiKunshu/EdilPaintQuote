@@ -74,6 +74,10 @@ public partial class SqlDataService
                 x.ReminderCount,
                 x.LastReminderByDevice,
                 x.EventsJson,
+                x.SupplierName,
+                x.MaterialOrderDate,
+                x.ExpectedDeliveryDate,
+                x.MaterialStatus,
                 x.LastModifiedUtc,
                 x.Revision,
                 x.IsJointVenture,
@@ -138,6 +142,10 @@ public partial class SqlDataService
                 ReminderCount = x.ReminderCount,
                 LastReminderByDevice = x.LastReminderByDevice,
                 Events = DeserializeQuoteEvents(x.EventsJson),
+                SupplierName = x.SupplierName,
+                MaterialOrderDate = x.MaterialOrderDate,
+                ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+                MaterialStatus = x.MaterialStatus,
                 IsJointVenture = x.IsJointVenture,
                 PartnerCompanyName = x.PartnerCompanyName,
                 OurCosts = costs?.OurCosts ?? [],
@@ -221,6 +229,10 @@ public partial class SqlDataService
             ReminderCount = x.ReminderCount,
             LastReminderByDevice = x.LastReminderByDevice,
             Events = DeserializeQuoteEvents(x.EventsJson),
+            SupplierName = x.SupplierName,
+            MaterialOrderDate = x.MaterialOrderDate,
+            ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+            MaterialStatus = x.MaterialStatus,
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
             Revision = x.Revision,
@@ -319,6 +331,10 @@ public partial class SqlDataService
             ReminderCount = x.ReminderCount,
             LastReminderByDevice = x.LastReminderByDevice,
             Events = DeserializeQuoteEvents(x.EventsJson),
+            SupplierName = x.SupplierName,
+            MaterialOrderDate = x.MaterialOrderDate,
+            ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+            MaterialStatus = x.MaterialStatus,
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
                 Name = m.Name,
@@ -386,6 +402,10 @@ public partial class SqlDataService
             ReminderCount = x.ReminderCount,
             LastReminderByDevice = x.LastReminderByDevice,
             Events = DeserializeQuoteEvents(x.EventsJson),
+            SupplierName = x.SupplierName,
+            MaterialOrderDate = x.MaterialOrderDate,
+            ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+            MaterialStatus = x.MaterialStatus,
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
             Revision = x.Revision,
@@ -453,7 +473,11 @@ public partial class SqlDataService
                 SentByDevice = x.SentByDevice,
                 LastReminderAtUtc = x.LastReminderAtUtc,
                 ReminderCount = x.ReminderCount,
-                LastReminderByDevice = x.LastReminderByDevice
+                LastReminderByDevice = x.LastReminderByDevice,
+                SupplierName = x.SupplierName,
+                MaterialOrderDate = x.MaterialOrderDate,
+                ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+                MaterialStatus = x.MaterialStatus
             })
             .ToListAsync(cancellationToken);
     }
@@ -507,7 +531,11 @@ public partial class SqlDataService
                 SentByDevice = x.SentByDevice,
                 LastReminderAtUtc = x.LastReminderAtUtc,
                 ReminderCount = x.ReminderCount,
-                LastReminderByDevice = x.LastReminderByDevice
+                LastReminderByDevice = x.LastReminderByDevice,
+                SupplierName = x.SupplierName,
+                MaterialOrderDate = x.MaterialOrderDate,
+                ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+                MaterialStatus = x.MaterialStatus
             })
             .ToListAsync(cancellationToken);
     }
@@ -532,7 +560,9 @@ public partial class SqlDataService
                 (x.Customer != null && x.Customer.BusinessName.ToLower().Contains(term)) ||
                 (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)) ||
                 x.SiteName.ToLower().Contains(term) ||
-                x.BillingCustomerName.ToLower().Contains(term));
+                x.BillingCustomerName.ToLower().Contains(term) ||
+                x.SupplierName.ToLower().Contains(term) ||
+                x.MaterialStatus.ToLower().Contains(term));
         }
 
         return await query
@@ -563,7 +593,79 @@ public partial class SqlDataService
                 SentByDevice = x.SentByDevice,
                 LastReminderAtUtc = x.LastReminderAtUtc,
                 ReminderCount = x.ReminderCount,
-                LastReminderByDevice = x.LastReminderByDevice
+                LastReminderByDevice = x.LastReminderByDevice,
+                SupplierName = x.SupplierName,
+                MaterialOrderDate = x.MaterialOrderDate,
+                ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+                MaterialStatus = x.MaterialStatus
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<QuoteHistorySummary>> GetSupplierOrderSummariesAsync(
+        string searchText,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+
+        IQueryable<QuoteEntity> query = db.Quotes
+            .AsNoTracking()
+            .Include(x => x.Customer)
+            .Include(x => x.ReferenceCustomer)
+            .Where(x =>
+                x.Status == QuoteStatus.Confermato &&
+                (x.SupplierName != string.Empty ||
+                 x.MaterialOrderDate.HasValue ||
+                 x.ExpectedDeliveryDate.HasValue ||
+                 x.MaterialStatus != string.Empty));
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            string term = searchText.Trim().ToLower();
+            query = query.Where(x =>
+                x.QuoteNumber.ToLower().Contains(term) ||
+                (x.Customer != null && x.Customer.BusinessName.ToLower().Contains(term)) ||
+                (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)) ||
+                x.SiteName.ToLower().Contains(term) ||
+                x.BillingCustomerName.ToLower().Contains(term) ||
+                x.SupplierName.ToLower().Contains(term) ||
+                x.MaterialStatus.ToLower().Contains(term));
+        }
+
+        return await query
+            .OrderByDescending(x => x.Date)
+            .Take(Math.Max(1, take))
+            .Select(x => new QuoteHistorySummary
+            {
+                QuoteNumber = x.QuoteNumber,
+                Date = x.Date,
+                CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
+                ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                SiteName = x.SiteName,
+                BillingCustomerName = x.BillingCustomerName,
+                PdfPath = x.PdfPath,
+                Total = (decimal)x.Total,
+                IvaType = x.IvaType,
+                MaterialDiscount = x.MaterialDiscount,
+                LaborDiscount = x.LaborDiscount,
+                Status = x.Status,
+                Notes = x.Notes,
+                IsJointVenture = x.IsJointVenture,
+                PartnerCompanyName = x.PartnerCompanyName,
+                CreatedByDevice = x.CreatedByDevice,
+                LastModifiedByDevice = x.LastModifiedByDevice,
+                SentAtUtc = x.SentAtUtc,
+                SentMethod = x.SentMethod,
+                SentRecipient = x.SentRecipient,
+                SentByDevice = x.SentByDevice,
+                LastReminderAtUtc = x.LastReminderAtUtc,
+                ReminderCount = x.ReminderCount,
+                LastReminderByDevice = x.LastReminderByDevice,
+                SupplierName = x.SupplierName,
+                MaterialOrderDate = x.MaterialOrderDate,
+                ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+                MaterialStatus = x.MaterialStatus
             })
             .ToListAsync(cancellationToken);
     }
@@ -589,7 +691,9 @@ public partial class SqlDataService
                 (x.Customer != null && x.Customer.BusinessName.ToLower().Contains(term)) ||
                 (x.ReferenceCustomer != null && x.ReferenceCustomer.BusinessName.ToLower().Contains(term)) ||
                 x.SiteName.ToLower().Contains(term) ||
-                x.BillingCustomerName.ToLower().Contains(term));
+                x.BillingCustomerName.ToLower().Contains(term) ||
+                x.SupplierName.ToLower().Contains(term) ||
+                x.MaterialStatus.ToLower().Contains(term));
         }
 
         return await query
@@ -621,7 +725,11 @@ public partial class SqlDataService
                 SentByDevice = x.SentByDevice,
                 LastReminderAtUtc = x.LastReminderAtUtc,
                 ReminderCount = x.ReminderCount,
-                LastReminderByDevice = x.LastReminderByDevice
+                LastReminderByDevice = x.LastReminderByDevice,
+                SupplierName = x.SupplierName,
+                MaterialOrderDate = x.MaterialOrderDate,
+                ExpectedDeliveryDate = x.ExpectedDeliveryDate,
+                MaterialStatus = x.MaterialStatus
             })
             .ToListAsync(cancellationToken);
     }
@@ -678,6 +786,10 @@ public partial class SqlDataService
             ReminderCount = q.ReminderCount,
             LastReminderByDevice = q.LastReminderByDevice,
             Events = DeserializeQuoteEvents(q.EventsJson),
+            SupplierName = q.SupplierName,
+            MaterialOrderDate = q.MaterialOrderDate,
+            ExpectedDeliveryDate = q.ExpectedDeliveryDate,
+            MaterialStatus = q.MaterialStatus,
             LastModifiedUtc = q.LastModifiedUtc,
             BaseVersionUtc = q.LastModifiedUtc,
             Revision = q.Revision,
@@ -816,6 +928,28 @@ public partial class SqlDataService
                 quote.LastReminderAtUtc.Value);
         }, cancellationToken);
 
+    public Task UpdateQuoteSupplierInfoAsync(
+        string quoteNumber,
+        QuoteSupplierInfo supplierInfo,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(supplierInfo.DeviceName)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : supplierInfo.DeviceName.Trim();
+
+            quote.SupplierName = supplierInfo.SupplierName?.Trim() ?? string.Empty;
+            quote.MaterialOrderDate = supplierInfo.MaterialOrderDate;
+            quote.ExpectedDeliveryDate = supplierInfo.ExpectedDeliveryDate;
+            quote.MaterialStatus = supplierInfo.MaterialStatus?.Trim() ?? string.Empty;
+            quote.LastModifiedByDevice = deviceName;
+            AppendQuoteEvent(
+                quote,
+                "fornitori",
+                $"Dati fornitori aggiornati: {FormatSupplierEventDescription(quote)}",
+                deviceName);
+        }, cancellationToken);
+
     private async Task UpdateQuoteMetadataAsync(
         string quoteNumber,
         Action<QuoteEntity> update,
@@ -866,6 +1000,10 @@ public partial class SqlDataService
             ReminderCount = entry.ReminderCount,
             LastReminderByDevice = entry.LastReminderByDevice,
             Events = entry.Events.ToList(),
+            SupplierName = entry.SupplierName,
+            MaterialOrderDate = entry.MaterialOrderDate,
+            ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+            MaterialStatus = entry.MaterialStatus,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             Revision = entry.Revision,
@@ -933,10 +1071,9 @@ public partial class SqlDataService
                     if (existing.IsDeleted)
                         throw new QuoteConflictException(quote.QuoteNumber);
 
-                    if (quote.BaseRevision > 0 && existing.Revision != quote.BaseRevision)
-                    {
-                        throw new QuoteConflictException(quote.QuoteNumber);
-                    }
+                    // Un salvataggio completo nasce da una modifica esplicita dell'utente:
+                    // in questo caso il contenuto aperto nell'editor e' autorevole e deve
+                    // sostituire la versione attualmente presente nel database.
 
                     DateTime savedAtUtc = DateTime.UtcNow;
                     existing.Date = quote.Date;
@@ -963,6 +1100,10 @@ public partial class SqlDataService
                     existing.ReminderCount = quote.ReminderCount;
                     existing.LastReminderByDevice = quote.LastReminderByDevice;
                     existing.EventsJson = SerializeQuoteEvents(quote.Events);
+                    existing.SupplierName = quote.SupplierName;
+                    existing.MaterialOrderDate = quote.MaterialOrderDate;
+                    existing.ExpectedDeliveryDate = quote.ExpectedDeliveryDate;
+                    existing.MaterialStatus = quote.MaterialStatus;
                     existing.LastModifiedUtc = savedAtUtc;
                     existing.Revision += 1;
                     existing.SyncHash = quote.SyncHash;
@@ -1044,6 +1185,10 @@ public partial class SqlDataService
                         ReminderCount = quote.ReminderCount,
                         LastReminderByDevice = quote.LastReminderByDevice,
                         EventsJson = SerializeQuoteEvents(quote.Events),
+                        SupplierName = quote.SupplierName,
+                        MaterialOrderDate = quote.MaterialOrderDate,
+                        ExpectedDeliveryDate = quote.ExpectedDeliveryDate,
+                        MaterialStatus = quote.MaterialStatus,
                         LastModifiedUtc = savedAtUtc,
                         Revision = 1,
                         SyncHash = quote.SyncHash,
@@ -1194,5 +1339,19 @@ public partial class SqlDataService
 
         quote.EventsJson = SerializeQuoteEvents(events);
     }
-}
 
+    private static string FormatSupplierEventDescription(QuoteEntity quote)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(quote.SupplierName))
+            parts.Add($"fornitore {quote.SupplierName}");
+        if (quote.MaterialOrderDate.HasValue)
+            parts.Add($"ordine {quote.MaterialOrderDate.Value:dd/MM/yyyy}");
+        if (quote.ExpectedDeliveryDate.HasValue)
+            parts.Add($"consegna prevista {quote.ExpectedDeliveryDate.Value:dd/MM/yyyy}");
+        if (!string.IsNullOrWhiteSpace(quote.MaterialStatus))
+            parts.Add($"stato {quote.MaterialStatus}");
+
+        return parts.Count == 0 ? "campi svuotati" : string.Join(", ", parts);
+    }
+}

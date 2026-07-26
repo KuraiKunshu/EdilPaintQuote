@@ -202,11 +202,13 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Anagrafica clienti"
+                        <TextBlock x:Name="TxtHeaderTitle"
+                                   Text="Anagrafica clienti"
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource DefaultTextBrush}"/>
-                        <TextBlock Text="Seleziona o modifica un cliente esistente"
+                        <TextBlock x:Name="TxtHeaderSubtitle"
+                                   Text="Seleziona o modifica un cliente esistente"
                                    Margin="0,2,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource MutedTextBrush}"/>
@@ -235,15 +237,25 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="8"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0"
+                        <TextBlock x:Name="TxtSearchLabel"
+                                   Grid.Row="0"
                                    Style="{StaticResource SectionLabelStyle}"
                                    Text="Ricerca veloce cliente"/>
 
                         <TextBox x:Name="TxtSearch"
                                  Grid.Row="2"
                                  TextChanged="OnSearchTextChanged"/>
+
+                        <CheckBox x:Name="ChkShowAllCustomers"
+                                  Grid.Row="3"
+                                  Margin="0,10,0,0"
+                                  Content="Mostra tutti i clienti per gestire l'elenco"
+                                  Visibility="Collapsed"
+                                  Checked="OnShowAllCustomersChanged"
+                                  Unchecked="OnShowAllCustomersChanged"/>
                     </Grid>
                 </Border>
 
@@ -256,7 +268,6 @@
                         CornerRadius="10"
                         Padding="0">
                     <DataGrid x:Name="GridResults"
-                              ItemsSource="{Binding FilteredCustomers}"
                               Style="{StaticResource ModernCustomerGridStyle}"
                               MouseDoubleClick="OnInsertClick">
                         <DataGrid.Columns>
@@ -313,6 +324,18 @@
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
 
+                            <DataGridTemplateColumn Header="Fornitore" Width="88">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSupplier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Click="OnSupplierFlagClick"
+                                                  ToolTip="Includi nell'elenco fornitori"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
                             <DataGridTemplateColumn Width="80" Header="Azioni">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -350,7 +373,8 @@
                             Click="OnCancelClick"
                             Background="{StaticResource MutedTextBrush}"/>
 
-                    <Button Grid.Column="3"
+                    <Button x:Name="BtnSelect"
+                            Grid.Column="3"
                             Style="{StaticResource FooterButtonStyle}"
                             Content="Seleziona cliente"
                             Click="OnInsertClick"

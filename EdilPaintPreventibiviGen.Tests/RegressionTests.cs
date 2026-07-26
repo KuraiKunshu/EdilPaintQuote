@@ -1,3 +1,4 @@
+using EdilPaintPreventibiviGen.Data.Mappers;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 using Xunit;
@@ -95,6 +96,66 @@ public sealed class RegressionTests
 
         Assert.Equal(0d, totals.IvaTotale);
         Assert.Equal(100d, totals.TotaleGenerale);
+    }
+
+    [Fact]
+    public void SupplierOrderMailUsesConfiguredSubjectAndBody()
+    {
+        var quote = new QuoteHistoryEntry
+        {
+            QuoteNumber = "PREV/42",
+            Date = new DateTime(2026, 7, 25),
+            CustomerName = "Cliente Uno",
+            ReferenceName = "Cantiere Alfa",
+            SupplierName = "Fornitore Test",
+            Materials =
+            [
+                new Item { Name = "Vernice bianca", Description = "Confezione da 10 L", Quantity = 2, SortOrder = 1 },
+                new Item { Name = "Pennello", Quantity = 3, SortOrder = 2 }
+            ]
+        };
+        var suppliers = new[]
+        {
+            new Customer
+            {
+                BusinessName = "Fornitore Test",
+                Email = "ordini@fornitore.test",
+                IsSupplier = true
+            }
+        };
+        var settings = new MailSettingsModel
+        {
+            SupplierOrderSubjectTemplate = "Ordine {OrderReference} - {SupplierName}",
+            SupplierOrderBodyTemplate =
+                "Cliente: {CustomerName}\nPreventivo: {QuoteNumber}\nData: {Date}\n\n{Materials}"
+        };
+
+        var draft = SupplierOrderMailService.CreateDraft(quote, suppliers, settings);
+
+        Assert.Equal("ordini@fornitore.test", draft.Recipient);
+        Assert.Equal("Ordine Cantiere Alfa - Fornitore Test", draft.Subject);
+        Assert.Contains("Cliente: Cliente Uno", draft.Body);
+        Assert.Contains("Preventivo: PREV/42", draft.Body);
+        Assert.Contains("Data: 25/07/2026", draft.Body);
+        Assert.Contains("- 2 x Vernice bianca", draft.Body);
+        Assert.Contains("  Confezione da 10 L", draft.Body);
+        Assert.Contains("- 3 x Pennello", draft.Body);
+    }
+
+    [Fact]
+    public void SupplierOrderMailDefaultsToMaterialsOnly()
+    {
+        var quote = new QuoteHistoryEntry
+        {
+            QuoteNumber = "PREV/43",
+            CustomerName = "Cliente Due",
+            Materials = [new Item { Name = "Silicone", Quantity = 4 }]
+        };
+
+        var draft = SupplierOrderMailService.CreateDraft(quote, [], new MailSettingsModel());
+
+        Assert.Equal("Ordine Riferimento Cliente Due", draft.Subject);
+        Assert.Equal("- 4 x Silicone", draft.Body);
     }
 
     [Fact]
@@ -312,6 +373,7 @@ public sealed class RegressionTests
             {
                 SyncId = Guid.NewGuid(),
                 BusinessName = "Cliente offline",
+                IsSupplier = true,
                 BaseVersionUtc = baseVersion,
                 HasPendingDatabaseWrite = true
             };
@@ -320,12 +382,28 @@ public sealed class RegressionTests
             var restored = Assert.Single(await store.LoadCustomersAsync());
 
             Assert.True(restored.HasPendingDatabaseWrite);
+            Assert.True(restored.IsSupplier);
             Assert.Equal(baseVersion, restored.BaseVersionUtc);
         }
         finally
         {
             DeleteTemporaryTestPath(temporaryPath);
         }
+    }
+
+    [Fact]
+    public void CustomerDatabaseMappingPreservesSupplierFlag()
+    {
+        var customer = new Customer
+        {
+            SyncId = Guid.NewGuid(),
+            BusinessName = "Fornitore test",
+            IsSupplier = true
+        };
+
+        var restored = customer.ToEntity().ToModel();
+
+        Assert.True(restored.IsSupplier);
     }
 
     [Fact]

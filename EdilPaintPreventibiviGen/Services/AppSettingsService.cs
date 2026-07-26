@@ -58,7 +58,9 @@ public sealed class AppSettingsService
 			["SenderEmail"] = Mail.SenderEmail,
 			["SenderName"] = Mail.SenderName,
 			["DefaultSubject"] = Mail.DefaultSubject,
-			["DefaultBody"] = Mail.DefaultBody
+			["DefaultBody"] = Mail.DefaultBody,
+			["SupplierOrderSubjectTemplate"] = Mail.SupplierOrderSubjectTemplate,
+			["SupplierOrderBodyTemplate"] = Mail.SupplierOrderBodyTemplate
 		};
 
 		string temporaryPath = SettingsPath + ".tmp";
@@ -346,6 +348,8 @@ public sealed class PdfTemplateSettingsModel
 public sealed class MailSettingsModel
 {
 	public const string ProtectionPurpose = "MailSettings.v1";
+	public const string DefaultSupplierOrderSubjectTemplate = "Ordine Riferimento {OrderReference}";
+	public const string DefaultSupplierOrderBodyTemplate = "{Materials}";
 
 	public bool Enabled { get; set; }
 	public string SmtpServer { get; set; } = "smtp.libero.it";
@@ -357,6 +361,8 @@ public sealed class MailSettingsModel
 	public string SenderName { get; set; } = "EdilPaint";
 	public string DefaultSubject { get; set; } = "Preventivo {QuoteNumber}";
 	public string DefaultBody { get; set; } = "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti";
+	public string SupplierOrderSubjectTemplate { get; set; } = DefaultSupplierOrderSubjectTemplate;
+	public string SupplierOrderBodyTemplate { get; set; } = DefaultSupplierOrderBodyTemplate;
 	public bool RequiresCredentialReset { get; set; }
 
 	public string EffectiveSenderEmail =>
@@ -375,6 +381,12 @@ public sealed class MailSettingsModel
 		DefaultBody = string.IsNullOrWhiteSpace(DefaultBody)
 			? "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti"
 			: DefaultBody;
+		SupplierOrderSubjectTemplate = string.IsNullOrWhiteSpace(SupplierOrderSubjectTemplate)
+			? DefaultSupplierOrderSubjectTemplate
+			: SupplierOrderSubjectTemplate.Trim();
+		SupplierOrderBodyTemplate = string.IsNullOrWhiteSpace(SupplierOrderBodyTemplate)
+			? DefaultSupplierOrderBodyTemplate
+			: SupplierOrderBodyTemplate;
 	}
 
 	public void ValidateForSend()

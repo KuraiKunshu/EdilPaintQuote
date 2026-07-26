@@ -29,6 +29,9 @@ public sealed class LocalQuotePatchOutboxService
     public Task StoreReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo, CancellationToken cancellationToken = default) =>
         UpdateAsync(quoteNumber, patch => patch.ReminderInfo = reminderInfo, cancellationToken);
 
+    public Task StoreSupplierInfoAsync(string quoteNumber, QuoteSupplierInfo supplierInfo, CancellationToken cancellationToken = default) =>
+        UpdateAsync(quoteNumber, patch => patch.SupplierInfo = supplierInfo, cancellationToken);
+
     public async Task<List<PendingQuotePatch>> LoadAllAsync(CancellationToken cancellationToken = default)
     {
         var patches = new List<PendingQuotePatch>();
@@ -124,11 +127,13 @@ public sealed class PendingQuotePatch
     public QuoteStatus? Status { get; set; }
     public QuoteSendInfo? SendInfo { get; set; }
     public QuoteReminderInfo? ReminderInfo { get; set; }
+    public QuoteSupplierInfo? SupplierInfo { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
     public bool IsEmpty =>
         Notes == null &&
         !Status.HasValue &&
         SendInfo == null &&
-        ReminderInfo == null;
+        ReminderInfo == null &&
+        SupplierInfo == null;
 }

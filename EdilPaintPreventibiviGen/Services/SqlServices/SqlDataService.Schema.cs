@@ -87,6 +87,7 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Customers", "Phone", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "IsSupplier", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LastModifiedUtc",
             "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "IsDeleted", "BIT NOT NULL DEFAULT 0", cancellationToken);
@@ -145,6 +146,10 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Quotes", "ReminderCount", "INT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "LastReminderByDevice", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "EventsJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "SupplierName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "MaterialOrderDate", "DATETIME2 NULL", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "ExpectedDeliveryDate", "DATETIME2 NULL", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "MaterialStatus", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
 
         await EnsureQuoteNumberColumnDefinitionAsync(db, cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "PdfPath", "NVARCHAR(1000) NOT NULL", cancellationToken);
@@ -163,6 +168,8 @@ public partial class SqlDataService
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "SentByDevice", "NVARCHAR(120) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "LastReminderByDevice", "NVARCHAR(120) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "EventsJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "SupplierName", "NVARCHAR(250) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "MaterialStatus", "NVARCHAR(120) NOT NULL", cancellationToken);
     }
 
     private static async Task EnsureQuoteAttachmentSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
@@ -195,6 +202,11 @@ public partial class SqlDataService
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "SiteName" character varying(250) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "BillingCustomerName" character varying(250) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "Revision" bigint NOT NULL DEFAULT 0;
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "SupplierName" character varying(250) NOT NULL DEFAULT '';
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialOrderDate" timestamp with time zone NULL;
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "ExpectedDeliveryDate" timestamp with time zone NULL;
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialStatus" character varying(120) NOT NULL DEFAULT '';
+        ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "IsSupplier" boolean NOT NULL DEFAULT FALSE;
         UPDATE "Quotes" SET "Revision" = 1 WHERE "Revision" = 0;
 
         CREATE TABLE IF NOT EXISTS "QuoteAttachments"

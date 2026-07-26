@@ -113,7 +113,9 @@ public static class AppSettingsFileService
                 SenderEmail = string.Empty,
                 SenderName = "EdilPaint",
                 DefaultSubject = "Preventivo {QuoteNumber}",
-                DefaultBody = "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti"
+                DefaultBody = "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti",
+                SupplierOrderSubjectTemplate = MailSettingsModel.DefaultSupplierOrderSubjectTemplate,
+                SupplierOrderBodyTemplate = MailSettingsModel.DefaultSupplierOrderBodyTemplate
             }
         };
 

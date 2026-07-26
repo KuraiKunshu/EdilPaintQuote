@@ -43,6 +43,7 @@ public partial class MainViewModel
         _isEditingExistingQuote = false;
         _hasPersistedCurrentQuote = false;
         _loadedQuoteDate = null;
+        _loadedQuotePdfPath = string.Empty;
         _loadedQuoteBaseVersionUtc = default;
         _loadedQuoteBaseRevision = 0;
         _lastSharedDraftContentHash = string.Empty;
@@ -268,11 +269,13 @@ public partial class MainViewModel
 
             string targetPath = !string.IsNullOrWhiteSpace(forceTargetPath)
                 ? forceTargetPath
-                : _storagePathService.BuildQuotePdfPath(
-                    SelectedCustomer.BusinessName,
-                    QuoteNumber,
-                    effectiveDate,
-                    IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
+                : _isEditingExistingQuote && !string.IsNullOrWhiteSpace(_loadedQuotePdfPath)
+                    ? _loadedQuotePdfPath
+                    : _storagePathService.BuildQuotePdfPath(
+                        SelectedCustomer.BusinessName,
+                        QuoteNumber,
+                        effectiveDate,
+                        IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
 
             string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
             Directory.CreateDirectory(tempRoot);
@@ -376,6 +379,7 @@ public partial class MainViewModel
         _isEditingExistingQuote = isEdit;
         _hasPersistedCurrentQuote = isEdit;
         _loadedQuoteDate = isEdit ? entry.Date : null;
+        _loadedQuotePdfPath = isEdit ? entry.PdfPath : string.Empty;
         _loadedQuoteBaseVersionUtc = isEdit ? entry.BaseVersionUtc : default;
         _loadedQuoteBaseRevision = isEdit ? entry.BaseRevision : 0;
         _lastSharedDraftContentHash = string.Empty;

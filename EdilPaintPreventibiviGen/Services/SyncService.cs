@@ -454,6 +454,8 @@ public class SyncService
                     await _sqlService.UpdateQuoteSendInfoAsync(patch.QuoteNumber, patch.SendInfo, cancellationToken);
                 if (patch.ReminderInfo != null)
                     await _sqlService.RegisterQuoteReminderAsync(patch.QuoteNumber, patch.ReminderInfo, cancellationToken);
+                if (patch.SupplierInfo != null)
+                    await _sqlService.UpdateQuoteSupplierInfoAsync(patch.QuoteNumber, patch.SupplierInfo, cancellationToken);
 
                 var databaseVersion = await _sqlService.GetQuoteByNumberAsync(patch.QuoteNumber);
                 if (databaseVersion != null)
@@ -647,7 +649,8 @@ public class SyncService
         string.Equals(left.Email, right.Email, StringComparison.Ordinal) &&
         string.Equals(left.Phone, right.Phone, StringComparison.Ordinal) &&
         left.MaterialDiscount.Equals(right.MaterialDiscount) &&
-        left.LaborDiscount.Equals(right.LaborDiscount);
+        left.LaborDiscount.Equals(right.LaborDiscount) &&
+        left.IsSupplier == right.IsSupplier;
 
     private static void HydratePendingAttachments(QuoteHistoryEntry quote)
     {

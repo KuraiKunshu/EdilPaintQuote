@@ -10,6 +10,7 @@ public class CustomerEntity
 	public string Phone { get; set; } = string.Empty;
 	public double MaterialDiscount { get; set; }
 	public double LaborDiscount { get; set; }
+	public bool IsSupplier { get; set; }
 	public DateTime LastModifiedUtc { get; set; } = DateTime.UtcNow;
 	public bool IsDeleted { get; set; }
 	public ICollection<QuoteEntity> QuotesAsCustomer { get; set; } = new List<QuoteEntity>();

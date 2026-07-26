@@ -296,6 +296,7 @@ public partial class MainViewModel
         existing.Phone = saved.Phone;
         existing.MaterialDiscount = saved.MaterialDiscount;
         existing.LaborDiscount = saved.LaborDiscount;
+        existing.IsSupplier = saved.IsSupplier;
         existing.LastModifiedUtc = saved.LastModifiedUtc;
         existing.BaseVersionUtc = saved.BaseVersionUtc;
         existing.HasPendingDatabaseWrite = saved.HasPendingDatabaseWrite;

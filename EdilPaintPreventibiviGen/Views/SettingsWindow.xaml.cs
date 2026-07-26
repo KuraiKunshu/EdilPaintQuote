@@ -47,6 +47,8 @@ public partial class SettingsWindow : Window
         TxtMailSenderName.Text = mail.SenderName;
         TxtMailSubject.Text = mail.DefaultSubject;
         TxtMailBody.Text = mail.DefaultBody;
+        TxtSupplierOrderMailSubject.Text = mail.SupplierOrderSubjectTemplate;
+        TxtSupplierOrderMailBody.Text = mail.SupplierOrderBodyTemplate;
         ChkGeneratePdf.IsChecked = app.GeneratePDF;
         ChkRestoreMissingPdfsOnStartup.IsChecked = app.RestoreMissingPdfsOnStartup;
         ChkDatabaseCostSavingMode.IsChecked = app.DatabaseCostSavingMode;
@@ -140,6 +142,18 @@ public partial class SettingsWindow : Window
         string mailSenderName = TxtMailSenderName.Text.Trim();
         string mailSubject = TxtMailSubject.Text.Trim();
         string mailBody = TxtMailBody.Text;
+        string supplierOrderMailSubject = TxtSupplierOrderMailSubject.Text.Trim();
+        string supplierOrderMailBody = TxtSupplierOrderMailBody.Text;
+
+        if (!supplierOrderMailBody.Contains("{Materials}", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(
+                "Il testo dell'email per gli ordini fornitori deve contenere il segnaposto {Materials}.",
+                "Impostazioni non valide",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         if (!int.TryParse(TxtMailPort.Text, out int mailPort) || mailPort <= 0 || mailPort > 65535)
         {
@@ -177,6 +191,8 @@ public partial class SettingsWindow : Window
             mail.SenderName = mailSenderName;
             mail.DefaultSubject = mailSubject;
             mail.DefaultBody = mailBody;
+            mail.SupplierOrderSubjectTemplate = supplierOrderMailSubject;
+            mail.SupplierOrderBodyTemplate = supplierOrderMailBody;
             mail.RequiresCredentialReset = false;
             mail.Normalize();
 

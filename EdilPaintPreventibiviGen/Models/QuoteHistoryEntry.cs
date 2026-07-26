@@ -39,6 +39,15 @@ public sealed class QuoteReminderInfo
 	public string DeviceName { get; set; } = string.Empty;
 }
 
+public sealed class QuoteSupplierInfo
+{
+	public string SupplierName { get; set; } = string.Empty;
+	public DateTime? MaterialOrderDate { get; set; }
+	public DateTime? ExpectedDeliveryDate { get; set; }
+	public string MaterialStatus { get; set; } = string.Empty;
+	public string DeviceName { get; set; } = string.Empty;
+}
+
 public class QuoteHistoryEntry
 {
 	public string QuoteNumber { get; set; } = string.Empty;
@@ -68,6 +77,10 @@ public class QuoteHistoryEntry
 	public int ReminderCount { get; set; }
 	public string LastReminderByDevice { get; set; } = string.Empty;
 	public List<QuoteEventEntry> Events { get; set; } = new();
+	public string SupplierName { get; set; } = string.Empty;
+	public DateTime? MaterialOrderDate { get; set; }
+	public DateTime? ExpectedDeliveryDate { get; set; }
+	public string MaterialStatus { get; set; } = string.Empty;
 
 	//-----------------collaborazione-------------
 	// Collaborazione con altra ditta

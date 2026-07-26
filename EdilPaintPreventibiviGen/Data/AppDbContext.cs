@@ -91,6 +91,8 @@ public class AppDbContext : DbContext
             entity.Property(x => x.SentRecipient).HasMaxLength(250);
             entity.Property(x => x.SentByDevice).HasMaxLength(120);
             entity.Property(x => x.LastReminderByDevice).HasMaxLength(120);
+            entity.Property(x => x.SupplierName).HasMaxLength(250);
+            entity.Property(x => x.MaterialStatus).HasMaxLength(120);
 
             entity.HasOne(x => x.Customer)
                 .WithMany(x => x.QuotesAsCustomer)

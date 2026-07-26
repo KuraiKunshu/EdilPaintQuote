@@ -26,9 +26,20 @@ public partial class HistoryWindow : Window
     private readonly int _initialHistoryCount;
     private bool _isLoadingHistory;
     private bool _isSavingStatus;
+    private bool _isSavingSupplierInfo;
     private readonly HashSet<string> _loadedQuoteNumbers = new();
     private readonly List<QuoteHistorySummary> _currentSummaries = new();
     private CancellationTokenSource? _searchCts;
+
+    public IReadOnlyList<string> MaterialStatusOptions { get; } =
+    [
+        "Da ordinare",
+        "Ordinato",
+        "Da ritirare",
+        "In magazzino",
+        "Consegnato",
+        "Non disponibile"
+    ];
 
     public ICollectionView HistoryView { get; private set; } = null!;
 
@@ -331,6 +342,134 @@ public partial class HistoryWindow : Window
         {
             await _historyService.UpdateNotesAsync(entry.QuoteNumber, notesWin.ResultNotes);
             entry.Notes = notesWin.ResultNotes;
+        }
+    }
+
+    private void OnSelectSupplierClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        var win = new SelectCustomerWindow(_vm, suppliersOnly: true)
+        {
+            Owner = this,
+            Title = "Seleziona fornitore"
+        };
+
+        if (win.ShowDialog() == true && win.SelectedResult != null)
+            entry.SupplierName = win.SelectedResult.BusinessName;
+    }
+
+    private async void OnSaveSupplierInfoClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+        if (_isSavingSupplierInfo) return;
+
+        try
+        {
+            _isSavingSupplierInfo = true;
+            Mouse.OverrideCursor = Cursors.Wait;
+
+            await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
+            {
+                SupplierName = entry.SupplierName,
+                MaterialOrderDate = entry.MaterialOrderDate,
+                ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+                MaterialStatus = entry.MaterialStatus,
+                DeviceName = DeviceNameService.GetCurrentDeviceName()
+            });
+
+            entry.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            MessageBox.Show(
+                "Dati fornitori salvati.",
+                "Fornitori",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SupplierInfo] Errore salvataggio: {ex.Message}");
+            MessageBox.Show(
+                $"Errore durante il salvataggio dei dati fornitori:\n\n{ex.Message}",
+                "Fornitori",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+            _isSavingSupplierInfo = false;
+        }
+    }
+
+    private async void OnPrepareSupplierOrderMailClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        try
+        {
+            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+            if (fullEntry == null)
+            {
+                MessageBox.Show(
+                    "Preventivo non trovato nello storico.",
+                    "Fornitori",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            fullEntry.SupplierName = entry.SupplierName;
+            fullEntry.MaterialOrderDate = entry.MaterialOrderDate;
+            fullEntry.ExpectedDeliveryDate = entry.ExpectedDeliveryDate;
+            fullEntry.MaterialStatus = entry.MaterialStatus;
+
+            if (string.IsNullOrWhiteSpace(fullEntry.SupplierName))
+            {
+                MessageBox.Show(
+                    "Seleziona prima un fornitore.",
+                    "Fornitori",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var draft = SupplierOrderMailService.CreateDraft(fullEntry, _vm.AllCustomers);
+            if (string.IsNullOrWhiteSpace(draft.Recipient))
+            {
+                MessageBox.Show(
+                    "Il fornitore selezionato non ha un indirizzo email in anagrafica. La finestra verra' preparata senza destinatario.",
+                    "Fornitori",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            var win = new SupplierOrderMailWindow(fullEntry, draft) { Owner = this };
+            if (win.ShowDialog() == true && win.WasRegisteredAsSent)
+            {
+                entry.MaterialOrderDate ??= win.RegisteredAtUtc.ToLocalTime().Date;
+                if (string.IsNullOrWhiteSpace(entry.MaterialStatus))
+                    entry.MaterialStatus = "Ordinato";
+
+                string deviceName = DeviceNameService.GetCurrentDeviceName();
+                await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
+                {
+                    SupplierName = entry.SupplierName,
+                    MaterialOrderDate = entry.MaterialOrderDate,
+                    ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+                    MaterialStatus = entry.MaterialStatus,
+                    DeviceName = deviceName
+                });
+                entry.LastModifiedByDevice = deviceName;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SupplierMail] Errore preparazione mail: {ex.Message}");
+            MessageBox.Show(
+                $"Errore durante la gestione dell'ordine.\n\n{ex.Message}",
+                "Fornitori",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 

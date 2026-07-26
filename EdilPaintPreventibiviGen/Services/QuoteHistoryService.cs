@@ -49,6 +49,12 @@ public sealed class QuoteHistoryService
         return await _dataService.SearchQuoteSummariesAsync(text, take, cancellationToken);
     }
 
+    public Task<List<QuoteHistorySummary>> LoadSupplierOrderSummariesAsync(
+        string searchText,
+        int take,
+        CancellationToken cancellationToken = default) =>
+        _dataService.GetSupplierOrderSummariesAsync(searchText, Math.Max(1, take), cancellationToken);
+
     public async Task<List<QuoteHistorySummary>> LoadSentOpenSummariesAsync(
         DateTime sinceUtc,
         CancellationToken cancellationToken = default)
@@ -85,6 +91,9 @@ public sealed class QuoteHistoryService
 
     public Task RegisterReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo) =>
         _dataService.RegisterQuoteReminderAsync(quoteNumber, reminderInfo);
+
+    public Task UpdateSupplierInfoAsync(string quoteNumber, QuoteSupplierInfo supplierInfo) =>
+        _dataService.UpdateQuoteSupplierInfoAsync(quoteNumber, supplierInfo);
 
     public async Task DeleteQuoteAsync(string quoteNumber)
     {

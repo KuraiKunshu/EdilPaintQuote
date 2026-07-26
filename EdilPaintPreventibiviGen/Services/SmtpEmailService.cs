@@ -40,7 +40,7 @@ public sealed class SmtpEmailService
         string messageId = CreateMessageId(_settings.EffectiveSenderEmail);
 
         debugLog.Separator();
-        debugLog.Write("Avvio invio email preventivo.");
+        debugLog.Write("Avvio invio email.");
         debugLog.Write($"Message-ID: {messageId}");
 
         using var timeoutCts = AppShutdownManager.CreateLinkedTokenSource(cancellationToken);
@@ -53,7 +53,7 @@ public sealed class SmtpEmailService
 
             if (string.IsNullOrWhiteSpace(request.Recipient))
                 throw new InvalidOperationException("Destinatario email non configurato.");
-            if (string.IsNullOrWhiteSpace(request.AttachmentPath) || !File.Exists(request.AttachmentPath))
+            if (!string.IsNullOrWhiteSpace(request.AttachmentPath) && !File.Exists(request.AttachmentPath))
                 throw new InvalidOperationException("PDF da allegare non trovato.");
 
             var from = new MailAddress(_settings.EffectiveSenderEmail, _settings.SenderName);
@@ -65,14 +65,21 @@ public sealed class SmtpEmailService
                 .ToList();
             var smtpRecipients = recipients.Concat(ccRecipients).ToList();
 
-            var attachmentInfo = new FileInfo(request.AttachmentPath);
             debugLog.Write($"SMTP: server={_settings.SmtpServer}, port={_settings.Port}, ssl={_settings.UseSsl}.");
             debugLog.Write($"Mittente: {from.Address}");
             debugLog.Write($"Destinatari: {string.Join(", ", recipients.Select(r => r.Address))}");
             if (ccRecipients.Count > 0)
                 debugLog.Write($"CC: {string.Join(", ", ccRecipients.Select(r => r.Address))}");
             debugLog.Write($"Oggetto: {request.Subject}");
-            debugLog.Write($"Allegato: {attachmentInfo.FullName} ({FormatBytes(attachmentInfo.Length)})");
+            if (!string.IsNullOrWhiteSpace(request.AttachmentPath))
+            {
+                var attachmentInfo = new FileInfo(request.AttachmentPath);
+                debugLog.Write($"Allegato: {attachmentInfo.FullName} ({FormatBytes(attachmentInfo.Length)})");
+            }
+            else
+            {
+                debugLog.Write("Allegato: nessuno.");
+            }
 
             string message = await BuildMimeMessageAsync(from, recipients, ccRecipients, request, messageId, token);
 
@@ -165,9 +172,10 @@ public sealed class SmtpEmailService
         string messageId,
         CancellationToken cancellationToken)
     {
-        byte[] attachmentBytes = await File.ReadAllBytesAsync(request.AttachmentPath, cancellationToken);
+        byte[]? attachmentBytes = string.IsNullOrWhiteSpace(request.AttachmentPath)
+            ? null
+            : await File.ReadAllBytesAsync(request.AttachmentPath, cancellationToken);
         string boundary = "----=_EdilPaint_" + Guid.NewGuid().ToString("N");
-        string fileName = Path.GetFileName(request.AttachmentPath);
 
         var sb = new StringBuilder();
         sb.AppendLine($"From: {FormatMailbox(from)}");
@@ -191,13 +199,18 @@ public sealed class SmtpEmailService
         AppendQuotedPrintableText(sb, request.Body ?? string.Empty);
         sb.AppendLine();
 
-        sb.AppendLine($"--{boundary}");
-        sb.AppendLine($"Content-Type: application/pdf; name=\"{EncodeQuoted(fileName)}\"");
-        sb.AppendLine("Content-Transfer-Encoding: base64");
-        sb.AppendLine($"Content-Disposition: attachment; filename=\"{EncodeQuoted(fileName)}\"");
-        sb.AppendLine();
-        AppendBase64Lines(sb, attachmentBytes);
-        sb.AppendLine();
+        if (attachmentBytes != null)
+        {
+            string fileName = Path.GetFileName(request.AttachmentPath);
+            sb.AppendLine($"--{boundary}");
+            sb.AppendLine($"Content-Type: application/pdf; name=\"{EncodeQuoted(fileName)}\"");
+            sb.AppendLine("Content-Transfer-Encoding: base64");
+            sb.AppendLine($"Content-Disposition: attachment; filename=\"{EncodeQuoted(fileName)}\"");
+            sb.AppendLine();
+            AppendBase64Lines(sb, attachmentBytes);
+            sb.AppendLine();
+        }
+
         sb.AppendLine($"--{boundary}--");
 
         return sb.ToString();

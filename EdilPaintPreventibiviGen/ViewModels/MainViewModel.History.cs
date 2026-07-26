@@ -132,6 +132,10 @@ public partial class MainViewModel
                 entry.ReminderCount = existingEntry.ReminderCount;
                 entry.LastReminderByDevice = existingEntry.LastReminderByDevice;
                 entry.Events = existingEntry.Events.ToList();
+                entry.SupplierName = existingEntry.SupplierName;
+                entry.MaterialOrderDate = existingEntry.MaterialOrderDate;
+                entry.ExpectedDeliveryDate = existingEntry.ExpectedDeliveryDate;
+                entry.MaterialStatus = existingEntry.MaterialStatus;
                 // La versione caricata quando e' iniziata la modifica e' quella
                 // autorevole. Una voce History locale puo' essere piu' vecchia.
                 if (entry.BaseVersionUtc == default)
@@ -157,6 +161,10 @@ public partial class MainViewModel
                 existingEntry.ReminderCount = entry.ReminderCount;
                 existingEntry.LastReminderByDevice = entry.LastReminderByDevice;
                 existingEntry.Events = entry.Events.ToList();
+                existingEntry.SupplierName = entry.SupplierName;
+                existingEntry.MaterialOrderDate = entry.MaterialOrderDate;
+                existingEntry.ExpectedDeliveryDate = entry.ExpectedDeliveryDate;
+                existingEntry.MaterialStatus = entry.MaterialStatus;
                 existingEntry.Materials = entry.Materials;
                 existingEntry.Labors = entry.Labors;
                 existingEntry.Imponibile = entry.Imponibile;
@@ -204,6 +212,10 @@ public partial class MainViewModel
                 entry.ReminderCount = existing.ReminderCount;
                 entry.LastReminderByDevice = existing.LastReminderByDevice;
                 entry.Events = existing.Events.ToList();
+                entry.SupplierName = existing.SupplierName;
+                entry.MaterialOrderDate = existing.MaterialOrderDate;
+                entry.ExpectedDeliveryDate = existing.ExpectedDeliveryDate;
+                entry.MaterialStatus = existing.MaterialStatus;
                 // Non sostituire la versione di partenza con quella letta subito
                 // prima del salvataggio: annullerebbe il controllo multi-PC.
                 if (entry.BaseVersionUtc == default)
@@ -284,6 +296,7 @@ public partial class MainViewModel
 
         _isEditingExistingQuote = true;
         _loadedQuoteDate = entry.Date;
+        _loadedQuotePdfPath = entry.PdfPath;
         _loadedQuoteBaseVersionUtc = persistedVersion;
         _loadedQuoteBaseRevision = entry.BaseRevision;
 
@@ -382,6 +395,10 @@ public partial class MainViewModel
             ReminderCount = entry.ReminderCount,
             LastReminderByDevice = entry.LastReminderByDevice,
             Events = entry.Events.ToList(),
+            SupplierName = entry.SupplierName,
+            MaterialOrderDate = entry.MaterialOrderDate,
+            ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+            MaterialStatus = entry.MaterialStatus,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             Revision = entry.Revision,

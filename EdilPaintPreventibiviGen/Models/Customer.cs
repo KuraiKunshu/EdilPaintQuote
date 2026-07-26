@@ -12,6 +12,7 @@ public class Customer : INotifyPropertyChanged
 	private string _phone = string.Empty;
 	private double _materialDiscount;
 	private double _laborDiscount;
+	private bool _isSupplier;
 
 	[JsonPropertyName("syncId")]
 	public Guid SyncId { get; set; }
@@ -33,6 +34,9 @@ public class Customer : INotifyPropertyChanged
 
 	[JsonPropertyName("sconto_lavori")]
 	public double LaborDiscount { get => _laborDiscount; set { _laborDiscount = value; OnPropertyChanged(); } }
+
+	[JsonPropertyName("isSupplier")]
+	public bool IsSupplier { get => _isSupplier; set { _isSupplier = value; OnPropertyChanged(); } }
 
 	// Metadati di sincronizzazione
 	[JsonPropertyName("lastModifiedUtc")]

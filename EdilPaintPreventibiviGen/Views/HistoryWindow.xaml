@@ -1049,6 +1049,63 @@
                                             <TextBlock Text="{Binding LastModifiedByDevice}" Style="{StaticResource DetailValueStyle}" ToolTip="{Binding LastModifiedByDevice}"/>
                                         </StackPanel>
                                     </Grid>
+
+                                    <Separator Margin="0,16,0,14"/>
+
+                                    <StackPanel>
+                                        <TextBlock Text="Fornitori"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource DefaultTextBrush}"
+                                                   Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Fornitore" Style="{StaticResource DetailCaptionStyle}"/>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="92"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Text="{Binding SupplierName, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <Button Grid.Column="2"
+                                                    Content="Seleziona"
+                                                    Style="{StaticResource DetailActionButtonStyle}"
+                                                    MinWidth="92"
+                                                    Margin="0"
+                                                    Click="OnSelectSupplierClick"/>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Data ordine" Style="{StaticResource DetailCaptionStyle}"/>
+                                                <DatePicker SelectedDate="{Binding MaterialOrderDate, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Consegna prevista" Style="{StaticResource DetailCaptionStyle}"/>
+                                                <DatePicker SelectedDate="{Binding ExpectedDeliveryDate, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Stato materiale" Style="{StaticResource DetailCaptionStyle}"/>
+                                        <ComboBox IsEditable="True"
+                                                  ItemsSource="{Binding MaterialStatusOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  Text="{Binding MaterialStatus, UpdateSourceTrigger=PropertyChanged}"
+                                                  Margin="0,0,0,12"/>
+
+                                        <Button Content="Salva fornitori"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                HorizontalAlignment="Left"
+                                                Click="OnSaveSupplierInfoClick"/>
+                                        <Button Content="Mail ordine"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                HorizontalAlignment="Left"
+                                                Click="OnPrepareSupplierOrderMailClick"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </ScrollViewer>
                         </Border>

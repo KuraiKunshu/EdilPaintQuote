@@ -279,7 +279,7 @@
                                            Foreground="{StaticResource DefaultTextBrush}"
                                            Margin="0,0,0,10"/>
                                 <CheckBox x:Name="ChkMailEnabled"
-                                          Content="Abilita invio preventivi via SMTP"
+                                          Content="Abilita invio email via SMTP"
                                           Margin="0,0,0,12"/>
 
                                 <Grid>
@@ -353,6 +353,32 @@
                                          VerticalScrollBarVisibility="Auto"/>
                                 <TextBlock Style="{StaticResource HintStyle}"
                                            Text="Parametri Libero: smtp.libero.it, porta 465, SSL/TLS. Segnaposto disponibili: {QuoteNumber}, {CustomerName}, {ReferenceName}, {Date}, {Total}."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource SectionStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Email ordini fornitori"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource DefaultTextBrush}"
+                                           Margin="0,0,0,12"/>
+
+                                <TextBlock Style="{StaticResource LabelStyle}"
+                                           Text="Oggetto predefinito"/>
+                                <TextBox x:Name="TxtSupplierOrderMailSubject"/>
+
+                                <TextBlock Style="{StaticResource LabelStyle}"
+                                           Text="Testo predefinito"
+                                           Margin="0,12,0,5"/>
+                                <TextBox x:Name="TxtSupplierOrderMailBody"
+                                         Height="110"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"/>
+                                <TextBlock Style="{StaticResource HintStyle}"
+                                           Text="Segnaposto disponibili: {OrderReference}, {QuoteNumber}, {CustomerName}, {ReferenceName}, {SupplierName}, {Date}, {Materials}. Il testo deve contenere {Materials}."/>
                             </StackPanel>
                         </Border>
 
