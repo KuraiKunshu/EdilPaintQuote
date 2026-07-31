@@ -38,6 +38,16 @@ public partial class MainViewModel
             // anche quando il database cloud e' temporaneamente irraggiungibile.
             await _draftService.SaveAsync(draft, cancellationToken);
 
+            // Il sync lavora sugli stessi record e sulle stesse cache. Durante una
+            // sincronizzazione manteniamo al sicuro la bozza locale e rimandiamo
+            // il salvataggio cloud al tick successivo, evitando contesa e blocchi UI.
+            if (App.SyncService is { IsSyncRunning: true })
+            {
+                DraftSyncStatus = "Bozza salvata su questo PC: sincronizzazione in corso";
+                HasDraftSyncError = false;
+                return;
+            }
+
             if (SelectedCustomer == null)
             {
                 DraftSyncStatus = "Bozza locale: seleziona un cliente per condividerla";

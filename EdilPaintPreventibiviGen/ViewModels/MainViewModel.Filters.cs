@@ -32,9 +32,10 @@ public partial class MainViewModel
 
     public async Task DeleteCustomerAsync(Customer customer)
     {
+        BeginSharedDataMutation();
         try
         {
-            await _dataService.DeleteCustomerAsync(customer);
+            await _dataService.DeleteCustomerAsync(CloneCustomerForPersistence(customer));
             AllCustomers.Remove(customer);
             _allCustomers.Remove(customer);
             ApplyCustomerFilter(_customerSearchText);
@@ -44,6 +45,10 @@ public partial class MainViewModel
         {
             MessageBox.Show($"Impossibile eliminare il cliente.\n\n{ex.Message}",
                 "Errore eliminazione", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            EndSharedDataMutation();
         }
     }
 

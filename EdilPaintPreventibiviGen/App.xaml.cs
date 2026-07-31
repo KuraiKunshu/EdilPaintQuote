@@ -216,22 +216,16 @@ public partial class App : Application
             $"[STARTUP] Sync ancora in corso dopo {StartupSyncForegroundTimeout.TotalSeconds:F0}s: apertura app, completamento in background.");
     }
 
-    private static async void OnSyncCompleted(object? sender, EventArgs e)
+    private static void OnSyncCompleted(object? sender, EventArgs e)
     {
-        if (MainVm == null || _isShuttingDown)
+        var viewModel = MainVm;
+        if (viewModel == null || _isShuttingDown)
             return;
 
-        try
-        {
-            await MainVm.RefreshSharedDataAsync(_shutdownCts?.Token ?? CancellationToken.None);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[Sync] Aggiornamento raccolte UI non riuscito: {ex.Message}");
-        }
+        _ = AppShutdownManager.Track(
+            "Post-sync shared data refresh",
+            token => viewModel.RefreshSharedDataAsync(token),
+            AppShutdownManager.ShutdownToken);
     }
 
     private static Task RunStartupPdfGenerationAsync(CancellationToken token)

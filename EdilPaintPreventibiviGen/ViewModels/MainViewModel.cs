@@ -30,6 +30,8 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly QuoteHistoryService _quoteHistoryService;
     private readonly SemaphoreSlim _draftSaveLock = new(1, 1);
     private readonly SemaphoreSlim _sharedDataRefreshLock = new(1, 1);
+    private int _sharedDataMutationsInProgress;
+    private long _sharedDataMutationVersion;
     #endregion
 
     #region Data Collections

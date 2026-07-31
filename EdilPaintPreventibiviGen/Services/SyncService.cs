@@ -21,11 +21,12 @@ public class SyncService
     private readonly LocalDeletionOutboxService _deletionOutbox;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
     private readonly object _statusLock = new();
+    private int _activeSyncRequests;
     private DateTime _lastSyncTime = DateTime.MinValue;
     private DateTime? _lastSyncCompletedUtc;
     private string _lastSyncSummary = "Sincronizzazione non ancora eseguita.";
 
-    public bool IsSyncRunning => _syncLock.CurrentCount == 0;
+    public bool IsSyncRunning => Volatile.Read(ref _activeSyncRequests) > 0;
 
     public DateTime? LastSyncCompletedUtc
     {
@@ -59,11 +60,46 @@ public class SyncService
         _deletionOutbox = deletionOutbox;
     }
     
-    public async Task<SyncResult> SyncAllAsync(
+    public Task<SyncResult> SyncAllAsync(
         bool force = false,
         int take = 0,
         CancellationToken cancellationToken = default,
         bool waitForCurrentRun = false)
+    {
+        // La sincronizzazione comprende anche confronto hash, serializzazione JSON
+        // e aggiornamento delle cache locali. Deve sempre partire dal thread pool:
+        // se invocata da una finestra WPF, le continuazioni non devono occupare
+        // il dispatcher e bloccare l'utente durante il lavoro.
+        Interlocked.Increment(ref _activeSyncRequests);
+        return RunSyncOnBackgroundAsync(force, take, cancellationToken, waitForCurrentRun);
+    }
+
+    private async Task<SyncResult> RunSyncOnBackgroundAsync(
+        bool force,
+        int take,
+        CancellationToken cancellationToken,
+        bool waitForCurrentRun)
+    {
+        try
+        {
+            // Non passiamo il token allo scheduler: il delegate deve sempre
+            // partire per poter azzerare in modo affidabile lo stato di sync.
+            return await Task.Run(
+                    () => SyncAllCoreAsync(force, take, cancellationToken, waitForCurrentRun),
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeSyncRequests);
+        }
+    }
+
+    private async Task<SyncResult> SyncAllCoreAsync(
+        bool force,
+        int take,
+        CancellationToken cancellationToken,
+        bool waitForCurrentRun)
     {
         bool lockTaken = false;
 

@@ -28,22 +28,28 @@ public partial class MainViewModel
 
     public async Task RemovePersonalMaterialAsync(Item item)
     {
+        BeginSharedDataMutation();
         try
         {
-            await _dataService.DeletePersonalMaterialAsync(item);
+            await _dataService.DeletePersonalMaterialAsync(CloneCatalogItem(item));
             _personalMaterials.Remove(item);
         }
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message, "Materiale non eliminato", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally
+        {
+            EndSharedDataMutation();
+        }
     }
 
     public async Task RemoveCatalogLaborAsync(Item item)
     {
+        BeginSharedDataMutation();
         try
         {
-            await _dataService.DeleteLaborCatalogItemAsync(item);
+            await _dataService.DeleteLaborCatalogItemAsync(CloneCatalogItem(item));
             AllCatalogLabors.Remove(item);
             _allCatalogLabors.RemoveAll(x => x.PersistentId == item.PersistentId ||
                 x.Name.Equals(item.Name, StringComparison.OrdinalIgnoreCase));
@@ -51,6 +57,10 @@ public partial class MainViewModel
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message, "Lavorazione non eliminata", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            EndSharedDataMutation();
         }
     }
 

@@ -65,6 +65,7 @@ public partial class MainWindow : Window
     {
         if (!_isMainWindowLoaded ||
             DateTime.UtcNow - _lastSharedDataRefreshUtc < TimeSpan.FromSeconds(15) ||
+            App.SyncService is { IsSyncRunning: true } ||
             DataContext is not MainViewModel vm)
             return;
 
