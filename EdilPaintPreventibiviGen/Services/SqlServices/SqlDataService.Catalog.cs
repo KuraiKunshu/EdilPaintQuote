@@ -97,6 +97,7 @@ public partial class SqlDataService
             entity.Description = material.Description?.Trim() ?? string.Empty;
             entity.UnitPrice = material.UnitPrice;
             entity.IsSignificant = material.IsSignificant;
+            entity.IsCompanyMaterial = material.IsCompanyMaterial;
             material.PersistentId = entity.Id;
         }
 

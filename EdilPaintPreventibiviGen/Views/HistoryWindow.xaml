@@ -983,6 +983,9 @@
                                         <Button Content="Copia"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnCopyPastQuoteClick"/>
+                                        <Button Content="Guadagno reale"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnCalculateRealProfitClick"/>
                                         <Button Content="Elimina"
                                                 Style="{StaticResource DetailDangerButtonStyle}"
                                                 Click="OnDeletePastQuoteClick"/>

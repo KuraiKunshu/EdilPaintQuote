@@ -650,6 +650,7 @@ public class SyncService
         string.Equals(left.Phone, right.Phone, StringComparison.Ordinal) &&
         left.MaterialDiscount.Equals(right.MaterialDiscount) &&
         left.LaborDiscount.Equals(right.LaborDiscount) &&
+        left.SupplierDiscount.Equals(right.SupplierDiscount) &&
         left.IsSupplier == right.IsSupplier;
 
     private static void HydratePendingAttachments(QuoteHistoryEntry quote)

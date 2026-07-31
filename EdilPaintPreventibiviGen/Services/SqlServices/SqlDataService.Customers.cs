@@ -45,6 +45,7 @@ public partial class SqlDataService
             existing.Phone = customer.Phone;
             existing.MaterialDiscount = customer.MaterialDiscount;
             existing.LaborDiscount = customer.LaborDiscount;
+            existing.SupplierDiscount = customer.SupplierDiscount;
             existing.IsSupplier = customer.IsSupplier;
             existing.LastModifiedUtc = customer.LastModifiedUtc;
             existing.SyncId = customer.SyncId;
@@ -86,6 +87,7 @@ public partial class SqlDataService
             entity.Phone = customer.Phone;
             entity.MaterialDiscount = customer.MaterialDiscount;
             entity.LaborDiscount = customer.LaborDiscount;
+            entity.SupplierDiscount = customer.SupplierDiscount;
             entity.IsSupplier = customer.IsSupplier;
             entity.LastModifiedUtc = customer.LastModifiedUtc;
             entity.SyncId = customer.SyncId;
@@ -102,6 +104,7 @@ public partial class SqlDataService
         customer.Address = customer.Address?.Trim() ?? string.Empty;
         customer.Email = customer.Email?.Trim() ?? string.Empty;
         customer.Phone = customer.Phone?.Trim() ?? string.Empty;
+        customer.SupplierDiscount = Math.Clamp(customer.SupplierDiscount, 0, 100);
 
         if (string.IsNullOrWhiteSpace(customer.BusinessName))
             throw new InvalidOperationException("Impossibile salvare un cliente senza ragione sociale.");

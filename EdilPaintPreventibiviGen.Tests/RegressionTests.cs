@@ -161,6 +161,77 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public void RealProfitCalculationIncludesSupplierLaborAndCompanyCosts()
+    {
+        var result = RealProfitCalculator.Calculate(new RealProfitInput
+        {
+            QuoteRevenue = 2000,
+            SupplierDiscount = 20,
+            Workers = 2,
+            Days = 3,
+            HoursPerDay = 8,
+            HourlyCost = 25,
+            Materials =
+            [
+                new ProfitMaterialCost
+                {
+                    Name = "Vernice",
+                    Quantity = 2,
+                    CustomerUnitPrice = 500,
+                    CustomerDiscount = 10
+                }
+            ],
+            CompanyMaterials =
+            [
+                new CompanyMaterialCost
+                {
+                    Name = "Teli",
+                    Quantity = 3,
+                    UnitCost = 40
+                }
+            ]
+        });
+
+        Assert.Equal(900, result.CustomerMaterialRevenue);
+        Assert.Equal(800, result.SupplierMaterialCost);
+        Assert.Equal(100, result.MaterialMargin);
+        Assert.Equal(1200, result.LaborCost);
+        Assert.Equal(120, result.CompanyMaterialCost);
+        Assert.Equal(2120, result.TotalCosts);
+        Assert.Equal(-120, result.Profit);
+        Assert.Equal(-6, result.ProfitPercentage);
+    }
+
+    [Fact]
+    public void RealProfitForSupplierCustomerExcludesQuotedMaterials()
+    {
+        var result = RealProfitCalculator.Calculate(new RealProfitInput
+        {
+            QuoteRevenue = 600,
+            ExcludeMaterials = true,
+            SupplierDiscount = 20,
+            Workers = 1,
+            Days = 1,
+            HoursPerDay = 8,
+            HourlyCost = 25,
+            Materials =
+            [
+                new ProfitMaterialCost
+                {
+                    Name = "Finestra",
+                    Quantity = 1,
+                    CustomerUnitPrice = 1000
+                }
+            ]
+        });
+
+        Assert.Equal(0, result.CustomerMaterialRevenue);
+        Assert.Equal(0, result.SupplierMaterialCost);
+        Assert.Equal(200, result.LaborCost);
+        Assert.Equal(400, result.Profit);
+    }
+
+    [Fact]
     public async Task TombstoneKeepsOfflineDeletions()
     {
         string temporaryPath = CreateTemporaryTestPath();
@@ -376,6 +447,7 @@ public sealed class RegressionTests
                 SyncId = Guid.NewGuid(),
                 BusinessName = "Cliente offline",
                 IsSupplier = true,
+                SupplierDiscount = 18.5,
                 BaseVersionUtc = baseVersion,
                 HasPendingDatabaseWrite = true
             };
@@ -385,6 +457,7 @@ public sealed class RegressionTests
 
             Assert.True(restored.HasPendingDatabaseWrite);
             Assert.True(restored.IsSupplier);
+            Assert.Equal(18.5, restored.SupplierDiscount);
             Assert.Equal(baseVersion, restored.BaseVersionUtc);
         }
         finally
@@ -400,12 +473,14 @@ public sealed class RegressionTests
         {
             SyncId = Guid.NewGuid(),
             BusinessName = "Fornitore test",
-            IsSupplier = true
+            IsSupplier = true,
+            SupplierDiscount = 22.5
         };
 
         var restored = customer.ToEntity().ToModel();
 
         Assert.True(restored.IsSupplier);
+        Assert.Equal(22.5, restored.SupplierDiscount);
     }
 
     [Fact]
@@ -416,11 +491,18 @@ public sealed class RegressionTests
         {
             var store = new LocalJsonStoreService(temporaryPath);
             await store.SavePersonalMaterialsAsync([
-                new Item { PersistentId = 42, Name = "Materiale condiviso", UnitPrice = 12.5 }
+                new Item
+                {
+                    PersistentId = 42,
+                    Name = "Materiale condiviso",
+                    UnitPrice = 12.5,
+                    IsCompanyMaterial = true
+                }
             ]);
 
             var restored = Assert.Single(await store.LoadPersonalMaterialsAsync());
             Assert.Equal(42, restored.PersistentId);
+            Assert.True(restored.IsCompanyMaterial);
         }
         finally
         {

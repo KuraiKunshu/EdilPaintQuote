@@ -249,6 +249,8 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="16"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
                                     <Grid Grid.Column="0">
@@ -279,6 +281,22 @@
                                                    Text="Sconto manodopera (%)"/>
 
                                         <TextBox x:Name="TxtDiscountLab"
+                                                 Grid.Row="2"
+                                                 Text="0"/>
+                                    </Grid>
+
+                                    <Grid Grid.Column="4">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="8"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Style="{StaticResource SectionLabelStyle}"
+                                                   Text="Sconto fornitore (%)"/>
+
+                                        <TextBox x:Name="TxtSupplierDiscount"
                                                  Grid.Row="2"
                                                  Text="0"/>
                                     </Grid>

@@ -12,6 +12,7 @@ public class Item : INotifyPropertyChanged
     private int _quantity = 1;
     private double _discount;
     private bool _isSignificant;
+    private bool _isCompanyMaterial;
     private int _sortOrder;
 
     public string Name { get => _name; set { _name = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalPrice)); } }
@@ -20,6 +21,7 @@ public class Item : INotifyPropertyChanged
     public int Quantity { get => _quantity; set { _quantity = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalPrice)); } }
     public double Discount { get => _discount; set { _discount = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalPrice)); } }
     public bool IsSignificant { get => _isSignificant; set { _isSignificant = value; OnPropertyChanged(); } }
+    public bool IsCompanyMaterial { get => _isCompanyMaterial; set { _isCompanyMaterial = value; OnPropertyChanged(); } }
     public int SortOrder { get => _sortOrder; set { _sortOrder = value; OnPropertyChanged(); } }
 
     public double TotalPrice => (UnitPrice * Quantity) * (1 - Math.Clamp(Discount, 0, 100) / 100);

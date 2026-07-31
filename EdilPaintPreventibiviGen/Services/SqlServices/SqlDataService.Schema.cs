@@ -87,6 +87,7 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Customers", "Phone", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "SupplierDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "IsSupplier", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LastModifiedUtc",
             "DATETIME2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000Z'", cancellationToken);
@@ -111,6 +112,7 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "PersonalMaterials", "Description", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "PersonalMaterials", "UnitPrice", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "PersonalMaterials", "IsSignificant", "BIT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "PersonalMaterials", "IsCompanyMaterial", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "PersonalMaterials", "Name", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "PersonalMaterials", "Description", "NVARCHAR(MAX) NOT NULL", cancellationToken);
     }
@@ -207,6 +209,8 @@ public partial class SqlDataService
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "ExpectedDeliveryDate" timestamp with time zone NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialStatus" character varying(120) NOT NULL DEFAULT '';
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "IsSupplier" boolean NOT NULL DEFAULT FALSE;
+        ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "SupplierDiscount" double precision NOT NULL DEFAULT 0;
+        ALTER TABLE "PersonalMaterials" ADD COLUMN IF NOT EXISTS "IsCompanyMaterial" boolean NOT NULL DEFAULT FALSE;
         UPDATE "Quotes" SET "Revision" = 1 WHERE "Revision" = 0;
 
         CREATE TABLE IF NOT EXISTS "QuoteAttachments"

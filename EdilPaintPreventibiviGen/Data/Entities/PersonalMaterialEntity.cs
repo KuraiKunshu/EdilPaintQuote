@@ -7,4 +7,5 @@ public class PersonalMaterialEntity
 	public string Description { get; set; } = string.Empty;
 	public double UnitPrice { get; set; }
 	public bool IsSignificant { get; set; }
+	public bool IsCompanyMaterial { get; set; }
 }

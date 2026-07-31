@@ -58,6 +58,7 @@ public partial class SelectMaterialWindow : Window
             TxtDesc.Text = selected.Description;
             TxtPrice.Text = selected.UnitPrice.ToString(CultureInfo.InvariantCulture);
             ChkSignificant.IsChecked = selected.IsSignificant;
+            ChkCompanyMaterial.IsChecked = selected.IsCompanyMaterial;
         }
         else
         {
@@ -89,6 +90,7 @@ public partial class SelectMaterialWindow : Window
             _editingMaterial.Description = TxtDesc.Text;
             _editingMaterial.UnitPrice = price;
             _editingMaterial.IsSignificant = ChkSignificant.IsChecked ?? false;
+            _editingMaterial.IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false;
         }
         else
         {
@@ -98,7 +100,8 @@ public partial class SelectMaterialWindow : Window
                 Description = TxtDesc.Text,
                 UnitPrice = price,
                 Quantity = 1,
-                IsSignificant = ChkSignificant.IsChecked ?? false
+                IsSignificant = ChkSignificant.IsChecked ?? false,
+                IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false
             });
         }
 
@@ -137,6 +140,7 @@ public partial class SelectMaterialWindow : Window
         TxtDesc.Text = string.Empty;
         TxtPrice.Text = "0";
         ChkSignificant.IsChecked = false;
+        ChkCompanyMaterial.IsChecked = false;
         GridMaterials.SelectedItem = null;
     }
 

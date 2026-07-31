@@ -79,7 +79,9 @@ public partial class MainViewModel
             cancellationToken.ThrowIfCancellationRequested();
 
             var personalMatches = _personalMaterials
-                .Where(m => m.Name.Contains(text, StringComparison.OrdinalIgnoreCase))
+                .Where(m =>
+                    !m.IsCompanyMaterial &&
+                    m.Name.Contains(text, StringComparison.OrdinalIgnoreCase))
                 .Select(p => new VeluxResult
                 {
                     Id = "LOCAL_" + p.Name,

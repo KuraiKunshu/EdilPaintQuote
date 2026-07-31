@@ -12,6 +12,7 @@ public class Customer : INotifyPropertyChanged
 	private string _phone = string.Empty;
 	private double _materialDiscount;
 	private double _laborDiscount;
+	private double _supplierDiscount;
 	private bool _isSupplier;
 
 	[JsonPropertyName("syncId")]
@@ -34,6 +35,9 @@ public class Customer : INotifyPropertyChanged
 
 	[JsonPropertyName("sconto_lavori")]
 	public double LaborDiscount { get => _laborDiscount; set { _laborDiscount = value; OnPropertyChanged(); } }
+
+	[JsonPropertyName("sconto_fornitore")]
+	public double SupplierDiscount { get => _supplierDiscount; set { _supplierDiscount = value; OnPropertyChanged(); } }
 
 	[JsonPropertyName("isSupplier")]
 	public bool IsSupplier { get => _isSupplier; set { _isSupplier = value; OnPropertyChanged(); } }

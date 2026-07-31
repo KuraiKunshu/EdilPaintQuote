@@ -1,0 +1,195 @@
+<Window x:Class="EdilPaintPreventibiviGen.Views.RealProfitWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Calcolo guadagno reale"
+        Width="1050" Height="760"
+        MinWidth="900" MinHeight="650"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource ShellBackgroundBrush}"
+        Icon="pack://application:,,,/Assets/Windowsicon/main.ico">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource SubtleBorderBrush}"
+                BorderThickness="1" CornerRadius="10" Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Guadagno reale" FontSize="24" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TxtQuoteInfo" Margin="0,4,0,0"
+                               Foreground="{StaticResource MutedTextBrush}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Ricavo imponibile (€)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox x:Name="TxtRevenue"/>
+                </StackPanel>
+                <StackPanel Grid.Column="3">
+                    <TextBlock Text="Sconto fornitore (%)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
+                    <TextBox x:Name="TxtSupplierDiscount"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TabControl Grid.Row="2">
+            <TabItem x:Name="TabMaterials" Header="Materiali preventivo">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Il costo d'acquisto usa il prezzo del preventivo come base e applica automaticamente lo sconto fornitore."
+                               Foreground="{StaticResource MutedTextBrush}"/>
+                    <DataGrid Grid.Row="2" x:Name="GridMaterialCosts" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Materiale" Binding="{Binding Name}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="Quantità" Binding="{Binding Quantity}" IsReadOnly="True" Width="90"/>
+                            <DataGridTextColumn Header="Prezzo cliente unit. €" Binding="{Binding CustomerUnitPrice, StringFormat=N2}"
+                                                IsReadOnly="True" Width="155"/>
+                            <DataGridTextColumn Header="Sconto cliente %" Binding="{Binding CustomerDiscount, StringFormat=N2}"
+                                                IsReadOnly="True" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Manodopera">
+                <Grid Margin="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Numero operai"/>
+                        <TextBox x:Name="TxtWorkers" Text="1"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Giorni"/>
+                        <TextBox x:Name="TxtDays" Text="1"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Ore al giorno"/>
+                        <TextBox x:Name="TxtHoursPerDay" Text="8"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="6">
+                        <TextBlock Text="Costo orario per operaio (€)"/>
+                        <TextBox x:Name="TxtHourlyCost" Text="0"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Costi materiali aziendali">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Queste voci sono solo costi interni: non vengono aggiunte al catalogo né al preventivo cliente."
+                               Foreground="{StaticResource MutedTextBrush}"/>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="150"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="CboCompanyMaterialSearch"
+                                  IsEditable="True"
+                                  IsTextSearchEnabled="False"
+                                  DisplayMemberPath="Name"
+                                  StaysOpenOnEdit="True"
+                                  KeyUp="OnCompanyMaterialSearchKeyUp"
+                                  SelectionChanged="OnCompanyMaterialSelected"/>
+                        <Button Grid.Column="2"
+                                Content="Aggiungi selezionato"
+                                Click="OnAddSelectedCompanyMaterialClick"/>
+                    </Grid>
+                    <DataGrid Grid.Row="4" x:Name="GridCompanyMaterials" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Materiale / costo aziendale"
+                                                Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridTextColumn Header="Quantità"
+                                                Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="90"/>
+                            <DataGridTextColumn Header="Costo unitario €"
+                                                Binding="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="145"/>
+                            <DataGridTextColumn Header="Totale €"
+                                                Binding="{Binding Total, StringFormat=N2}"
+                                                IsReadOnly="True"
+                                                Width="120"/>
+                            <DataGridTemplateColumn Header="" Width="70">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Rimuovi"
+                                                Padding="6,2"
+                                                Click="OnRemoveCompanyCostClick"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <Button Grid.Row="6" Content="Aggiungi costo manuale" Width="180" HorizontalAlignment="Left"
+                            Click="OnAddCompanyCostClick"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="4" Background="{StaticResource SectionPanelBackgroundBrush}"
+                BorderBrush="{StaticResource SectionPanelBorderBrush}" BorderThickness="1"
+                CornerRadius="10" Padding="14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <UniformGrid Columns="4">
+                    <StackPanel>
+                        <TextBlock Text="Ricavo materiali cliente" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBlock x:Name="TxtCustomerMaterials" FontSize="16" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Costo materiali fornitore" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBlock x:Name="TxtSupplierMaterials" FontSize="16" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Manodopera + costi aziendali" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBlock x:Name="TxtOtherCosts" FontSize="16" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Guadagno reale" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBlock x:Name="TxtProfit" FontSize="20" FontWeight="Bold"/>
+                    </StackPanel>
+                </UniformGrid>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="18,0,0,0" VerticalAlignment="Center">
+                    <Button Content="Calcola" Width="110" Height="38" Margin="0,0,8,0"
+                            Background="{StaticResource GeneratePdfButtonBrush}" Foreground="White"
+                            Click="OnCalculateClick"/>
+                    <Button Content="Chiudi" Width="90" Height="38" Click="OnCloseClick"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

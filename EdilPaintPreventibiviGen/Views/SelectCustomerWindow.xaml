@@ -336,6 +336,11 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
+                            <DataGridTextColumn Header="Sconto forn. %"
+                                                Binding="{Binding SupplierDiscount, StringFormat={}{0:0.##}}"
+                                                IsReadOnly="True"
+                                                Width="105"/>
+
                             <DataGridTemplateColumn Width="80" Header="Azioni">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>

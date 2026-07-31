@@ -249,7 +249,12 @@
                                 <StackPanel Grid.Column="4" VerticalAlignment="Bottom" Margin="0,0,0,6">
                                     <TextBlock Style="{StaticResource SectionLabelStyle}" Text="Bene significativo" Margin="0,0,0,6"/>
                                     <CheckBox x:Name="ChkSignificant" Content="Sì, è un bene significativo"
-                                              VerticalAlignment="Center" FontSize="13"/>
+                                              VerticalAlignment="Center" FontSize="13" Margin="0,0,0,5"/>
+                                    <CheckBox x:Name="ChkCompanyMaterial"
+                                              Content="Solo costo aziendale"
+                                              VerticalAlignment="Center"
+                                              FontSize="13"
+                                              ToolTip="Non compare nel catalogo materiali del preventivo"/>
                                 </StackPanel>
                             </Grid>
 
@@ -341,6 +346,10 @@
                                 </DataGridTextColumn>
 
                                 <DataGridCheckBoxColumn Header="B.S." Binding="{Binding IsSignificant}" Width="50" IsReadOnly="True"/>
+                                <DataGridCheckBoxColumn Header="Aziendale"
+                                                        Binding="{Binding IsCompanyMaterial}"
+                                                        Width="82"
+                                                        IsReadOnly="True"/>
 
                                 <DataGridTemplateColumn Header="" Width="56" IsReadOnly="True">
                                     <DataGridTemplateColumn.CellTemplate>

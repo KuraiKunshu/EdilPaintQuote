@@ -345,6 +345,50 @@ public partial class HistoryWindow : Window
         }
     }
 
+    private async Task OpenRealProfitCalculatorAsync(QuoteHistorySummary entry)
+    {
+        try
+        {
+            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+            if (fullEntry == null)
+            {
+                MessageBox.Show("Preventivo non trovato nello storico.", "Guadagno reale",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            double supplierDiscount = _vm.AllCustomers
+                .FirstOrDefault(customer =>
+                    customer.IsSupplier &&
+                    string.Equals(customer.BusinessName, fullEntry.SupplierName, StringComparison.OrdinalIgnoreCase))
+                ?.SupplierDiscount ?? 0;
+
+            bool customerIsSupplier = _vm.AllCustomers.Any(customer =>
+                customer.IsSupplier &&
+                string.Equals(customer.BusinessName, fullEntry.CustomerName, StringComparison.OrdinalIgnoreCase));
+
+            new RealProfitWindow(
+                fullEntry,
+                supplierDiscount,
+                customerIsSupplier,
+                _vm.PersonalMaterialsView)
+            {
+                Owner = this
+            }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Impossibile aprire il calcolo del guadagno.\n\n{ex.Message}",
+                "Guadagno reale", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void OnCalculateRealProfitClick(object sender, RoutedEventArgs e)
+    {
+        if (TryGetSummary(sender, out var entry))
+            await OpenRealProfitCalculatorAsync(entry);
+    }
+
     private void OnSelectSupplierClick(object sender, RoutedEventArgs e)
     {
         if (!TryGetSummary(sender, out var entry)) return;
@@ -1079,6 +1123,7 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
         menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Calcola guadagno reale", async () => await OpenRealProfitCalculatorAsync(entry)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));
 

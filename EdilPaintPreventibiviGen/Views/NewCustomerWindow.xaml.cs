@@ -30,6 +30,7 @@ public partial class NewCustomerWindow : Window
             TxtPhone.Text = _existingCustomer.Phone;
             TxtDiscountMat.Text = _existingCustomer.MaterialDiscount.ToString(CultureInfo.InvariantCulture);
             TxtDiscountLab.Text = _existingCustomer.LaborDiscount.ToString(CultureInfo.InvariantCulture);
+            TxtSupplierDiscount.Text = _existingCustomer.SupplierDiscount.ToString(CultureInfo.InvariantCulture);
             ChkIsSupplier.IsChecked = _existingCustomer.IsSupplier;
         }
         else
@@ -71,6 +72,13 @@ public partial class NewCustomerWindow : Window
             return;
         }
 
+        if (!TryParseDiscount(TxtSupplierDiscount.Text, out var supplierDiscount) ||
+            supplierDiscount < 0 || supplierDiscount > 100)
+        {
+            MessageBox.Show("Lo sconto fornitore deve essere una percentuale compresa tra 0 e 100.");
+            return;
+        }
+
         if (_existingCustomer != null)
         {
             _existingCustomer.BusinessName = TxtBusiness.Text;
@@ -79,6 +87,7 @@ public partial class NewCustomerWindow : Window
             _existingCustomer.Phone = TxtPhone.Text;
             _existingCustomer.MaterialDiscount = materialDiscount;
             _existingCustomer.LaborDiscount = laborDiscount;
+            _existingCustomer.SupplierDiscount = supplierDiscount;
             _existingCustomer.IsSupplier = ChkIsSupplier.IsChecked == true;
 
             NewCustomer = _existingCustomer;
@@ -93,6 +102,7 @@ public partial class NewCustomerWindow : Window
                 Phone = TxtPhone.Text,
                 MaterialDiscount = materialDiscount,
                 LaborDiscount = laborDiscount,
+                SupplierDiscount = supplierDiscount,
                 IsSupplier = ChkIsSupplier.IsChecked == true
             };
         }

@@ -83,7 +83,8 @@ public class JsonImportService
                 Email = GetJsonString(c, "email", "Email", "EMAIL"),
                 Phone = GetJsonString(c, "Telefono", "telefono", "Phone", "tel"),
                 MaterialDiscount = GetJsonDouble(c, "sconto_materiale"),
-                LaborDiscount = GetJsonDouble(c, "sconto_lavori")
+                LaborDiscount = GetJsonDouble(c, "sconto_lavori"),
+                SupplierDiscount = GetJsonDouble(c, "sconto_fornitore")
             };
 
             if (string.IsNullOrWhiteSpace(customer.BusinessName))

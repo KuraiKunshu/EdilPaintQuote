@@ -18,6 +18,7 @@ public static class EntityModelMapper
             Phone = entity.Phone,
             MaterialDiscount = entity.MaterialDiscount,
             LaborDiscount = entity.LaborDiscount,
+            SupplierDiscount = entity.SupplierDiscount,
             IsSupplier = entity.IsSupplier,
             LastModifiedUtc = entity.LastModifiedUtc,
             BaseVersionUtc = entity.LastModifiedUtc,
@@ -36,6 +37,7 @@ public static class EntityModelMapper
             Phone = model.Phone,
             MaterialDiscount = model.MaterialDiscount,
             LaborDiscount = model.LaborDiscount,
+            SupplierDiscount = model.SupplierDiscount,
             IsSupplier = model.IsSupplier,
             LastModifiedUtc = model.LastModifiedUtc
         };
@@ -83,7 +85,8 @@ public static class EntityModelMapper
             Description = entity.Description,
             UnitPrice = entity.UnitPrice,
             Quantity = 1,
-            IsSignificant = entity.IsSignificant
+            IsSignificant = entity.IsSignificant,
+            IsCompanyMaterial = entity.IsCompanyMaterial
         };
     }
 
@@ -95,7 +98,8 @@ public static class EntityModelMapper
             Name = model.Name,
             Description = model.Description,
             UnitPrice = model.UnitPrice,
-            IsSignificant = model.IsSignificant
+            IsSignificant = model.IsSignificant,
+            IsCompanyMaterial = model.IsCompanyMaterial
         };
     }
 
