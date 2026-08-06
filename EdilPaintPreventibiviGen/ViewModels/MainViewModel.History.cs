@@ -73,10 +73,21 @@ public partial class MainViewModel
         {
             QuoteNumber = QuoteNumber,
             Date = quoteDate ?? DateTime.Now,
-            CustomerName = SelectedCustomer?.BusinessName ?? "Sconosciuto",
-            ReferenceName = IsSecondCustomerEnabled ? (SelectedSecondCustomer?.BusinessName ?? "") : "",
+            CustomerName = SelectedCustomer?.BusinessName ?? _unresolvedCustomerName,
+            CustomerSyncId = SelectedCustomer?.SyncId ?? Guid.Empty,
+            ReferenceName = IsSecondCustomerEnabled
+                ? SelectedSecondCustomer?.BusinessName ?? _unresolvedReferenceCustomerName
+                : string.Empty,
+            ReferenceCustomerSyncId = IsSecondCustomerEnabled
+                ? SelectedSecondCustomer?.SyncId ?? Guid.Empty
+                : Guid.Empty,
             SiteName = IsSiteCustomerEnabled ? SiteAddress.Trim() : "",
-            BillingCustomerName = IsBillingCustomerEnabled ? (SelectedBillingCustomer?.BusinessName ?? "") : "",
+            BillingCustomerName = IsBillingCustomerEnabled
+                ? SelectedBillingCustomer?.BusinessName ?? _unresolvedBillingCustomerName
+                : string.Empty,
+            BillingCustomerSyncId = IsBillingCustomerEnabled
+                ? SelectedBillingCustomer?.SyncId ?? Guid.Empty
+                : Guid.Empty,
             PdfPath = pdfPath,
             PaymentTerms = PaymentTerms,
             IvaType = IvaType,
@@ -144,9 +155,12 @@ public partial class MainViewModel
                     entry.BaseRevision = existingEntry.BaseRevision;
 
                 existingEntry.CustomerName = entry.CustomerName;
+                existingEntry.CustomerSyncId = entry.CustomerSyncId;
                 existingEntry.ReferenceName = entry.ReferenceName;
+                existingEntry.ReferenceCustomerSyncId = entry.ReferenceCustomerSyncId;
                 existingEntry.SiteName = entry.SiteName;
                 existingEntry.BillingCustomerName = entry.BillingCustomerName;
+                existingEntry.BillingCustomerSyncId = entry.BillingCustomerSyncId;
                 existingEntry.PdfPath = entry.PdfPath;
                 existingEntry.PaymentTerms = entry.PaymentTerms;
                 existingEntry.IvaType = entry.IvaType;
@@ -192,43 +206,8 @@ public partial class MainViewModel
     
     private async Task<bool> SaveWithExistingMetadataAsync(QuoteHistoryEntry entry)
     {
-        try
-        {
-            var existing = await _dataService.GetQuoteByNumberAsync(entry.QuoteNumber);
-            if (existing != null)
-            {
-                entry.Date = existing.Date;
-                entry.Status = existing.Status == QuoteStatus.Bozza
-                    ? QuoteStatus.Finalizzato
-                    : existing.Status;
-                entry.Notes = existing.Notes;
-                entry.CreatedByDevice = existing.CreatedByDevice;
-                entry.LastModifiedByDevice = existing.LastModifiedByDevice;
-                entry.SentAtUtc = existing.SentAtUtc;
-                entry.SentMethod = existing.SentMethod;
-                entry.SentRecipient = existing.SentRecipient;
-                entry.SentByDevice = existing.SentByDevice;
-                entry.LastReminderAtUtc = existing.LastReminderAtUtc;
-                entry.ReminderCount = existing.ReminderCount;
-                entry.LastReminderByDevice = existing.LastReminderByDevice;
-                entry.Events = existing.Events.ToList();
-                entry.SupplierName = existing.SupplierName;
-                entry.MaterialOrderDate = existing.MaterialOrderDate;
-                entry.ExpectedDeliveryDate = existing.ExpectedDeliveryDate;
-                entry.MaterialStatus = existing.MaterialStatus;
-                // Non sostituire la versione di partenza con quella letta subito
-                // prima del salvataggio: annullerebbe il controllo multi-PC.
-                if (entry.BaseVersionUtc == default)
-                    entry.BaseVersionUtc = existing.BaseVersionUtc;
-                if (entry.BaseRevision == 0)
-                    entry.BaseRevision = existing.BaseRevision;
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[SaveWithExistingMetadata] Errore recupero metadati originali: {ex.Message}");
-        }
-
+        // Il recupero autorevole dei metadati avviene in
+        // SaveSingleHistoryEntrySafeAsync dentro lo stesso gate del write.
         History.Insert(0, entry);
         return await SaveSingleHistoryEntrySafeAsync(entry);
     }
@@ -249,25 +228,56 @@ public partial class MainViewModel
         }
 
         _isSavingQuoteHistory = true;
+        bool databaseGateTaken = false;
+        bool databaseSaveCompleted = false;
+
+        void ReleaseDatabaseGate()
+        {
+            if (!databaseGateTaken)
+                return;
+
+            DatabaseOperationCoordinator.Gate.Release();
+            databaseGateTaken = false;
+        }
 
         try
         {
-            await _dataService.SaveQuoteAsync(entry);
+            await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+                _dataService,
+                $"Salvataggio preventivo {entry.QuoteNumber}");
+            await DatabaseOperationCoordinator.Gate.WaitAsync();
+            databaseGateTaken = true;
+
+            // Legge e preserva i metadati operativi dentro lo stesso gate del
+            // salvataggio: una sync non puo' piu' inserirsi nel mezzo e venire
+            // poi annullata da uno snapshot precedente dell'interfaccia.
+            var databaseVersion = await _dataService.GetQuoteByNumberAsync(
+                entry.QuoteNumber,
+                includeAttachments: false);
+            if (databaseVersion != null)
+                PreserveDatabaseManagedMetadata(entry, databaseVersion);
+
+            await SaveQuoteToAuthoritativeDatabaseAsync(entry);
+            databaseSaveCompleted = true;
+            ReleaseDatabaseGate();
             RememberPersistedQuote(entry);
             return true;
         }
-        catch (System.Text.Json.JsonException jsonEx)
+        catch (System.Text.Json.JsonException jsonEx) when (!databaseSaveCompleted)
         {
             Debug.WriteLine($"[SAVE HISTORY] Errore JSON: {jsonEx.Message}");
             try
             {
                 var fallback = CloneEntryWithoutPdfBytes(entry);
-                await _dataService.SaveQuoteAsync(fallback);
+                await SaveQuoteToAuthoritativeDatabaseAsync(fallback);
+                databaseSaveCompleted = true;
+                ReleaseDatabaseGate();
                 RememberPersistedQuote(fallback);
                 return true;
             }
             catch (Exception retryEx)
             {
+                ReleaseDatabaseGate();
                 MessageBox.Show($"Errore durante il salvataggio dello storico.\n\n{retryEx.Message}",
                     "Errore salvataggio storico", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
@@ -275,14 +285,47 @@ public partial class MainViewModel
         }
         catch (Exception ex)
         {
+            ReleaseDatabaseGate();
             MessageBox.Show($"Errore durante il salvataggio dello storico.\n\n{ex.Message}",
                 "Errore salvataggio storico", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
         finally
         {
+            ReleaseDatabaseGate();
             _isSavingQuoteHistory = false;
         }
+    }
+
+    private Task SaveQuoteToAuthoritativeDatabaseAsync(
+        QuoteHistoryEntry entry,
+        CancellationToken cancellationToken = default) =>
+        _dataService is FallbackDataService fallback
+            ? fallback.SaveQuoteDatabaseOnlyAsync(entry, cancellationToken)
+            : _dataService.SaveQuoteAsync(entry, cancellationToken);
+
+    private static void PreserveDatabaseManagedMetadata(
+        QuoteHistoryEntry target,
+        QuoteHistoryEntry source)
+    {
+        target.Date = source.Date;
+        target.Status = source.Status == QuoteStatus.Bozza
+            ? QuoteStatus.Finalizzato
+            : source.Status;
+        target.Notes = source.Notes;
+        target.CreatedByDevice = source.CreatedByDevice;
+        target.SentAtUtc = source.SentAtUtc;
+        target.SentMethod = source.SentMethod;
+        target.SentRecipient = source.SentRecipient;
+        target.SentByDevice = source.SentByDevice;
+        target.LastReminderAtUtc = source.LastReminderAtUtc;
+        target.ReminderCount = source.ReminderCount;
+        target.LastReminderByDevice = source.LastReminderByDevice;
+        target.Events = source.Events.ToList();
+        target.SupplierName = source.SupplierName;
+        target.MaterialOrderDate = source.MaterialOrderDate;
+        target.ExpectedDeliveryDate = source.ExpectedDeliveryDate;
+        target.MaterialStatus = source.MaterialStatus;
     }
 
     private void RememberPersistedQuote(QuoteHistoryEntry entry)
@@ -299,6 +342,14 @@ public partial class MainViewModel
         _loadedQuotePdfPath = entry.PdfPath;
         _loadedQuoteBaseVersionUtc = persistedVersion;
         _loadedQuoteBaseRevision = entry.BaseRevision;
+        _isDraftQuoteNumberAllocated = true;
+        _sharedDraftCreatedByAutosave = false;
+
+        // Il contenuto appena confermato dal database diventa la nuova base.
+        // Senza questo aggiornamento, il tick successivo dell'autosave lo
+        // interpretava come un'altra modifica e risalvava inutilmente la quote.
+        _lastSharedDraftContentHash = ComputeSharedDraftContentHash(CreateDraftEntry());
+        _lastSharedDraftAttachmentHash = ComputeAttachmentContentHash(entry.Attachments);
 
         var historyEntry = History.FirstOrDefault(x => x.QuoteNumber == entry.QuoteNumber);
         if (historyEntry != null)
@@ -371,9 +422,12 @@ public partial class MainViewModel
             QuoteNumber = entry.QuoteNumber,
             Date = entry.Date,
             CustomerName = entry.CustomerName,
+            CustomerSyncId = entry.CustomerSyncId,
             ReferenceName = entry.ReferenceName,
+            ReferenceCustomerSyncId = entry.ReferenceCustomerSyncId,
             SiteName = entry.SiteName,
             BillingCustomerName = entry.BillingCustomerName,
+            BillingCustomerSyncId = entry.BillingCustomerSyncId,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             IvaType = entry.IvaType,

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 
@@ -6,16 +8,35 @@ namespace EdilPaintPreventibiviGen.ViewModels;
 
 public partial class MainViewModel
 {
+    private static readonly TimeSpan SharedDraftSaveInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan SharedDraftCloudTimeout = TimeSpan.FromSeconds(10);
     private readonly LocalDraftService _draftService = new(LocalApplicationDataService.GetDataDirectoryPath());
+    private DateTime _lastSharedDraftSaveAttemptUtc = DateTime.MinValue;
+    private bool _isDraftQuoteNumberAllocated;
+    private bool _sharedDraftCreatedByAutosave;
 
     public async Task<QuoteHistoryEntry?> LoadDraftAsync(CancellationToken cancellationToken = default)
     {
         return await _draftService.LoadAsync(cancellationToken);
     }
 
-    public async Task SaveDraftAsync(CancellationToken cancellationToken = default)
+    public async Task SaveDraftAsync(
+        CancellationToken cancellationToken = default,
+        bool forceDatabaseSave = false)
     {
         bool lockTaken = false;
+        bool databaseGateTaken = false;
+        CancellationTokenSource? cloudSaveCts = null;
+
+        void ReleaseDatabaseGate()
+        {
+            if (!databaseGateTaken)
+                return;
+
+            DatabaseOperationCoordinator.Gate.Release();
+            databaseGateTaken = false;
+        }
+
         try
         {
             await _draftSaveLock.WaitAsync(cancellationToken);
@@ -36,7 +57,20 @@ public partial class MainViewModel
 
             // Il file locale viene sempre aggiornato per primo: resta disponibile
             // anche quando il database cloud e' temporaneamente irraggiungibile.
-            await _draftService.SaveAsync(draft, cancellationToken);
+            await _draftService.SaveIfChangedAsync(draft, cancellationToken);
+
+            if (IsBillingCustomerEnabled && SelectedBillingCustomer == null)
+            {
+                DraftSyncStatus = "Bozza locale: riseleziona il cliente di fatturazione";
+                HasDraftSyncError = false;
+                return;
+            }
+            if (IsSecondCustomerEnabled && SelectedSecondCustomer == null)
+            {
+                DraftSyncStatus = "Bozza locale: riseleziona il riferimento";
+                HasDraftSyncError = false;
+                return;
+            }
 
             // Il sync lavora sugli stessi record e sulle stesse cache. Durante una
             // sincronizzazione manteniamo al sicuro la bozza locale e rimandiamo
@@ -62,27 +96,145 @@ public partial class MainViewModel
                 return;
             }
 
-            if (!_isEditingExistingQuote)
+            DateTime nowUtc = DateTime.UtcNow;
+            CancellationToken databaseCancellationToken = cancellationToken;
+            if (!forceDatabaseSave)
             {
-                int nextNumber = await _dataService.GetNextQuoteNumberAsync();
-                QuoteNumber = nextNumber.ToString();
-                draft.QuoteNumber = QuoteNumber;
-                await _draftService.SaveAsync(draft, cancellationToken);
+                cloudSaveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cloudSaveCts.CancelAfter(SharedDraftCloudTimeout);
+                databaseCancellationToken = cloudSaveCts.Token;
             }
 
-            string contentHash = QuoteSyncHashService.Compute(draft);
-            if (string.Equals(contentHash, _lastSharedDraftContentHash, StringComparison.Ordinal))
+            string contentHash;
+            string attachmentHash;
+            if (_isEditingExistingQuote)
             {
-                return;
-            }
+                (contentHash, attachmentHash) = await Task.Run(
+                    () =>
+                    {
+                        string currentAttachmentHash = ComputeAttachmentContentHash(draft.Attachments);
+                        return (
+                            ComputeSharedDraftContentHash(draft, currentAttachmentHash),
+                            currentAttachmentHash);
+                    },
+                    cancellationToken);
+                if (string.Equals(contentHash, _lastSharedDraftContentHash, StringComparison.Ordinal))
+                    return;
 
-            await SaveSharedDraftAsync(draft, cancellationToken);
+                if (!forceDatabaseSave &&
+                    nowUtc - _lastSharedDraftSaveAttemptUtc < SharedDraftSaveInterval)
+                {
+                    DraftSyncStatus = "Bozza salvata su questo PC: condivisione in attesa";
+                    HasDraftSyncError = false;
+                    return;
+                }
+
+                await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+                    _dataService,
+                    "Condivisione bozza preventivo",
+                    databaseCancellationToken);
+            }
+            else
+            {
+                // Per una nuova bozza il throttle precede l'allocazione atomica:
+                // un tick rinviato non deve consumare un nuovo numero preventivo.
+                if (!forceDatabaseSave &&
+                    nowUtc - _lastSharedDraftSaveAttemptUtc < SharedDraftSaveInterval)
+                {
+                    DraftSyncStatus = "Bozza salvata su questo PC: condivisione in attesa";
+                    HasDraftSyncError = false;
+                    return;
+                }
+
+
+                await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+                    _dataService,
+                    "Condivisione nuova bozza",
+                    databaseCancellationToken);
+
+                if (!_isDraftQuoteNumberAllocated)
+                {
+                    await DatabaseOperationCoordinator.Gate.WaitAsync(databaseCancellationToken);
+                    databaseGateTaken = true;
+                    int nextNumber = await RunDraftDatabaseOperationAsync(
+                        () => _dataService.GetNextQuoteNumberAsync(databaseCancellationToken),
+                        databaseCancellationToken);
+                    ReleaseDatabaseGate();
+
+                    QuoteNumber = nextNumber.ToString();
+                    draft.QuoteNumber = QuoteNumber;
+                    _isDraftQuoteNumberAllocated = true;
+                    draft.IsDraftQuoteNumberAllocated = true;
+                    await _draftService.SaveIfChangedAsync(draft, CancellationToken.None);
+                }
+
+                (contentHash, attachmentHash) = await Task.Run(
+                    () =>
+                    {
+                        string currentAttachmentHash = ComputeAttachmentContentHash(draft.Attachments);
+                        return (
+                            ComputeSharedDraftContentHash(draft, currentAttachmentHash),
+                            currentAttachmentHash);
+                    },
+                    cancellationToken);
+            }
+            _lastSharedDraftSaveAttemptUtc = nowUtc;
+
+            // Foto e PDF sono spesso la parte piu' pesante della bozza. Il DB li
+            // riceve solo alla prima creazione o quando il loro contenuto cambia;
+            // negli altri autosave la relazione esistente viene preservata.
+            draft.HasCompleteAttachmentSnapshot =
+                !_isEditingExistingQuote ||
+                !string.Equals(
+                    attachmentHash,
+                    _lastSharedDraftAttachmentHash,
+                    StringComparison.Ordinal);
+
+            DateTime loadedBaseVersionUtc = _loadedQuoteBaseVersionUtc;
+            long loadedBaseRevision = _loadedQuoteBaseRevision;
+            await DatabaseOperationCoordinator.Gate.WaitAsync(databaseCancellationToken);
+            databaseGateTaken = true;
+            var savedState = await RunDraftDatabaseOperationAsync(
+                () => SaveSharedDraftCoreAsync(
+                    draft,
+                    loadedBaseVersionUtc,
+                    loadedBaseRevision,
+                    databaseCancellationToken),
+                databaseCancellationToken);
+            ReleaseDatabaseGate();
+
+            // Questi campi alimentano il binding WPF: vengono applicati solo
+            // quando il lavoro DB e' terminato e l'await e' tornato al chiamante.
+            _isEditingExistingQuote = true;
+            _hasPersistedCurrentQuote = true;
+            _loadedQuoteDate = savedState.Date;
+            _loadedQuoteBaseVersionUtc = savedState.BaseVersionUtc;
+            _loadedQuoteBaseRevision = savedState.BaseRevision;
+            _isDraftQuoteNumberAllocated = true;
+            _sharedDraftCreatedByAutosave = savedState.WasCreatedByAutosave;
+            draft.IsEditingExistingQuoteDraft = true;
+            draft.IsDraftQuoteNumberAllocated = true;
+            draft.WasCreatedByDraftAutosave = _sharedDraftCreatedByAutosave;
+
             if (draft.BaseRevision > 0)
             {
+                draft.HasCompleteAttachmentSnapshot = true;
+                draft.SharedDraftContentHash = contentHash;
+                await _draftService.SaveIfChangedAsync(
+                    draft,
+                    CancellationToken.None,
+                    forceWrite: true);
                 _lastSharedDraftContentHash = contentHash;
-                await _draftService.SaveAsync(draft, cancellationToken);
+                _lastSharedDraftAttachmentHash = attachmentHash;
             }
             DraftSyncStatus = $"Bozza condivisa alle {DateTime.Now:HH:mm:ss}";
+            HasDraftSyncError = false;
+        }
+        catch (OperationCanceledException) when (
+            cloudSaveCts?.IsCancellationRequested == true &&
+            !cancellationToken.IsCancellationRequested)
+        {
+            DraftSyncStatus = "Bozza salvata su questo PC: database lento, condivisione rinviata";
             HasDraftSyncError = false;
         }
         catch (OperationCanceledException)
@@ -97,6 +249,8 @@ public partial class MainViewModel
         }
         finally
         {
+            cloudSaveCts?.Dispose();
+            ReleaseDatabaseGate();
             if (lockTaken)
                 _draftSaveLock.Release();
         }
@@ -107,19 +261,70 @@ public partial class MainViewModel
 
     public async Task DiscardCurrentWorkAsync(CancellationToken cancellationToken = default)
     {
-        var draft = await _draftService.LoadAsync(cancellationToken);
-        await _draftService.DeleteAsync(cancellationToken);
-
-        if (draft is not { IsEditingExistingQuoteDraft: true } ||
-            string.IsNullOrWhiteSpace(draft.QuoteNumber) ||
-            !_dataService.CanSynchronize)
+        bool lockTaken = false;
+        bool databaseGateTaken = false;
+        CancellationTokenSource? cleanupCts = null;
+        try
         {
-            return;
-        }
+            await _draftSaveLock.WaitAsync(cancellationToken);
+            lockTaken = true;
 
-        var stored = await _dataService.GetQuoteByNumberAsync(draft.QuoteNumber);
-        if (stored?.Status == QuoteStatus.Bozza)
-            await _dataService.DeleteQuoteAsync(draft.QuoteNumber);
+            var draft = await _draftService.LoadAsync(cancellationToken);
+            await _draftService.DeleteAsync(cancellationToken);
+
+            if (draft is not { IsEditingExistingQuoteDraft: true, WasCreatedByDraftAutosave: true } ||
+                string.IsNullOrWhiteSpace(draft.QuoteNumber) ||
+                !_dataService.CanSynchronize)
+            {
+                return;
+            }
+
+            cleanupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cleanupCts.CancelAfter(TimeSpan.FromSeconds(8));
+            CancellationToken cleanupToken = cleanupCts.Token;
+            await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+                _dataService,
+                $"Pulizia bozza {draft.QuoteNumber}",
+                cleanupToken);
+            await DatabaseOperationCoordinator.Gate.WaitAsync(cleanupToken);
+            databaseGateTaken = true;
+
+            var stored = await RunDraftDatabaseOperationAsync(
+                () => _dataService.GetQuoteByNumberAsync(
+                    draft.QuoteNumber,
+                    cleanupToken,
+                    includeAttachments: false),
+                cleanupToken);
+            if (stored?.Status == QuoteStatus.Bozza)
+            {
+                await RunDraftDatabaseOperationAsync(
+                    () => _dataService.DeleteQuoteAsync(draft.QuoteNumber, cleanupToken),
+                    cleanupToken);
+            }
+        }
+        catch (OperationCanceledException) when (
+            cleanupCts?.IsCancellationRequested == true &&
+            !cancellationToken.IsCancellationRequested)
+        {
+            Debug.WriteLine("[Draft] Pulizia bozza cloud rinviata: database lento.");
+        }
+        finally
+        {
+            cleanupCts?.Dispose();
+            if (databaseGateTaken)
+                DatabaseOperationCoordinator.Gate.Release();
+            if (lockTaken)
+            {
+                try
+                {
+                    ResetQuote();
+                }
+                finally
+                {
+                    _draftSaveLock.Release();
+                }
+            }
+        }
     }
 
     public void ApplyDraft(QuoteHistoryEntry draft)
@@ -130,14 +335,18 @@ public partial class MainViewModel
             ? _companyData.Counter.ToString()
             : draft.QuoteNumber;
 
-        SelectedCustomer = AllCustomers.FirstOrDefault(c =>
-            c.BusinessName.Equals(draft.CustomerName, StringComparison.OrdinalIgnoreCase));
+        SelectedCustomer = FindCustomerByIdentity(draft.CustomerSyncId, draft.CustomerName);
+        if (SelectedCustomer == null)
+            _unresolvedCustomerName = draft.CustomerName;
 
         if (!string.IsNullOrWhiteSpace(draft.ReferenceName))
         {
             IsSecondCustomerEnabled = true;
-            SelectedSecondCustomer = AllCustomers.FirstOrDefault(c =>
-                c.BusinessName.Equals(draft.ReferenceName, StringComparison.OrdinalIgnoreCase));
+            SelectedSecondCustomer = FindCustomerByIdentity(
+                draft.ReferenceCustomerSyncId,
+                draft.ReferenceName);
+            if (SelectedSecondCustomer == null)
+                _unresolvedReferenceCustomerName = draft.ReferenceName;
         }
 
         if (!string.IsNullOrWhiteSpace(draft.SiteName))
@@ -149,8 +358,11 @@ public partial class MainViewModel
         if (!string.IsNullOrWhiteSpace(draft.BillingCustomerName))
         {
             IsBillingCustomerEnabled = true;
-            SelectedBillingCustomer = AllCustomers.FirstOrDefault(c =>
-                c.BusinessName.Equals(draft.BillingCustomerName, StringComparison.OrdinalIgnoreCase));
+            SelectedBillingCustomer = FindCustomerByIdentity(
+                draft.BillingCustomerSyncId,
+                draft.BillingCustomerName);
+            if (SelectedBillingCustomer == null)
+                _unresolvedBillingCustomerName = draft.BillingCustomerName;
         }
 
         PaymentTerms = draft.PaymentTerms;
@@ -201,10 +413,23 @@ public partial class MainViewModel
             ? draft.BaseVersionUtc
             : default;
         _loadedQuoteBaseRevision = resumesExistingQuote ? draft.BaseRevision : 0;
-        _lastSharedDraftContentHash = string.Empty;
+        _isDraftQuoteNumberAllocated = draft.IsDraftQuoteNumberAllocated || resumesExistingQuote;
+        _sharedDraftCreatedByAutosave = draft.WasCreatedByDraftAutosave;
+        _lastSharedDraftSaveAttemptUtc = DateTime.MinValue;
 
         UpdateItemSortOrders();
         CalculateTotals();
+        string recoveredContentHash = ComputeSharedDraftContentHash(CreateDraftEntry());
+        bool matchesLastSharedVersion = string.Equals(
+            recoveredContentHash,
+            draft.SharedDraftContentHash,
+            StringComparison.Ordinal);
+        _lastSharedDraftContentHash = matchesLastSharedVersion
+            ? recoveredContentHash
+            : string.Empty;
+        _lastSharedDraftAttachmentHash = matchesLastSharedVersion
+            ? ComputeAttachmentContentHash(draft.Attachments)
+            : string.Empty;
     }
 
     private QuoteHistoryEntry CreateDraftEntry()
@@ -214,10 +439,21 @@ public partial class MainViewModel
         {
             QuoteNumber = QuoteNumber,
             Date = _loadedQuoteDate ?? DateTime.Now,
-            CustomerName = SelectedCustomer?.BusinessName ?? string.Empty,
-            ReferenceName = IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName ?? string.Empty : string.Empty,
+            CustomerName = SelectedCustomer?.BusinessName ?? _unresolvedCustomerName,
+            CustomerSyncId = SelectedCustomer?.SyncId ?? Guid.Empty,
+            ReferenceName = IsSecondCustomerEnabled
+                ? SelectedSecondCustomer?.BusinessName ?? _unresolvedReferenceCustomerName
+                : string.Empty,
+            ReferenceCustomerSyncId = IsSecondCustomerEnabled
+                ? SelectedSecondCustomer?.SyncId ?? Guid.Empty
+                : Guid.Empty,
             SiteName = IsSiteCustomerEnabled ? SiteAddress.Trim() : string.Empty,
-            BillingCustomerName = IsBillingCustomerEnabled ? SelectedBillingCustomer?.BusinessName ?? string.Empty : string.Empty,
+            BillingCustomerName = IsBillingCustomerEnabled
+                ? SelectedBillingCustomer?.BusinessName ?? _unresolvedBillingCustomerName
+                : string.Empty,
+            BillingCustomerSyncId = IsBillingCustomerEnabled
+                ? SelectedBillingCustomer?.SyncId ?? Guid.Empty
+                : Guid.Empty,
             PaymentTerms = PaymentTerms,
             IvaType = IvaType,
             Materials = Materials.Select(CloneItem).ToList(),
@@ -247,15 +483,27 @@ public partial class MainViewModel
                 ImportedAt = DateTime.UtcNow
             }).ToList(),
             HasCompleteAttachmentSnapshot = true,
+            IsDraftQuoteNumberAllocated = _isDraftQuoteNumberAllocated,
+            WasCreatedByDraftAutosave = _sharedDraftCreatedByAutosave,
+            SharedDraftContentHash = _lastSharedDraftContentHash,
             Events = []
         };
     }
 
-    private async Task SaveSharedDraftAsync(
+    private async Task<SharedDraftSaveState> SaveSharedDraftCoreAsync(
         QuoteHistoryEntry draft,
+        DateTime loadedBaseVersionUtc,
+        long loadedBaseRevision,
         CancellationToken cancellationToken)
     {
-        QuoteHistoryEntry? existing = await _dataService.GetQuoteByNumberAsync(draft.QuoteNumber);
+        cancellationToken.ThrowIfCancellationRequested();
+        QuoteHistoryEntry? existing = await _dataService.GetQuoteByNumberAsync(
+                draft.QuoteNumber,
+                cancellationToken,
+                includeAttachments: false)
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        bool createdByAutosave = draft.WasCreatedByDraftAutosave || existing == null;
         if (existing != null)
         {
             draft.Date = existing.Date;
@@ -280,9 +528,9 @@ public partial class MainViewModel
             // Non usiamo il timestamp appena letto, altrimenti perderemmo il
             // controllo sulle modifiche concorrenti degli altri PC.
             if (draft.BaseVersionUtc == default)
-                draft.BaseVersionUtc = _loadedQuoteBaseVersionUtc;
+                draft.BaseVersionUtc = loadedBaseVersionUtc;
             if (draft.BaseRevision == 0)
-                draft.BaseRevision = _loadedQuoteBaseRevision;
+                draft.BaseRevision = loadedBaseRevision;
         }
         else
         {
@@ -297,22 +545,138 @@ public partial class MainViewModel
             Description = "Bozza condivisa aggiornata"
         });
 
-        await _dataService.SaveQuoteAsync(draft, cancellationToken);
-
-        _isEditingExistingQuote = true;
-        _hasPersistedCurrentQuote = true;
-        _loadedQuoteDate = draft.Date;
-        _loadedQuoteBaseVersionUtc = draft.BaseVersionUtc;
-        _loadedQuoteBaseRevision = draft.BaseRevision;
-        draft.IsEditingExistingQuoteDraft = true;
+        // Il gate copre soltanto il commit autorevole SQL. history.json e' una
+        // cache e verra' riallineato in un unico batch dalla sync periodica.
+        await SaveQuoteToAuthoritativeDatabaseAsync(draft, cancellationToken)
+            .ConfigureAwait(false);
+        return new SharedDraftSaveState(
+            draft.Date,
+            draft.BaseVersionUtc,
+            draft.BaseRevision,
+            createdByAutosave);
     }
+
+    private static async Task<T> RunDraftDatabaseOperationAsync<T>(
+        Func<Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return await Task.Run(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return await operation().ConfigureAwait(false);
+        }, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private static async Task RunDraftDatabaseOperationAsync(
+        Func<Task> operation,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await Task.Run(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await operation().ConfigureAwait(false);
+        }, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private string ComputeSharedDraftContentHash(QuoteHistoryEntry draft)
+    {
+        string attachmentHash = ComputeAttachmentContentHash(draft.Attachments);
+        return ComputeSharedDraftContentHash(draft, attachmentHash);
+    }
+
+    private static string ComputeSharedDraftContentHash(
+        QuoteHistoryEntry draft,
+        string attachmentHash)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+
+        static void AppendText(IncrementalHash target, string? value)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
+            target.AppendData(BitConverter.GetBytes(bytes.Length));
+            target.AppendData(bytes);
+        }
+
+        AppendText(hash, QuoteSyncHashService.Compute(draft));
+        AppendText(hash, draft.CustomerSyncId.ToString("N"));
+        AppendText(hash, draft.ReferenceCustomerSyncId.ToString("N"));
+        AppendText(hash, draft.BillingCustomerSyncId.ToString("N"));
+        AppendText(hash, draft.HasCompleteAttachmentSnapshot.ToString());
+        AppendText(hash, attachmentHash);
+
+        return Convert.ToBase64String(hash.GetHashAndReset());
+    }
+
+    private string ComputeAttachmentContentHash(IReadOnlyList<StoredFile> attachments)
+    {
+        lock (_attachmentHashCacheLock)
+        {
+            bool cacheMatches = attachments.Count == _attachmentHashCache.Count;
+            for (int index = 0; cacheMatches && index < attachments.Count; index++)
+            {
+                var attachment = attachments[index];
+                var cached = _attachmentHashCache[index];
+                cacheMatches =
+                    string.Equals(attachment.FileName, cached.FileName, StringComparison.Ordinal) &&
+                    string.Equals(attachment.ContentType, cached.ContentType, StringComparison.Ordinal) &&
+                    ReferenceEquals(attachment.Content, cached.Content);
+            }
+
+            if (cacheMatches && !string.IsNullOrEmpty(_cachedAttachmentHash))
+                return _cachedAttachmentHash;
+
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+
+            static void AppendText(IncrementalHash target, string? value)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
+                target.AppendData(BitConverter.GetBytes(bytes.Length));
+                target.AppendData(bytes);
+            }
+
+            hash.AppendData(BitConverter.GetBytes(attachments.Count));
+            foreach (var attachment in attachments)
+            {
+                AppendText(hash, attachment.FileName);
+                AppendText(hash, attachment.ContentType);
+                byte[] content = attachment.Content ?? [];
+                hash.AppendData(BitConverter.GetBytes(content.Length));
+                hash.AppendData(content);
+            }
+
+            _attachmentHashCache = attachments
+                .Select(attachment => new AttachmentHashCacheEntry(
+                    attachment.FileName,
+                    attachment.ContentType,
+                    attachment.Content))
+                .ToList();
+            _cachedAttachmentHash = Convert.ToBase64String(hash.GetHashAndReset());
+            return _cachedAttachmentHash;
+        }
+    }
+
+    private sealed record AttachmentHashCacheEntry(
+        string FileName,
+        string ContentType,
+        byte[]? Content);
+
+    private sealed record SharedDraftSaveState(
+        DateTime Date,
+        DateTime BaseVersionUtc,
+        long BaseRevision,
+        bool WasCreatedByAutosave);
 
     private bool HasDraftContent()
     {
         return SelectedCustomer != null ||
+               !string.IsNullOrWhiteSpace(_unresolvedCustomerName) ||
                SelectedSecondCustomer != null ||
+               !string.IsNullOrWhiteSpace(_unresolvedReferenceCustomerName) ||
                !string.IsNullOrWhiteSpace(SiteAddress) ||
                SelectedBillingCustomer != null ||
+               !string.IsNullOrWhiteSpace(_unresolvedBillingCustomerName) ||
                Materials.Count > 0 ||
                Labors.Count > 0 ||
                AttachedImages.Count > 0 ||

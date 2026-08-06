@@ -72,32 +72,68 @@ public sealed class QuoteHistoryService
                !SentOpenExcludedStatuses.Contains(status);
     }
     
-    public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber)
+    public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default)
     {
-        return await _dataService.GetQuoteByNumberAsync(quoteNumber);
+        return await _dataService.GetQuoteByNumberAsync(quoteNumber, cancellationToken);
     }
     public async Task SaveSingleAsync(QuoteHistoryEntry entry)
     {
-        await _dataService.SaveQuoteAsync(entry);
+        await ExecuteCoordinatedMutationAsync(
+            $"Salvataggio preventivo {entry.QuoteNumber}",
+            () => _dataService is FallbackDataService fallback
+                ? fallback.SaveQuoteDatabaseOnlyAsync(entry)
+                : _dataService.SaveQuoteAsync(entry));
     }
     public Task UpdateNotesAsync(string quoteNumber, string notes) =>
-        _dataService.UpdateQuoteNotesAsync(quoteNumber, notes);
+        ExecuteCoordinatedMutationAsync(
+            $"Aggiornamento note preventivo {quoteNumber}",
+            () => _dataService.UpdateQuoteNotesAsync(quoteNumber, notes));
 
     public Task UpdateStatusAsync(string quoteNumber, QuoteStatus status) =>
-        _dataService.UpdateQuoteStatusAsync(quoteNumber, status);
+        ExecuteCoordinatedMutationAsync(
+            $"Aggiornamento stato preventivo {quoteNumber}",
+            () => _dataService.UpdateQuoteStatusAsync(quoteNumber, status));
 
     public Task UpdateSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo) =>
-        _dataService.UpdateQuoteSendInfoAsync(quoteNumber, sendInfo);
+        ExecuteCoordinatedMutationAsync(
+            $"Aggiornamento invio preventivo {quoteNumber}",
+            () => _dataService.UpdateQuoteSendInfoAsync(quoteNumber, sendInfo));
 
     public Task RegisterReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo) =>
-        _dataService.RegisterQuoteReminderAsync(quoteNumber, reminderInfo);
+        ExecuteCoordinatedMutationAsync(
+            $"Aggiornamento promemoria preventivo {quoteNumber}",
+            () => _dataService.RegisterQuoteReminderAsync(quoteNumber, reminderInfo));
 
     public Task UpdateSupplierInfoAsync(string quoteNumber, QuoteSupplierInfo supplierInfo) =>
-        _dataService.UpdateQuoteSupplierInfoAsync(quoteNumber, supplierInfo);
+        ExecuteCoordinatedMutationAsync(
+            $"Aggiornamento fornitore preventivo {quoteNumber}",
+            () => _dataService.UpdateQuoteSupplierInfoAsync(quoteNumber, supplierInfo));
 
     public async Task DeleteQuoteAsync(string quoteNumber)
     {
-        await _dataService.DeleteQuoteAsync(quoteNumber);
+        await ExecuteCoordinatedMutationAsync(
+            $"Eliminazione preventivo {quoteNumber}",
+            () => _dataService.DeleteQuoteAsync(quoteNumber));
+    }
+
+    private async Task ExecuteCoordinatedMutationAsync(
+        string operation,
+        Func<Task> mutation)
+    {
+        await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+            _dataService,
+            operation);
+        await DatabaseOperationCoordinator.Gate.WaitAsync();
+        try
+        {
+            await mutation();
+        }
+        finally
+        {
+            DatabaseOperationCoordinator.Gate.Release();
+        }
     }
 
     public string GetExpectedPdfPath(QuoteHistoryEntry entry)

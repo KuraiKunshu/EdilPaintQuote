@@ -9,6 +9,7 @@ namespace EdilPaintPreventibiviGen.Services;
 public sealed class LocalQuotePatchOutboxService
 {
     private readonly string _outboxPath;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public LocalQuotePatchOutboxService(string dataPath)
@@ -34,60 +35,165 @@ public sealed class LocalQuotePatchOutboxService
 
     public async Task<List<PendingQuotePatch>> LoadAllAsync(CancellationToken cancellationToken = default)
     {
-        var patches = new List<PendingQuotePatch>();
-        foreach (string path in Directory.EnumerateFiles(_outboxPath, "*.json"))
+        await _semaphore.WaitAsync(cancellationToken);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
+            var patches = new List<PendingQuotePatch>();
+            foreach (string path in Directory.EnumerateFiles(_outboxPath, "*.json"))
             {
-                string json = await File.ReadAllTextAsync(path, cancellationToken);
-                var patch = JsonSerializer.Deserialize<PendingQuotePatch>(json, JsonOptions);
-                if (!string.IsNullOrWhiteSpace(patch?.QuoteNumber))
-                    patches.Add(patch);
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    string json = await File.ReadAllTextAsync(path, cancellationToken);
+                    var patch = JsonSerializer.Deserialize<PendingQuotePatch>(json, JsonOptions);
+                    if (!string.IsNullOrWhiteSpace(patch?.QuoteNumber))
+                        patches.Add(patch);
+                }
+                catch (JsonException)
+                {
+                }
             }
-            catch (JsonException)
-            {
-            }
+
+            return patches;
         }
-
-        return patches;
+        finally
+        {
+            _semaphore.Release();
+        }
     }
 
-    public Task RemoveAsync(string quoteNumber)
-    {
-        string path = BuildPath(quoteNumber);
-        if (File.Exists(path))
-            File.Delete(path);
-
-        return Task.CompletedTask;
-    }
-
-    public async Task RemoveAppliedAsync(
+    public async Task RemoveAsync(
         string quoteNumber,
-        Action<PendingQuotePatch> clearApplied,
         CancellationToken cancellationToken = default)
     {
-        string path = BuildPath(quoteNumber);
-        if (!File.Exists(path))
-            return;
-
-        string existing = await File.ReadAllTextAsync(path, cancellationToken);
-        var patch = JsonSerializer.Deserialize<PendingQuotePatch>(existing, JsonOptions);
-        if (patch == null)
+        await _semaphore.WaitAsync(cancellationToken);
+        try
         {
-            File.Delete(path);
-            return;
+            string path = BuildPath(quoteNumber);
+            if (File.Exists(path))
+                File.Delete(path);
         }
-
-        clearApplied(patch);
-
-        if (patch.IsEmpty)
+        finally
         {
-            File.Delete(path);
-            return;
+            _semaphore.Release();
         }
+    }
 
-        await LocalDeletionOutboxService.WriteAtomicAsync(path, patch, cancellationToken);
+    public Task RemoveNotesIfMatchesAsync(
+        string quoteNumber,
+        string appliedNotes,
+        CancellationToken cancellationToken = default) =>
+        RemoveAppliedAsync(
+            quoteNumber,
+            patch =>
+            {
+                if (!string.Equals(patch.Notes, appliedNotes, StringComparison.Ordinal))
+                    return false;
+
+                patch.Notes = null;
+                return true;
+            },
+            cancellationToken);
+
+    public Task RemoveStatusIfMatchesAsync(
+        string quoteNumber,
+        QuoteStatus appliedStatus,
+        CancellationToken cancellationToken = default) =>
+        RemoveAppliedAsync(
+            quoteNumber,
+            patch =>
+            {
+                if (patch.Status != appliedStatus)
+                    return false;
+
+                patch.Status = null;
+                return true;
+            },
+            cancellationToken);
+
+    public Task RemoveSendInfoIfMatchesAsync(
+        string quoteNumber,
+        QuoteSendInfo appliedSendInfo,
+        CancellationToken cancellationToken = default) =>
+        RemoveAppliedAsync(
+            quoteNumber,
+            patch =>
+            {
+                if (!SendInfoEquals(patch.SendInfo, appliedSendInfo))
+                    return false;
+
+                patch.SendInfo = null;
+                return true;
+            },
+            cancellationToken);
+
+    public Task RemoveReminderInfoIfMatchesAsync(
+        string quoteNumber,
+        QuoteReminderInfo appliedReminderInfo,
+        CancellationToken cancellationToken = default) =>
+        RemoveAppliedAsync(
+            quoteNumber,
+            patch =>
+            {
+                if (!ReminderInfoEquals(patch.ReminderInfo, appliedReminderInfo))
+                    return false;
+
+                patch.ReminderInfo = null;
+                return true;
+            },
+            cancellationToken);
+
+    public Task RemoveSupplierInfoIfMatchesAsync(
+        string quoteNumber,
+        QuoteSupplierInfo appliedSupplierInfo,
+        CancellationToken cancellationToken = default) =>
+        RemoveAppliedAsync(
+            quoteNumber,
+            patch =>
+            {
+                if (!SupplierInfoEquals(patch.SupplierInfo, appliedSupplierInfo))
+                    return false;
+
+                patch.SupplierInfo = null;
+                return true;
+            },
+            cancellationToken);
+
+    private async Task RemoveAppliedAsync(
+        string quoteNumber,
+        Func<PendingQuotePatch, bool> tryClearApplied,
+        CancellationToken cancellationToken = default)
+    {
+        await _semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            string path = BuildPath(quoteNumber);
+            if (!File.Exists(path))
+                return;
+
+            string existing = await File.ReadAllTextAsync(path, cancellationToken);
+            var patch = JsonSerializer.Deserialize<PendingQuotePatch>(existing, JsonOptions);
+            if (patch == null)
+            {
+                File.Delete(path);
+                return;
+            }
+
+            if (!tryClearApplied(patch))
+                return;
+
+            if (patch.IsEmpty)
+            {
+                File.Delete(path);
+                return;
+            }
+
+            await LocalDeletionOutboxService.WriteAtomicAsync(path, patch, cancellationToken);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
     }
 
     private async Task UpdateAsync(
@@ -95,23 +201,51 @@ public sealed class LocalQuotePatchOutboxService
         Action<PendingQuotePatch> update,
         CancellationToken cancellationToken)
     {
-        string path = BuildPath(quoteNumber);
-        PendingQuotePatch patch;
-        if (File.Exists(path))
+        await _semaphore.WaitAsync(cancellationToken);
+        try
         {
-            string existing = await File.ReadAllTextAsync(path, cancellationToken);
-            patch = JsonSerializer.Deserialize<PendingQuotePatch>(existing, JsonOptions) ?? new PendingQuotePatch();
-        }
-        else
-        {
-            patch = new PendingQuotePatch();
-        }
+            string path = BuildPath(quoteNumber);
+            PendingQuotePatch patch;
+            if (File.Exists(path))
+            {
+                string existing = await File.ReadAllTextAsync(path, cancellationToken);
+                patch = JsonSerializer.Deserialize<PendingQuotePatch>(existing, JsonOptions) ?? new PendingQuotePatch();
+            }
+            else
+            {
+                patch = new PendingQuotePatch();
+            }
 
-        patch.QuoteNumber = quoteNumber;
-        patch.UpdatedAtUtc = DateTime.UtcNow;
-        update(patch);
-        await LocalDeletionOutboxService.WriteAtomicAsync(path, patch, cancellationToken);
+            patch.QuoteNumber = quoteNumber;
+            patch.UpdatedAtUtc = DateTime.UtcNow;
+            update(patch);
+            await LocalDeletionOutboxService.WriteAtomicAsync(path, patch, cancellationToken);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
     }
+
+    private static bool SendInfoEquals(QuoteSendInfo? current, QuoteSendInfo applied) =>
+        current != null &&
+        current.SentAtUtc == applied.SentAtUtc &&
+        string.Equals(current.Method, applied.Method, StringComparison.Ordinal) &&
+        string.Equals(current.Recipient, applied.Recipient, StringComparison.Ordinal) &&
+        string.Equals(current.DeviceName, applied.DeviceName, StringComparison.Ordinal);
+
+    private static bool ReminderInfoEquals(QuoteReminderInfo? current, QuoteReminderInfo applied) =>
+        current != null &&
+        current.ReminderAtUtc == applied.ReminderAtUtc &&
+        string.Equals(current.DeviceName, applied.DeviceName, StringComparison.Ordinal);
+
+    private static bool SupplierInfoEquals(QuoteSupplierInfo? current, QuoteSupplierInfo applied) =>
+        current != null &&
+        string.Equals(current.SupplierName, applied.SupplierName, StringComparison.Ordinal) &&
+        current.MaterialOrderDate == applied.MaterialOrderDate &&
+        current.ExpectedDeliveryDate == applied.ExpectedDeliveryDate &&
+        string.Equals(current.MaterialStatus, applied.MaterialStatus, StringComparison.Ordinal) &&
+        string.Equals(current.DeviceName, applied.DeviceName, StringComparison.Ordinal);
 
     private string BuildPath(string quoteNumber)
     {

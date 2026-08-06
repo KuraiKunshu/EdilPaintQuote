@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace EdilPaintPreventibiviGen.Services;
 public partial class SqlDataService
 {
+    private const int QuoteQueryBatchSize = 500;
 
     public async Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default)
     {
@@ -32,6 +33,25 @@ public partial class SqlDataService
             StringComparer.OrdinalIgnoreCase);
     }
 
+    public async Task<QuoteMetadata?> GetQuoteMetadataByNumberAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+        return await db.Quotes
+            .AsNoTracking()
+            .Where(quote => quote.QuoteNumber == quoteNumber)
+            .Select(quote => new QuoteMetadata
+            {
+                QuoteNumber = quote.QuoteNumber,
+                LastModifiedUtc = quote.LastModifiedUtc,
+                SyncHash = quote.SyncHash,
+                Revision = quote.Revision
+            })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<List<QuoteHistoryEntry>> GetQuoteSyncSnapshotsAsync(
         IEnumerable<string> quoteNumbers,
         CancellationToken cancellationToken = default)
@@ -45,17 +65,37 @@ public partial class SqlDataService
         if (numberList.Count == 0)
             return [];
 
+        if (numberList.Count > QuoteQueryBatchSize)
+        {
+            var combined = new List<QuoteHistoryEntry>();
+            foreach (var batch in numberList.Chunk(QuoteQueryBatchSize))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                combined.AddRange(await GetQuoteSyncSnapshotsAsync(batch, cancellationToken));
+            }
+
+            return combined;
+        }
+
         var quotes = await db.Quotes
             .AsNoTracking()
             .Where(x => numberList.Contains(x.QuoteNumber))
+            .AsSplitQuery()
             .Select(x => new
             {
                 x.QuoteNumber,
                 x.Date,
                 CustomerName = x.Customer != null ? x.Customer.BusinessName : string.Empty,
+                CustomerSyncId = x.Customer != null ? x.Customer.SyncId : Guid.Empty,
                 ReferenceName = x.ReferenceCustomer != null ? x.ReferenceCustomer.BusinessName : string.Empty,
+                ReferenceCustomerSyncId = x.ReferenceCustomer != null
+                    ? x.ReferenceCustomer.SyncId
+                    : Guid.Empty,
                 x.SiteName,
                 x.BillingCustomerName,
+                BillingCustomerSyncId = x.BillingCustomer != null
+                    ? x.BillingCustomer.SyncId
+                    : Guid.Empty,
                 x.PaymentTerms,
                 x.IvaType,
                 x.Notes,
@@ -121,9 +161,12 @@ public partial class SqlDataService
                 QuoteNumber = x.QuoteNumber,
                 Date = x.Date,
                 CustomerName = x.CustomerName,
+                CustomerSyncId = x.CustomerSyncId,
                 ReferenceName = x.ReferenceName,
+                ReferenceCustomerSyncId = x.ReferenceCustomerSyncId,
                 SiteName = x.SiteName,
                 BillingCustomerName = x.BillingCustomerName,
+                BillingCustomerSyncId = x.BillingCustomerSyncId,
                 PaymentTerms = x.PaymentTerms,
                 IvaType = x.IvaType,
                 Notes = x.Notes,
@@ -162,11 +205,24 @@ public partial class SqlDataService
     }
 
     public async Task UpdateQuoteSyncHashesAsync(
-        IReadOnlyDictionary<string, string> updates,
+        IReadOnlyDictionary<string, (string SyncHash, long ExpectedRevision)> updates,
         CancellationToken cancellationToken = default)
     {
         if (updates.Count == 0)
             return;
+
+        if (updates.Count > QuoteQueryBatchSize)
+        {
+            foreach (var batch in updates.Chunk(QuoteQueryBatchSize))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await UpdateQuoteSyncHashesAsync(
+                    batch.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+                    cancellationToken);
+            }
+
+            return;
+        }
 
         await using var db = AppDbContextFactory.Create();
         var quoteNumbers = updates.Keys.ToList();
@@ -177,8 +233,11 @@ public partial class SqlDataService
 
         foreach (var quote in quotes)
         {
-            if (updates.TryGetValue(quote.QuoteNumber, out var syncHash))
-                quote.SyncHash = syncHash;
+            if (updates.TryGetValue(quote.QuoteNumber, out var update) &&
+                quote.Revision == update.ExpectedRevision)
+            {
+                quote.SyncHash = update.SyncHash;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -190,14 +249,30 @@ public partial class SqlDataService
     {
         await using var db = AppDbContextFactory.Create();
     
-        var numberList = quoteNumbers.ToList();
+        var numberList = quoteNumbers
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (numberList.Count > QuoteQueryBatchSize)
+        {
+            var combined = new List<QuoteHistoryEntry>();
+            foreach (var batch in numberList.Chunk(QuoteQueryBatchSize))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                combined.AddRange(await GetQuotesByNumbersAsync(batch, cancellationToken));
+            }
+
+            return combined;
+        }
     
         var quotes = await db.Quotes
             .AsNoTracking()
             .Include(x => x.Customer)
             .Include(x => x.ReferenceCustomer)
+            .Include(x => x.BillingCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
+            .AsSplitQuery()
             .Where(x => numberList.Contains(x.QuoteNumber))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -207,9 +282,12 @@ public partial class SqlDataService
             QuoteNumber = x.QuoteNumber,
             Date = x.Date,
             CustomerName = x.Customer?.BusinessName ?? string.Empty,
+            CustomerSyncId = x.Customer?.SyncId ?? Guid.Empty,
             ReferenceName = x.ReferenceCustomer?.BusinessName ?? string.Empty,
+            ReferenceCustomerSyncId = x.ReferenceCustomer?.SyncId ?? Guid.Empty,
             SiteName = x.SiteName,
             BillingCustomerName = x.BillingCustomerName,
+            BillingCustomerSyncId = x.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             IvaType = x.IvaType,
@@ -290,8 +368,10 @@ public partial class SqlDataService
             .AsNoTracking()
             .Include(x => x.Customer)
             .Include(x => x.ReferenceCustomer)
+            .Include(x => x.BillingCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
+            .AsSplitQuery()
             .OrderByDescending(x => x.Date)
             .ToListAsync();
 
@@ -300,9 +380,12 @@ public partial class SqlDataService
             QuoteNumber = x.QuoteNumber,
             Date = x.Date,
             CustomerName = x.Customer?.BusinessName ?? string.Empty,
+            CustomerSyncId = x.Customer?.SyncId ?? Guid.Empty,
             ReferenceName = x.ReferenceCustomer?.BusinessName ?? string.Empty,
+            ReferenceCustomerSyncId = x.ReferenceCustomer?.SyncId ?? Guid.Empty,
             SiteName = x.SiteName,
             BillingCustomerName = x.BillingCustomerName,
+            BillingCustomerSyncId = x.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             IvaType = x.IvaType,
@@ -369,8 +452,10 @@ public partial class SqlDataService
             .AsNoTracking()
             .Include(x => x.Customer)
             .Include(x => x.ReferenceCustomer)
+            .Include(x => x.BillingCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
+            .AsSplitQuery()
             .OrderByDescending(x => x.Date)
             .Take(Math.Max(1, take))
             .ToListAsync();
@@ -380,9 +465,12 @@ public partial class SqlDataService
             QuoteNumber = x.QuoteNumber,
             Date = x.Date,
             CustomerName = x.Customer?.BusinessName ?? string.Empty,
+            CustomerSyncId = x.Customer?.SyncId ?? Guid.Empty,
             ReferenceName = x.ReferenceCustomer?.BusinessName ?? string.Empty,
+            ReferenceCustomerSyncId = x.ReferenceCustomer?.SyncId ?? Guid.Empty,
             SiteName = x.SiteName,
             BillingCustomerName = x.BillingCustomerName,
+            BillingCustomerSyncId = x.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             IvaType = x.IvaType,
@@ -744,18 +832,27 @@ public partial class SqlDataService
         return new HashSet<string>(numbers, StringComparer.OrdinalIgnoreCase);
     }
 
-    public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber)
+    public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default,
+        bool includeAttachments = true)
     {
         await using var db = AppDbContextFactory.Create();
 
-        var q = await db.Quotes
+        IQueryable<QuoteEntity> query = db.Quotes
             .AsNoTracking()
             .Include(x => x.Customer)
             .Include(x => x.ReferenceCustomer)
+            .Include(x => x.BillingCustomer)
             .Include(x => x.Materials)
             .Include(x => x.Labors)
-            .Include(x => x.Attachments)
-            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber);
+            .AsSplitQuery();
+
+        if (includeAttachments)
+            query = query.Include(x => x.Attachments);
+
+        var q = await query
+            .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
 
         if (q == null) return null;
 
@@ -764,9 +861,12 @@ public partial class SqlDataService
             QuoteNumber = q.QuoteNumber,
             Date = q.Date,
             CustomerName = q.Customer?.BusinessName ?? string.Empty,
+            CustomerSyncId = q.Customer?.SyncId ?? Guid.Empty,
             ReferenceName = q.ReferenceCustomer?.BusinessName ?? string.Empty,
+            ReferenceCustomerSyncId = q.ReferenceCustomer?.SyncId ?? Guid.Empty,
             SiteName = q.SiteName,
             BillingCustomerName = q.BillingCustomerName,
+            BillingCustomerSyncId = q.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = q.PdfPath,
             PaymentTerms = q.PaymentTerms,
             IvaType = q.IvaType,
@@ -813,36 +913,40 @@ public partial class SqlDataService
                 SortOrder = l.SortOrder
             }).ToList(),
             PdfFile = null,
-            Attachments = q.Attachments.Select(ToStoredFile).ToList(),
-            HasCompleteAttachmentSnapshot = true
+            Attachments = includeAttachments
+                ? q.Attachments.Select(ToStoredFile).ToList()
+                : [],
+            HasCompleteAttachmentSnapshot = includeAttachments
         };
     }
 
-    public async Task DeleteQuoteAsync(string quoteNumber)
+    public async Task DeleteQuoteAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
         var strategy = db.Database.CreateExecutionStrategy();
 
         await strategy.ExecuteAsync(async () =>
         {
-            await using var transaction = await db.Database.BeginTransactionAsync();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             try
             {
                 var existing = await db.Quotes
                     .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber);
+                    .FirstOrDefaultAsync(x => x.QuoteNumber == quoteNumber, cancellationToken);
                 if (existing != null)
                 {
                     existing.IsDeleted = true;
                     existing.LastModifiedUtc = DateTime.UtcNow;
                     existing.Revision += 1;
-                    await db.SaveChangesAsync();
+                    await db.SaveChangesAsync(cancellationToken);
                 }
-                await transaction.CommitAsync();
+                await transaction.CommitAsync(cancellationToken);
             }
             catch
             {
-                await transaction.RollbackAsync();
+                await transaction.RollbackAsync(CancellationToken.None);
                 throw;
             }
         });
@@ -978,9 +1082,12 @@ public partial class SqlDataService
             QuoteNumber = entry.QuoteNumber,
             Date = entry.Date,
             CustomerName = entry.CustomerName,
+            CustomerSyncId = entry.CustomerSyncId,
             ReferenceName = entry.ReferenceName,
+            ReferenceCustomerSyncId = entry.ReferenceCustomerSyncId,
             SiteName = entry.SiteName,
             BillingCustomerName = entry.BillingCustomerName,
+            BillingCustomerSyncId = entry.BillingCustomerSyncId,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             IvaType = entry.IvaType,
@@ -1034,7 +1141,15 @@ public partial class SqlDataService
         };
     }
 
-    public async Task SaveQuoteAsync(QuoteHistoryEntry quote, CancellationToken cancellationToken = default)
+    public Task SaveQuoteAsync(
+        QuoteHistoryEntry quote,
+        CancellationToken cancellationToken = default) =>
+        SaveQuoteWithExpectedRevisionAsync(quote, cancellationToken, expectedRevision: null);
+
+    public async Task SaveQuoteWithExpectedRevisionAsync(
+        QuoteHistoryEntry quote,
+        CancellationToken cancellationToken,
+        long? expectedRevision)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -1050,21 +1165,37 @@ public partial class SqlDataService
 
             try
             {
+                var existing = await db.Quotes
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(x => x.QuoteNumber == quote.QuoteNumber, cancellationToken);
+
+                if (expectedRevision.HasValue)
+                {
+                    bool matchesExpectedState = expectedRevision.Value == 0
+                        ? existing == null
+                        : existing != null && existing.Revision == expectedRevision.Value;
+                    if (!matchesExpectedState)
+                        throw new QuoteConflictException(quote.QuoteNumber);
+                }
+
                 CustomerEntity? customer = await GetOrCreateCustomerForQuoteAsync(
                     db,
                     quote.CustomerName,
+                    quote.CustomerSyncId,
+                    existing?.CustomerId,
                     cancellationToken);
                 CustomerEntity? referenceCustomer = await GetOrCreateCustomerForQuoteAsync(
                     db,
                     quote.ReferenceName,
+                    quote.ReferenceCustomerSyncId,
+                    existing?.ReferenceCustomerId,
                     cancellationToken);
-
-                var existing = await db.Quotes
-                    .IgnoreQueryFilters()
-                    .Include(x => x.Materials)
-                    .Include(x => x.Labors)
-                    .Include(x => x.Attachments)
-                    .FirstOrDefaultAsync(x => x.QuoteNumber == quote.QuoteNumber, cancellationToken);
+                CustomerEntity? billingCustomer = await GetOrCreateCustomerForQuoteAsync(
+                    db,
+                    quote.BillingCustomerName,
+                    quote.BillingCustomerSyncId,
+                    existing?.BillingCustomerId,
+                    cancellationToken);
 
                 if (existing != null)
                 {
@@ -1077,8 +1208,12 @@ public partial class SqlDataService
 
                     DateTime savedAtUtc = DateTime.UtcNow;
                     existing.Date = quote.Date;
+                    existing.Customer = customer;
                     existing.CustomerId = customer?.Id;
+                    existing.ReferenceCustomer = referenceCustomer;
                     existing.ReferenceCustomerId = referenceCustomer?.Id;
+                    existing.BillingCustomer = billingCustomer;
+                    existing.BillingCustomerId = billingCustomer?.Id;
                     existing.SiteName = quote.SiteName;
                     existing.BillingCustomerName = quote.BillingCustomerName;
                     existing.PdfPath = quote.PdfPath;
@@ -1110,19 +1245,27 @@ public partial class SqlDataService
                     
                     existing.IsJointVenture = quote.IsJointVenture;
                     existing.PartnerCompanyName = quote.PartnerCompanyName;
-                    existing.CostAllocationsJson = string.IsNullOrEmpty(quote.PartnerCompanyName) && !quote.IsJointVenture
-                        ? string.Empty
-                        : JsonSerializer.Serialize(new CostAllocations
-                        {
-                            OurCosts = quote.OurCosts,
-                            PartnerCosts = quote.PartnerCosts,
-                            AdditionalCosts = quote.AdditionalCosts
-                        });
-                    // Rimuovi e ricrea i dettagli
-                    db.QuoteMaterials.RemoveRange(existing.Materials);
-                    db.QuoteLabors.RemoveRange(existing.Labors);
+                    existing.CostAllocationsJson = JsonSerializer.Serialize(new CostAllocations
+                    {
+                        OurCosts = quote.OurCosts,
+                        PartnerCosts = quote.PartnerCosts,
+                        AdditionalCosts = quote.AdditionalCosts
+                    });
+                    // Le collezioni precedenti vengono eliminate direttamente
+                    // per QuoteId: caricarle con Include moltiplicava materiali,
+                    // lavorazioni e blob allegati in un enorme prodotto cartesiano.
+                    await db.QuoteMaterials
+                        .Where(item => item.QuoteId == existing.Id)
+                        .ExecuteDeleteAsync(cancellationToken);
+                    await db.QuoteLabors
+                        .Where(item => item.QuoteId == existing.Id)
+                        .ExecuteDeleteAsync(cancellationToken);
                     if (quote.HasCompleteAttachmentSnapshot)
-                        db.QuoteAttachments.RemoveRange(existing.Attachments);
+                    {
+                        await db.QuoteAttachments
+                            .Where(item => item.QuoteId == existing.Id)
+                            .ExecuteDeleteAsync(cancellationToken);
+                    }
 
                     existing.Materials = quote.Materials.Select(m => new QuoteMaterialEntity
                     {
@@ -1162,8 +1305,12 @@ public partial class SqlDataService
                     {
                         QuoteNumber = quote.QuoteNumber,
                         Date = quote.Date,
+                        Customer = customer,
                         CustomerId = customer?.Id,
+                        ReferenceCustomer = referenceCustomer,
                         ReferenceCustomerId = referenceCustomer?.Id,
+                        BillingCustomer = billingCustomer,
+                        BillingCustomerId = billingCustomer?.Id,
                         SiteName = quote.SiteName,
                         BillingCustomerName = quote.BillingCustomerName,
                         PdfPath = quote.PdfPath,
@@ -1194,14 +1341,12 @@ public partial class SqlDataService
                         SyncHash = quote.SyncHash,
                         IsJointVenture = quote.IsJointVenture,
                         PartnerCompanyName = quote.PartnerCompanyName,
-                        CostAllocationsJson = string.IsNullOrEmpty(quote.PartnerCompanyName) && !quote.IsJointVenture
-                            ? string.Empty
-                            : JsonSerializer.Serialize(new CostAllocations
-                            {
-                                OurCosts = quote.OurCosts,
-                                PartnerCosts = quote.PartnerCosts,
-                                AdditionalCosts = quote.AdditionalCosts
-                            }),
+                        CostAllocationsJson = JsonSerializer.Serialize(new CostAllocations
+                        {
+                            OurCosts = quote.OurCosts,
+                            PartnerCosts = quote.PartnerCosts,
+                            AdditionalCosts = quote.AdditionalCosts
+                        }),
                         Materials = quote.Materials.Select(m => new QuoteMaterialEntity
                         {
                             Name = m.Name,
@@ -1222,7 +1367,9 @@ public partial class SqlDataService
                             IsSignificant = l.IsSignificant,
                             SortOrder = l.SortOrder
                         }).ToList(),
-                        Attachments = quote.Attachments.Select(ToAttachmentEntity).ToList()
+                        Attachments = quote.HasCompleteAttachmentSnapshot
+                            ? quote.Attachments.Select(ToAttachmentEntity).ToList()
+                            : []
                     };
 
                     db.Quotes.Add(entity);
@@ -1267,14 +1414,60 @@ public partial class SqlDataService
     private static async Task<CustomerEntity?> GetOrCreateCustomerForQuoteAsync(
         AppDbContext db,
         string? businessName,
+        Guid preferredCustomerSyncId,
+        int? preferredCustomerId,
         CancellationToken cancellationToken)
     {
         businessName = (businessName ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(businessName))
             return null;
 
-        var customer = await db.Customers
-            .FirstOrDefaultAsync(x => x.BusinessName == businessName, cancellationToken);
+        if (preferredCustomerSyncId != Guid.Empty)
+        {
+            var stableCustomer = await db.Customers
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(
+                    customer => customer.SyncId == preferredCustomerSyncId,
+                    cancellationToken);
+            if (stableCustomer != null)
+            {
+                if (stableCustomer.IsDeleted)
+                {
+                    stableCustomer.IsDeleted = false;
+                    stableCustomer.LastModifiedUtc = DateTime.UtcNow;
+                }
+
+                return stableCustomer;
+            }
+
+            throw new InvalidOperationException(
+                $"Il cliente '{businessName}' non e' ancora sincronizzato nel database. " +
+                "Sincronizza prima l'anagrafica e riprova.");
+        }
+
+        if (preferredCustomerId.HasValue)
+        {
+            var preferredCustomer = await db.Customers
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(customer => customer.Id == preferredCustomerId.Value, cancellationToken);
+            if (preferredCustomer != null &&
+                preferredCustomer.BusinessName.Equals(businessName, StringComparison.OrdinalIgnoreCase))
+            {
+                return preferredCustomer;
+            }
+        }
+
+        var sameNameCustomers = await db.Customers
+            .Where(customer => customer.BusinessName == businessName)
+            .Take(2)
+            .ToListAsync(cancellationToken);
+        if (sameNameCustomers.Count > 1)
+        {
+            throw new InvalidOperationException(
+                $"Esistono piu' clienti chiamati '{businessName}': seleziona l'anagrafica con ID stabile prima di salvare.");
+        }
+
+        var customer = sameNameCustomers.SingleOrDefault();
 
         if (customer != null)
         {

@@ -7,7 +7,15 @@ namespace EdilPaintPreventibiviGen.Services;
 
 internal static class QuoteSyncHashService
 {
-    public static string Compute(QuoteHistoryEntry entry)
+    public static string Compute(QuoteHistoryEntry entry) =>
+        ComputeCore(entry, includeCustomerIdentity: true);
+
+    public static string ComputeLegacy(QuoteHistoryEntry entry) =>
+        ComputeCore(entry, includeCustomerIdentity: false);
+
+    private static string ComputeCore(
+        QuoteHistoryEntry entry,
+        bool includeCustomerIdentity)
     {
         static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
         var materialsHash = string.Join("|", entry.Materials
@@ -30,11 +38,12 @@ internal static class QuoteSyncHashService
             .ThenBy(e => e.EventType, StringComparer.OrdinalIgnoreCase)
             .Select(e => $"{e.CreatedAtUtc.ToUniversalTime():O}:{e.DeviceName}:{e.EventType}:{e.Description}"));
 
-        var data = string.Join("|",
+        var commonPrefix = string.Join("|",
             entry.QuoteNumber,
             entry.Date.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
             entry.CustomerName,
-            entry.ReferenceName,
+            entry.ReferenceName);
+        var commonSuffix = string.Join("|",
             entry.SiteName,
             entry.BillingCustomerName,
             entry.PaymentTerms,
@@ -64,6 +73,13 @@ internal static class QuoteSyncHashService
             laborsHash,
             costsHash,
             eventsHash);
+        var data = includeCustomerIdentity
+            ? string.Join(
+                "|",
+                commonPrefix,
+                $"customer-sync-v1:{entry.CustomerSyncId:N}:{entry.ReferenceCustomerSyncId:N}:{entry.BillingCustomerSyncId:N}",
+                commonSuffix)
+            : string.Join("|", commonPrefix, commonSuffix);
 
         var bytes = Encoding.UTF8.GetBytes(data);
         var hash = SHA256.HashData(bytes);

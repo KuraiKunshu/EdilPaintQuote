@@ -53,9 +53,15 @@ public class QuoteHistoryEntry
 	public string QuoteNumber { get; set; } = string.Empty;
 	public DateTime Date { get; set; }
 	public string CustomerName { get; set; } = string.Empty;
+	[JsonPropertyName("customerSyncId")]
+	public Guid CustomerSyncId { get; set; }
 	public string ReferenceName { get; set; } = string.Empty;
+	[JsonPropertyName("referenceCustomerSyncId")]
+	public Guid ReferenceCustomerSyncId { get; set; }
 	public string SiteName { get; set; } = string.Empty;
 	public string BillingCustomerName { get; set; } = string.Empty;
+	[JsonPropertyName("billingCustomerSyncId")]
+	public Guid BillingCustomerSyncId { get; set; }
 	public string PdfPath { get; set; } = string.Empty;
 	public string PaymentTerms { get; set; } = string.Empty;
 	public string IvaType { get; set; } = "esclusa";
@@ -119,4 +125,13 @@ public class QuoteHistoryEntry
 	// di un preventivo esistente mantenendo il controllo di concorrenza.
 	[JsonPropertyName("isEditingExistingQuoteDraft")]
 	public bool IsEditingExistingQuoteDraft { get; set; }
+
+	[JsonPropertyName("isDraftQuoteNumberAllocated")]
+	public bool IsDraftQuoteNumberAllocated { get; set; }
+
+	[JsonPropertyName("wasCreatedByDraftAutosave")]
+	public bool WasCreatedByDraftAutosave { get; set; }
+
+	[JsonPropertyName("sharedDraftContentHash")]
+	public string SharedDraftContentHash { get; set; } = string.Empty;
 }

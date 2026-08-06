@@ -52,7 +52,7 @@ public partial class SqlDataService
         await db.SaveChangesAsync();
     }
 
-    public async Task<int> GetNextQuoteNumberAsync()
+    public async Task<int> GetNextQuoteNumberAsync(CancellationToken cancellationToken = default)
     {
         await using var db = AppDbContextFactory.Create();
 
@@ -84,7 +84,7 @@ public partial class SqlDataService
                                                 FROM first_settings, max_quote
                                                 WHERE settings."Id" = first_settings."Id"
                                                 RETURNING settings."Counter"
-                                                """).ToListAsync()
+                                                """).ToListAsync(cancellationToken)
             : await db.Database.SqlQueryRaw<int>("""
                                                 ;WITH FirstSettings AS (
                                                     SELECT TOP(1) [Id]
@@ -109,20 +109,22 @@ public partial class SqlDataService
                                                 FROM [dbo].[CompanySettings] AS settings
                                                 INNER JOIN FirstSettings ON FirstSettings.[Id] = settings.[Id]
                                                 CROSS JOIN MaxQuote
-                                                """).ToListAsync();
+                                                """).ToListAsync(cancellationToken);
 
         if (result.Count > 0)
             return result[0];
 
         // Fallback: nessuna riga trovata, crea il record base
-        int maxExistingQuoteNumber = await GetMaxExistingQuoteNumberAsync(db);
+        int maxExistingQuoteNumber = await GetMaxExistingQuoteNumberAsync(db, cancellationToken);
         var newSettings = new CompanySettingsEntity { Counter = Math.Max(1, maxExistingQuoteNumber + 1) };
         db.CompanySettings.Add(newSettings);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return newSettings.Counter;
     }
 
-    private static async Task<int> GetMaxExistingQuoteNumberAsync(AppDbContext db)
+    private static async Task<int> GetMaxExistingQuoteNumberAsync(
+        AppDbContext db,
+        CancellationToken cancellationToken)
     {
         var result = db.Database.IsNpgsql()
             ? await db.Database.SqlQueryRaw<int>("""
@@ -135,14 +137,14 @@ public partial class SqlDataService
                                                 ), 0)
                                                 FROM "Quotes"
                                                 WHERE NOT "IsDeleted"
-                                                """).ToListAsync()
+                                                """).ToListAsync(cancellationToken)
             : await db.Database.SqlQueryRaw<int>("""
                                                 SELECT COALESCE(MAX(TRY_CONVERT(INT,
                                                     LEFT([QuoteNumber], PATINDEX('%[^0-9]%', [QuoteNumber] + 'X') - 1)
                                                 )), 0)
                                                 FROM [dbo].[Quotes]
                                                 WHERE [IsDeleted] = 0
-                                                """).ToListAsync();
+                                                """).ToListAsync(cancellationToken);
 
         return result.FirstOrDefault();
     }

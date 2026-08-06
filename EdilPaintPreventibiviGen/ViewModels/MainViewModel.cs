@@ -46,6 +46,9 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private Customer? _selectedCustomer;
     private Customer? _selectedSecondCustomer;
     private Customer? _selectedBillingCustomer;
+    private string _unresolvedCustomerName = string.Empty;
+    private string _unresolvedReferenceCustomerName = string.Empty;
+    private string _unresolvedBillingCustomerName = string.Empty;
     private VeluxResult? _selectedCatalogMaterial;
     private Item? _selectedCatalogLabor;
     private CancellationTokenSource? _veluxDetailsCts;
@@ -80,6 +83,10 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private DateTime _loadedQuoteBaseVersionUtc;
     private long _loadedQuoteBaseRevision;
     private string _lastSharedDraftContentHash = string.Empty;
+    private string _lastSharedDraftAttachmentHash = string.Empty;
+    private readonly object _attachmentHashCacheLock = new();
+    private List<AttachmentHashCacheEntry> _attachmentHashCache = [];
+    private string _cachedAttachmentHash = string.Empty;
     #endregion
 
     #region Input Fields
@@ -180,7 +187,10 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             _isSecondCustomerEnabled = value;
             if (!value)
+            {
                 SelectedSecondCustomer = null;
+                _unresolvedReferenceCustomerName = string.Empty;
+            }
             OnPropertyChanged();
         }
     }
@@ -204,7 +214,10 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             _isBillingCustomerEnabled = value;
             if (!value)
+            {
                 SelectedBillingCustomer = null;
+                _unresolvedBillingCustomerName = string.Empty;
+            }
             OnPropertyChanged();
         }
     }
@@ -233,6 +246,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
 
             if (value != null)
             {
+                _unresolvedCustomerName = string.Empty;
                 ApplyCustomerDiscounts(value);
                 CustomerBorderBrush = GetCustomerSelectionBrush(true);
             }
@@ -253,6 +267,8 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             _selectedSecondCustomer = value;
+            if (value != null)
+                _unresolvedReferenceCustomerName = string.Empty;
             SecondCustomerBorderBrush = GetCustomerSelectionBrush(value != null);
             OnPropertyChanged();
         }
@@ -277,6 +293,8 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             _selectedBillingCustomer = value;
+            if (value != null)
+                _unresolvedBillingCustomerName = string.Empty;
             OnPropertyChanged();
         }
     }

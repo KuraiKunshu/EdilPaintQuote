@@ -8,6 +8,64 @@ namespace EdilPaintPreventibiviGen.Tests;
 public sealed class RegressionTests
 {
     [Fact]
+    public void QuoteSyncHashDistinguishesStableCustomerIdentityAndKeepsLegacyComparison()
+    {
+        DateTime quoteDate = new(2026, 7, 31, 10, 0, 0, DateTimeKind.Utc);
+        var first = new QuoteHistoryEntry
+        {
+            QuoteNumber = "IDENTITY-1",
+            Date = quoteDate,
+            CustomerName = "Cliente omonimo",
+            CustomerSyncId = Guid.NewGuid()
+        };
+        var second = new QuoteHistoryEntry
+        {
+            QuoteNumber = first.QuoteNumber,
+            Date = quoteDate,
+            CustomerName = first.CustomerName,
+            CustomerSyncId = Guid.NewGuid()
+        };
+
+        Type hashService = typeof(SyncService).Assembly.GetType(
+            "EdilPaintPreventibiviGen.Services.QuoteSyncHashService",
+            throwOnError: true)!;
+        var compute = hashService.GetMethod("Compute")!;
+        var computeLegacy = hashService.GetMethod("ComputeLegacy")!;
+
+        string firstHash = Assert.IsType<string>(compute.Invoke(null, [first]));
+        string secondHash = Assert.IsType<string>(compute.Invoke(null, [second]));
+        string firstLegacyHash = Assert.IsType<string>(computeLegacy.Invoke(null, [first]));
+        string secondLegacyHash = Assert.IsType<string>(computeLegacy.Invoke(null, [second]));
+
+        Assert.NotEqual(firstHash, secondHash);
+        Assert.Equal(firstLegacyHash, secondLegacyHash);
+        Assert.NotEqual(firstLegacyHash, firstHash);
+        Assert.NotEqual(secondLegacyHash, secondHash);
+
+        var differentBillingCustomer = new QuoteHistoryEntry
+        {
+            QuoteNumber = first.QuoteNumber,
+            Date = quoteDate,
+            CustomerName = first.CustomerName,
+            CustomerSyncId = first.CustomerSyncId,
+            BillingCustomerName = "Fatturazione omonima",
+            BillingCustomerSyncId = Guid.NewGuid()
+        };
+        var anotherBillingCustomer = new QuoteHistoryEntry
+        {
+            QuoteNumber = first.QuoteNumber,
+            Date = quoteDate,
+            CustomerName = first.CustomerName,
+            CustomerSyncId = first.CustomerSyncId,
+            BillingCustomerName = differentBillingCustomer.BillingCustomerName,
+            BillingCustomerSyncId = Guid.NewGuid()
+        };
+        Assert.NotEqual(
+            Assert.IsType<string>(compute.Invoke(null, [differentBillingCustomer])),
+            Assert.IsType<string>(compute.Invoke(null, [anotherBillingCustomer])));
+    }
+
+    [Fact]
     public void ReverseChargeSplitsSignificantGoodsAndAddsVat()
     {
         var calculator = new QuoteCalculator();
@@ -137,11 +195,9 @@ public sealed class RegressionTests
         Assert.Contains("Cliente: Cliente Uno", draft.Body);
         Assert.Contains("Preventivo: PREV/42", draft.Body);
         Assert.Contains("Data: 25/07/2026", draft.Body);
-        Assert.Contains("- Vernice bianca", draft.Body);
-        Assert.Contains("- Pennello", draft.Body);
+        Assert.Contains("- Vernice bianca — Quantità: 2", draft.Body);
+        Assert.Contains("- Pennello — Quantità: 3", draft.Body);
         Assert.DoesNotContain("Confezione da 10 L", draft.Body);
-        Assert.DoesNotContain("2 x", draft.Body);
-        Assert.DoesNotContain("3 x", draft.Body);
     }
 
     [Fact]
@@ -157,7 +213,7 @@ public sealed class RegressionTests
         var draft = SupplierOrderMailService.CreateDraft(quote, [], new MailSettingsModel());
 
         Assert.Equal("Ordine Riferimento Cliente Due", draft.Subject);
-        Assert.Equal("- Silicone", draft.Body);
+        Assert.Equal("- Silicone — Quantità: 4", draft.Body);
     }
 
     [Fact]
@@ -280,7 +336,7 @@ public sealed class RegressionTests
             Assert.Equal(QuoteStatus.Spedito, patch.Status);
             Assert.Equal("Email", patch.SendInfo?.Method);
 
-            await service.RemoveAppliedAsync("PREV/PATCH", p => p.Notes = null);
+            await service.RemoveNotesIfMatchesAsync("PREV/PATCH", "nota");
             patch = Assert.Single(await service.LoadAllAsync());
             Assert.Null(patch.Notes);
             Assert.Equal(QuoteStatus.Spedito, patch.Status);
@@ -310,6 +366,28 @@ public sealed class RegressionTests
             var restored = await store.LoadHistoryAsync();
             var restoredQuote = Assert.Single(restored);
             Assert.Equal("PREV/BACKUP", restoredQuote.QuoteNumber);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
+    public async Task QuotePatchOutboxKeepsANewerValueWhileRemovingTheAppliedOne()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            var service = new LocalQuotePatchOutboxService(temporaryPath);
+            await service.StoreNotesAsync("PREV/RACE", "nota inviata");
+
+            var appliedPatch = Assert.Single(await service.LoadAllAsync());
+            await service.StoreNotesAsync("PREV/RACE", "nota piu recente");
+            await service.RemoveNotesIfMatchesAsync("PREV/RACE", appliedPatch.Notes!);
+
+            var pendingPatch = Assert.Single(await service.LoadAllAsync());
+            Assert.Equal("nota piu recente", pendingPatch.Notes);
         }
         finally
         {

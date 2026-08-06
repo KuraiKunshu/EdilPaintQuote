@@ -127,6 +127,7 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Quotes", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "SiteName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "BillingCustomerName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "BillingCustomerId", "INT NULL", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "IsJointVenture", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "PartnerCompanyName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "CostAllocationsJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
@@ -172,6 +173,7 @@ public partial class SqlDataService
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "EventsJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "SupplierName", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "MaterialStatus", "NVARCHAR(120) NOT NULL", cancellationToken);
+        await EnsureBillingCustomerRelationAsync(db, cancellationToken);
     }
 
     private static async Task EnsureQuoteAttachmentSchemaAsync(AppDbContext db, CancellationToken cancellationToken)
@@ -203,6 +205,7 @@ public partial class SqlDataService
         await db.Database.ExecuteSqlRawAsync("""
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "SiteName" character varying(250) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "BillingCustomerName" character varying(250) NOT NULL DEFAULT '';
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "BillingCustomerId" integer NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "Revision" bigint NOT NULL DEFAULT 0;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "SupplierName" character varying(250) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialOrderDate" timestamp with time zone NULL;
@@ -226,7 +229,79 @@ public partial class SqlDataService
                 FOREIGN KEY ("QuoteId") REFERENCES "Quotes" ("Id") ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS "IX_QuoteAttachments_QuoteId" ON "QuoteAttachments" ("QuoteId");
+
+        UPDATE "Quotes" AS q
+        SET "BillingCustomerId" = unique_customer."Id"
+        FROM (
+            SELECT MIN("Id") AS "Id", "BusinessName"
+            FROM "Customers"
+            WHERE NOT "IsDeleted"
+            GROUP BY "BusinessName"
+            HAVING COUNT(*) = 1
+        ) AS unique_customer
+        WHERE q."BillingCustomerId" IS NULL
+          AND q."BillingCustomerName" <> ''
+          AND unique_customer."BusinessName" = q."BillingCustomerName";
+
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'FK_Quotes_Customers_BillingCustomerId'
+            ) THEN
+                ALTER TABLE "Quotes"
+                ADD CONSTRAINT "FK_Quotes_Customers_BillingCustomerId"
+                FOREIGN KEY ("BillingCustomerId") REFERENCES "Customers" ("Id")
+                ON DELETE RESTRICT;
+            END IF;
+        END $$;
+        CREATE INDEX IF NOT EXISTS "IX_Quotes_BillingCustomerId" ON "Quotes" ("BillingCustomerId");
         """, cancellationToken);
+    }
+
+    private static Task EnsureBillingCustomerRelationAsync(
+        AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+        ;WITH UniqueCustomers AS
+        (
+            SELECT MIN([Id]) AS [Id], [BusinessName]
+            FROM [dbo].[Customers]
+            WHERE [IsDeleted] = 0
+            GROUP BY [BusinessName]
+            HAVING COUNT(*) = 1
+        )
+        UPDATE q
+        SET [BillingCustomerId] = c.[Id]
+        FROM [dbo].[Quotes] q
+        INNER JOIN UniqueCustomers c ON c.[BusinessName] = q.[BillingCustomerName]
+        WHERE q.[BillingCustomerId] IS NULL
+          AND q.[BillingCustomerName] <> N'';
+
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.foreign_keys
+            WHERE name = N'FK_Quotes_Customers_BillingCustomerId'
+              AND parent_object_id = OBJECT_ID(N'[dbo].[Quotes]')
+        )
+        BEGIN
+            ALTER TABLE [dbo].[Quotes] WITH CHECK
+            ADD CONSTRAINT [FK_Quotes_Customers_BillingCustomerId]
+            FOREIGN KEY ([BillingCustomerId]) REFERENCES [dbo].[Customers]([Id]);
+        END
+
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes
+            WHERE name = N'IX_Quotes_BillingCustomerId'
+              AND object_id = OBJECT_ID(N'[dbo].[Quotes]')
+        )
+        BEGIN
+            CREATE INDEX [IX_Quotes_BillingCustomerId]
+            ON [dbo].[Quotes]([BillingCustomerId]);
+        END
+        """;
+
+        return db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
     }
 
     private static async Task EnsureQuoteDetailSchemaAsync(AppDbContext db, CancellationToken cancellationToken)

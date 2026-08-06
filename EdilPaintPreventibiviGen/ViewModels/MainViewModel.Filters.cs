@@ -35,7 +35,18 @@ public partial class MainViewModel
         BeginSharedDataMutation();
         try
         {
-            await _dataService.DeleteCustomerAsync(CloneCustomerForPersistence(customer));
+            await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+                _dataService,
+                $"Eliminazione cliente {customer.BusinessName}");
+            await DatabaseOperationCoordinator.Gate.WaitAsync();
+            try
+            {
+                await _dataService.DeleteCustomerAsync(CloneCustomerForPersistence(customer));
+            }
+            finally
+            {
+                DatabaseOperationCoordinator.Gate.Release();
+            }
             AllCustomers.Remove(customer);
             _allCustomers.Remove(customer);
             ApplyCustomerFilter(_customerSearchText);

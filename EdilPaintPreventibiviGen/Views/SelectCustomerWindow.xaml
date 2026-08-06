@@ -8,11 +8,11 @@
         RenderOptions.BitmapScalingMode="HighQuality"
         Icon="pack://application:,,,/Assets/Windowsicon/contatti.png"
         Title="Anagrafica Clienti"
-        Width="980"
-        Height="680"
-        MinWidth="900"
+        Width="1020"
+        Height="720"
+        MinWidth="820"
         MinHeight="560"
-        MaxWidth="1320"
+        MaxWidth="1600"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -112,7 +112,8 @@
             <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource DataGridLineBrush}"/>
             <Setter Property="VerticalGridLinesBrush" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="RowHeight" Value="46"/>
+            <Setter Property="RowHeight" Value="68"/>
+            <Setter Property="MinRowHeight" Value="68"/>
             <Setter Property="ColumnHeaderHeight" Value="42"/>
             <Setter Property="AutoGenerateColumns" Value="False"/>
             <Setter Property="CanUserAddRows" Value="False"/>
@@ -125,6 +126,11 @@
             <Setter Property="AlternatingRowBackground" Value="{StaticResource PanelBackgroundBrush}"/>
             <Setter Property="RowBackground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
+            <Setter Property="EnableColumnVirtualization" Value="True"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="VirtualizingPanel.ScrollUnit" Value="Item"/>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
@@ -140,7 +146,7 @@
         </Style>
 
         <Style TargetType="DataGridRow">
-            <Setter Property="Height" Value="46"/>
+            <Setter Property="MinHeight" Value="68"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
@@ -158,7 +164,7 @@
 
         <Style TargetType="DataGridCell">
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Padding" Value="10,4"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -271,77 +277,79 @@
                               Style="{StaticResource ModernCustomerGridStyle}"
                               MouseDoubleClick="OnInsertClick">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Nominativo"
-                                                Binding="{Binding DisplayName}"
-                                                Width="*">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="Margin" Value="5,0"/>
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                        <Setter Property="ToolTip" Value="{Binding DisplayName}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-
-                            <DataGridTextColumn Header="Indirizzo"
-                                                Binding="{Binding Address}"
-                                                Width="260">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="Margin" Value="5,0"/>
-                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                        <Setter Property="ToolTip" Value="{Binding Address}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-
-                            <DataGridTextColumn Header="Telefono"
-                                                Binding="{Binding Phone}"
-                                                Width="140">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="Margin" Value="5,0"/>
-                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                        <Setter Property="ToolTip" Value="{Binding Phone}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-
-                            <DataGridTextColumn Header="Email"
-                                                Binding="{Binding Email}"
-                                                Width="220">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="Margin" Value="5,0"/>
-                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                        <Setter Property="ToolTip" Value="{Binding Email}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-
-                            <DataGridTemplateColumn Header="Fornitore" Width="88">
+                            <DataGridTemplateColumn Header="Cliente / indirizzo"
+                                                    Width="1.6*"
+                                                    MinWidth="280">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsSupplier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  Click="OnSupplierFlagClick"
-                                                  ToolTip="Includi nell'elenco fornitori"/>
+                                        <StackPanel Margin="5,3" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxHeight="36"
+                                                       ToolTip="{Binding DisplayName}"/>
+                                            <TextBlock Text="{Binding Address}"
+                                                       Margin="0,3,0,0"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Address}"/>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTextColumn Header="Sconto forn. %"
-                                                Binding="{Binding SupplierDiscount, StringFormat={}{0:0.##}}"
-                                                IsReadOnly="True"
-                                                Width="105"/>
+                            <DataGridTemplateColumn Header="Contatti"
+                                                    Width="1*"
+                                                    MinWidth="220">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="5,3" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Email}"
+                                                       TextWrapping="Wrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxHeight="34"
+                                                       ToolTip="{Binding Email}"/>
+                                            <TextBlock Text="{Binding Phone}"
+                                                       Margin="0,3,0,0"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Phone}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Width="80" Header="Azioni">
+                            <DataGridTemplateColumn Header="Fornitore / sconto"
+                                                    Width="150"
+                                                    MinWidth="140">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                            <CheckBox IsChecked="{Binding IsSupplier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      VerticalAlignment="Center"
+                                                      Click="OnSupplierFlagClick"
+                                                      ToolTip="Includi nell'elenco fornitori"/>
+                                            <Border Margin="10,0,0,0"
+                                                    Padding="8,4"
+                                                    Background="{StaticResource SectionPanelBackgroundBrush}"
+                                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="7">
+                                                <TextBlock Text="{Binding SupplierDiscount, StringFormat={}{0:0.##}%}"
+                                                           FontWeight="SemiBold"
+                                                           ToolTip="Sconto fornitore"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="84" Header="Azioni">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">

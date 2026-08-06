@@ -24,6 +24,7 @@ public partial class App : Application
     private const int HardShutdownTimeoutSeconds = 8;
     private const int StartupSyncQuoteLimit = 150;
     private static readonly TimeSpan StartupSyncForegroundTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan PeriodicSyncInterval = TimeSpan.FromMinutes(15);
     private static System.Timers.Timer? _syncTimer;
     private static CancellationTokenSource? _shutdownCts;
     private static bool _isShuttingDown;
@@ -216,15 +217,15 @@ public partial class App : Application
             $"[STARTUP] Sync ancora in corso dopo {StartupSyncForegroundTimeout.TotalSeconds:F0}s: apertura app, completamento in background.");
     }
 
-    private static void OnSyncCompleted(object? sender, EventArgs e)
+    private static void OnSyncCompleted(object? sender, SyncCompletedEventArgs e)
     {
         var viewModel = MainVm;
-        if (viewModel == null || _isShuttingDown)
+        if (viewModel == null || _isShuttingDown || e.Result.CustomersSynced == 0)
             return;
 
         _ = AppShutdownManager.Track(
-            "Post-sync shared data refresh",
-            token => viewModel.RefreshSharedDataAsync(token),
+            "Post-sync customer refresh",
+            token => viewModel.RefreshCustomersAsync(token),
             AppShutdownManager.ShutdownToken);
     }
 
@@ -287,7 +288,8 @@ public partial class App : Application
             syncTask = Task.Run(() => SyncService.SyncAllAsync(
                 force: true,
                 cancellationToken: timeoutCts.Token,
-                waitForCurrentRun: false));
+                waitForCurrentRun: false,
+                includeCustomers: false));
 
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(ShutdownSyncTimeoutSeconds));
             var completed = await Task.WhenAny(syncTask, timeoutTask);
@@ -356,12 +358,12 @@ public partial class App : Application
             return;
         }
 
-        _syncTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
+        _syncTimer = new System.Timers.Timer(PeriodicSyncInterval.TotalMilliseconds);
         _syncTimer.Elapsed += OnPeriodicSyncElapsed;
         _syncTimer.AutoReset = true;
         _syncTimer.Start();
 
-        Debug.WriteLine("[STARTUP] Periodic sync started (every 5 minutes)");
+        Debug.WriteLine($"[STARTUP] Periodic sync started (every {PeriodicSyncInterval.TotalMinutes:F0} minutes)");
     }
 
     private static async void OnPeriodicSyncElapsed(object? sender, System.Timers.ElapsedEventArgs e)
@@ -374,7 +376,9 @@ public partial class App : Application
             Debug.WriteLine("[PeriodicSync] Running scheduled sync...");
             await AppShutdownManager.Track(
                 "Periodic sync",
-                async token => await SyncService.SyncAllAsync(cancellationToken: token),
+                async token => await SyncService.SyncAllAsync(
+                    cancellationToken: token,
+                    includeCustomers: false),
                 _shutdownCts?.Token ?? CancellationToken.None);
         }
         catch (Exception ex)

@@ -43,9 +43,12 @@ public interface IDataService
     Task<HashSet<string>> GetAllQuoteNumbersAsync();
     Task<Dictionary<string, QuoteMetadata>> GetQuoteMetadataAsync(CancellationToken cancellationToken = default);
     Task<List<QuoteHistoryEntry>> GetQuotesByNumbersAsync(IEnumerable<string> quoteNumbers, CancellationToken cancellationToken = default);
-    Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber);
+    Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default,
+        bool includeAttachments = true);
     Task SaveQuoteAsync(QuoteHistoryEntry quote, CancellationToken cancellationToken = default);
-    Task DeleteQuoteAsync(string quoteNumber);
+    Task DeleteQuoteAsync(string quoteNumber, CancellationToken cancellationToken = default);
     Task UpdateQuoteNotesAsync(string quoteNumber, string notes, CancellationToken cancellationToken = default);
     Task UpdateQuoteStatusAsync(string quoteNumber, QuoteStatus status, CancellationToken cancellationToken = default);
     Task UpdateQuoteSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo, CancellationToken cancellationToken = default);
@@ -53,7 +56,7 @@ public interface IDataService
     Task UpdateQuoteSupplierInfoAsync(string quoteNumber, QuoteSupplierInfo supplierInfo, CancellationToken cancellationToken = default);
     
     // Utilities
-    Task<int> GetNextQuoteNumberAsync();
+    Task<int> GetNextQuoteNumberAsync(CancellationToken cancellationToken = default);
     Task<bool> IsDatabaseEmptyAsync();
 }
 

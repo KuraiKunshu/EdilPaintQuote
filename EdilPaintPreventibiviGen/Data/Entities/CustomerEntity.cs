@@ -16,4 +16,5 @@ public class CustomerEntity
 	public bool IsDeleted { get; set; }
 	public ICollection<QuoteEntity> QuotesAsCustomer { get; set; } = new List<QuoteEntity>();
 	public ICollection<QuoteEntity> QuotesAsReference { get; set; } = new List<QuoteEntity>();
+	public ICollection<QuoteEntity> QuotesAsBillingCustomer { get; set; } = new List<QuoteEntity>();
 }

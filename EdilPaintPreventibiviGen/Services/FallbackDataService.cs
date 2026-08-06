@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
@@ -24,10 +25,10 @@ public class FallbackDataService : IDataService
     private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan DbConnectionAttemptTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan DbStartupWakeupTimeout = TimeSpan.FromSeconds(90);
-    private static readonly TimeSpan DbInteractiveWakeupTimeout = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan DbInteractiveWakeupTimeout = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan DbWakeupRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DbSchemaInitializationTimeout = TimeSpan.FromSeconds(60);
-    private const int DbSaveRetryCount = 2;
+    private const int DbSaveRetryCount = 1;
 
 
     // Cache dei numeri preventivo presenti nel DB (query leggera, una sola volta ogni 10 min)
@@ -44,6 +45,8 @@ public class FallbackDataService : IDataService
 
     private Dictionary<string, QuoteMetadata>? _localQuoteMetadataCache;
     private DateTime _localQuoteMetadataCacheTime = DateTime.MinValue;
+    private readonly ConcurrentDictionary<string, QuoteMetadata> _sessionQuoteMetadata =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
 
@@ -109,7 +112,11 @@ public class FallbackDataService : IDataService
             cancellationToken.ThrowIfCancellationRequested();
             attempt++;
 
-            using var attemptCts = new CancellationTokenSource(DbConnectionAttemptTimeout);
+            TimeSpan remainingBeforeAttempt = deadline - DateTime.UtcNow;
+            TimeSpan attemptTimeout = remainingBeforeAttempt < DbConnectionAttemptTimeout
+                ? remainingBeforeAttempt
+                : DbConnectionAttemptTimeout;
+            using var attemptCts = new CancellationTokenSource(attemptTimeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, attemptCts.Token);
 
             try
@@ -200,6 +207,7 @@ public class FallbackDataService : IDataService
             _localQuoteNumbersCache = new HashSet<string>(
                 localEntries.Select(q => q.QuoteNumber),
                 StringComparer.OrdinalIgnoreCase);
+            _localQuoteNumbersCache.UnionWith(_sessionQuoteMetadata.Keys);
             _localQuoteNumbersCacheTime = DateTime.UtcNow;
             Debug.WriteLine($"[FallbackDataService] Local numbers cache refreshed: {_localQuoteNumbersCache.Count} entries");
         }
@@ -255,6 +263,9 @@ public class FallbackDataService : IDataService
             _localQuoteMetadataCacheTime = DateTime.UtcNow;
         }
 
+        foreach (var pair in _sessionQuoteMetadata)
+            _localQuoteMetadataCache[pair.Key] = pair.Value;
+
         return _localQuoteMetadataCache;
     }
 
@@ -268,6 +279,13 @@ public class FallbackDataService : IDataService
         _localQuoteNumbersCache = null;
         _dbQuoteMetadataCache = null;
         _localQuoteMetadataCache = null;
+    }
+
+    internal void MarkLocalQuoteCacheUpdated(IEnumerable<string> quoteNumbers)
+    {
+        foreach (string quoteNumber in quoteNumbers)
+            _sessionQuoteMetadata.TryRemove(quoteNumber, out _);
+        InvalidateQuoteNumbersCaches();
     }
 
     /// <summary>
@@ -418,6 +436,18 @@ public class FallbackDataService : IDataService
                 DbInteractiveWakeupTimeout,
                 cancellationToken);
 
+        if (!databaseAvailable)
+            throw CreateDatabaseUnavailableException(operation);
+    }
+
+    internal async Task EnsureInteractiveDatabaseReadyAsync(
+        string operation,
+        CancellationToken cancellationToken = default)
+    {
+        bool databaseAvailable = await TryEnsureDatabaseAvailableAsync(
+            operation,
+            DbInteractiveWakeupTimeout,
+            cancellationToken);
         if (!databaseAvailable)
             throw CreateDatabaseUnavailableException(operation);
     }
@@ -827,13 +857,23 @@ public class FallbackDataService : IDataService
         throw CreateDatabaseUnavailableException("Ricerca storico");
     }
 
-    public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(string quoteNumber)
+    public async Task<QuoteHistoryEntry?> GetQuoteByNumberAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default,
+        bool includeAttachments = true)
     {
-        await EnsureDatabaseRequiredAsync($"Apertura preventivo {quoteNumber}");
+        await EnsureDatabaseRequiredAsync($"Apertura preventivo {quoteNumber}", cancellationToken);
 
         if (IsDatabaseAvailable())
         {
-            try { return await _sqlService.GetQuoteByNumberAsync(quoteNumber); }
+            try
+            {
+                return await _sqlService.GetQuoteByNumberAsync(
+                    quoteNumber,
+                    cancellationToken,
+                    includeAttachments);
+            }
+            catch (OperationCanceledException) { throw; }
             catch(Exception ex) { HandleDatabaseException("GetQuoteByNumberAsync", ex); }
         }
 
@@ -852,9 +892,12 @@ public class FallbackDataService : IDataService
             QuoteNumber = entry.QuoteNumber,
             Date = entry.Date,
             CustomerName = entry.CustomerName,
+            CustomerSyncId = entry.CustomerSyncId,
             ReferenceName = entry.ReferenceName,
+            ReferenceCustomerSyncId = entry.ReferenceCustomerSyncId,
             SiteName = entry.SiteName,
             BillingCustomerName = entry.BillingCustomerName,
+            BillingCustomerSyncId = entry.BillingCustomerSyncId,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             IvaType = entry.IvaType,
@@ -906,45 +949,16 @@ public class FallbackDataService : IDataService
                 Content = [],   // nessun byte nel JSON locale
                 ImportedAt = a.ImportedAt
             }).ToList(),
-            HasCompleteAttachmentSnapshot = entry.HasCompleteAttachmentSnapshot
+            // La cache JSON contiene solo metadati allegato, mai i byte.
+            HasCompleteAttachmentSnapshot = false
         };
     }
     public async Task SaveQuoteAsync(QuoteHistoryEntry quote, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        quote.LastModifiedUtc = DateTime.UtcNow;
-        quote.HasPendingDatabaseWrite = true;
-        EnsureDeviceMetadata(quote);
-
-        var lightEntry = CreateLightEntry(quote);
-        lightEntry.SyncHash = QuoteSyncHashService.Compute(lightEntry);
-        quote.SyncHash = lightEntry.SyncHash;
-
         try
         {
-            bool savedOnline = await SaveQuoteOnlineWithRetryAsync(quote, cancellationToken);
-            if (!savedOnline)
-            {
-                throw new DatabaseWritePendingException(
-                    $"Il preventivo {quote.QuoteNumber} non e' stato salvato: il database non ha confermato il salvataggio.");
-            }
-
-            quote.HasPendingDatabaseWrite = false;
-            lightEntry.LastModifiedUtc = quote.LastModifiedUtc;
-            lightEntry.BaseVersionUtc = quote.BaseVersionUtc;
-            lightEntry.Revision = quote.Revision;
-            lightEntry.BaseRevision = quote.BaseRevision;
-            lightEntry.SyncHash = quote.SyncHash;
-            lightEntry.HasPendingDatabaseWrite = false;
-
-            try
-            {
-                await _localStore.SaveOrUpdateQuoteAsync(lightEntry);
-            }
-            catch (Exception ex)
-            {
-                WriteDatabaseLog($"Preventivo {quote.QuoteNumber} salvato nel DB, ma cache locale non aggiornata: {ex.Message}");
-            }
+            await SaveQuoteDatabaseOnlyAsync(quote, cancellationToken);
+            await UpdateLocalQuoteCacheAfterDatabaseSaveAsync(quote, cancellationToken);
         }
         catch (QuoteConflictException)
         {
@@ -952,15 +966,69 @@ public class FallbackDataService : IDataService
                 quote,
                 "Salvataggio completo rifiutato: il database contiene una versione piu' recente.",
                 cancellationToken);
-            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quote.QuoteNumber);
+            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(
+                quote.QuoteNumber,
+                cancellationToken,
+                includeAttachments: false);
             if (databaseVersion != null)
                 await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
 
             throw;
         }
+    }
 
-        // Invalida le cache dopo ogni salvataggio
+    internal async Task SaveQuoteDatabaseOnlyAsync(
+        QuoteHistoryEntry quote,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        quote.LastModifiedUtc = DateTime.UtcNow;
+        quote.HasPendingDatabaseWrite = true;
+        EnsureDeviceMetadata(quote);
+
+        var lightEntry = CreateLightEntry(quote);
+        quote.SyncHash = QuoteSyncHashService.Compute(lightEntry);
+
+        bool savedOnline = await SaveQuoteOnlineWithRetryAsync(quote, cancellationToken);
+        if (!savedOnline)
+        {
+            throw new DatabaseWritePendingException(
+                $"Il preventivo {quote.QuoteNumber} non e' stato salvato: il database non ha confermato il salvataggio.");
+        }
+
+        quote.HasPendingDatabaseWrite = false;
+        _sessionQuoteMetadata[quote.QuoteNumber] = new QuoteMetadata
+        {
+            QuoteNumber = quote.QuoteNumber,
+            LastModifiedUtc = quote.LastModifiedUtc,
+            SyncHash = quote.SyncHash,
+            Revision = quote.Revision,
+            HasPendingDatabaseWrite = false
+        };
         InvalidateQuoteNumbersCaches();
+    }
+
+    internal async Task UpdateLocalQuoteCacheAfterDatabaseSaveAsync(
+        QuoteHistoryEntry quote,
+        CancellationToken cancellationToken = default)
+    {
+        var lightEntry = CreateLightEntry(quote);
+        lightEntry.SyncHash = quote.SyncHash;
+        lightEntry.HasPendingDatabaseWrite = false;
+        try
+        {
+            await _localStore.SaveOrUpdateQuoteAsync(lightEntry, cancellationToken);
+            MarkLocalQuoteCacheUpdated([quote.QuoteNumber]);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            WriteDatabaseLog(
+                $"Preventivo {quote.QuoteNumber} salvato nel DB, ma cache locale non aggiornata: {ex.Message}");
+        }
     }
 
     private async Task<bool> SaveQuoteOnlineWithRetryAsync(
@@ -975,14 +1043,23 @@ public class FallbackDataService : IDataService
 
             try
             {
-                await EnsureDatabaseReachableAsync(DbInteractiveWakeupTimeout, cancellationToken);
+                if (!IsDatabaseAvailable())
+                    await EnsureDatabaseReachableAsync(DbInteractiveWakeupTimeout, cancellationToken);
                 await _sqlService.SaveQuoteAsync(onlineEntry, cancellationToken);
                 MarkDatabaseAvailable($"Preventivo {onlineEntry.QuoteNumber} salvato online.");
                 return true;
             }
             catch (QuoteConflictException)
             {
-                throw;
+                // Il salvataggio completo nasce dall'editor: il contenuto del
+                // file aperto e modificato e' autorevole. Una concorrenza nella
+                // stretta finestra SELECT->UPDATE viene quindi ritentata una
+                // sola volta su un nuovo DbContext, che rilegge la revisione.
+                WriteDatabaseLog(
+                    $"SaveQuoteAsync concorrenza transitoria per {onlineEntry.QuoteNumber}: ritento come editor autorevole.");
+                await _sqlService.SaveQuoteAsync(onlineEntry, cancellationToken);
+                MarkDatabaseAvailable($"Preventivo {onlineEntry.QuoteNumber} salvato online al secondo tentativo.");
+                return true;
             }
             catch (OperationCanceledException)
             {
@@ -1010,15 +1087,19 @@ public class FallbackDataService : IDataService
         return false;
     }
 
-    public async Task DeleteQuoteAsync(string quoteNumber)
+    public async Task DeleteQuoteAsync(
+        string quoteNumber,
+        CancellationToken cancellationToken = default)
     {
-        await EnsureDatabaseRequiredAsync($"Eliminazione preventivo {quoteNumber}");
+        await EnsureDatabaseRequiredAsync($"Eliminazione preventivo {quoteNumber}", cancellationToken);
 
         try
         {
-            await _sqlService.DeleteQuoteAsync(quoteNumber);
-            await _deletionOutbox.RemoveQuoteAsync(quoteNumber);
-            await _localStore.DeleteQuoteAsync(quoteNumber);
+            await _sqlService.DeleteQuoteAsync(quoteNumber, cancellationToken);
+            await _deletionOutbox.RemoveQuoteAsync(quoteNumber, cancellationToken);
+            // history.json e' una cache: la sync elimina tutte le quote tombstonate
+            // in un solo batch, evitando una riscrittura da decine di MB qui.
+            _sessionQuoteMetadata.TryRemove(quoteNumber, out _);
         }
         catch(Exception ex)
         {
@@ -1040,10 +1121,9 @@ public class FallbackDataService : IDataService
         try
         {
             await _sqlService.UpdateQuoteNotesAsync(quoteNumber, notes, cancellationToken);
-            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
-            if (databaseVersion != null)
-                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.Notes = null, cancellationToken);
+            // La cache JSON viene riallineata in batch dalla sync periodica.
+            // Non riscriviamo l'intero storico per ogni singola azione UI.
+            await _quotePatchOutbox.RemoveNotesIfMatchesAsync(quoteNumber, notes, cancellationToken);
             InvalidateQuoteNumbersCaches();
         }
         catch (Exception ex)
@@ -1063,10 +1143,7 @@ public class FallbackDataService : IDataService
         try
         {
             await _sqlService.UpdateQuoteStatusAsync(quoteNumber, status, cancellationToken);
-            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
-            if (databaseVersion != null)
-                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.Status = null, cancellationToken);
+            await _quotePatchOutbox.RemoveStatusIfMatchesAsync(quoteNumber, status, cancellationToken);
             InvalidateQuoteNumbersCaches();
         }
         catch (Exception ex)
@@ -1091,10 +1168,7 @@ public class FallbackDataService : IDataService
         try
         {
             await _sqlService.UpdateQuoteSendInfoAsync(quoteNumber, sendInfo, cancellationToken);
-            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
-            if (databaseVersion != null)
-                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.SendInfo = null, cancellationToken);
+            await _quotePatchOutbox.RemoveSendInfoIfMatchesAsync(quoteNumber, sendInfo, cancellationToken);
             InvalidateQuoteNumbersCaches();
         }
         catch (Exception ex)
@@ -1119,10 +1193,7 @@ public class FallbackDataService : IDataService
         try
         {
             await _sqlService.RegisterQuoteReminderAsync(quoteNumber, reminderInfo, cancellationToken);
-            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
-            if (databaseVersion != null)
-                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.ReminderInfo = null, cancellationToken);
+            await _quotePatchOutbox.RemoveReminderInfoIfMatchesAsync(quoteNumber, reminderInfo, cancellationToken);
             InvalidateQuoteNumbersCaches();
         }
         catch (Exception ex)
@@ -1145,10 +1216,7 @@ public class FallbackDataService : IDataService
         try
         {
             await _sqlService.UpdateQuoteSupplierInfoAsync(quoteNumber, supplierInfo, cancellationToken);
-            var databaseVersion = await _sqlService.GetQuoteByNumberAsync(quoteNumber);
-            if (databaseVersion != null)
-                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
-            await _quotePatchOutbox.RemoveAppliedAsync(quoteNumber, patch => patch.SupplierInfo = null, cancellationToken);
+            await _quotePatchOutbox.RemoveSupplierInfoIfMatchesAsync(quoteNumber, supplierInfo, cancellationToken);
             InvalidateQuoteNumbersCaches();
         }
         catch (Exception ex)
@@ -1181,7 +1249,16 @@ public class FallbackDataService : IDataService
 
         if (IsDatabaseAvailable())
         {
-            try { return await _sqlService.GetCustomersAsync(cancellationToken); }
+            try
+            {
+                var customers = await _sqlService.GetCustomersAsync(cancellationToken);
+                var referencedCustomerIds = await _sqlService
+                    .GetReferencedCustomerSyncIdsAsync(cancellationToken);
+                return CustomerDuplicateFilter
+                    .Compact(customers, referencedCustomerIds)
+                    .Kept
+                    .ToList();
+            }
             catch(Exception ex) { HandleDatabaseException("GetCustomersAsync", ex); }
         }
 
@@ -1211,7 +1288,8 @@ public class FallbackDataService : IDataService
                 var saved = await _sqlService.AddCustomerAsync(customer, cancellationToken);
                 saved.HasPendingDatabaseWrite = false;
                 MarkDatabaseAvailable($"Cliente {saved.BusinessName} salvato online.");
-                await _localStore.BulkUpdateCustomersAsync([saved], cancellationToken);
+                // clienti.json e' una cache: la sync completa raggruppa gli
+                // aggiornamenti, senza riscrivere 4+ MB per ogni click UI.
                 return saved;
             }
             catch (Exception ex) when (IsDatabaseConnectivityException(ex))
@@ -1252,7 +1330,6 @@ public class FallbackDataService : IDataService
                 var saved = await _sqlService.UpdateCustomerAsync(originalBusinessName, customer);
                 saved.HasPendingDatabaseWrite = false;
                 MarkDatabaseAvailable($"Cliente {saved.BusinessName} aggiornato online.");
-                await _localStore.BulkUpdateCustomersAsync([saved]);
                 return saved;
             }
             catch (Exception ex) when (IsDatabaseConnectivityException(ex))
@@ -1290,7 +1367,6 @@ public class FallbackDataService : IDataService
         {
             await _sqlService.DeleteCustomerAsync(customer.SyncId, customer.BusinessName);
             await _deletionOutbox.RemoveCustomerAsync(customer.SyncId, customer.BusinessName);
-            await _localStore.DeleteCustomerAsync(customer);
         }
         catch (Exception ex)
         {
@@ -1358,7 +1434,9 @@ public class FallbackDataService : IDataService
             try
             {
                 var labors = await _sqlService.GetLaborCatalogAsync();
-                await _localStore.SaveLaborCatalogAsync(labors);
+                var localLabors = await _localStore.LoadLaborCatalogAsync();
+                if (!CatalogCollectionsHaveSameContent(localLabors, labors))
+                    await _localStore.SaveLaborCatalogAsync(labors);
                 return labors;
             }
             catch (Exception ex)
@@ -1406,7 +1484,9 @@ public class FallbackDataService : IDataService
             try
             {
                 var materials = await _sqlService.GetPersonalMaterialsAsync();
-                await _localStore.SavePersonalMaterialsAsync(materials);
+                var localMaterials = await _localStore.LoadPersonalMaterialsAsync();
+                if (!CatalogCollectionsHaveSameContent(localMaterials, materials))
+                    await _localStore.SavePersonalMaterialsAsync(materials);
                 return materials;
             }
             catch (Exception ex)
@@ -1449,11 +1529,45 @@ public class FallbackDataService : IDataService
         (left.PersistentId > 0 && right.PersistentId > 0 && left.PersistentId == right.PersistentId) ||
         left.Name.Equals(right.Name, StringComparison.OrdinalIgnoreCase);
 
-    public async Task<int> GetNextQuoteNumberAsync()
+    private static bool CatalogCollectionsHaveSameContent(
+        IReadOnlyCollection<Item> left,
+        IReadOnlyCollection<Item> right)
     {
+        if (left.Count != right.Count)
+            return false;
+
+        static string Identity(Item item) => item.PersistentId > 0
+            ? $"id:{item.PersistentId:D10}"
+            : $"name:{item.Name}";
+
+        var orderedLeft = left
+            .OrderBy(Identity, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var orderedRight = right
+            .OrderBy(Identity, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return orderedLeft.Zip(orderedRight).All(pair =>
+            pair.First.PersistentId == pair.Second.PersistentId &&
+            string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) &&
+            string.Equals(pair.First.Description, pair.Second.Description, StringComparison.Ordinal) &&
+            pair.First.UnitPrice.Equals(pair.Second.UnitPrice) &&
+            pair.First.Quantity == pair.Second.Quantity &&
+            pair.First.Discount.Equals(pair.Second.Discount) &&
+            pair.First.IsSignificant == pair.Second.IsSignificant &&
+            pair.First.IsCompanyMaterial == pair.Second.IsCompanyMaterial &&
+            pair.First.SortOrder == pair.Second.SortOrder);
+    }
+
+    public async Task<int> GetNextQuoteNumberAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (IsDatabaseAvailable())
         {
-            try { return await _sqlService.GetNextQuoteNumberAsync(); }
+            try { return await _sqlService.GetNextQuoteNumberAsync(cancellationToken); }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex) { HandleDatabaseException("GetNextQuoteNumberAsync", ex); }
         }
 

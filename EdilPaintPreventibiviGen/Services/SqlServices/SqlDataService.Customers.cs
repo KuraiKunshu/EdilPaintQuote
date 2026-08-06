@@ -22,9 +22,70 @@ public partial class SqlDataService
             .ConfigureAwait(false);
     }
 
-    public async Task<Customer> AddCustomerAsync(
-        Customer customer,
+    public async Task<HashSet<Guid>> GetReferencedCustomerSyncIdsAsync(
         CancellationToken cancellationToken = default)
+    {
+        await using var db = AppDbContextFactory.Create();
+
+        // Quotes applica il filtro globale !IsDeleted: proteggiamo quindi solo
+        // gli ID realmente usati dai preventivi attivi, sui tre ruoli cliente.
+        IQueryable<int> primaryCustomerIds = db.Quotes
+            .AsNoTracking()
+            .Where(quote => quote.CustomerId.HasValue)
+            .Select(quote => quote.CustomerId!.Value);
+        IQueryable<int> referenceCustomerIds = db.Quotes
+            .AsNoTracking()
+            .Where(quote => quote.ReferenceCustomerId.HasValue)
+            .Select(quote => quote.ReferenceCustomerId!.Value);
+        IQueryable<int> billingCustomerIds = db.Quotes
+            .AsNoTracking()
+            .Where(quote => quote.BillingCustomerId.HasValue)
+            .Select(quote => quote.BillingCustomerId!.Value);
+
+        var referencedEntityIds = primaryCustomerIds
+            .Concat(referenceCustomerIds)
+            .Concat(billingCustomerIds)
+            .Distinct();
+
+        var syncIds = await db.Customers
+            .AsNoTracking()
+            .Where(customer => referencedEntityIds.Contains(customer.Id))
+            .Select(customer => customer.SyncId)
+            .Where(syncId => syncId != Guid.Empty)
+            .Distinct()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return syncIds.ToHashSet();
+    }
+
+    public async Task<(Customer? Customer, bool IsDeleted)> GetCustomerSyncStateAsync(
+        Guid syncId,
+        CancellationToken cancellationToken = default)
+    {
+        if (syncId == Guid.Empty)
+            return (null, false);
+
+        await using var db = AppDbContextFactory.Create();
+        var entity = await db.Customers
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(customer => customer.SyncId == syncId, cancellationToken)
+            .ConfigureAwait(false);
+        return entity == null
+            ? (null, false)
+            : (entity.ToModel(), entity.IsDeleted);
+    }
+
+    public Task<Customer> AddCustomerAsync(
+        Customer customer,
+        CancellationToken cancellationToken = default) =>
+        AddCustomerWithExpectedVersionAsync(customer, cancellationToken, expectedLastModifiedUtc: null);
+
+    public async Task<Customer> AddCustomerWithExpectedVersionAsync(
+        Customer customer,
+        CancellationToken cancellationToken,
+        DateTime? expectedLastModifiedUtc)
     {
         NormalizeCustomerForSave(customer);
 
@@ -33,8 +94,20 @@ public partial class SqlDataService
             customer.SyncId = Guid.NewGuid();
 
         var existing = await db.Customers
-            .FirstOrDefaultAsync(x => x.SyncId == customer.SyncId, cancellationToken)
-            ?? await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName, cancellationToken);
+            .FirstOrDefaultAsync(x => x.SyncId == customer.SyncId, cancellationToken);
+
+        if (expectedLastModifiedUtc.HasValue)
+        {
+            bool matchesExpectedState = expectedLastModifiedUtc.Value == default
+                ? existing == null
+                : existing != null &&
+                  existing.LastModifiedUtc == expectedLastModifiedUtc.Value;
+            if (!matchesExpectedState)
+            {
+                throw new DbUpdateConcurrencyException(
+                    $"Il cliente {customer.BusinessName} e' stato modificato da un altro dispositivo.");
+            }
+        }
 
         if (existing != null)
         {
@@ -70,9 +143,7 @@ public partial class SqlDataService
             customer.SyncId = Guid.NewGuid();
 
         var entity = await db.Customers
-            .FirstOrDefaultAsync(x => x.SyncId == customer.SyncId)
-            ?? await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == originalBusinessName)
-            ?? await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == customer.BusinessName);
+            .FirstOrDefaultAsync(x => x.SyncId == customer.SyncId);
 
         if (entity == null)
         {
@@ -119,8 +190,9 @@ public partial class SqlDataService
     public async Task DeleteCustomerAsync(Guid syncId, string businessName)
     {
         await using var db = AppDbContextFactory.Create();
-        var entity = await db.Customers.FirstOrDefaultAsync(x =>
-            (syncId != Guid.Empty && x.SyncId == syncId) || x.BusinessName == businessName);
+        var entity = syncId != Guid.Empty
+            ? await db.Customers.FirstOrDefaultAsync(x => x.SyncId == syncId)
+            : await db.Customers.FirstOrDefaultAsync(x => x.BusinessName == businessName);
         if (entity == null) return;
         entity.IsDeleted = true;
         entity.LastModifiedUtc = DateTime.UtcNow;

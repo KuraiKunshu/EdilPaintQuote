@@ -14,7 +14,7 @@
         Height="760"
         MinWidth="1080"
         MinHeight="640"
-        MaxWidth="1540"
+        MaxWidth="1800"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -166,7 +166,7 @@
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
         <Style x:Key="ModernHistoryGridStyle" TargetType="DataGrid">
@@ -177,7 +177,8 @@
             <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource DataGridLineBrush}"/>
             <Setter Property="VerticalGridLinesBrush" Value="{StaticResource TransparentBrush}"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="RowHeight" Value="62"/>
+            <Setter Property="RowHeight" Value="72"/>
+            <Setter Property="MinRowHeight" Value="72"/>
             <Setter Property="ColumnHeaderHeight" Value="42"/>
             <Setter Property="AutoGenerateColumns" Value="False"/>
             <Setter Property="CanUserAddRows" Value="False"/>
@@ -189,6 +190,7 @@
             <Setter Property="AlternatingRowBackground" Value="{StaticResource PanelBackgroundBrush}"/>
             <Setter Property="RowBackground" Value="{StaticResource WhiteBrush}"/>
             <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
@@ -232,7 +234,7 @@
         </Style>
 
         <Style TargetType="DataGridRow">
-            <Setter Property="MinHeight" Value="62"/>
+            <Setter Property="MinHeight" Value="72"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -543,9 +545,9 @@
                         Padding="0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="14"/>
-                            <ColumnDefinition Width="318"/>
+                            <ColumnDefinition Width="*" MinWidth="650"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="300"/>
                         </Grid.ColumnDefinitions>
                         <DataGrid x:Name="GridHistory"
                                   Grid.Column="0"
@@ -573,38 +575,54 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="N. preventivo" Width="118">
+                            <DataGridTemplateColumn Header="Preventivo / date" Width="132">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel HorizontalAlignment="Center">
                                             <TextBlock Text="{Binding QuoteNumber}"
                                                        FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding CreatedDateDisplay}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource MutedTextBrush}"
                                                        HorizontalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis"/>
+                                                       Margin="0,3,0,0"/>
+                                            <TextBlock Text="{Binding SentDateDisplay}"
+                                                       FontSize="10"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding SentDateDisplay}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Cliente / riferimento" Width="*">
+                            <DataGridTemplateColumn Header="Cliente / riferimento"
+                                                    Width="*"
+                                                    MinWidth="260">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel HorizontalAlignment="Stretch" Margin="4,0">
                                             <TextBlock Text="{Binding CustomerName}"
                                                        FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"
                                                        TextTrimming="CharacterEllipsis"
+                                                       MaxHeight="34"
                                                        ToolTip="{Binding CustomerName}"/>
                                             <TextBlock Text="{Binding ReferenceName}"
                                                        FontSize="11"
                                                        Foreground="{StaticResource MutedTextBrush}"
+                                                       TextWrapping="Wrap"
                                                        TextTrimming="CharacterEllipsis"
+                                                       MaxHeight="20"
                                                        ToolTip="{Binding ReferenceName}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Totale / sconti" Width="140">
+                            <DataGridTemplateColumn Header="Totale / sconti" Width="132">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel HorizontalAlignment="Stretch" Margin="4,0">
@@ -625,26 +643,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="IVA" Width="82">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{StaticResource SectionPanelBackgroundBrush}"
-                                                BorderBrush="{StaticResource SubtleBorderBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="8"
-                                                Padding="8,4"
-                                                HorizontalAlignment="Center">
-                                            <TextBlock Text="{Binding IvaDisplay}"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="12"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       ToolTip="{Binding IvaType}"/>
-                                        </Border>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-
-                            <DataGridTemplateColumn Header="Stato" Width="124">
+                            <DataGridTemplateColumn Header="Stato" Width="116">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <ComboBox ItemsSource="{Binding DataContext.StatusOptions, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -658,25 +657,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Date" Width="122">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel HorizontalAlignment="Center">
-                                            <TextBlock Text="{Binding CreatedDateDisplay}"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="12"
-                                                       HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding SentDateDisplay}"
-                                                       FontSize="11"
-                                                       Foreground="{StaticResource MutedTextBrush}"
-                                                       HorizontalAlignment="Center"
-                                                       Margin="0,2,0,0"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-
-                            <DataGridTemplateColumn Header="" Width="46">
+                            <DataGridTemplateColumn Header="" Width="42">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Border BorderBrush="{StaticResource NotificationRedBrush}"
@@ -938,7 +919,18 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
+                        <GridSplitter Grid.Column="1"
+                                      Width="8"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Stretch"
+                                      Background="{StaticResource SubtleBorderBrush}"
+                                      ResizeDirection="Columns"
+                                      ResizeBehavior="PreviousAndNext"
+                                      ShowsPreview="True"
+                                      ToolTip="Trascina per allargare la lista o il dettaglio"/>
+
                         <Border Grid.Column="2"
+                                MinWidth="260"
                                 Background="{StaticResource SectionPanelBackgroundBrush}"
                                 BorderBrush="{StaticResource SubtleBorderBrush}"
                                 BorderThickness="1"

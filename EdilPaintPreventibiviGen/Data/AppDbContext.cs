@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
             entity.ToTable("Customers");
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => x.SyncId).IsUnique();
+            entity.Property(x => x.LastModifiedUtc).IsConcurrencyToken();
 
             entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.SyncId).IsRequired();
@@ -102,6 +103,11 @@ public class AppDbContext : DbContext
             entity.HasOne(x => x.ReferenceCustomer)
                 .WithMany(x => x.QuotesAsReference)
                 .HasForeignKey(x => x.ReferenceCustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.BillingCustomer)
+                .WithMany(x => x.QuotesAsBillingCustomer)
+                .HasForeignKey(x => x.BillingCustomerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
         });

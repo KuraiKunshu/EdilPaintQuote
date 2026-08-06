@@ -362,14 +362,17 @@
                                            FontSize="15"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,12"/>
+                                           Margin="0,0,0,4"/>
+                                <TextBlock Style="{StaticResource HintStyle}"
+                                           Margin="0,0,0,12"
+                                           Text="Puoi personalizzare liberamente oggetto e testo usando le variabili tra parentesi graffe."/>
 
                                 <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Oggetto predefinito"/>
+                                           Text="Oggetto personalizzato"/>
                                 <TextBox x:Name="TxtSupplierOrderMailSubject"/>
 
                                 <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Testo predefinito"
+                                           Text="Testo personalizzato"
                                            Margin="0,12,0,5"/>
                                 <TextBox x:Name="TxtSupplierOrderMailBody"
                                          Height="110"
@@ -378,7 +381,7 @@
                                          VerticalContentAlignment="Top"
                                          VerticalScrollBarVisibility="Auto"/>
                                 <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Segnaposto disponibili: {OrderReference}, {QuoteNumber}, {CustomerName}, {ReferenceName}, {SupplierName}, {Date}, {Materials}. Il testo deve contenere {Materials}."/>
+                                           Text="Variabili: {OrderReference}, {QuoteNumber}, {CustomerName}, {ReferenceName}, {SupplierName}, {Date}, {Materials}. {Materials} inserisce una riga per prodotto con la relativa quantità e deve essere presente nel testo."/>
                             </StackPanel>
                         </Border>
 

@@ -302,7 +302,7 @@ public partial class HistoryWindow : Window
         if (MessageBox.Show($"Vuoi creare un NUOVO preventivo copiando i dati del n. {entry.QuoteNumber}?",
                 "Copia Preventivo", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
         {
-            _vm.LoadQuoteFromHistory(fullEntry, isEdit: false);
+            await _vm.LoadQuoteFromHistoryAsync(fullEntry, isEdit: false);
             Close();
         }
     }
@@ -322,7 +322,7 @@ public partial class HistoryWindow : Window
         if (MessageBox.Show($"Vuoi MODIFICARE il preventivo n. {entry.QuoteNumber}?",
                 "Modifica Preventivo", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
         {
-            _vm.LoadQuoteFromHistory(fullEntry, isEdit: true);
+            await _vm.LoadQuoteFromHistoryAsync(fullEntry, isEdit: true);
             Close();
         }
     }

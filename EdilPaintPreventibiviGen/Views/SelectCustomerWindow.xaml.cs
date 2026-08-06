@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.ViewModels;
 
@@ -12,6 +13,7 @@ public partial class SelectCustomerWindow : Window
     public Customer? SelectedResult { get; private set; }
     private readonly MainViewModel _vm;
     private readonly bool _suppliersOnly;
+    private readonly DispatcherTimer _searchDebounceTimer;
     private string _searchText = string.Empty;
     #endregion
 
@@ -23,6 +25,11 @@ public partial class SelectCustomerWindow : Window
 
         _vm = vm;
         _suppliersOnly = suppliersOnly;
+        _searchDebounceTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(180)
+        };
+        _searchDebounceTimer.Tick += OnSearchDebounceTick;
 
         ConfigureMode();
         RefreshResults();
@@ -42,6 +49,7 @@ public partial class SelectCustomerWindow : Window
     private void SelectCustomerWindow_Closed(object? sender, System.EventArgs e)
     {
         TxtSearch.Text = string.Empty;
+        _searchDebounceTimer.Stop();
     }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -68,7 +76,8 @@ public partial class SelectCustomerWindow : Window
         if (sender is TextBox tb)
         {
             _searchText = tb.Text;
-            RefreshResults();
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
             tb.CaretIndex = tb.Text.Length;
         }
     }
@@ -127,6 +136,12 @@ public partial class SelectCustomerWindow : Window
                 RefreshResults();
             }
         }
+    }
+
+    private void OnSearchDebounceTick(object? sender, EventArgs e)
+    {
+        _searchDebounceTimer.Stop();
+        RefreshResults();
     }
 
     private void OnSupplierFlagClick(object sender, RoutedEventArgs e)

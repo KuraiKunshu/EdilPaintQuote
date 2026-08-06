@@ -34,6 +34,9 @@ public partial class MainViewModel
         _selectedSecondCustomer = null;
         _siteAddress = string.Empty;
         _selectedBillingCustomer = null;
+        _unresolvedCustomerName = string.Empty;
+        _unresolvedReferenceCustomerName = string.Empty;
+        _unresolvedBillingCustomerName = string.Empty;
         _isSecondCustomerEnabled = false;
         _isSiteCustomerEnabled = false;
         _isBillingCustomerEnabled = false;
@@ -47,6 +50,10 @@ public partial class MainViewModel
         _loadedQuoteBaseVersionUtc = default;
         _loadedQuoteBaseRevision = 0;
         _lastSharedDraftContentHash = string.Empty;
+        _lastSharedDraftAttachmentHash = string.Empty;
+        _lastSharedDraftSaveAttemptUtc = DateTime.MinValue;
+        _isDraftQuoteNumberAllocated = false;
+        _sharedDraftCreatedByAutosave = false;
 
         _materialDiscount = 0;
         _laborDiscount = 0;
@@ -217,10 +224,10 @@ public partial class MainViewModel
         return value.Trim().Replace("_", " ").ToUpperInvariant();
     }
 
-    public void GeneratePdf() => _ = GeneratePdfAsync(!_isEditingExistingQuote);
+    public void GeneratePdf() => _ = GeneratePdfAsync();
 
     public async Task GeneratePdfAsync(
-        bool incrementCounter = true,
+        bool? incrementCounter = null,
         bool openAfterGeneration = true,
         DateTime? specificDate = null,
         string? forceTargetPath = null)
@@ -235,6 +242,24 @@ public partial class MainViewModel
             MessageBox.Show("Seleziona un cliente prima di generare il PDF.");
             return;
         }
+        if (IsSecondCustomerEnabled && SelectedSecondCustomer == null)
+        {
+            MessageBox.Show(
+                "Il riferimento non e' identificabile in modo univoco. Riselezionalo prima di generare il PDF.",
+                "Riferimento da selezionare",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        if (IsBillingCustomerEnabled && SelectedBillingCustomer == null)
+        {
+            MessageBox.Show(
+                "Il cliente di fatturazione non e' identificabile in modo univoco. Riselezionalo prima di generare il PDF.",
+                "Cliente di fatturazione da selezionare",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         if (_isGeneratingPdf)
         {
@@ -243,17 +268,36 @@ public partial class MainViewModel
         }
 
         _isGeneratingPdf = true;
+        bool lockTaken = false;
 
         try
         {
-            if (incrementCounter && !_isEditingExistingQuote)
+            await _draftSaveLock.WaitAsync();
+            lockTaken = true;
+
+            // Lo stato puo' essere cambiato da un autosalvataggio che era gia'
+            // in corso quando l'utente ha premuto il pulsante. Decidiamo la
+            // numerazione soltanto dopo aver atteso quel salvataggio.
+            bool effectiveIsNewEntry = incrementCounter ?? !_isEditingExistingQuote;
+            bool shouldAllocateQuoteNumber =
+                effectiveIsNewEntry &&
+                !_isEditingExistingQuote &&
+                !_isDraftQuoteNumberAllocated;
+            if (shouldAllocateQuoteNumber)
             {
                 try
                 {
                     int nextNumber = await _dataService.GetNextQuoteNumberAsync();
                     _companyData.Counter = nextNumber;
                     QuoteNumber = nextNumber.ToString();
+                    _isDraftQuoteNumberAllocated = true;
                     OnPropertyChanged(nameof(QuoteNumber));
+
+                    // Se la generazione fallisce dopo l'allocazione, il tentativo
+                    // successivo deve riutilizzare lo stesso numero.
+                    await _draftService.SaveIfChangedAsync(
+                        CreateDraftEntry(),
+                        CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -305,7 +349,7 @@ public partial class MainViewModel
                 ? targetPath
                 : MoveTemporaryPdfToLocalFallback(pathToGenerate, targetPath);
 
-            if (!await SaveToHistoryAsync(persistedPdfPath, incrementCounter, effectiveDate))
+            if (!await SaveToHistoryAsync(persistedPdfPath, effectiveIsNewEntry, effectiveDate))
                 return;
             _hasPersistedCurrentQuote = true;
             await DiscardDraftAsync();
@@ -339,21 +383,45 @@ public partial class MainViewModel
         finally
         {
             _isGeneratingPdf = false;
+            if (lockTaken)
+                _draftSaveLock.Release();
         }
     }
 
-    public void LoadQuoteFromHistory(QuoteHistoryEntry entry, bool isEdit = false)
+    public async Task LoadQuoteFromHistoryAsync(
+        QuoteHistoryEntry entry,
+        bool isEdit = false,
+        CancellationToken cancellationToken = default)
+    {
+        await _draftSaveLock.WaitAsync(cancellationToken);
+        try
+        {
+            LoadQuoteFromHistoryCore(entry, isEdit);
+        }
+        finally
+        {
+            _draftSaveLock.Release();
+        }
+    }
+
+    private void LoadQuoteFromHistoryCore(QuoteHistoryEntry entry, bool isEdit)
     {
         ResetQuote();
 
-        SelectedCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.CustomerName);
+        SelectedCustomer = FindCustomerByIdentity(entry.CustomerSyncId, entry.CustomerName);
+        if (SelectedCustomer == null)
+            _unresolvedCustomerName = entry.CustomerName;
         CustomerBorderBrush = GetCustomerSelectionBrush(_selectedCustomer != null);
         OnPropertyChanged(nameof(SelectedCustomer));
 
         if (!string.IsNullOrWhiteSpace(entry.ReferenceName))
         {
             IsSecondCustomerEnabled = true;
-            SelectedSecondCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.ReferenceName);
+            SelectedSecondCustomer = FindCustomerByIdentity(
+                entry.ReferenceCustomerSyncId,
+                entry.ReferenceName);
+            if (SelectedSecondCustomer == null)
+                _unresolvedReferenceCustomerName = entry.ReferenceName;
         }
 
         if (!string.IsNullOrWhiteSpace(entry.SiteName))
@@ -365,7 +433,11 @@ public partial class MainViewModel
         if (!string.IsNullOrWhiteSpace(entry.BillingCustomerName))
         {
             IsBillingCustomerEnabled = true;
-            SelectedBillingCustomer = AllCustomers.FirstOrDefault(c => c.BusinessName == entry.BillingCustomerName);
+            SelectedBillingCustomer = FindCustomerByIdentity(
+                entry.BillingCustomerSyncId,
+                entry.BillingCustomerName);
+            if (SelectedBillingCustomer == null)
+                _unresolvedBillingCustomerName = entry.BillingCustomerName;
         }
 
         PaymentTerms = entry.PaymentTerms;
@@ -383,6 +455,10 @@ public partial class MainViewModel
         _loadedQuoteBaseVersionUtc = isEdit ? entry.BaseVersionUtc : default;
         _loadedQuoteBaseRevision = isEdit ? entry.BaseRevision : 0;
         _lastSharedDraftContentHash = string.Empty;
+        _lastSharedDraftAttachmentHash = string.Empty;
+        _lastSharedDraftSaveAttemptUtc = DateTime.MinValue;
+        _isDraftQuoteNumberAllocated = isEdit;
+        _sharedDraftCreatedByAutosave = false;
         if (isEdit)
             QuoteNumber = entry.QuoteNumber;
 
@@ -434,6 +510,35 @@ public partial class MainViewModel
 
         UpdateItemSortOrders();
         CalculateTotals();
+
+        // Aprire un preventivo non e' una modifica: il database resta
+        // autorevole finche' il contenuto dell'editor non cambia davvero.
+        if (isEdit)
+        {
+            _lastSharedDraftContentHash = ComputeSharedDraftContentHash(CreateDraftEntry());
+            _lastSharedDraftAttachmentHash = ComputeAttachmentContentHash(entry.Attachments);
+        }
+    }
+
+    private Customer? FindCustomerByIdentity(Guid syncId, string? businessName)
+    {
+        if (syncId != Guid.Empty)
+        {
+            var byId = AllCustomers.FirstOrDefault(customer => customer.SyncId == syncId);
+            if (byId != null)
+                return byId;
+        }
+
+        if (string.IsNullOrWhiteSpace(businessName))
+            return null;
+
+        var byName = AllCustomers
+            .Where(customer => customer.BusinessName.Equals(
+                businessName,
+                StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToList();
+        return byName.Count == 1 ? byName[0] : null;
     }
 
     private List<SelectedAttachment> LoadAttachmentsForQuote(QuoteHistoryEntry entry)

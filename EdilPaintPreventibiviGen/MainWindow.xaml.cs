@@ -43,6 +43,7 @@ public partial class MainWindow : Window
             await vm.InitializeAsync();
             await PromptDraftRecoveryAsync(vm);
             StartDraftAutosave();
+            _lastSharedDataRefreshUtc = DateTime.UtcNow;
             _isMainWindowLoaded = true;
         };
     }
@@ -56,6 +57,7 @@ public partial class MainWindow : Window
         {
             await PromptDraftRecoveryAsync(vm);
             StartDraftAutosave();
+            _lastSharedDataRefreshUtc = DateTime.UtcNow;
             _isMainWindowLoaded = true;
         };
     }
@@ -64,7 +66,7 @@ public partial class MainWindow : Window
     private async void OnMainWindowActivated(object? sender, EventArgs e)
     {
         if (!_isMainWindowLoaded ||
-            DateTime.UtcNow - _lastSharedDataRefreshUtc < TimeSpan.FromSeconds(15) ||
+            DateTime.UtcNow - _lastSharedDataRefreshUtc < TimeSpan.FromMinutes(5) ||
             App.SyncService is { IsSyncRunning: true } ||
             DataContext is not MainViewModel vm)
             return;
@@ -206,7 +208,7 @@ public partial class MainWindow : Window
                 {
                     CommitPendingGridEdits();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                    await vm.SaveDraftAsync(cts.Token);
+                    await vm.SaveDraftAsync(cts.Token, forceDatabaseSave: true);
                 }
                 catch (OperationCanceledException)
                 {
@@ -234,7 +236,7 @@ public partial class MainWindow : Window
         _draftAutosaveCts = AppShutdownManager.CreateLinkedTokenSource();
         _draftAutosaveTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(3)
+            Interval = TimeSpan.FromSeconds(10)
         };
         _draftAutosaveTimer.Tick += OnDraftAutosaveTick;
         _draftAutosaveTimer.Start();
@@ -271,7 +273,11 @@ public partial class MainWindow : Window
         _isAutosavingDraft = true;
         try
         {
-            CommitPendingGridEdits();
+            // Non chiudere la cella/riga che l'utente sta modificando: il commit
+            // forzato del DataGrid a ogni tick causava salti di focus e blocchi
+            // percepiti. Aggiorniamo soltanto il binding attualmente focalizzato.
+            CommitFocusedTextBinding();
+            vm.CalculateTotals();
             await vm.SaveDraftAsync(cancellationToken);
         }
         catch (OperationCanceledException)
@@ -346,7 +352,6 @@ public partial class MainWindow : Window
         else
         {
             await vm.DiscardCurrentWorkAsync();
-            vm.ResetQuote();
         }
     }
     
@@ -523,7 +528,6 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel vm)
         {
             await vm.DiscardCurrentWorkAsync();
-            vm.ResetQuote();
         }
     }
     private void OnGeneratePdfClick(object sender, RoutedEventArgs e)

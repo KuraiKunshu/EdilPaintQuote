@@ -24,86 +24,132 @@ public partial class MainViewModel
     #region Data Loading & Saving
     public Task InitializeAsync() => LoadDataAsync();
 
-    public async Task RefreshSharedDataAsync(CancellationToken cancellationToken = default)
+    public Task RefreshSharedDataAsync(CancellationToken cancellationToken = default) =>
+        RefreshSharedDataAsync(refreshCatalogs: true, waitForCurrentRefresh: false, cancellationToken);
+
+    public Task RefreshCustomersAsync(CancellationToken cancellationToken = default) =>
+        RefreshSharedDataAsync(refreshCatalogs: false, waitForCurrentRefresh: true, cancellationToken);
+
+    private async Task RefreshSharedDataAsync(
+        bool refreshCatalogs,
+        bool waitForCurrentRefresh,
+        CancellationToken cancellationToken)
     {
-        if (!await _sharedDataRefreshLock.WaitAsync(0, cancellationToken))
+        if (waitForCurrentRefresh)
+        {
+            await _sharedDataRefreshLock.WaitAsync(cancellationToken);
+        }
+        else if (!await _sharedDataRefreshLock.WaitAsync(0, cancellationToken))
+        {
             return;
+        }
 
         try
         {
-            if (Volatile.Read(ref _sharedDataMutationsInProgress) > 0)
-                return;
-
-            long mutationVersion = Volatile.Read(ref _sharedDataMutationVersion);
-            var snapshot = await Task.Run(async () =>
+            while (true)
             {
-                var customers = await _dataService.GetCustomersAsync(cancellationToken);
-                var labors = await _dataService.GetLaborCatalogAsync();
-                var personalMaterials = await _dataService.GetPersonalMaterialsAsync();
-                return (customers, labors, personalMaterials);
-            }, cancellationToken).ConfigureAwait(false);
+                if (Volatile.Read(ref _sharedDataMutationsInProgress) > 0)
+                {
+                    if (!waitForCurrentRefresh)
+                        return;
+                    await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Volatile.Read(ref _sharedDataMutationsInProgress) > 0 ||
-                Volatile.Read(ref _sharedDataMutationVersion) != mutationVersion)
-            {
-                return;
-            }
+                long mutationVersion = Volatile.Read(ref _sharedDataMutationVersion);
+                var snapshot = await Task.Run(async () =>
+                {
+                    var customers = await _dataService.GetCustomersAsync(cancellationToken);
+                    List<Item>? labors = null;
+                    List<Item>? personalMaterials = null;
+                    if (refreshCatalogs)
+                    {
+                        labors = await _dataService.GetLaborCatalogAsync();
+                        personalMaterials = await _dataService.GetPersonalMaterialsAsync();
+                    }
+                    return (customers, labors, personalMaterials);
+                }, cancellationToken).ConfigureAwait(false);
 
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
-                return;
-
-            await dispatcher.InvokeAsync(() =>
-            {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (Volatile.Read(ref _sharedDataMutationsInProgress) > 0 ||
                     Volatile.Read(ref _sharedDataMutationVersion) != mutationVersion)
                 {
+                    if (!waitForCurrentRefresh)
+                        return;
+                    await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
                     return;
-                }
 
-                Customer? selectedCustomer = SelectedCustomer;
-                Customer? selectedReference = SelectedSecondCustomer;
-                Customer? selectedBilling = SelectedBillingCustomer;
-
-                if (MergeCustomers(snapshot.customers))
+                bool applied = false;
+                await dispatcher.InvokeAsync(() =>
                 {
-                    _selectedCustomer = FindRefreshedCustomer(selectedCustomer);
-                    _selectedSecondCustomer = FindRefreshedCustomer(selectedReference);
-                    _selectedBillingCustomer = FindRefreshedCustomer(selectedBilling);
-                    CustomerBorderBrush = GetCustomerSelectionBrush(_selectedCustomer != null);
-                    SecondCustomerBorderBrush = GetCustomerSelectionBrush(_selectedSecondCustomer != null);
-                    OnPropertyChanged(nameof(SelectedCustomer));
-                    OnPropertyChanged(nameof(SelectedSecondCustomer));
-                    OnPropertyChanged(nameof(SelectedBillingCustomer));
-
-                    if (FilteredCustomers.Count > 0 || !string.IsNullOrWhiteSpace(_customerSearchText))
+                    if (Volatile.Read(ref _sharedDataMutationsInProgress) > 0 ||
+                        Volatile.Read(ref _sharedDataMutationVersion) != mutationVersion)
                     {
-                        SynchronizeCollection(
-                            FilteredCustomers,
-                            AllCustomers.Where(customer => customer.ContainsText(_customerSearchText)).ToList());
+                        return;
                     }
 
-                    if (FilteredSecondCustomers.Count > 0 || !string.IsNullOrWhiteSpace(_secondCustomerSearchText))
+                    Customer? selectedCustomer = SelectedCustomer;
+                    Customer? selectedReference = SelectedSecondCustomer;
+                    Customer? selectedBilling = SelectedBillingCustomer;
+
+                    if (MergeCustomers(snapshot.customers))
+                    {
+                        _selectedCustomer = FindRefreshedCustomer(selectedCustomer);
+                        _selectedSecondCustomer = FindRefreshedCustomer(selectedReference);
+                        _selectedBillingCustomer = FindRefreshedCustomer(selectedBilling);
+                        if (_selectedCustomer == null && selectedCustomer != null)
+                            _unresolvedCustomerName = selectedCustomer.BusinessName;
+                        if (_selectedSecondCustomer == null && selectedReference != null)
+                            _unresolvedReferenceCustomerName = selectedReference.BusinessName;
+                        if (_selectedBillingCustomer == null && selectedBilling != null)
+                            _unresolvedBillingCustomerName = selectedBilling.BusinessName;
+                        CustomerBorderBrush = GetCustomerSelectionBrush(_selectedCustomer != null);
+                        SecondCustomerBorderBrush = GetCustomerSelectionBrush(_selectedSecondCustomer != null);
+                        OnPropertyChanged(nameof(SelectedCustomer));
+                        OnPropertyChanged(nameof(SelectedSecondCustomer));
+                        OnPropertyChanged(nameof(SelectedBillingCustomer));
+
+                        if (FilteredCustomers.Count > 0 || !string.IsNullOrWhiteSpace(_customerSearchText))
+                        {
+                            SynchronizeCollection(
+                                FilteredCustomers,
+                                AllCustomers.Where(customer => customer.ContainsText(_customerSearchText)).ToList());
+                        }
+
+                        if (FilteredSecondCustomers.Count > 0 || !string.IsNullOrWhiteSpace(_secondCustomerSearchText))
+                        {
+                            SynchronizeCollection(
+                                FilteredSecondCustomers,
+                                AllCustomers.Where(customer => customer.ContainsText(_secondCustomerSearchText)).ToList());
+                        }
+                    }
+
+                    if (snapshot.labors != null &&
+                        MergeCatalogLabors(snapshot.labors) &&
+                        (FilteredLabors.Count > 0 || !string.IsNullOrWhiteSpace(_laborSearchText)))
                     {
                         SynchronizeCollection(
-                            FilteredSecondCustomers,
-                            AllCustomers.Where(customer => customer.ContainsText(_secondCustomerSearchText)).ToList());
+                            FilteredLabors,
+                            AllCatalogLabors.Where(labor =>
+                                string.IsNullOrWhiteSpace(_laborSearchText) ||
+                                labor.Name.Contains(_laborSearchText, StringComparison.OrdinalIgnoreCase)).ToList());
                     }
-                }
 
-                if (MergeCatalogLabors(snapshot.labors) &&
-                    (FilteredLabors.Count > 0 || !string.IsNullOrWhiteSpace(_laborSearchText)))
-                {
-                    SynchronizeCollection(
-                        FilteredLabors,
-                        AllCatalogLabors.Where(labor =>
-                            string.IsNullOrWhiteSpace(_laborSearchText) ||
-                            labor.Name.Contains(_laborSearchText, StringComparison.OrdinalIgnoreCase)).ToList());
-                }
+                    if (snapshot.personalMaterials != null)
+                        MergeItemList(_personalMaterials, snapshot.personalMaterials);
+                    applied = true;
+                }, System.Windows.Threading.DispatcherPriority.Background, cancellationToken);
 
-                MergeItemList(_personalMaterials, snapshot.personalMaterials);
-            }, System.Windows.Threading.DispatcherPriority.Background, cancellationToken);
+                if (applied || !waitForCurrentRefresh)
+                    return;
+
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -522,7 +568,18 @@ public partial class MainViewModel
         try
         {
             var snapshot = CloneCustomerForPersistence(c);
-            savedCustomer = await _dataService.AddCustomerAsync(snapshot);
+            await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+                _dataService,
+                $"Salvataggio cliente {snapshot.BusinessName}");
+            await DatabaseOperationCoordinator.Gate.WaitAsync();
+            try
+            {
+                savedCustomer = await _dataService.AddCustomerAsync(snapshot);
+            }
+            finally
+            {
+                DatabaseOperationCoordinator.Gate.Release();
+            }
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 ApplySavedCustomerToCollections(c.BusinessName, savedCustomer);
@@ -585,7 +642,19 @@ public partial class MainViewModel
         bool refreshAfterSave = false;
         try
         {
-            var saved = await _dataService.UpdateCustomerAsync(originalBusinessName, updated);
+            Customer saved;
+            await DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(
+                _dataService,
+                $"Aggiornamento cliente {updated.BusinessName}");
+            await DatabaseOperationCoordinator.Gate.WaitAsync();
+            try
+            {
+                saved = await _dataService.UpdateCustomerAsync(originalBusinessName, updated);
+            }
+            finally
+            {
+                DatabaseOperationCoordinator.Gate.Release();
+            }
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 ApplySavedCustomerToCollections(originalBusinessName, saved);
