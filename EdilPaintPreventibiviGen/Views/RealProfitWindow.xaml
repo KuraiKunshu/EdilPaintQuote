@@ -1,194 +1,901 @@
 <Window x:Class="EdilPaintPreventibiviGen.Views.RealProfitWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Calcolo guadagno reale"
-        Width="1050" Height="760"
-        MinWidth="900" MinHeight="650"
+        Width="1120"
+        Height="800"
+        MinWidth="980"
+        MinHeight="700"
+        MaxWidth="1600"
         WindowStartupLocation="CenterOwner"
-        Background="{StaticResource ShellBackgroundBrush}"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="True"
+        Background="{StaticResource TransparentBrush}"
         Icon="pack://application:,,,/Assets/Windowsicon/main.ico">
-    <Grid Margin="18">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
 
-        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource SubtleBorderBrush}"
-                BorderThickness="1" CornerRadius="10" Padding="16">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="8"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="{StaticResource HoverSurfaceBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="MinWidth" Value="108"/>
+            <Setter Property="Padding" Value="16,7"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.86"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.68"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource GeneratePdfButtonBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource GeneratePdfButtonBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+        </Style>
+
+        <Style x:Key="SecondaryActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource NeutralButtonBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource NeutralButtonBorderBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource NeutralButtonTextBrush}"/>
+        </Style>
+
+        <Style x:Key="RemoveButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinWidth" Value="72"/>
+            <Setter Property="Padding" Value="9,3"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Background" Value="{StaticResource DangerSoftBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DangerSoftBorderBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DangerRedBrush}"/>
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <Style x:Key="FieldHintStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,5,0,0"/>
+        </Style>
+
+        <Style x:Key="ProfitTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ProfitComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style x:Key="SectionCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+
+        <Style x:Key="InfoBannerStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="Padding" Value="12,9"/>
+        </Style>
+
+        <Style x:Key="MetricCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="3,1,1,1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="13,11"/>
+            <Setter Property="MinHeight" Value="76"/>
+        </Style>
+
+        <Style x:Key="NumericCellTextStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+
+        <Style x:Key="NumericEditingTextStyle" TargetType="TextBox"
+               BasedOn="{StaticResource ProfitTextBoxStyle}">
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+
+        <Style x:Key="ProfitDataGridStyle" TargetType="DataGrid">
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DataGridBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource DataGridLineBrush}"/>
+            <Setter Property="VerticalGridLinesBrush" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="RowHeaderWidth" Value="0"/>
+            <Setter Property="RowHeight" Value="44"/>
+            <Setter Property="ColumnHeaderHeight" Value="40"/>
+            <Setter Property="AlternatingRowBackground" Value="{StaticResource PanelBackgroundBrush}"/>
+            <Setter Property="RowBackground" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="CanUserResizeRows" Value="False"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="11,0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        </Style>
+
+        <Style TargetType="DataGridRow">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SearchResultHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SearchResultSelectedBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ProfitTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="16,9"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder"
+                                        Property="Background"
+                                        Value="{StaticResource HoverSurfaceBrush}"/>
+                                <Setter TargetName="TabBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource SubtleBorderBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder"
+                                        Property="Background"
+                                        Value="{StaticResource PrimaryBlueBrush}"/>
+                                <Setter TargetName="TabBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource PrimaryBlueBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="TabBorder" Property="Opacity" Value="0.42"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ProfitTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ProfitTabItemStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="5">
+                                <TabPanel IsItemsHost="True"/>
+                            </Border>
+                            <Border Grid.Row="2"
+                                    Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9">
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  ContentSource="SelectedContent"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{StaticResource TransparentBrush}">
+        <Border Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource WindowShadowBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="22" ShadowDepth="0" Opacity="0.22"/>
+            </Border.Effect>
+
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="12"/>
-                    <ColumnDefinition Width="150"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Guadagno reale" FontSize="24" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TxtQuoteInfo" Margin="0,4,0,0"
-                               Foreground="{StaticResource MutedTextBrush}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="1">
-                    <TextBlock Text="Ricavo imponibile (€)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox x:Name="TxtRevenue"/>
-                </StackPanel>
-                <StackPanel Grid.Column="3">
-                    <TextBlock Text="Sconto fornitore (%)" FontSize="11" Foreground="{StaticResource MutedTextBrush}"/>
-                    <TextBox x:Name="TxtSupplierDiscount"/>
-                </StackPanel>
-            </Grid>
-        </Border>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="68"/>
+                    <RowDefinition Height="1"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="1"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="2">
-            <TabItem x:Name="TabMaterials" Header="Materiali preventivo">
-                <Grid Margin="12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="Il costo d'acquisto usa il prezzo del preventivo come base e applica automaticamente lo sconto fornitore."
-                               Foreground="{StaticResource MutedTextBrush}"/>
-                    <DataGrid Grid.Row="2" x:Name="GridMaterialCosts" AutoGenerateColumns="False"
-                              CanUserAddRows="False" CanUserDeleteRows="False">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Materiale" Binding="{Binding Name}" IsReadOnly="True" Width="*"/>
-                            <DataGridTextColumn Header="Quantità" Binding="{Binding Quantity}" IsReadOnly="True" Width="90"/>
-                            <DataGridTextColumn Header="Prezzo cliente unit. €" Binding="{Binding CustomerUnitPrice, StringFormat=N2}"
-                                                IsReadOnly="True" Width="155"/>
-                            <DataGridTextColumn Header="Sconto cliente %" Binding="{Binding CustomerDiscount, StringFormat=N2}"
-                                                IsReadOnly="True" Width="150"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="Manodopera">
-                <Grid Margin="18">
+                <Grid Grid.Row="0"
+                      Margin="20,0,10,0"
+                      MouseLeftButtonDown="Header_MouseLeftButtonDown">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="16"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="16"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="16"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="Numero operai"/>
-                        <TextBox x:Name="TxtWorkers" Text="1"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Giorni"/>
-                        <TextBox x:Name="TxtDays" Text="1"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="4">
-                        <TextBlock Text="Ore al giorno"/>
-                        <TextBox x:Name="TxtHoursPerDay" Text="8"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="6">
-                        <TextBlock Text="Costo orario per operaio (€)"/>
-                        <TextBox x:Name="TxtHourlyCost" Text="0"/>
-                    </StackPanel>
-                </Grid>
-            </TabItem>
 
-            <TabItem Header="Costi materiali aziendali">
-                <Grid Margin="12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="Queste voci sono solo costi interni: non vengono aggiunte al catalogo né al preventivo cliente."
-                               Foreground="{StaticResource MutedTextBrush}"/>
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="150"/>
-                        </Grid.ColumnDefinitions>
-                        <ComboBox x:Name="CboCompanyMaterialSearch"
-                                  IsEditable="True"
-                                  IsTextSearchEnabled="False"
-                                  DisplayMemberPath="Name"
-                                  StaysOpenOnEdit="True"
-                                  KeyUp="OnCompanyMaterialSearchKeyUp"
-                                  SelectionChanged="OnCompanyMaterialSelected"/>
-                        <Button Grid.Column="2"
-                                Content="Aggiungi selezionato"
-                                Click="OnAddSelectedCompanyMaterialClick"/>
+                    <Border Width="40"
+                            Height="40"
+                            VerticalAlignment="Center"
+                            Background="{StaticResource SectionPanelBackgroundBrush}"
+                            BorderBrush="{StaticResource SuccessGreenBrush}"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                        <TextBlock Text="€"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource SuccessGreenBrush}"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="Calcolo del guadagno reale"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource DefaultTextBrush}"/>
+                        <TextBlock x:Name="TxtQuoteInfo"
+                                   Margin="0,3,0,0"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="3"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Content="X"
+                            ToolTip="Chiudi"
+                            Click="OnCloseClick"/>
+                </Grid>
+
+                <Border Grid.Row="1" Background="{StaticResource SubtleBorderBrush}"/>
+
+                <Grid Grid.Row="2" Background="{StaticResource ShellBackgroundBrush}">
+                    <Grid Margin="20,17,20,16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="14"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Style="{StaticResource SectionCardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="18"/>
+                                    <ColumnDefinition Width="210"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="210"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Parametri principali"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource DefaultTextBrush}"/>
+                                    <TextBlock Margin="0,4,0,0"
+                                               Text="Definiscono il ricavo di partenza e il costo effettivo dei materiali."
+                                               FontSize="11.5"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Ricavo imponibile (€)"
+                                               Style="{StaticResource FieldLabelStyle}"/>
+                                    <TextBox x:Name="TxtRevenue"
+                                             Style="{StaticResource ProfitTextBoxStyle}"
+                                             TextAlignment="Right"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="Sconto fornitore (%)"
+                                               Style="{StaticResource FieldLabelStyle}"/>
+                                    <TextBox x:Name="TxtSupplierDiscount"
+                                             Style="{StaticResource ProfitTextBoxStyle}"
+                                             TextAlignment="Right"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <TabControl Grid.Row="2" Style="{StaticResource ProfitTabControlStyle}">
+                            <TabItem x:Name="TabMaterials" Header="Materiali del preventivo">
+                                <Grid Margin="16">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Style="{StaticResource InfoBannerStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4"/>
+                                                <ColumnDefinition Width="10"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{StaticResource PrimaryBlueBrush}"
+                                                    CornerRadius="2"/>
+                                            <TextBlock Grid.Column="2"
+                                                       VerticalAlignment="Center"
+                                                       Text="Il costo d'acquisto parte dal prezzo del preventivo e applica automaticamente lo sconto fornitore."
+                                                       FontSize="11.5"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       TextWrapping="Wrap"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <DataGrid Grid.Row="2"
+                                              x:Name="GridMaterialCosts"
+                                              Style="{StaticResource ProfitDataGridStyle}"
+                                              AutoGenerateColumns="False"
+                                              CanUserAddRows="False"
+                                              CanUserDeleteRows="False"
+                                              IsReadOnly="True">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Materiale"
+                                                                Binding="{Binding Name}"
+                                                                Width="*"/>
+                                            <DataGridTextColumn Header="Quantità"
+                                                                Binding="{Binding Quantity}"
+                                                                ElementStyle="{StaticResource NumericCellTextStyle}"
+                                                                Width="90"/>
+                                            <DataGridTextColumn Header="Prezzo cliente unit. €"
+                                                                Binding="{Binding CustomerUnitPrice, StringFormat=N2}"
+                                                                ElementStyle="{StaticResource NumericCellTextStyle}"
+                                                                Width="165"/>
+                                            <DataGridTextColumn Header="Sconto cliente %"
+                                                                Binding="{Binding CustomerDiscount, StringFormat=N2}"
+                                                                ElementStyle="{StaticResource NumericCellTextStyle}"
+                                                                Width="150"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </TabItem>
+
+                            <TabItem Header="Manodopera">
+                                <Grid Margin="16">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Style="{StaticResource InfoBannerStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4"/>
+                                                <ColumnDefinition Width="10"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{StaticResource CostsOurBrush}"
+                                                    CornerRadius="2"/>
+                                            <TextBlock Grid.Column="2"
+                                                       VerticalAlignment="Center"
+                                                       Text="Inserisci l'impiego reale della squadra per stimare il costo complessivo della manodopera."
+                                                       FontSize="11.5"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       TextWrapping="Wrap"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="2"
+                                            Style="{StaticResource SectionCardStyle}"
+                                            Background="{StaticResource SectionPanelBackgroundBrush}"
+                                            VerticalAlignment="Top">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="16"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <StackPanel>
+                                                <TextBlock Text="Impiego della squadra"
+                                                           FontSize="14"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource DefaultTextBrush}"/>
+                                                <TextBlock Margin="0,3,0,0"
+                                                           Text="Compila i quattro valori operativi usati nel calcolo."
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource MutedTextBrush}"/>
+                                            </StackPanel>
+
+                                            <Grid Grid.Row="2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Background="{StaticResource WhiteBrush}"
+                                                        BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="7"
+                                                        Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Numero operai"
+                                                                   Style="{StaticResource FieldLabelStyle}"/>
+                                                        <TextBox x:Name="TxtWorkers"
+                                                                 Text="2"
+                                                                 Style="{StaticResource ProfitTextBoxStyle}"
+                                                                 TextAlignment="Right"/>
+                                                        <TextBlock Text="Persone impiegate"
+                                                                   Style="{StaticResource FieldHintStyle}"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Border Grid.Column="2"
+                                                        Background="{StaticResource WhiteBrush}"
+                                                        BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="7"
+                                                        Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Giorni"
+                                                                   Style="{StaticResource FieldLabelStyle}"/>
+                                                        <TextBox x:Name="TxtDays"
+                                                                 Text="1"
+                                                                 Style="{StaticResource ProfitTextBoxStyle}"
+                                                                 TextAlignment="Right"/>
+                                                        <TextBlock Text="Durata prevista"
+                                                                   Style="{StaticResource FieldHintStyle}"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Border Grid.Column="4"
+                                                        Background="{StaticResource WhiteBrush}"
+                                                        BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="7"
+                                                        Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Ore al giorno"
+                                                                   Style="{StaticResource FieldLabelStyle}"/>
+                                                        <TextBox x:Name="TxtHoursPerDay"
+                                                                 Text="10"
+                                                                 Style="{StaticResource ProfitTextBoxStyle}"
+                                                                 TextAlignment="Right"/>
+                                                        <TextBlock Text="Per ogni operaio"
+                                                                   Style="{StaticResource FieldHintStyle}"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Border Grid.Column="6"
+                                                        Background="{StaticResource WhiteBrush}"
+                                                        BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="7"
+                                                        Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Costo orario (€)"
+                                                                   Style="{StaticResource FieldLabelStyle}"/>
+                                                        <TextBox x:Name="TxtHourlyCost"
+                                                                 Text="40"
+                                                                 Style="{StaticResource ProfitTextBoxStyle}"
+                                                                 TextAlignment="Right"/>
+                                                        <TextBlock Text="Per ogni operaio"
+                                                                   Style="{StaticResource FieldHintStyle}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+
+                                            <Border Grid.Row="4"
+                                                    Background="{StaticResource WhiteBrush}"
+                                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="7"
+                                                    Padding="12,9">
+                                                <TextBlock Text="Formula applicata: operai × giorni × ore giornaliere × costo orario."
+                                                           HorizontalAlignment="Center"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource MutedTextBrush}"
+                                                           TextWrapping="Wrap"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </TabItem>
+
+                            <TabItem Header="Costi aziendali">
+                                <Grid Margin="16">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Style="{StaticResource InfoBannerStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4"/>
+                                                <ColumnDefinition Width="10"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{StaticResource CostsAdditionalBrush}"
+                                                    CornerRadius="2"/>
+                                            <TextBlock Grid.Column="2"
+                                                       VerticalAlignment="Center"
+                                                       Text="Queste voci sono costi interni: non vengono aggiunte al catalogo né mostrate nel preventivo cliente."
+                                                       FontSize="11.5"
+                                                       Foreground="{StaticResource MutedTextBrush}"
+                                                       TextWrapping="Wrap"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="2"
+                                            Style="{StaticResource SectionCardStyle}"
+                                            Background="{StaticResource SectionPanelBackgroundBrush}"
+                                            Padding="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="178"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Cerca nel catalogo aziendale"
+                                                           Style="{StaticResource FieldLabelStyle}"/>
+                                                <ComboBox x:Name="CboCompanyMaterialSearch"
+                                                          Style="{StaticResource ProfitComboBoxStyle}"
+                                                          IsEditable="True"
+                                                          IsTextSearchEnabled="False"
+                                                          DisplayMemberPath="Name"
+                                                          StaysOpenOnEdit="True"
+                                                          KeyUp="OnCompanyMaterialSearchKeyUp"
+                                                          SelectionChanged="OnCompanyMaterialSelected"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="2"
+                                                    VerticalAlignment="Bottom"
+                                                    Content="Aggiungi selezionato"
+                                                    Style="{StaticResource SecondaryActionButtonStyle}"
+                                                    Click="OnAddSelectedCompanyMaterialClick"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <DataGrid Grid.Row="4"
+                                              x:Name="GridCompanyMaterials"
+                                              Style="{StaticResource ProfitDataGridStyle}"
+                                              AutoGenerateColumns="False"
+                                              CanUserAddRows="False"
+                                              CanUserDeleteRows="False">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Materiale / costo aziendale"
+                                                                Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="*"/>
+                                            <DataGridTextColumn Header="Quantità"
+                                                                Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
+                                                                ElementStyle="{StaticResource NumericCellTextStyle}"
+                                                                EditingElementStyle="{StaticResource NumericEditingTextStyle}"
+                                                                Width="90"/>
+                                            <DataGridTextColumn Header="Costo unitario €"
+                                                                Binding="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged}"
+                                                                ElementStyle="{StaticResource NumericCellTextStyle}"
+                                                                EditingElementStyle="{StaticResource NumericEditingTextStyle}"
+                                                                Width="145"/>
+                                            <DataGridTextColumn Header="Totale €"
+                                                                Binding="{Binding Total, StringFormat=N2}"
+                                                                ElementStyle="{StaticResource NumericCellTextStyle}"
+                                                                IsReadOnly="True"
+                                                                Width="120"/>
+                                            <DataGridTemplateColumn Header="" Width="94">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="Rimuovi"
+                                                                Style="{StaticResource RemoveButtonStyle}"
+                                                                Click="OnRemoveCompanyCostClick"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <Button Grid.Row="6"
+                                            Content="+ Aggiungi costo manuale"
+                                            Width="194"
+                                            HorizontalAlignment="Left"
+                                            Style="{StaticResource SecondaryActionButtonStyle}"
+                                            Click="OnAddCompanyCostClick"/>
+                                </Grid>
+                            </TabItem>
+                        </TabControl>
                     </Grid>
-                    <DataGrid Grid.Row="4" x:Name="GridCompanyMaterials" AutoGenerateColumns="False"
-                              CanUserAddRows="False" CanUserDeleteRows="False">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Materiale / costo aziendale"
-                                                Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
-                            <DataGridTextColumn Header="Quantità"
-                                                Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="90"/>
-                            <DataGridTextColumn Header="Costo unitario €"
-                                                Binding="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="145"/>
-                            <DataGridTextColumn Header="Totale €"
-                                                Binding="{Binding Total, StringFormat=N2}"
-                                                IsReadOnly="True"
-                                                Width="120"/>
-                            <DataGridTemplateColumn Header="" Width="70">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Button Content="Rimuovi"
-                                                Padding="6,2"
-                                                Click="OnRemoveCompanyCostClick"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                    <Button Grid.Row="6" Content="Aggiungi costo manuale" Width="180" HorizontalAlignment="Left"
-                            Click="OnAddCompanyCostClick"/>
                 </Grid>
-            </TabItem>
-        </TabControl>
 
-        <Border Grid.Row="4" Background="{StaticResource SectionPanelBackgroundBrush}"
-                BorderBrush="{StaticResource SectionPanelBorderBrush}" BorderThickness="1"
-                CornerRadius="10" Padding="14">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <UniformGrid Columns="4">
-                    <StackPanel>
-                        <TextBlock Text="Ricavo materiali cliente" Foreground="{StaticResource MutedTextBrush}"/>
-                        <TextBlock x:Name="TxtCustomerMaterials" FontSize="16" FontWeight="SemiBold"/>
-                    </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="Costo materiali fornitore" Foreground="{StaticResource MutedTextBrush}"/>
-                        <TextBlock x:Name="TxtSupplierMaterials" FontSize="16" FontWeight="SemiBold"/>
-                    </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="Manodopera + costi aziendali" Foreground="{StaticResource MutedTextBrush}"/>
-                        <TextBlock x:Name="TxtOtherCosts" FontSize="16" FontWeight="SemiBold"/>
-                    </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="Guadagno reale" Foreground="{StaticResource MutedTextBrush}"/>
-                        <TextBlock x:Name="TxtProfit" FontSize="20" FontWeight="Bold"/>
-                    </StackPanel>
-                </UniformGrid>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="18,0,0,0" VerticalAlignment="Center">
-                    <Button Content="Calcola" Width="110" Height="38" Margin="0,0,8,0"
-                            Background="{StaticResource GeneratePdfButtonBrush}" Foreground="White"
-                            Click="OnCalculateClick"/>
-                    <Button Content="Chiudi" Width="90" Height="38" Click="OnCloseClick"/>
-                </StackPanel>
+                <Border Grid.Row="3" Background="{StaticResource SubtleBorderBrush}"/>
+
+                <Border Grid.Row="4"
+                        Background="{StaticResource SurfaceBrush}"
+                        Padding="20,15">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="12"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="1.3*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource MetricCardStyle}"
+                                    BorderBrush="{StaticResource PrimaryBlueBrush}">
+                                <StackPanel>
+                                    <TextBlock Text="RICAVO MATERIALI"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource MutedTextBrush}"/>
+                                    <TextBlock x:Name="TxtCustomerMaterials"
+                                               Margin="0,5,0,0"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource PrimaryBlueBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2"
+                                    Style="{StaticResource MetricCardStyle}"
+                                    BorderBrush="{StaticResource CostsPartnerBrush}">
+                                <StackPanel>
+                                    <TextBlock Text="COSTO FORNITORE"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource MutedTextBrush}"/>
+                                    <TextBlock x:Name="TxtSupplierMaterials"
+                                               Margin="0,5,0,0"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource CostsPartnerBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="4"
+                                    Style="{StaticResource MetricCardStyle}"
+                                    BorderBrush="{StaticResource CostsAdditionalBrush}">
+                                <StackPanel>
+                                    <TextBlock Text="MANODOPERA + AZIENDALI"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource MutedTextBrush}"/>
+                                    <TextBlock x:Name="TxtOtherCosts"
+                                               Margin="0,5,0,0"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource CostsAdditionalBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="6"
+                                    x:Name="ProfitCard"
+                                    Background="{StaticResource SectionPanelBackgroundBrush}"
+                                    BorderBrush="{StaticResource SuccessGreenBrush}"
+                                    BorderThickness="2"
+                                    CornerRadius="9"
+                                    Padding="15,10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="TxtProfitState"
+                                                   Text="UTILE STIMATO"
+                                                   FontSize="10"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource SuccessGreenBrush}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="Guadagno reale"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource MutedTextBrush}"/>
+                                    </Grid>
+                                    <TextBlock Grid.Row="1"
+                                               x:Name="TxtProfit"
+                                               Margin="0,3,0,0"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Bottom"
+                                               FontSize="22"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource SuccessGreenBrush}"
+                                               TextAlignment="Right"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="Modifica i parametri e premi Ricalcola per aggiornare il risultato."
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       TextWrapping="Wrap"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="Chiudi"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Click="OnCloseClick"/>
+                                <Button Content="Ricalcola"
+                                        Margin="10,0,0,0"
+                                        MinWidth="126"
+                                        Style="{StaticResource PrimaryActionButtonStyle}"
+                                        Click="OnCalculateClick"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
     </Grid>

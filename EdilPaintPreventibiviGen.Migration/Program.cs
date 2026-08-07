@@ -108,20 +108,33 @@ internal static class SqlServerToPostgresMigrator
         if (!await target.Database.CanConnectAsync())
             throw new InvalidOperationException("Impossibile connettersi al database PostgreSQL target.");
 
-        Console.WriteLine("Controllo coerenza dati sorgente...");
-        await ValidateSourceAsync(source);
-
         Console.WriteLine("Creo schema PostgreSQL se mancante...");
         await target.Database.EnsureCreatedAsync();
 
-        if (await TargetHasDataAsync(target))
+        bool targetHasData = await TargetHasDataAsync(target);
+        if (targetHasData && !options.OverwriteTarget)
         {
-            if (!options.OverwriteTarget)
-                throw new InvalidOperationException("Il database PostgreSQL target contiene gia' dati. Riesegui con --overwrite-target solo se vuoi cancellarli.");
+            throw new InvalidOperationException("Il database PostgreSQL target contiene gia' dati. Riesegui con --overwrite-target solo se vuoi cancellarli.");
+        }
 
+        if (!await SourceHasCustomerNotesColumnAsync(source))
+        {
+            throw new InvalidOperationException(
+                "Il database SQL Server sorgente non contiene ancora la colonna CustomerNotes. " +
+                "Avvia una volta l'app desktop aggiornata con credenziali abilitate all'aggiornamento schema, poi riesegui la migrazione.");
+        }
+
+        Console.WriteLine("Controllo coerenza dati sorgente...");
+        await ValidateSourceAsync(source);
+
+        if (targetHasData)
+        {
             Console.WriteLine("Target non vuoto: cancello dati esistenti...");
             await TruncateTargetAsync(target);
         }
+
+        Console.WriteLine("Allineo schema note cliente sul target...");
+        await EnsureCustomerNotesColumnAsync(target);
 
         Console.WriteLine("Copio dati...");
         var counts = new List<(string Name, int Source, int Target)>();
@@ -224,6 +237,64 @@ internal static class SqlServerToPostgresMigrator
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private static async Task EnsureCustomerNotesColumnAsync(AppDbContext db)
+    {
+        if (db.Database.IsSqlServer())
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                IF COL_LENGTH(N'[dbo].[Quotes]', N'CustomerNotes') IS NULL
+                BEGIN
+                    ALTER TABLE [dbo].[Quotes]
+                    ADD [CustomerNotes] NVARCHAR(MAX) NOT NULL DEFAULT N'';
+                END
+                """);
+
+            await db.Database.ExecuteSqlRawAsync("""
+                UPDATE [dbo].[Quotes]
+                SET [CustomerNotes] = N''
+                WHERE [CustomerNotes] IS NULL;
+
+                ALTER TABLE [dbo].[Quotes]
+                ALTER COLUMN [CustomerNotes] NVARCHAR(MAX) NOT NULL;
+                """);
+            return;
+        }
+
+        if (db.Database.IsNpgsql())
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                ALTER TABLE "Quotes"
+                ADD COLUMN IF NOT EXISTS "CustomerNotes" text NOT NULL DEFAULT '';
+                """);
+
+            await db.Database.ExecuteSqlRawAsync("""
+                UPDATE "Quotes"
+                SET "CustomerNotes" = ''
+                WHERE "CustomerNotes" IS NULL;
+
+                ALTER TABLE "Quotes"
+                ALTER COLUMN "CustomerNotes" SET DEFAULT '',
+                ALTER COLUMN "CustomerNotes" SET NOT NULL;
+                """);
+            return;
+        }
+
+        throw new NotSupportedException("Provider database non supportato per l'allineamento di CustomerNotes.");
+    }
+
+    private static async Task<bool> SourceHasCustomerNotesColumnAsync(AppDbContext source)
+    {
+        int result = await source.Database
+            .SqlQueryRaw<int>("""
+                SELECT CASE
+                    WHEN COL_LENGTH(N'[dbo].[Quotes]', N'CustomerNotes') IS NULL THEN 0
+                    ELSE 1
+                END AS [Value]
+                """)
+            .SingleAsync();
+        return result == 1;
     }
 
     private static async Task<bool> TargetHasDataAsync(AppDbContext target)

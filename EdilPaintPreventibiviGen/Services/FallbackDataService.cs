@@ -900,6 +900,7 @@ public class FallbackDataService : IDataService
             BillingCustomerSyncId = entry.BillingCustomerSyncId,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
+            CustomerNotes = entry.CustomerNotes,
             IvaType = entry.IvaType,
             Notes = entry.Notes,
             Imponibile = entry.Imponibile,

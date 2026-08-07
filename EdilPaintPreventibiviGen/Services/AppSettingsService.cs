@@ -10,6 +10,7 @@ namespace EdilPaintPreventibiviGen.Services;
 public sealed class AppSettingsService
 {
 	public AppSettingsServiceModel App { get; }
+	public RealProfitSettingsModel RealProfit { get; }
 	public PdfStorageSettingsModel PdfStorage { get; }
 	public PdfTemplateSettingsModel PdfTemplate { get; }
 	public DatabaseSettingsModel Database { get; }
@@ -20,6 +21,8 @@ public sealed class AppSettingsService
 	{
 		SettingsPath = AppSettingsFileService.EnsureExists();
 		App = configuration.GetSection("App").Get<AppSettingsServiceModel>() ?? new AppSettingsServiceModel();
+		RealProfit = configuration.GetSection("RealProfit").Get<RealProfitSettingsModel>() ?? new RealProfitSettingsModel();
+		RealProfit.Normalize();
 		PdfStorage = configuration.GetSection("PdfStorage").Get<PdfStorageSettingsModel>() ?? new PdfStorageSettingsModel();
 		PdfTemplate = configuration.GetSection("PdfTemplate").Get<PdfTemplateSettingsModel>() ?? new PdfTemplateSettingsModel();
 		PdfTemplate.Normalize();
@@ -34,6 +37,7 @@ public sealed class AppSettingsService
 			: new JsonObject();
 
 		var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+		RealProfit.Normalize();
 		root.Remove("ConnectionStrings");
 		root["Database"] = new JsonObject
 		{
@@ -45,6 +49,7 @@ public sealed class AppSettingsService
 			["Password"] = SecretProtectionService.Protect(Database.Password)
 		};
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
+		root["RealProfit"] = JsonSerializer.SerializeToNode(RealProfit, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
 		root["PdfTemplate"] = JsonSerializer.SerializeToNode(PdfTemplate, jsonOptions);
 		root["Mail"] = new JsonObject
@@ -308,6 +313,31 @@ public sealed class AppSettingsServiceModel
 	}
 }
 
+public sealed class RealProfitSettingsModel
+{
+	public const int DefaultWorkers = 2;
+	public const double DefaultDays = 1d;
+	public const double DefaultHoursPerDay = 10d;
+	public const double DefaultHourlyCost = 40d;
+
+	public int Workers { get; set; } = DefaultWorkers;
+	public double Days { get; set; } = DefaultDays;
+	public double HoursPerDay { get; set; } = DefaultHoursPerDay;
+	public double HourlyCost { get; set; } = DefaultHourlyCost;
+
+	public void Normalize()
+	{
+		if (Workers < 1)
+			Workers = DefaultWorkers;
+		if (!double.IsFinite(Days) || Days <= 0)
+			Days = DefaultDays;
+		if (!double.IsFinite(HoursPerDay) || HoursPerDay <= 0)
+			HoursPerDay = DefaultHoursPerDay;
+		if (!double.IsFinite(HourlyCost) || HourlyCost < 0)
+			HourlyCost = DefaultHourlyCost;
+	}
+}
+
 public sealed class PdfStorageSettingsModel
 {
 	public string RootPath { get; set; } = string.Empty;
@@ -318,6 +348,9 @@ public sealed class PdfStorageSettingsModel
 
 public sealed class PdfTemplateSettingsModel
 {
+	public const string DefaultNotesTitle = "NOTE PER IL CLIENTE";
+	private const string LegacyCombinedNotesTitle = "NOTE E TERMINI DI PAGAMENTO";
+
 	public static readonly string[] AvailableTemplates =
 	[
 		"Standard",
@@ -328,7 +361,7 @@ public sealed class PdfTemplateSettingsModel
 	];
 
 	public string ActiveTemplate { get; set; } = "Standard";
-	public string NotesTitle { get; set; } = "NOTE E TERMINI DI PAGAMENTO";
+	public string NotesTitle { get; set; } = DefaultNotesTitle;
 	public string FooterText { get; set; } = string.Empty;
 	public string SignatureText { get; set; } = "Firma per accettazione";
 	public bool ShowTemplateName { get; set; }
@@ -337,8 +370,12 @@ public sealed class PdfTemplateSettingsModel
 	{
 		if (string.IsNullOrWhiteSpace(ActiveTemplate))
 			ActiveTemplate = "Standard";
-		if (string.IsNullOrWhiteSpace(NotesTitle))
-			NotesTitle = "NOTE E TERMINI DI PAGAMENTO";
+		NotesTitle = NotesTitle?.Trim() ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(NotesTitle) ||
+		    string.Equals(NotesTitle, LegacyCombinedNotesTitle, StringComparison.OrdinalIgnoreCase))
+		{
+			NotesTitle = DefaultNotesTitle;
+		}
 		if (string.IsNullOrWhiteSpace(SignatureText))
 			SignatureText = "Firma per accettazione";
 		FooterText ??= string.Empty;

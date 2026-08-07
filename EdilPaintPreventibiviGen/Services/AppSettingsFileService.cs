@@ -87,6 +87,13 @@ public static class AppSettingsFileService
                 TempPath = string.Empty,
                 DeviceName = Environment.MachineName
             },
+            RealProfit = new
+            {
+                Workers = RealProfitSettingsModel.DefaultWorkers,
+                Days = RealProfitSettingsModel.DefaultDays,
+                HoursPerDay = RealProfitSettingsModel.DefaultHoursPerDay,
+                HourlyCost = RealProfitSettingsModel.DefaultHourlyCost
+            },
             PdfStorage = new
             {
                 RootPath = pdfRootPath,
@@ -97,7 +104,7 @@ public static class AppSettingsFileService
             PdfTemplate = new
             {
                 ActiveTemplate = "Standard",
-                NotesTitle = "NOTE E TERMINI DI PAGAMENTO",
+                NotesTitle = PdfTemplateSettingsModel.DefaultNotesTitle,
                 FooterText = string.Empty,
                 SignatureText = "Firma per accettazione",
                 ShowTemplateName = false

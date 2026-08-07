@@ -118,7 +118,7 @@
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0"
-                               Text="Note"
+                               Text="Note interne"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource DefaultTextBrush}"/>
 
@@ -131,7 +131,7 @@
                              HorizontalContentAlignment="Left"/>
 
                     <TextBlock Grid.Row="4"
-                               Text="Suggerimento: usa queste note per promemoria interni, dettagli cliente o informazioni non da stampare."
+                               Text="Queste note restano interne e non vengono mai stampate. Per il PDF usa il campo 'Note per il cliente' nel preventivo."
                                FontSize="12"
                                Foreground="{StaticResource MutedTextBrush}"/>
                 </Grid>

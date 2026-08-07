@@ -102,6 +102,7 @@ public class PdfService
             QuoteNumber = vm.QuoteNumber,
             Date = quoteDate ?? DateTime.Now,
             PaymentTerms = vm.PaymentTerms,
+            CustomerNotes = vm.CustomerNotes,
             IvaType = vm.IvaType,
             CustomerName = vm.SelectedCustomer?.BusinessName ?? string.Empty,
             ReferenceName = vm.IsSecondCustomerEnabled ? (vm.SelectedSecondCustomer?.BusinessName ?? string.Empty) : string.Empty,
@@ -378,32 +379,46 @@ public class PdfService
                     }
                     #endregion
 
-                    col.Item().PaddingTop(30).BorderTop(1).BorderColor(PdfPalette.GreyLighten1).Row(row =>
+                    if (!string.IsNullOrWhiteSpace(ctx.CustomerNotes))
                     {
-                        #region Note
-                        row.RelativeItem().PaddingRight(30).Column(noteCol =>
+                        // Le note possono essere lunghe: restano fuori dal blocco
+                        // indivisibile finale, cosi' QuestPDF puo' paginarle senza errori.
+                        col.Item().PaddingTop(16).EnsureSpace(48).Column(noteCol =>
                         {
-                            noteCol.Item().Text(ctx.PdfNotesTitle).FontSize(9).Bold().FontColor(templateStyle.AccentColor);
-                            noteCol.Item().PaddingTop(5).Text(ctx.PaymentTerms).FontSize(9).LineHeight(1.2f);
-                            noteCol.Item().PaddingTop(18).Text(ctx.PdfSignatureText)
-                                .FontSize(9).SemiBold().FontColor(PdfPalette.GreyDarken2);
-                            noteCol.Item().PaddingTop(8).Row(signatureRow =>
-                            {
-                                signatureRow.RelativeItem().BorderBottom(1)
-                                    .BorderColor(PdfPalette.GreyDarken1).Height(14);
-                                signatureRow.ConstantItem(18);
-                                signatureRow.RelativeItem().BorderBottom(1)
-                                    .BorderColor(PdfPalette.GreyDarken1).Height(14);
-                            });
-                            noteCol.Item().PaddingTop(4).Text("Luogo e data")
-                                .FontSize(8).FontColor(PdfPalette.GreyMedium);
+                            noteCol.Item().Text(ctx.PdfNotesTitle)
+                                .FontSize(9).Bold().FontColor(PdfPalette.GreyDarken2);
+                            noteCol.Item().PaddingTop(5).Text(ctx.CustomerNotes.Trim())
+                                .FontSize(9).LineHeight(1.2f).FontColor(PdfPalette.GreyDarken3);
                         });
-                        #endregion
+                    }
 
-                        row.ConstantItem(230).BorderLeft(3).BorderColor(templateStyle.AccentColor)
-                            .Background(PdfPalette.GreyLighten3).Padding(12).Column(totCol =>
+                    // Riserva abbastanza spazio per tenere insieme totale e termini
+                    // ordinari, ma consente ai testi eccezionalmente lunghi di paginarsi.
+                    col.Item().PaddingTop(16).EnsureSpace(210).Column(summaryCol =>
+                    {
+                        summaryCol.Item().BorderTop(1).BorderColor(PdfPalette.GreyLighten1)
+                            .PaddingTop(8).Row(row =>
                         {
-                            bool hasDiscount = (ctx.MaterialDiscount + ctx.LaborDiscount) > 0;
+                            row.RelativeItem().PaddingRight(30).Column(noteCol =>
+                            {
+                                noteCol.Item().Text(ctx.PdfSignatureText)
+                                    .FontSize(9).SemiBold().FontColor(PdfPalette.GreyDarken2);
+                                noteCol.Item().PaddingTop(6).Row(signatureRow =>
+                                {
+                                    signatureRow.RelativeItem().BorderBottom(1)
+                                        .BorderColor(PdfPalette.GreyDarken1).Height(12);
+                                    signatureRow.ConstantItem(18);
+                                    signatureRow.RelativeItem().BorderBottom(1)
+                                        .BorderColor(PdfPalette.GreyDarken1).Height(12);
+                                });
+                                noteCol.Item().PaddingTop(2).Text("Luogo e data")
+                                    .FontSize(8).FontColor(PdfPalette.GreyMedium);
+                            });
+
+                            row.ConstantItem(230).BorderLeft(3).BorderColor(templateStyle.AccentColor)
+                                .Background(PdfPalette.GreyLighten3).Padding(12).Column(totCol =>
+                            {
+                                bool hasDiscount = (ctx.MaterialDiscount + ctx.LaborDiscount) > 0;
 
                             switch (QuoteCalculator.NormalizeIvaType(ctx.IvaType))
                             {
@@ -441,6 +456,22 @@ public class PdfService
                                     .ExtraBold().FontSize(15).FontColor(templateStyle.AccentColor);
                             });
                         });
+                        });
+
+                        if (!string.IsNullOrWhiteSpace(ctx.PaymentTerms))
+                        {
+                            summaryCol.Item().PaddingTop(10)
+                                .Border(2).BorderColor(templateStyle.AccentColor)
+                                .Background(PdfPalette.GreyLighten3)
+                                .Padding(12).Column(paymentCol =>
+                                {
+                                    paymentCol.Item().Text("TERMINI DI PAGAMENTO")
+                                        .FontSize(10).ExtraBold().FontColor(templateStyle.AccentColor);
+                                    paymentCol.Item().PaddingTop(4).Text(ctx.PaymentTerms.Trim())
+                                        .FontSize(13).ExtraBold().LineHeight(1.25f)
+                                        .FontColor(PdfPalette.GreyDarken3);
+                                });
+                        }
                     });
 
                 });
@@ -834,7 +865,7 @@ public class PdfService
         if (string.IsNullOrWhiteSpace(ctx.PdfTemplateName))
             ctx.PdfTemplateName = "Standard";
         if (string.IsNullOrWhiteSpace(ctx.PdfNotesTitle))
-            ctx.PdfNotesTitle = "NOTE E TERMINI DI PAGAMENTO";
+            ctx.PdfNotesTitle = PdfTemplateSettingsModel.DefaultNotesTitle;
         if (string.IsNullOrWhiteSpace(ctx.PdfSignatureText))
             ctx.PdfSignatureText = "Firma per accettazione";
         ctx.PdfFooterText ??= string.Empty;

@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 
@@ -19,9 +21,12 @@ public partial class RealProfitWindow : Window
         QuoteHistoryEntry quote,
         double supplierDiscount,
         bool customerIsSupplier,
-        IEnumerable<Item> companyMaterials)
+        IEnumerable<Item> companyMaterials,
+        RealProfitSettingsModel? defaults = null)
     {
         InitializeComponent();
+        defaults ??= new RealProfitSettingsModel();
+        defaults.Normalize();
         _quote = quote;
         _excludeMaterials = customerIsSupplier;
         _availableCompanyMaterials = companyMaterials
@@ -52,6 +57,10 @@ public partial class RealProfitWindow : Window
             : quote.Imponibile;
         TxtRevenue.Text = revenue.ToString("0.00", CultureInfo.CurrentCulture);
         TxtSupplierDiscount.Text = supplierDiscount.ToString("0.##", CultureInfo.CurrentCulture);
+        TxtWorkers.Text = defaults.Workers.ToString(CultureInfo.CurrentCulture);
+        TxtDays.Text = defaults.Days.ToString("0.##", CultureInfo.CurrentCulture);
+        TxtHoursPerDay.Text = defaults.HoursPerDay.ToString("0.##", CultureInfo.CurrentCulture);
+        TxtHourlyCost.Text = defaults.HourlyCost.ToString("0.##", CultureInfo.CurrentCulture);
         TabMaterials.IsEnabled = !customerIsSupplier;
         ShowResult(RealProfitCalculator.Calculate(BuildInput()));
     }
@@ -89,9 +98,19 @@ public partial class RealProfitWindow : Window
         TxtSupplierMaterials.Text = $"{result.SupplierMaterialCost:N2} €";
         TxtOtherCosts.Text = $"{result.LaborCost + result.CompanyMaterialCost:N2} €";
         TxtProfit.Text = $"{result.Profit:N2} € ({result.ProfitPercentage:N1}%)";
-        TxtProfit.Foreground = result.Profit >= 0
-            ? System.Windows.Media.Brushes.ForestGreen
-            : System.Windows.Media.Brushes.Firebrick;
+
+        bool isProfit = result.Profit >= 0;
+        Brush resultBrush = (Brush)FindResource(isProfit ? "SuccessGreenBrush" : "DangerRedBrush");
+        TxtProfitState.Text = isProfit ? "UTILE STIMATO" : "PERDITA STIMATA";
+        TxtProfitState.Foreground = resultBrush;
+        TxtProfit.Foreground = resultBrush;
+        ProfitCard.BorderBrush = resultBrush;
+    }
+
+    private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed)
+            DragMove();
     }
 
     private void OnAddCompanyCostClick(object sender, RoutedEventArgs e)

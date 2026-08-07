@@ -11,6 +11,7 @@ public sealed class QuoteDetail
     public string CustomerName { get; init; } = string.Empty;
     public string ReferenceName { get; init; } = string.Empty;
     public string PaymentTerms { get; init; } = string.Empty;
+    public string CustomerNotes { get; init; } = string.Empty;
     public string IvaType { get; init; } = string.Empty;
     public string Notes { get; init; } = string.Empty;
     public double Imponibile { get; init; }
@@ -34,6 +35,7 @@ public sealed class QuoteDetail
     public string PaymentTermsDisplay => string.IsNullOrWhiteSpace(PaymentTerms) ? "-" : PaymentTerms.Trim();
     public string SentRecipientDisplay => string.IsNullOrWhiteSpace(SentRecipient) ? "-" : SentRecipient.Trim();
     public string LastModifiedByDeviceDisplay => string.IsNullOrWhiteSpace(LastModifiedByDevice) ? "-" : LastModifiedByDevice.Trim();
+    public bool HasCustomerNotes => !string.IsNullOrWhiteSpace(CustomerNotes);
     public bool HasNotes => !string.IsNullOrWhiteSpace(Notes);
     public bool HasMaterials => Materials.Count > 0;
     public bool HasLabors => Labors.Count > 0;

@@ -47,6 +47,7 @@ internal static class QuoteSyncHashService
             entry.SiteName,
             entry.BillingCustomerName,
             entry.PaymentTerms,
+            entry.CustomerNotes,
             entry.IvaType,
             entry.Notes,
             Number(entry.Imponibile),

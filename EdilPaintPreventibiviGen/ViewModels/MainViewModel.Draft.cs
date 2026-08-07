@@ -366,6 +366,7 @@ public partial class MainViewModel
         }
 
         PaymentTerms = draft.PaymentTerms;
+        CustomerNotes = draft.CustomerNotes;
         IvaType = !string.IsNullOrWhiteSpace(draft.IvaType) ? draft.IvaType : IvaType;
         MaterialDiscount = draft.MaterialDiscount;
         LaborDiscount = draft.LaborDiscount;
@@ -455,6 +456,7 @@ public partial class MainViewModel
                 ? SelectedBillingCustomer?.SyncId ?? Guid.Empty
                 : Guid.Empty,
             PaymentTerms = PaymentTerms,
+            CustomerNotes = CustomerNotes,
             IvaType = IvaType,
             Materials = Materials.Select(CloneItem).ToList(),
             Labors = Labors.Select(CloneItem).ToList(),

@@ -8,6 +8,7 @@ public partial class QuoteDetailPage : ContentPage
     {
         InitializeComponent();
         BindingContext = detail;
-        NotesPanel.IsVisible = !string.IsNullOrWhiteSpace(detail.Notes);
+        CustomerNotesPanel.IsVisible = detail.HasCustomerNotes;
+        NotesPanel.IsVisible = detail.HasNotes;
     }
 }

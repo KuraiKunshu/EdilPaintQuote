@@ -90,6 +90,7 @@ public partial class MainViewModel
                 : Guid.Empty,
             PdfPath = pdfPath,
             PaymentTerms = PaymentTerms,
+            CustomerNotes = CustomerNotes,
             IvaType = IvaType,
             Notes = string.Empty,
             Materials = Materials.ToList(),
@@ -163,6 +164,7 @@ public partial class MainViewModel
                 existingEntry.BillingCustomerSyncId = entry.BillingCustomerSyncId;
                 existingEntry.PdfPath = entry.PdfPath;
                 existingEntry.PaymentTerms = entry.PaymentTerms;
+                existingEntry.CustomerNotes = entry.CustomerNotes;
                 existingEntry.IvaType = entry.IvaType;
                 existingEntry.Notes = entry.Notes;
                 existingEntry.CreatedByDevice = entry.CreatedByDevice;
@@ -430,6 +432,7 @@ public partial class MainViewModel
             BillingCustomerSyncId = entry.BillingCustomerSyncId,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
+            CustomerNotes = entry.CustomerNotes,
             IvaType = entry.IvaType,
             Notes = entry.Notes,
             Materials = entry.Materials,

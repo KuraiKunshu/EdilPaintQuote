@@ -127,7 +127,8 @@ public sealed class PdfTemplatePreviewService
         {
             QuoteNumber = "PREVIEW-001",
             Date = DateTime.Today,
-            PaymentTerms = "Pagamento 30% all'accettazione, saldo a fine lavori.",
+            PaymentTerms = "Acconto 50% all'accettazione - saldo a fine lavori.",
+            CustomerNotes = "Le tempistiche definitive saranno concordate con il cliente prima dell'inizio dei lavori.",
             IvaType = "RC 10%+22%",
             CustomerName = customer.BusinessName,
             ReferenceName = reference.BusinessName,

@@ -231,6 +231,7 @@ public sealed class LocalDraftService
         BillingCustomerSyncId = draft.BillingCustomerSyncId,
         PdfPath = draft.PdfPath,
         PaymentTerms = draft.PaymentTerms,
+        CustomerNotes = draft.CustomerNotes,
         IvaType = draft.IvaType,
         Notes = draft.Notes,
         Materials = draft.Materials,
@@ -354,6 +355,7 @@ public sealed class LocalDraftService
             draft.BillingCustomerName,
             draft.BillingCustomerSyncId,
             draft.PaymentTerms,
+            draft.CustomerNotes,
             draft.IvaType,
             Materials = draft.Materials.Select(item => new
             {

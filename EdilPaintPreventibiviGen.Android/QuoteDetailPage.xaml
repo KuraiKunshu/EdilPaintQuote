@@ -143,13 +143,30 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Border x:Name="CustomerNotesPanel"
+                    Stroke="#B3261E"
+                    BackgroundColor="#FCEDEA"
+                    Padding="12"
+                    StrokeShape="RoundRectangle 8">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Note per il cliente"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#B3261E"/>
+                    <Label Text="{Binding CustomerNotes}"
+                           FontSize="14"
+                           TextColor="#221614"
+                           LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+
             <Border x:Name="NotesPanel"
                     Stroke="#E6D6D2"
                     BackgroundColor="#FFFFFF"
                     Padding="12"
                     StrokeShape="RoundRectangle 8">
                 <VerticalStackLayout Spacing="6">
-                    <Label Text="Note"
+                    <Label Text="Note interne"
                            FontSize="16"
                            FontAttributes="Bold"
                            TextColor="#221614"/>

@@ -155,6 +155,7 @@ public static class EntityModelMapper
             BillingCustomerSyncId = entity.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = entity.PdfPath,
             PaymentTerms = entity.PaymentTerms,
+            CustomerNotes = entity.CustomerNotes,
             IvaType = entity.IvaType,
             Notes = entity.Notes,
             Imponibile = entity.Imponibile,

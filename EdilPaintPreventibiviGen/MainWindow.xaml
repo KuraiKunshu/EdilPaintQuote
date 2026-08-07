@@ -1207,11 +1207,12 @@
                 </Grid>
             </Grid>
 
-            <!-- Colonna destra: Allegati e Note -->
+            <!-- Colonna destra: Allegati, termini di pagamento e note cliente -->
             <Grid Grid.Column="1" Margin="10,10,0,0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="0.9*"/>
+                    <RowDefinition Height="1.05*"/>
+                    <RowDefinition Height="1.05*"/>
                 </Grid.RowDefinitions>
 
                 <GroupBox Grid.Row="0" Header="Foto / Allegati">
@@ -1243,9 +1244,51 @@
                     </DockPanel>
                 </GroupBox>
 
-                <GroupBox Grid.Row="1" Header="Termini di pagamento / Note" Margin="0,10,0,0">
-                    <TextBox TextWrapping="Wrap" AcceptsReturn="True"
-                             Text="{Binding PaymentTerms, UpdateSourceTrigger=PropertyChanged}"/>
+                <GroupBox Grid.Row="1" Header="Termini di pagamento" Margin="0,10,0,0">
+                    <Border Background="{StaticResource WarningPanelBackgroundBrush}"
+                            BorderBrush="{StaticResource WarningPanelBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="7">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="VISIBILI IN EVIDENZA NEL PDF"
+                                       Margin="2,0,2,5"
+                                       FontSize="9"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource DefaultTextBrush}"/>
+                            <TextBox Grid.Row="1"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto"
+                                     VerticalContentAlignment="Top"
+                                     FontWeight="SemiBold"
+                                     Text="{Binding PaymentTerms, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
+                    </Border>
+                </GroupBox>
+
+                <GroupBox Grid.Row="2" Header="Note per il cliente" Margin="0,10,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="VISIBILI NEL PDF"
+                                   Margin="2,0,2,5"
+                                   FontSize="9"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBox Grid.Row="1"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 VerticalContentAlignment="Top"
+                                 Text="{Binding CustomerNotes, UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
                 </GroupBox>
             </Grid>
         </Grid>

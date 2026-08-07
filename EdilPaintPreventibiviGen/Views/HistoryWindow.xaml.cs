@@ -371,7 +371,8 @@ public partial class HistoryWindow : Window
                 fullEntry,
                 supplierDiscount,
                 customerIsSupplier,
-                _vm.PersonalMaterialsView)
+                _vm.PersonalMaterialsView,
+                App.AppSettings.RealProfit)
             {
                 Owner = this
             }.ShowDialog();
@@ -711,6 +712,7 @@ public partial class HistoryWindow : Window
             QuoteNumber = fullEntry.QuoteNumber,
             Date = fullEntry.Date,
             PaymentTerms = fullEntry.PaymentTerms,
+            CustomerNotes = fullEntry.CustomerNotes,
             IvaType = fullEntry.IvaType,
             CustomerName = fullEntry.CustomerName,
             ReferenceName = fullEntry.ReferenceName,

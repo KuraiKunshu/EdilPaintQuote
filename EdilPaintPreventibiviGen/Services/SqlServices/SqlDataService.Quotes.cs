@@ -97,6 +97,7 @@ public partial class SqlDataService
                     ? x.BillingCustomer.SyncId
                     : Guid.Empty,
                 x.PaymentTerms,
+                x.CustomerNotes,
                 x.IvaType,
                 x.Notes,
                 x.Imponibile,
@@ -168,6 +169,7 @@ public partial class SqlDataService
                 BillingCustomerName = x.BillingCustomerName,
                 BillingCustomerSyncId = x.BillingCustomerSyncId,
                 PaymentTerms = x.PaymentTerms,
+                CustomerNotes = x.CustomerNotes,
                 IvaType = x.IvaType,
                 Notes = x.Notes,
                 Imponibile = x.Imponibile,
@@ -290,6 +292,7 @@ public partial class SqlDataService
             BillingCustomerSyncId = x.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
+            CustomerNotes = x.CustomerNotes,
             IvaType = x.IvaType,
             Notes = x.Notes,
             Imponibile = x.Imponibile,
@@ -388,6 +391,7 @@ public partial class SqlDataService
             BillingCustomerSyncId = x.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
+            CustomerNotes = x.CustomerNotes,
             IvaType = x.IvaType,
             Notes = x.Notes,
             Imponibile = x.Imponibile,
@@ -473,6 +477,7 @@ public partial class SqlDataService
             BillingCustomerSyncId = x.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
+            CustomerNotes = x.CustomerNotes,
             IvaType = x.IvaType,
             Notes = x.Notes,
             Imponibile = x.Imponibile,
@@ -869,6 +874,7 @@ public partial class SqlDataService
             BillingCustomerSyncId = q.BillingCustomer?.SyncId ?? Guid.Empty,
             PdfPath = q.PdfPath,
             PaymentTerms = q.PaymentTerms,
+            CustomerNotes = q.CustomerNotes,
             IvaType = q.IvaType,
             Notes = q.Notes,
             Imponibile = q.Imponibile,
@@ -1090,6 +1096,7 @@ public partial class SqlDataService
             BillingCustomerSyncId = entry.BillingCustomerSyncId,
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
+            CustomerNotes = entry.CustomerNotes,
             IvaType = entry.IvaType,
             Notes = entry.Notes,
             Imponibile = entry.Imponibile,
@@ -1218,6 +1225,7 @@ public partial class SqlDataService
                     existing.BillingCustomerName = quote.BillingCustomerName;
                     existing.PdfPath = quote.PdfPath;
                     existing.PaymentTerms = quote.PaymentTerms;
+                    existing.CustomerNotes = quote.CustomerNotes;
                     existing.IvaType = quote.IvaType;
                     existing.Notes = quote.Notes;
                     existing.Imponibile = quote.Imponibile;
@@ -1315,6 +1323,7 @@ public partial class SqlDataService
                         BillingCustomerName = quote.BillingCustomerName,
                         PdfPath = quote.PdfPath,
                         PaymentTerms = quote.PaymentTerms,
+                        CustomerNotes = quote.CustomerNotes,
                         IvaType = quote.IvaType,
                         Notes = quote.Notes,
                         Imponibile = quote.Imponibile,

@@ -40,7 +40,7 @@ public sealed class QuoteReadService
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            where.Add("(q.\"QuoteNumber\" ilike @search or c.\"BusinessName\" ilike @search or r.\"BusinessName\" ilike @search or q.\"Notes\" ilike @search)");
+            where.Add("(q.\"QuoteNumber\" ilike @search or c.\"BusinessName\" ilike @search or r.\"BusinessName\" ilike @search or q.\"CustomerNotes\" ilike @search or q.\"Notes\" ilike @search)");
             command.Parameters.AddWithValue("search", $"%{search.Trim()}%");
         }
 
@@ -60,7 +60,8 @@ public sealed class QuoteReadService
                 q."IvaType",
                 q."Status",
                 q."SentAtUtc",
-                q."Notes"
+                q."Notes",
+                q."CustomerNotes"
             from "Quotes" q
             left join "Customers" c on c."Id" = q."CustomerId"
             left join "Customers" r on r."Id" = q."ReferenceCustomerId"
@@ -83,7 +84,8 @@ public sealed class QuoteReadService
                 IvaType = reader.GetString(5),
                 Status = (QuoteStatus)reader.GetInt32(6),
                 SentAtUtc = reader.IsDBNull(7) ? null : reader.GetDateTime(7),
-                HasNotes = !reader.IsDBNull(8) && !string.IsNullOrWhiteSpace(reader.GetString(8))
+                HasNotes = (!reader.IsDBNull(8) && !string.IsNullOrWhiteSpace(reader.GetString(8))) ||
+                           (!reader.IsDBNull(9) && !string.IsNullOrWhiteSpace(reader.GetString(9)))
             });
         }
 
@@ -119,6 +121,7 @@ public sealed class QuoteReadService
                     coalesce(c."BusinessName", '') as "CustomerName",
                     coalesce(r."BusinessName", '') as "ReferenceName",
                     q."PaymentTerms",
+                    q."CustomerNotes",
                     q."IvaType",
                     q."Notes",
                     q."Imponibile",
@@ -149,16 +152,17 @@ public sealed class QuoteReadService
                 CustomerName = reader.GetString(3),
                 ReferenceName = reader.GetString(4),
                 PaymentTerms = reader.GetString(5),
-                IvaType = reader.GetString(6),
-                Notes = reader.GetString(7),
-                Imponibile = reader.GetDouble(8),
-                Total = reader.GetDouble(9),
-                MaterialDiscount = reader.GetDouble(10),
-                LaborDiscount = reader.GetDouble(11),
-                Status = (QuoteStatus)reader.GetInt32(12),
-                SentAtUtc = reader.IsDBNull(13) ? null : reader.GetDateTime(13),
-                SentRecipient = reader.GetString(14),
-                LastModifiedByDevice = reader.GetString(15)
+                CustomerNotes = reader.GetString(6),
+                IvaType = reader.GetString(7),
+                Notes = reader.GetString(8),
+                Imponibile = reader.GetDouble(9),
+                Total = reader.GetDouble(10),
+                MaterialDiscount = reader.GetDouble(11),
+                LaborDiscount = reader.GetDouble(12),
+                Status = (QuoteStatus)reader.GetInt32(13),
+                SentAtUtc = reader.IsDBNull(14) ? null : reader.GetDateTime(14),
+                SentRecipient = reader.GetString(15),
+                LastModifiedByDevice = reader.GetString(16)
             };
         }
 

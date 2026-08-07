@@ -121,6 +121,7 @@ public partial class SqlDataService
     {
         await EnsureColumnAsync(db, "Quotes", "PdfPath", "NVARCHAR(1000) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "PaymentTerms", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "CustomerNotes", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "IvaType", "NVARCHAR(50) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "Notes", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
@@ -157,6 +158,8 @@ public partial class SqlDataService
         await EnsureQuoteNumberColumnDefinitionAsync(db, cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "PdfPath", "NVARCHAR(1000) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "PaymentTerms", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "CustomerNotes", "NVARCHAR(MAX) NOT NULL", cancellationToken);
+        await EnsureEmptyStringDefaultAsync(db, "Quotes", "CustomerNotes", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "IvaType", "NVARCHAR(50) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "Notes", "NVARCHAR(MAX) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "SiteName", "NVARCHAR(250) NOT NULL", cancellationToken);
@@ -203,6 +206,11 @@ public partial class SqlDataService
         CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlRawAsync("""
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "CustomerNotes" text NOT NULL DEFAULT '';
+        UPDATE "Quotes" SET "CustomerNotes" = '' WHERE "CustomerNotes" IS NULL;
+        ALTER TABLE "Quotes"
+            ALTER COLUMN "CustomerNotes" SET DEFAULT '',
+            ALTER COLUMN "CustomerNotes" SET NOT NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "SiteName" character varying(250) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "BillingCustomerName" character varying(250) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "BillingCustomerId" integer NULL;
@@ -418,6 +426,33 @@ public partial class SqlDataService
     BEGIN
         UPDATE [dbo].[{tableName}] SET [{columnName}] = N'' WHERE [{columnName}] IS NULL;
         ALTER TABLE [dbo].[{tableName}] ALTER COLUMN [{columnName}] {columnDefinition};
+    END
+    """;
+
+        return db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private static Task EnsureEmptyStringDefaultAsync(
+        AppDbContext db,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        string defaultName = $"DF_{tableName}_{columnName}";
+        string sql = $"""
+    IF COL_LENGTH(N'[dbo].[{tableName}]', N'{columnName}') IS NOT NULL
+       AND NOT EXISTS (
+           SELECT 1
+           FROM sys.default_constraints dc
+           INNER JOIN sys.columns c
+               ON c.object_id = dc.parent_object_id
+              AND c.column_id = dc.parent_column_id
+           WHERE dc.parent_object_id = OBJECT_ID(N'[dbo].[{tableName}]')
+             AND c.name = N'{columnName}'
+       )
+    BEGIN
+        ALTER TABLE [dbo].[{tableName}]
+        ADD CONSTRAINT [{defaultName}] DEFAULT N'' FOR [{columnName}];
     END
     """;
 

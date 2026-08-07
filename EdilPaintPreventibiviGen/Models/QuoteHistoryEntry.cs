@@ -64,6 +64,7 @@ public class QuoteHistoryEntry
 	public Guid BillingCustomerSyncId { get; set; }
 	public string PdfPath { get; set; } = string.Empty;
 	public string PaymentTerms { get; set; } = string.Empty;
+	public string CustomerNotes { get; set; } = string.Empty;
 	public string IvaType { get; set; } = "esclusa";
 	public string Notes { get; set; } = string.Empty;
 	public List<Item> Materials { get; set; } = new();

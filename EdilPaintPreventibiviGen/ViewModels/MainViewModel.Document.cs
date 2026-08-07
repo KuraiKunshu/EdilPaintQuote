@@ -60,6 +60,7 @@ public partial class MainViewModel
         _ivaType = "RC 10%+22%";
 
         PaymentTerms = _companyData.Termini_pagamento;
+        CustomerNotes = string.Empty;
         QuoteNumber = _companyData.Counter.ToString();
         SelectDefaultLogo();
 
@@ -441,6 +442,7 @@ public partial class MainViewModel
         }
 
         PaymentTerms = entry.PaymentTerms;
+        CustomerNotes = entry.CustomerNotes;
         IvaType = !string.IsNullOrEmpty(entry.IvaType) ? entry.IvaType : "esclusa";
 
         _materialDiscount = entry.MaterialDiscount;

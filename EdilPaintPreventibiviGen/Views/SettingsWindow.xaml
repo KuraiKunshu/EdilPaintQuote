@@ -3,11 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Impostazioni"
-        Width="760"
-        Height="790"
-        MinWidth="760"
-        MinHeight="620"
-        MaxWidth="980"
+        Width="1000"
+        Height="780"
+        MinWidth="900"
+        MinHeight="640"
+        MaxWidth="1200"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -32,60 +32,284 @@
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="{StaticResource HoverSurfaceBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <Style x:Key="FooterButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="Padding" Value="16,6"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="MinWidth" Value="108"/>
+            <Setter Property="Padding" Value="16,7"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.86"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.68"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource ModalPrimaryActionBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalPrimaryActionBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+        </Style>
+
+        <Style x:Key="SecondaryActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource NeutralButtonBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource NeutralButtonBorderBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource NeutralButtonTextBrush}"/>
+        </Style>
+
+        <Style x:Key="CompactActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="86"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="{StaticResource SecondaryBlueBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SecondaryBlueBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+        </Style>
+
+        <Style x:Key="DangerCompactButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource CompactActionButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource DangerSoftBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DangerSoftBorderBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DangerRedBrush}"/>
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="9,5"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="10,6"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style TargetType="PasswordBox">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="9,5"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="10,6"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="FontSize" Value="12.5"/>
         </Style>
 
         <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
-            <Setter Property="Margin" Value="0,0,0,5"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
         </Style>
 
         <Style x:Key="HintStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="10.5"/>
             <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="Margin" Value="0,5,0,0"/>
         </Style>
 
         <Style x:Key="SectionStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource SectionPanelBackgroundBrush}"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="CornerRadius" Value="9"/>
             <Setter Property="Padding" Value="16"/>
             <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="PageTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+        </Style>
+
+        <Style x:Key="PageSubtitleStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,3,0,0"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="SettingsTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="15,9"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder"
+                                        Property="Background"
+                                        Value="{StaticResource HoverSurfaceBrush}"/>
+                                <Setter TargetName="TabBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource SubtleBorderBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder"
+                                        Property="Background"
+                                        Value="{StaticResource PrimaryBlueBrush}"/>
+                                <Setter TargetName="TabBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource PrimaryBlueBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SettingsTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="{StaticResource TransparentBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource SettingsTabItemStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="5">
+                                <TabPanel IsItemsHost="True"/>
+                            </Border>
+                            <Border Grid.Row="2"
+                                    Background="{StaticResource ShellBackgroundBrush}"
+                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9">
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  ContentSource="SelectedContent"
+                                                  HorizontalAlignment="Stretch"
+                                                  VerticalAlignment="Stretch"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <Grid Background="{StaticResource TransparentBrush}">
+    <Grid Background="{StaticResource TransparentBrush}"
+          KeyboardNavigation.TabNavigation="Cycle">
         <Border Background="{StaticResource SurfaceBrush}"
                 CornerRadius="12"
                 BorderBrush="{StaticResource WindowShadowBorderBrush}"
@@ -96,27 +320,50 @@
 
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="58"/>
+                    <RowDefinition Height="68"/>
                     <RowDefinition Height="1"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="1"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="18,0,10,0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid Grid.Row="0"
+                      Margin="20,0,10,0"
+                      MouseLeftButtonDown="Header_MouseLeftButtonDown">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center">
+
+                    <Border Width="40"
+                            Height="40"
+                            VerticalAlignment="Center"
+                            Background="{StaticResource SectionPanelBackgroundBrush}"
+                            BorderBrush="{StaticResource PrimaryBlueBrush}"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                        <TextBlock Text="⚙"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontFamily="Segoe UI Symbol"
+                                   FontSize="21"
+                                   Foreground="{StaticResource PrimaryBlueBrush}"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
                         <TextBlock Text="Impostazioni applicazione"
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource DefaultTextBrush}"/>
-                        <TextBlock Text="Configura il comportamento locale di questo PC"
+                        <TextBlock Text="Configura funzioni, collegamenti e preferenze di questo PC"
+                                   Margin="0,3,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource MutedTextBrush}"/>
                     </StackPanel>
-                    <Button Grid.Column="1"
+
+                    <Button Grid.Column="3"
                             Style="{StaticResource HeaderButtonStyle}"
                             Content="X"
                             ToolTip="Chiudi"
@@ -125,439 +372,526 @@
 
                 <Border Grid.Row="1" Background="{StaticResource SubtleBorderBrush}"/>
 
-                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="20,18">
-                        <Border Style="{StaticResource SectionStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Connessione database"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,12"/>
-
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="120"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Tipo database"/>
-                                        <ComboBox x:Name="CmbDatabaseProvider"
-                                                  Height="34"
-                                                  Background="{StaticResource WhiteBrush}"
-                                                  BorderBrush="{StaticResource ModalFieldBorderBrush}"
-                                                  BorderThickness="1"/>
+                <Grid Grid.Row="2" Background="{StaticResource ShellBackgroundBrush}">
+                    <TabControl x:Name="SettingsTabs"
+                                Margin="20,16"
+                                SelectedIndex="0"
+                                Style="{StaticResource SettingsTabControlStyle}">
+                        <TabItem x:Name="TabGeneralSettings" Header="_Generali">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalContentAlignment="Stretch"
+                                          Focusable="False">
+                                <StackPanel Margin="18,16,18,6" HorizontalAlignment="Stretch">
+                                    <StackPanel Margin="2,0,0,14">
+                                        <TextBlock Text="Preferenze generali"
+                                                   Style="{StaticResource PageTitleStyle}"/>
+                                        <TextBlock Text="Comportamento dell'app, valori iniziali e manutenzione locale."
+                                                   Style="{StaticResource PageSubtitleStyle}"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Porta"/>
-                                        <TextBox x:Name="TxtDatabasePort"/>
-                                    </StackPanel>
-                                </Grid>
 
-                                <Grid Margin="0,0,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Server / host"/>
-                                        <TextBox x:Name="TxtDatabaseServer"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Database"/>
-                                        <TextBox x:Name="TxtDatabaseName"/>
-                                    </StackPanel>
-                                </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="14"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
 
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="User"/>
-                                        <TextBox x:Name="TxtDatabaseUsername"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Password"/>
-                                        <PasswordBox x:Name="TxtDatabasePassword"/>
-                                    </StackPanel>
-                                </Grid>
+                                        <StackPanel>
+                                            <Border Style="{StaticResource SectionStyle}">
+                                                <StackPanel>
+                                                    <TextBlock Text="Comportamento"
+                                                               Style="{StaticResource SectionTitleStyle}"/>
+                                                    <CheckBox x:Name="ChkGeneratePdf"
+                                                              Content="Abilita generazione PDF"
+                                                              Margin="0,0,0,10"/>
+                                                    <CheckBox x:Name="ChkRestoreMissingPdfsOnStartup"
+                                                              Content="Ripristina automaticamente i PDF mancanti all'avvio"
+                                                              Margin="0,0,0,10"/>
+                                                    <CheckBox x:Name="ChkDatabaseCostSavingMode"
+                                                              Content="Modalità risparmio database"
+                                                              Margin="0,0,0,10"/>
+                                                    <CheckBox x:Name="ChkSilentStartup"
+                                                              Content="Chiudi silenziosamente in caso di errore all'avvio"/>
+                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                               Text="La modalità risparmio disattiva la sincronizzazione automatica ogni 5 minuti dal prossimo avvio."/>
+                                                </StackPanel>
+                                            </Border>
 
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Per Neon/PostgreSQL usa porta 5432 salvo indicazioni diverse. Tutti i valori sensibili vengono salvati cifrati per questo utente Windows."/>
-                            </StackPanel>
-                        </Border>
+                                            <Border Style="{StaticResource SectionStyle}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="Aggiornamenti"
+                                                                   Style="{StaticResource SectionTitleStyle}"/>
+                                                        <TextBlock Style="{StaticResource HintStyle}"
+                                                                   Margin="0"
+                                                                   Text="Avvia lo script updater configurato. L'app verrà chiusa durante la sostituzione dei file."/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1"
+                                                            Content="Aggiorna ora"
+                                                            Margin="14,0,0,0"
+                                                            VerticalAlignment="Center"
+                                                            Style="{StaticResource CompactActionButtonStyle}"
+                                                            Click="OnRunUpdaterClick"/>
+                                                </Grid>
+                                            </Border>
+                                        </StackPanel>
 
-                        <Border Style="{StaticResource SectionStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Comportamento"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkGeneratePdf"
-                                          Content="Abilita generazione PDF"
-                                          Margin="0,0,0,9"/>
-                                <CheckBox x:Name="ChkRestoreMissingPdfsOnStartup"
-                                          Content="Ripristina automaticamente i PDF mancanti all'avvio (puo' essere lento)"
-                                          Margin="0,0,0,9"/>
-                                <CheckBox x:Name="ChkDatabaseCostSavingMode"
-                                          Content="Modalita' risparmio DB dal prossimo avvio (disattiva la sincronizzazione automatica ogni 5 minuti)"
-                                          Margin="0,0,0,9"/>
-                                <CheckBox x:Name="ChkSilentStartup"
-                                          Content="Chiudi silenziosamente l'app se si verifica un errore durante l'avvio"/>
-                            </StackPanel>
-                        </Border>
+                                        <StackPanel Grid.Column="2">
+                                            <Border Style="{StaticResource SectionStyle}">
+                                                <StackPanel>
+                                                    <TextBlock Text="Calcolo guadagno reale"
+                                                               Style="{StaticResource SectionTitleStyle}"/>
+                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                               Margin="0,0,0,12"
+                                                               Text="Valori proposti all'apertura del calcolo, sempre modificabili sul singolo preventivo."/>
 
-                        <Border Style="{StaticResource SectionStyle}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="Aggiornamenti"
-                                               FontSize="15"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource DefaultTextBrush}"
-                                               Margin="0,0,0,10"/>
-                                    <TextBlock Style="{StaticResource HintStyle}"
-                                               Text="Avvia lo script updater configurato su questo PC. L'applicazione verra' chiusa per permettere la sostituzione dei file."/>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="12"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Style="{StaticResource LabelStyle}" Text="Numero operai"/>
+                                                            <TextBox x:Name="TxtDefaultProfitWorkers"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Style="{StaticResource LabelStyle}" Text="Numero giorni"/>
+                                                            <TextBox x:Name="TxtDefaultProfitDays"/>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <Grid Margin="0,12,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="12"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Style="{StaticResource LabelStyle}" Text="Ore al giorno"/>
+                                                            <TextBox x:Name="TxtDefaultProfitHoursPerDay"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Style="{StaticResource LabelStyle}" Text="Costo orario (€)"/>
+                                                            <TextBox x:Name="TxtDefaultProfitHourlyCost"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Border Style="{StaticResource SectionStyle}">
+                                                <StackPanel>
+                                                    <TextBlock Text="Avanzate"
+                                                               Style="{StaticResource SectionTitleStyle}"/>
+                                                    <TextBlock Style="{StaticResource LabelStyle}" Text="Cartella temporanea"/>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="8"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox x:Name="TxtTempPath"/>
+                                                        <Button Grid.Column="2"
+                                                                Content="Sfoglia"
+                                                                Style="{StaticResource CompactActionButtonStyle}"
+                                                                Click="OnBrowseTempPathClick"/>
+                                                    </Grid>
+                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                               Text="Se vuota, viene usata la cartella temporanea di Windows."/>
+
+                                                    <TextBlock Style="{StaticResource LabelStyle}"
+                                                               Text="Nome dispositivo"
+                                                               Margin="0,12,0,6"/>
+                                                    <TextBox x:Name="TxtDeviceName"/>
+                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                               Text="Nome usato nei log, nello storico e nella sincronizzazione multi PC."/>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
                                 </StackPanel>
-                                <Button Grid.Column="1"
-                                        Content="Aggiorna ora"
-                                        Width="130"
-                                        Height="34"
-                                        Margin="14,0,0,0"
-                                        VerticalAlignment="Center"
-                                        Background="{StaticResource ModalPrimaryActionBrush}"
-                                        Foreground="{StaticResource WhiteBrush}"
-                                        BorderThickness="0"
-                                        Click="OnRunUpdaterClick"/>
-                            </Grid>
-                        </Border>
+                            </ScrollViewer>
+                        </TabItem>
 
-                        <Border Style="{StaticResource SectionStyle}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="Integrazione Velux"
-                                               FontSize="15"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource DefaultTextBrush}"
-                                               Margin="0,0,0,10"/>
-                                    <CheckBox x:Name="ChkUseVeluxLogin"
-                                              Content="Cerca anche nel catalogo Velux durante la ricerca materiali"/>
-                                    <TextBlock Style="{StaticResource HintStyle}"
-                                               Text="Il login viene richiesto nel browser integrato e la sessione resta salvata solo su questo PC."/>
+                        <TabItem x:Name="TabDatabaseSettings" Header="_Database e integrazioni">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalContentAlignment="Stretch"
+                                          Focusable="False">
+                                <StackPanel Margin="18,16,18,6" HorizontalAlignment="Stretch">
+                                    <StackPanel Margin="2,0,0,14">
+                                        <TextBlock Text="Database e integrazioni"
+                                                   Style="{StaticResource PageTitleStyle}"/>
+                                        <TextBlock Text="Connessione ai dati condivisi e servizi esterni utilizzati dall'app."
+                                                   Style="{StaticResource PageSubtitleStyle}"/>
+                                    </StackPanel>
+
+                                    <Border Style="{StaticResource SectionStyle}">
+                                        <StackPanel>
+                                            <TextBlock Text="Connessione database"
+                                                       Style="{StaticResource SectionTitleStyle}"/>
+
+                                            <Grid Margin="0,0,0,12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="14"/>
+                                                    <ColumnDefinition Width="130"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource LabelStyle}" Text="Tipo database"/>
+                                                    <ComboBox x:Name="CmbDatabaseProvider"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Style="{StaticResource LabelStyle}" Text="Porta"/>
+                                                    <TextBox x:Name="TxtDatabasePort"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="14"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource LabelStyle}" Text="Server / host"/>
+                                                    <TextBox x:Name="TxtDatabaseServer"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Style="{StaticResource LabelStyle}" Text="Database"/>
+                                                    <TextBox x:Name="TxtDatabaseName"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="14"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource LabelStyle}" Text="Utente"/>
+                                                    <TextBox x:Name="TxtDatabaseUsername"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Style="{StaticResource LabelStyle}" Text="Password"/>
+                                                    <PasswordBox x:Name="TxtDatabasePassword"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <TextBlock Style="{StaticResource HintStyle}"
+                                                       Text="Per Neon/PostgreSQL usa normalmente la porta 5432. Le credenziali vengono salvate cifrate per questo utente Windows."/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Style="{StaticResource SectionStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Integrazione Velux"
+                                                           Style="{StaticResource SectionTitleStyle}"/>
+                                                <CheckBox x:Name="ChkUseVeluxLogin"
+                                                          Content="Cerca anche nel catalogo Velux durante la ricerca materiali"/>
+                                                <TextBlock Style="{StaticResource HintStyle}"
+                                                           Text="Il login avviene nel browser integrato e la sessione resta salvata solo su questo PC."/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1"
+                                                    Content="Rimuovi sessione"
+                                                    Margin="16,0,0,0"
+                                                    VerticalAlignment="Center"
+                                                    Style="{StaticResource DangerCompactButtonStyle}"
+                                                    Click="OnClearVeluxSessionClick"/>
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
-                                <Button Grid.Column="1"
-                                        Content="Rimuovi sessione"
-                                        Width="130"
-                                        Height="32"
-                                        Margin="14,0,0,0"
-                                        VerticalAlignment="Bottom"
-                                        Background="{StaticResource DangerRedBrush}"
-                                        Foreground="{StaticResource WhiteBrush}"
-                                        BorderThickness="0"
-                                        Click="OnClearVeluxSessionClick"/>
-                            </Grid>
-                        </Border>
+                            </ScrollViewer>
+                        </TabItem>
 
-                        <Border Style="{StaticResource SectionStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Invio email"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkMailEnabled"
-                                          Content="Abilita invio email via SMTP"
-                                          Margin="0,0,0,12"/>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Server SMTP"/>
-                                        <TextBox x:Name="TxtMailSmtpServer"/>
+                        <TabItem x:Name="TabEmailSettings" Header="_Email">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalContentAlignment="Stretch"
+                                          Focusable="False">
+                                <StackPanel Margin="18,16,18,6" HorizontalAlignment="Stretch">
+                                    <StackPanel Margin="2,0,0,14">
+                                        <TextBlock Text="Configurazione email"
+                                                   Style="{StaticResource PageTitleStyle}"/>
+                                        <TextBlock Text="Invio dei preventivi e composizione degli ordini destinati ai fornitori."
+                                                   Style="{StaticResource PageSubtitleStyle}"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Porta"/>
-                                        <TextBox x:Name="TxtMailPort"/>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="14"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Style="{StaticResource SectionStyle}">
+                                            <StackPanel>
+                                                <TextBlock Text="Invio preventivi"
+                                                           Style="{StaticResource SectionTitleStyle}"/>
+                                                <CheckBox x:Name="ChkMailEnabled"
+                                                          Content="Abilita invio email via SMTP"
+                                                          Margin="0,0,0,12"/>
+
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="12"/>
+                                                        <ColumnDefinition Width="92"/>
+                                                        <ColumnDefinition Width="12"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Server SMTP"/>
+                                                        <TextBox x:Name="TxtMailSmtpServer"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Porta"/>
+                                                        <TextBox x:Name="TxtMailPort"/>
+                                                    </StackPanel>
+                                                    <CheckBox Grid.Column="4"
+                                                              x:Name="ChkMailUseSsl"
+                                                              Content="SSL/TLS"
+                                                              VerticalAlignment="Bottom"
+                                                              Margin="0,0,0,10"/>
+                                                </Grid>
+
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Utente / email"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtMailUsername"/>
+
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Password"
+                                                           Margin="0,12,0,6"/>
+                                                <PasswordBox x:Name="TxtMailPassword"/>
+
+                                                <Grid Margin="0,12,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="12"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Email mittente"/>
+                                                        <TextBox x:Name="TxtMailSenderEmail"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Nome mittente"/>
+                                                        <TextBox x:Name="TxtMailSenderName"/>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Oggetto predefinito"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtMailSubject"/>
+
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Testo predefinito"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtMailBody"
+                                                         Height="94"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         VerticalContentAlignment="Top"
+                                                         VerticalScrollBarVisibility="Auto"/>
+                                                <TextBlock Style="{StaticResource HintStyle}"
+                                                           Text="Per Libero: smtp.libero.it, porta 465, SSL/TLS. Variabili: {QuoteNumber}, {CustomerName}, {ReferenceName}, {Date}, {Total}."/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="2" Style="{StaticResource SectionStyle}">
+                                            <StackPanel>
+                                                <TextBlock Text="Ordini fornitori"
+                                                           Style="{StaticResource SectionTitleStyle}"/>
+                                                <TextBlock Style="{StaticResource HintStyle}"
+                                                           Margin="0,0,0,12"
+                                                           Text="Personalizza liberamente oggetto e testo usando le variabili tra parentesi graffe."/>
+
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Oggetto personalizzato"/>
+                                                <TextBox x:Name="TxtSupplierOrderMailSubject"/>
+
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Testo personalizzato"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtSupplierOrderMailBody"
+                                                         Height="150"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         VerticalContentAlignment="Top"
+                                                         VerticalScrollBarVisibility="Auto"/>
+                                                <TextBlock Style="{StaticResource HintStyle}"
+                                                           Text="Variabili: {OrderReference}, {QuoteNumber}, {CustomerName}, {ReferenceName}, {SupplierName}, {Date}, {Materials}. La variabile {Materials} è obbligatoria."/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem x:Name="TabPdfSettings" Header="_PDF e archiviazione">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalContentAlignment="Stretch"
+                                          Focusable="False">
+                                <StackPanel Margin="18,16,18,6" HorizontalAlignment="Stretch">
+                                    <StackPanel Margin="2,0,0,14">
+                                        <TextBlock Text="PDF e storico"
+                                                   Style="{StaticResource PageTitleStyle}"/>
+                                        <TextBlock Text="Percorsi di archiviazione, nomi file e aspetto dei preventivi generati."
+                                                   Style="{StaticResource PageSubtitleStyle}"/>
                                     </StackPanel>
-                                    <CheckBox Grid.Column="4"
-                                              x:Name="ChkMailUseSsl"
-                                              Content="SSL/TLS"
-                                              VerticalAlignment="Bottom"
-                                              Margin="0,0,0,8"/>
-                                </Grid>
 
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="User / email Libero"/>
-                                        <TextBox x:Name="TxtMailUsername"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Password"/>
-                                        <PasswordBox x:Name="TxtMailPassword"/>
-                                    </StackPanel>
-                                </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="14"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
 
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Email mittente"/>
-                                        <TextBox x:Name="TxtMailSenderEmail"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Nome mittente"/>
-                                        <TextBox x:Name="TxtMailSenderName"/>
-                                    </StackPanel>
-                                </Grid>
+                                        <Border Style="{StaticResource SectionStyle}">
+                                            <StackPanel>
+                                                <TextBlock Text="Archiviazione PDF"
+                                                           Style="{StaticResource SectionTitleStyle}"/>
 
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Oggetto predefinito"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtMailSubject"/>
+                                                <TextBlock Style="{StaticResource LabelStyle}" Text="Cartella principale PDF"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="8"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TxtPdfRootPath"/>
+                                                    <Button Grid.Column="2"
+                                                            Content="Sfoglia"
+                                                            Style="{StaticResource CompactActionButtonStyle}"
+                                                            Click="OnBrowsePdfRootClick"/>
+                                                </Grid>
 
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Testo predefinito"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtMailBody"
-                                         Height="86"
-                                         AcceptsReturn="True"
-                                         TextWrapping="Wrap"
-                                         VerticalContentAlignment="Top"
-                                         VerticalScrollBarVisibility="Auto"/>
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Parametri Libero: smtp.libero.it, porta 465, SSL/TLS. Segnaposto disponibili: {QuoteNumber}, {CustomerName}, {ReferenceName}, {Date}, {Total}."/>
-                            </StackPanel>
-                        </Border>
+                                                <Grid Margin="0,12,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="12"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Sottocartella storico"/>
+                                                        <TextBox x:Name="TxtHistorySubFolder"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Risultati nello storico"/>
+                                                        <TextBox x:Name="TxtHistoryResultLimit"/>
+                                                    </StackPanel>
+                                                </Grid>
 
-                        <Border Style="{StaticResource SectionStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Email ordini fornitori"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,4"/>
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Margin="0,0,0,12"
-                                           Text="Puoi personalizzare liberamente oggetto e testo usando le variabili tra parentesi graffe."/>
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Formato cartella cliente"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtCustomerFolderPattern"/>
+                                                <TextBlock Style="{StaticResource HintStyle}"
+                                                           Text="Variabili: {CustomerName}, {ReferenceName}"/>
 
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Oggetto personalizzato"/>
-                                <TextBox x:Name="TxtSupplierOrderMailSubject"/>
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Formato nome PDF"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtPdfFileNamePattern"/>
+                                                <TextBlock Style="{StaticResource HintStyle}"
+                                                           Text="Variabili: {CustomerName}, {ReferenceName}, {QuoteNumber}, {Date}"/>
+                                            </StackPanel>
+                                        </Border>
 
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Testo personalizzato"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtSupplierOrderMailBody"
-                                         Height="110"
-                                         AcceptsReturn="True"
-                                         TextWrapping="Wrap"
-                                         VerticalContentAlignment="Top"
-                                         VerticalScrollBarVisibility="Auto"/>
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Variabili: {OrderReference}, {QuoteNumber}, {CustomerName}, {ReferenceName}, {SupplierName}, {Date}, {Materials}. {Materials} inserisce una riga per prodotto con la relativa quantità e deve essere presente nel testo."/>
-                            </StackPanel>
-                        </Border>
+                                        <Border Grid.Column="2" Style="{StaticResource SectionStyle}">
+                                            <StackPanel>
+                                                <TextBlock Text="Template PDF"
+                                                           Style="{StaticResource SectionTitleStyle}"/>
 
-                        <Border Style="{StaticResource SectionStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Archiviazione PDF"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,12"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="12"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Template attivo"/>
+                                                        <ComboBox x:Name="CmbPdfTemplate"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Firma"/>
+                                                        <TextBox x:Name="TxtPdfSignatureText"/>
+                                                    </StackPanel>
+                                                </Grid>
 
-                                <TextBlock Style="{StaticResource LabelStyle}" Text="Cartella principale PDF"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="TxtPdfRootPath"/>
-                                    <Button Grid.Column="2"
-                                            Content="Sfoglia"
-                                            Width="86"
-                                            Height="34"
-                                            Background="{StaticResource SecondaryBlueBrush}"
-                                            Foreground="{StaticResource WhiteBrush}"
-                                            BorderThickness="0"
-                                            Click="OnBrowsePdfRootClick"/>
-                                </Grid>
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Titolo note per il cliente"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtPdfNotesTitle"/>
 
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Sottocartella storico"/>
-                                        <TextBox x:Name="TxtHistorySubFolder"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Numero risultati nello storico"/>
-                                        <TextBox x:Name="TxtHistoryResultLimit"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Formato cartella cliente"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtCustomerFolderPattern"/>
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Segnaposto disponibili: {CustomerName}, {ReferenceName}"/>
-
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Formato nome PDF"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtPdfFileNamePattern"/>
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Segnaposto disponibili: {CustomerName}, {ReferenceName}, {QuoteNumber}, {Date}"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource SectionStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Template PDF"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,12"/>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="14"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Template attivo"/>
-                                        <ComboBox x:Name="CmbPdfTemplate"
-                                                  Height="34"
-                                                  Background="{StaticResource WhiteBrush}"
-                                                  BorderBrush="{StaticResource ModalFieldBorderBrush}"
-                                                  BorderThickness="1"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Style="{StaticResource LabelStyle}" Text="Firma"/>
-                                        <TextBox x:Name="TxtPdfSignatureText"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Titolo note"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtPdfNotesTitle"/>
-
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Footer PDF"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtPdfFooterText"
-                                         Height="58"
-                                         AcceptsReturn="True"
-                                         TextWrapping="Wrap"
-                                         VerticalContentAlignment="Top"
-                                         VerticalScrollBarVisibility="Auto"/>
-                                <CheckBox x:Name="ChkPdfShowTemplateName"
-                                          Content="Mostra nome template nel PDF"
-                                          Margin="0,10,0,0"/>
-                                <Button Content="Anteprima template"
-                                        Width="150"
-                                        Height="34"
-                                        HorizontalAlignment="Left"
-                                        Margin="0,12,0,0"
-                                        Background="{StaticResource SecondaryBlueBrush}"
-                                        Foreground="{StaticResource WhiteBrush}"
-                                        BorderThickness="0"
-                                        Click="OnPreviewPdfTemplateClick"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource SectionStyle}">
-                            <StackPanel>
-                                <TextBlock Text="Avanzate"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource DefaultTextBrush}"
-                                           Margin="0,0,0,10"/>
-                                <TextBlock Style="{StaticResource LabelStyle}" Text="Cartella temporanea"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="TxtTempPath"/>
-                                    <Button Grid.Column="2"
-                                            Content="Sfoglia"
-                                            Width="86"
-                                            Height="34"
-                                            Background="{StaticResource SecondaryBlueBrush}"
-                                            Foreground="{StaticResource WhiteBrush}"
-                                            BorderThickness="0"
-                                            Click="OnBrowseTempPathClick"/>
-                                </Grid>
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Se lasciato vuoto viene usata automaticamente la cartella temporanea di Windows."/>
-
-                                <TextBlock Style="{StaticResource LabelStyle}"
-                                           Text="Nome dispositivo"
-                                           Margin="0,12,0,5"/>
-                                <TextBox x:Name="TxtDeviceName"/>
-                                <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Nome usato nei log, nello storico e nella sincronizzazione multi PC."/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <Grid Grid.Row="3" Margin="20,0,20,18">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Button Grid.Column="1"
-                            Style="{StaticResource FooterButtonStyle}"
-                            Content="Annulla"
-                            Width="110"
-                            Background="{StaticResource MutedTextBrush}"
-                            Click="OnCancelClick"/>
-                    <Button Grid.Column="3"
-                            Style="{StaticResource FooterButtonStyle}"
-                            Content="Salva"
-                            Width="110"
-                            Background="{StaticResource ModalPrimaryActionBrush}"
-                            Click="OnSaveClick"/>
+                                                <TextBlock Style="{StaticResource LabelStyle}"
+                                                           Text="Footer PDF"
+                                                           Margin="0,12,0,6"/>
+                                                <TextBox x:Name="TxtPdfFooterText"
+                                                         Height="72"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         VerticalContentAlignment="Top"
+                                                         VerticalScrollBarVisibility="Auto"/>
+                                                <CheckBox x:Name="ChkPdfShowTemplateName"
+                                                          Content="Mostra il nome del template nel PDF"
+                                                          Margin="0,12,0,0"/>
+                                                <Button Content="Anteprima template"
+                                                        Margin="0,14,0,0"
+                                                        HorizontalAlignment="Left"
+                                                        Style="{StaticResource CompactActionButtonStyle}"
+                                                        Click="OnPreviewPdfTemplateClick"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
                 </Grid>
+
+                <Border Grid.Row="3" Background="{StaticResource SubtleBorderBrush}"/>
+
+                <Border Grid.Row="4"
+                        Background="{StaticResource SurfaceBrush}"
+                        Padding="20,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center"
+                                   Text="Le modifiche vengono applicate dopo il salvataggio."
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedTextBrush}"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="Annulla"
+                                    Width="110"
+                                    Style="{StaticResource SecondaryActionButtonStyle}"
+                                    Click="OnCancelClick"/>
+                            <Button Content="Salva"
+                                    Width="118"
+                                    Margin="10,0,0,0"
+                                    IsDefault="True"
+                                    Style="{StaticResource PrimaryActionButtonStyle}"
+                                    Click="OnSaveClick"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
     </Grid>

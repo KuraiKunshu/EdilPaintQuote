@@ -77,6 +77,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _quoteNumber = "000000";
     private string _selectedLogo = string.Empty;
     private string _paymentTerms = string.Empty;
+    private string _customerNotes = string.Empty;
     private string _partnerCompanyName = string.Empty;
     private DateTime? _loadedQuoteDate;
     private string _loadedQuotePdfPath = string.Empty;
@@ -357,6 +358,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public string PaymentTerms { get => _paymentTerms; set { _paymentTerms = value; OnPropertyChanged(); } }
+    public string CustomerNotes { get => _customerNotes; set { _customerNotes = value; OnPropertyChanged(); } }
 
     public string InputName { get => _inputName; set { _inputName = value; OnPropertyChanged(); } }
     public string InputDescription { get => _inputDescription; set { _inputDescription = value; OnPropertyChanged(); } }

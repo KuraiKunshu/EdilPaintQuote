@@ -5,6 +5,7 @@ public class PdfGenerationContext
     public string QuoteNumber { get; set; } = string.Empty;
     public DateTime Date { get; set; }
     public string PaymentTerms { get; set; } = string.Empty;
+    public string CustomerNotes { get; set; } = string.Empty;
     public string IvaType { get; set; } = string.Empty;
     public string CustomerName { get; set; } = string.Empty;
     public string ReferenceName { get; set; } = string.Empty;
@@ -20,7 +21,7 @@ public class PdfGenerationContext
     public List<StoredFile> Attachments { get; set; } = new();
     public List<Customer> AllCustomers { get; set; } = new();
     public string PdfTemplateName { get; set; } = "Standard";
-    public string PdfNotesTitle { get; set; } = "NOTE E TERMINI DI PAGAMENTO";
+    public string PdfNotesTitle { get; set; } = "NOTE PER IL CLIENTE";
     public string PdfFooterText { get; set; } = string.Empty;
     public string PdfSignatureText { get; set; } = "Firma per accettazione";
     public bool PdfShowTemplateName { get; set; }

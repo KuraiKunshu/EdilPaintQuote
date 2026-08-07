@@ -93,6 +93,45 @@ public sealed class LocalDraftServiceTests
     }
 
     [Fact]
+    public async Task CustomerNotesRoundTripSeparatelyAndParticipateInTheStableFingerprint()
+    {
+        string temporaryPath = Path.Combine(
+            Path.GetTempPath(),
+            "EdilPaintPreventivi.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new LocalDraftService(temporaryPath);
+            var draft = CreateDraft([], DateTime.UtcNow);
+            draft.PaymentTerms = "Acconto 50% - saldo a fine lavori";
+            draft.CustomerNotes = "Proteggere con cura i pavimenti.";
+            draft.Notes = "Promemoria interno: verificare il margine.";
+
+            Assert.True(await service.SaveIfChangedAsync(draft));
+
+            var unchanged = CreateDraft([], DateTime.UtcNow.AddMinutes(1));
+            unchanged.PaymentTerms = draft.PaymentTerms;
+            unchanged.CustomerNotes = draft.CustomerNotes;
+            unchanged.Notes = draft.Notes;
+            Assert.False(await service.SaveIfChangedAsync(unchanged));
+
+            unchanged.CustomerNotes = "Proteggere pavimenti e serramenti.";
+            Assert.True(await service.SaveIfChangedAsync(unchanged));
+
+            var restored = Assert.IsType<QuoteHistoryEntry>(await service.LoadAsync());
+            Assert.Equal("Acconto 50% - saldo a fine lavori", restored.PaymentTerms);
+            Assert.Equal("Proteggere pavimenti e serramenti.", restored.CustomerNotes);
+            Assert.Equal("Promemoria interno: verificare il margine.", restored.Notes);
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryPath))
+                Directory.Delete(temporaryPath, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TextOnlyChangeDoesNotRewriteContentBlobAndLoadRestoresBytes()
     {
         string temporaryPath = Path.Combine(
@@ -175,6 +214,7 @@ public sealed class LocalDraftServiceTests
             var service = new LocalDraftService(temporaryPath);
             var legacyDraft = Assert.IsType<QuoteHistoryEntry>(await service.LoadAsync());
             Assert.Equal(legacyContent, Assert.Single(legacyDraft.Attachments).Content);
+            Assert.Equal(string.Empty, legacyDraft.CustomerNotes);
 
             Assert.True(await service.SaveIfChangedAsync(legacyDraft));
             using var envelope = JsonDocument.Parse(await File.ReadAllTextAsync(draftPath));
@@ -183,6 +223,7 @@ public sealed class LocalDraftServiceTests
 
             var migrated = Assert.IsType<QuoteHistoryEntry>(await service.LoadAsync());
             Assert.Equal(legacyContent, Assert.Single(migrated.Attachments).Content);
+            Assert.Equal(string.Empty, migrated.CustomerNotes);
         }
         finally
         {

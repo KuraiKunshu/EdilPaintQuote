@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using EdilPaintPreventibiviGen.Services;
 using Microsoft.Win32;
@@ -24,6 +25,7 @@ public partial class SettingsWindow : Window
     private void LoadSettings()
     {
         var app = App.AppSettings.App;
+        var realProfit = App.AppSettings.RealProfit;
         var pdf = App.AppSettings.PdfStorage;
         var template = App.AppSettings.PdfTemplate;
         var database = App.AppSettings.Database;
@@ -57,6 +59,10 @@ public partial class SettingsWindow : Window
         TxtHistoryResultLimit.Text = app.NumberOfQuote.ToString(CultureInfo.InvariantCulture);
         TxtTempPath.Text = app.TempPath;
         TxtDeviceName.Text = app.GetEffectiveDeviceName();
+        TxtDefaultProfitWorkers.Text = realProfit.Workers.ToString(CultureInfo.CurrentCulture);
+        TxtDefaultProfitDays.Text = realProfit.Days.ToString("0.##", CultureInfo.CurrentCulture);
+        TxtDefaultProfitHoursPerDay.Text = realProfit.HoursPerDay.ToString("0.##", CultureInfo.CurrentCulture);
+        TxtDefaultProfitHourlyCost.Text = realProfit.HourlyCost.ToString("0.##", CultureInfo.CurrentCulture);
 
         TxtPdfRootPath.Text = pdf.RootPath;
         TxtHistorySubFolder.Text = pdf.HistorySubFolder ?? string.Empty;
@@ -93,21 +99,16 @@ public partial class SettingsWindow : Window
     {
         if (string.IsNullOrWhiteSpace(TxtPdfRootPath.Text))
         {
-            MessageBox.Show(
-                "Inserisci la cartella principale dei PDF.",
-                "Impostazioni non valide",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            ShowValidationError(TabPdfSettings, TxtPdfRootPath, "Inserisci la cartella principale dei PDF.");
             return;
         }
 
         if (!int.TryParse(TxtHistoryResultLimit.Text, out int historyResultLimit) || historyResultLimit < 1)
         {
-            MessageBox.Show(
-                "Il numero di risultati nello storico deve essere maggiore di zero.",
-                "Impostazioni non valide",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            ShowValidationError(
+                TabPdfSettings,
+                TxtHistoryResultLimit,
+                "Il numero di risultati nello storico deve essere maggiore di zero.");
             return;
         }
 
@@ -120,11 +121,10 @@ public partial class SettingsWindow : Window
                 parsedDatabasePort <= 0 ||
                 parsedDatabasePort > 65535)
             {
-                MessageBox.Show(
-                    "La porta del database deve essere un numero valido tra 1 e 65535.",
-                    "Impostazioni non valide",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                ShowValidationError(
+                    TabDatabaseSettings,
+                    TxtDatabasePort,
+                    "La porta del database deve essere un numero valido tra 1 e 65535.");
                 return;
             }
 
@@ -147,27 +147,87 @@ public partial class SettingsWindow : Window
 
         if (!supplierOrderMailBody.Contains("{Materials}", StringComparison.OrdinalIgnoreCase))
         {
-            MessageBox.Show(
-                "Il testo dell'email per gli ordini fornitori deve contenere il segnaposto {Materials}.",
-                "Impostazioni non valide",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            ShowValidationError(
+                TabEmailSettings,
+                TxtSupplierOrderMailBody,
+                "Il testo dell'email per gli ordini fornitori deve contenere il segnaposto {Materials}.");
+            return;
+        }
+
+        if (!int.TryParse(TxtDefaultProfitWorkers.Text, out int defaultProfitWorkers) ||
+            defaultProfitWorkers < 1)
+        {
+            ShowValidationError(
+                TabGeneralSettings,
+                TxtDefaultProfitWorkers,
+                "Il numero predefinito di operai deve essere un intero maggiore di zero.");
+            return;
+        }
+
+        if (!TryParseSettingsDouble(TxtDefaultProfitDays.Text, allowZero: false, out double defaultProfitDays))
+        {
+            ShowValidationError(
+                TabGeneralSettings,
+                TxtDefaultProfitDays,
+                "Il numero predefinito di giorni deve essere maggiore di zero.");
+            return;
+        }
+
+        if (!TryParseSettingsDouble(
+                TxtDefaultProfitHoursPerDay.Text,
+                allowZero: false,
+                out double defaultProfitHoursPerDay))
+        {
+            ShowValidationError(
+                TabGeneralSettings,
+                TxtDefaultProfitHoursPerDay,
+                "Le ore giornaliere predefinite devono essere maggiori di zero.");
+            return;
+        }
+
+        if (!TryParseSettingsDouble(
+                TxtDefaultProfitHourlyCost.Text,
+                allowZero: true,
+                out double defaultProfitHourlyCost))
+        {
+            ShowValidationError(
+                TabGeneralSettings,
+                TxtDefaultProfitHourlyCost,
+                "Il costo orario predefinito deve essere uguale o maggiore di zero.");
             return;
         }
 
         if (!int.TryParse(TxtMailPort.Text, out int mailPort) || mailPort <= 0 || mailPort > 65535)
         {
-            MessageBox.Show(
-                "La porta SMTP deve essere un numero valido tra 1 e 65535.",
-                "Impostazioni non valide",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            ShowValidationError(
+                TabEmailSettings,
+                TxtMailPort,
+                "La porta SMTP deve essere un numero valido tra 1 e 65535.");
+            return;
+        }
+
+        if (mailEnabled && string.IsNullOrWhiteSpace(mailUsername))
+        {
+            ShowValidationError(
+                TabEmailSettings,
+                TxtMailUsername,
+                "Inserisci l'utente o l'indirizzo email SMTP.");
+            return;
+        }
+
+        if (mailEnabled && string.IsNullOrWhiteSpace(mailPassword))
+        {
+            ShowValidationError(
+                TabEmailSettings,
+                TxtMailPassword,
+                "Inserisci la password SMTP.");
             return;
         }
 
         try
         {
             var app = App.AppSettings.App;
+            var realProfit = App.AppSettings.RealProfit;
             var pdf = App.AppSettings.PdfStorage;
             var template = App.AppSettings.PdfTemplate;
             var database = App.AppSettings.Database;
@@ -210,6 +270,12 @@ public partial class SettingsWindow : Window
             app.DeviceName = string.IsNullOrWhiteSpace(TxtDeviceName.Text)
                 ? Environment.MachineName
                 : TxtDeviceName.Text.Trim();
+
+            realProfit.Workers = defaultProfitWorkers;
+            realProfit.Days = defaultProfitDays;
+            realProfit.HoursPerDay = defaultProfitHoursPerDay;
+            realProfit.HourlyCost = defaultProfitHourlyCost;
+            realProfit.Normalize();
 
             pdf.RootPath = TxtPdfRootPath.Text.Trim();
             pdf.HistorySubFolder = EmptyToNull(TxtHistorySubFolder.Text);
@@ -386,4 +452,31 @@ public partial class SettingsWindow : Window
 
     private static string? EmptyToNull(string value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void ShowValidationError(TabItem tab, Control control, string message)
+    {
+        SettingsTabs.SelectedItem = tab;
+        UpdateLayout();
+        control.BringIntoView();
+        MessageBox.Show(
+            message,
+            "Impostazioni non valide",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+        control.Focus();
+        if (control is TextBox textBox)
+            textBox.SelectAll();
+    }
+
+    private static bool TryParseSettingsDouble(string? text, bool allowZero, out double value)
+    {
+        string normalized = (text ?? string.Empty).Trim().Replace(',', '.');
+        if (!double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out value) ||
+            !double.IsFinite(value))
+        {
+            return false;
+        }
+
+        return allowZero ? value >= 0 : value > 0;
+    }
 }

@@ -66,6 +66,137 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public void QuoteSyncHashIncludesCustomerNotesSeparatelyFromPaymentTermsAndInternalNotes()
+    {
+        DateTime quoteDate = new(2026, 8, 6, 10, 0, 0, DateTimeKind.Utc);
+        var baseline = new QuoteHistoryEntry
+        {
+            QuoteNumber = "CUSTOMER-NOTES-1",
+            Date = quoteDate,
+            PaymentTerms = "Acconto 50%",
+            CustomerNotes = "Nota visibile al cliente",
+            Notes = "Nota interna"
+        };
+        var changedCustomerNotes = new QuoteHistoryEntry
+        {
+            QuoteNumber = baseline.QuoteNumber,
+            Date = quoteDate,
+            PaymentTerms = baseline.PaymentTerms,
+            CustomerNotes = "Nota cliente modificata",
+            Notes = baseline.Notes
+        };
+        var changedPaymentTerms = new QuoteHistoryEntry
+        {
+            QuoteNumber = baseline.QuoteNumber,
+            Date = quoteDate,
+            PaymentTerms = "Saldo a fine lavori",
+            CustomerNotes = baseline.CustomerNotes,
+            Notes = baseline.Notes
+        };
+        var changedInternalNotes = new QuoteHistoryEntry
+        {
+            QuoteNumber = baseline.QuoteNumber,
+            Date = quoteDate,
+            PaymentTerms = baseline.PaymentTerms,
+            CustomerNotes = baseline.CustomerNotes,
+            Notes = "Nota interna modificata"
+        };
+
+        Type hashService = typeof(SyncService).Assembly.GetType(
+            "EdilPaintPreventibiviGen.Services.QuoteSyncHashService",
+            throwOnError: true)!;
+        var compute = hashService.GetMethod("Compute")!;
+        var computeLegacy = hashService.GetMethod("ComputeLegacy")!;
+        string baselineHash = Assert.IsType<string>(compute.Invoke(null, [baseline]));
+        string baselineLegacyHash = Assert.IsType<string>(computeLegacy.Invoke(null, [baseline]));
+
+        Assert.NotEqual(
+            baselineHash,
+            Assert.IsType<string>(compute.Invoke(null, [changedCustomerNotes])));
+        Assert.NotEqual(
+            baselineLegacyHash,
+            Assert.IsType<string>(computeLegacy.Invoke(null, [changedCustomerNotes])));
+        Assert.NotEqual(
+            baselineHash,
+            Assert.IsType<string>(compute.Invoke(null, [changedPaymentTerms])));
+        Assert.NotEqual(
+            baselineHash,
+            Assert.IsType<string>(compute.Invoke(null, [changedInternalNotes])));
+    }
+
+    [Fact]
+    public void QuoteMapperKeepsPaymentCustomerNotesAndInternalNotesSeparate()
+    {
+        var entity = new EdilPaintPreventibiviGen.Data.Entities.QuoteEntity
+        {
+            QuoteNumber = "CUSTOMER-NOTES-MAP",
+            PaymentTerms = "Acconto 50%",
+            CustomerNotes = "Nota visibile al cliente",
+            Notes = "Promemoria interno"
+        };
+
+        QuoteHistoryEntry model = entity.ToModel();
+
+        Assert.Equal("Acconto 50%", model.PaymentTerms);
+        Assert.Equal("Nota visibile al cliente", model.CustomerNotes);
+        Assert.Equal("Promemoria interno", model.Notes);
+    }
+
+    [Fact]
+    public void PdfTemplateNormalizesLegacyCombinedTitleToCustomerNotesTitle()
+    {
+        var template = new PdfTemplateSettingsModel
+        {
+            NotesTitle = "NOTE E TERMINI DI PAGAMENTO"
+        };
+
+        template.Normalize();
+
+        Assert.Equal(PdfTemplateSettingsModel.DefaultNotesTitle, template.NotesTitle);
+    }
+
+    [Fact]
+    public void RealProfitSettingsUseRequestedDefaults()
+    {
+        var settings = new RealProfitSettingsModel();
+
+        Assert.Equal(2, settings.Workers);
+        Assert.Equal(1d, settings.Days);
+        Assert.Equal(10d, settings.HoursPerDay);
+        Assert.Equal(40d, settings.HourlyCost);
+
+        var result = RealProfitCalculator.Calculate(new RealProfitInput
+        {
+            QuoteRevenue = 1000,
+            Workers = settings.Workers,
+            Days = settings.Days,
+            HoursPerDay = settings.HoursPerDay,
+            HourlyCost = settings.HourlyCost
+        });
+
+        Assert.Equal(800d, result.LaborCost);
+    }
+
+    [Fact]
+    public void RealProfitSettingsNormalizeInvalidValues()
+    {
+        var settings = new RealProfitSettingsModel
+        {
+            Workers = 0,
+            Days = double.NaN,
+            HoursPerDay = double.PositiveInfinity,
+            HourlyCost = -1
+        };
+
+        settings.Normalize();
+
+        Assert.Equal(RealProfitSettingsModel.DefaultWorkers, settings.Workers);
+        Assert.Equal(RealProfitSettingsModel.DefaultDays, settings.Days);
+        Assert.Equal(RealProfitSettingsModel.DefaultHoursPerDay, settings.HoursPerDay);
+        Assert.Equal(RealProfitSettingsModel.DefaultHourlyCost, settings.HourlyCost);
+    }
+
+    [Fact]
     public void ReverseChargeSplitsSignificantGoodsAndAddsVat()
     {
         var calculator = new QuoteCalculator();
