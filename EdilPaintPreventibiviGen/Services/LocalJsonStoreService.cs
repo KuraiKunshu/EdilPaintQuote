@@ -116,6 +116,14 @@ public class LocalJsonStoreService
             {
                 labors.Add(new Item
                 {
+                    PersistentId = GetJsonInt(
+                        e,
+                        "persistentId",
+                        "PersistentId",
+                        "catalogItemId",
+                        "CatalogItemId",
+                        "idCatalogo",
+                        "IdCatalogo"),
                     Name = GetJsonString(e, "nome", "Nome", "name", "Name"),
                     Description = GetJsonString(e, "descrizione", "Descrizione", "description", "Description"),
                     UnitPrice = GetJsonDouble(e, "valore", "Valore", "unitPrice", "UnitPrice"),
@@ -149,6 +157,7 @@ public class LocalJsonStoreService
             {
                 lavori = labors.Select(l => new
                 {
+                    persistentId = l.PersistentId,
                     nome = l.Name,
                     descrizione = l.Description,
                     valore = l.UnitPrice
@@ -880,6 +889,30 @@ public class LocalJsonStoreService
             if (prop.ValueKind == JsonValueKind.String &&
                 double.TryParse(prop.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
                 return value;
+        }
+
+        return 0;
+    }
+
+    private static int GetJsonInt(JsonElement element, params string[] propertyNames)
+    {
+        foreach (string name in propertyNames)
+        {
+            if (!element.TryGetProperty(name, out JsonElement property))
+                continue;
+
+            if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out int value))
+                return value;
+
+            if (property.ValueKind == JsonValueKind.String &&
+                int.TryParse(
+                    property.GetString(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out value))
+            {
+                return value;
+            }
         }
 
         return 0;

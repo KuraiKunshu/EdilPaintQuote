@@ -191,6 +191,7 @@ public static class EntityModelMapper
                 .OrderBy(m => m.SortOrder)
                 .Select(m => new Item
                 {
+                    PersistentId = m.CatalogItemId,
                     Name = m.Name,
                     Description = m.Description,
                     UnitPrice = m.UnitPrice,
@@ -204,6 +205,7 @@ public static class EntityModelMapper
                 .OrderBy(l => l.SortOrder)
                 .Select(l => new Item
                 {
+                    PersistentId = l.CatalogItemId,
                     Name = l.Name,
                     Description = l.Description,
                     UnitPrice = l.UnitPrice,

@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
@@ -315,15 +317,44 @@ public sealed class AppSettingsServiceModel
 
 public sealed class RealProfitSettingsModel
 {
+	public const int CurrentWindowMaterialRulesSchemaVersion = 2;
 	public const int DefaultWorkers = 2;
 	public const double DefaultDays = 1d;
 	public const double DefaultHoursPerDay = 10d;
 	public const double DefaultHourlyCost = 40d;
+	public const double DefaultProfitReductionPercentage = 0d;
+	public const string DefaultInternalFinishLaborKeyword = "Finitura interna";
+	public const string DefaultInternalFinishMaterialName = "Perline";
 
 	public int Workers { get; set; } = DefaultWorkers;
 	public double Days { get; set; } = DefaultDays;
 	public double HoursPerDay { get; set; } = DefaultHoursPerDay;
 	public double HourlyCost { get; set; } = DefaultHourlyCost;
+	public double ProfitReductionPercentage { get; set; } = DefaultProfitReductionPercentage;
+	public List<string> WindowProductPrefixes { get; set; } = [];
+	public string WindowMaterialCatalogIdentity { get; set; } = string.Empty;
+	public int WindowMaterialRulesSchemaVersion { get; set; }
+	public List<WindowMaterialRuleSettingsModel> WindowMaterialRules { get; set; } = null!;
+
+	// Campi legacy mantenuti per leggere le configurazioni create dalle versioni precedenti.
+	public string InternalFinishLaborKeyword { get; set; } = DefaultInternalFinishLaborKeyword;
+	public string InternalFinishMaterialName { get; set; } = DefaultInternalFinishMaterialName;
+
+	public static List<string> CreateDefaultWindowProductPrefixes() =>
+		["GGL", "GGU", "GPL", "GPU", "Q4", "R8"];
+
+	public static List<WindowMaterialRuleSettingsModel> CreateDefaultWindowMaterialRules() =>
+	[
+		new WindowMaterialRuleSettingsModel
+		{
+			Enabled = true,
+			IsWindowAutomation = true,
+			LaborName = DefaultInternalFinishLaborKeyword,
+			MaterialName = DefaultInternalFinishMaterialName,
+			CalculationMode = WindowMaterialRuleSettingsModel.PerimeterCalculationMode,
+			QuantityParameter = 1m
+		}
+	];
 
 	public void Normalize()
 	{
@@ -335,6 +366,102 @@ public sealed class RealProfitSettingsModel
 			HoursPerDay = DefaultHoursPerDay;
 		if (!double.IsFinite(HourlyCost) || HourlyCost < 0)
 			HourlyCost = DefaultHourlyCost;
+		if (!double.IsFinite(ProfitReductionPercentage))
+			ProfitReductionPercentage = DefaultProfitReductionPercentage;
+		ProfitReductionPercentage = Math.Clamp(ProfitReductionPercentage, 0, 100);
+
+		WindowProductPrefixes ??= [];
+		if (WindowProductPrefixes.Count == 0)
+			WindowProductPrefixes = CreateDefaultWindowProductPrefixes();
+		WindowProductPrefixes = WindowProductPrefixes
+			.Select(prefix => prefix?.Trim().ToUpperInvariant() ?? string.Empty)
+			.Where(prefix => prefix.Length > 0)
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		WindowMaterialCatalogIdentity = WindowMaterialCatalogIdentity?.Trim() ?? string.Empty;
+
+		string legacyLaborName = InternalFinishLaborKeyword?.Trim() ?? string.Empty;
+		string legacyMaterialName = string.IsNullOrWhiteSpace(InternalFinishMaterialName)
+			? DefaultInternalFinishMaterialName
+			: InternalFinishMaterialName.Trim();
+
+		if (WindowMaterialRulesSchemaVersion < CurrentWindowMaterialRulesSchemaVersion)
+		{
+			// La lista non esisteva nel vecchio schema. Una lista vuota senza versione
+			// viene quindi migrata dalla coppia legacy; dal schema v1 in poi, invece,
+			// una lista vuota rappresenta la scelta esplicita di non avere regole.
+			if (WindowMaterialRules == null || WindowMaterialRules.Count == 0)
+			{
+				WindowMaterialRules = legacyLaborName.Length == 0
+					? []
+					:
+					[
+						new WindowMaterialRuleSettingsModel
+						{
+							Enabled = true,
+							IsWindowAutomation = true,
+							LaborName = legacyLaborName,
+							MaterialName = legacyMaterialName,
+							CalculationMode = WindowMaterialRuleSettingsModel.PerimeterCalculationMode,
+							QuantityParameter = 1m
+						}
+					];
+			}
+
+			WindowMaterialRulesSchemaVersion = CurrentWindowMaterialRulesSchemaVersion;
+		}
+		else
+		{
+			WindowMaterialRules ??= [];
+		}
+
+		foreach (WindowMaterialRuleSettingsModel rule in WindowMaterialRules)
+			rule.Normalize();
+
+		WindowMaterialRulesSchemaVersion = Math.Max(
+			WindowMaterialRulesSchemaVersion,
+			CurrentWindowMaterialRulesSchemaVersion);
+
+		// Mantiene un fallback leggibile anche per una versione precedente dell'app.
+		WindowMaterialRuleSettingsModel? firstEnabledRule =
+			WindowMaterialRules.FirstOrDefault(rule => rule.Enabled);
+		InternalFinishLaborKeyword = firstEnabledRule?.LaborName ?? string.Empty;
+		InternalFinishMaterialName = firstEnabledRule?.MaterialName ?? string.Empty;
+	}
+}
+
+public sealed class WindowMaterialRuleSettingsModel
+{
+	public const string PerimeterCalculationMode = "Perimeter";
+	public const string FixedPerWindowCalculationMode = "FixedPerWindow";
+
+	public bool Enabled { get; set; } = true;
+	public bool IsWindowAutomation { get; set; } = true;
+	public int? LaborCatalogId { get; set; }
+	public string LaborName { get; set; } = string.Empty;
+	public int? MaterialCatalogId { get; set; }
+	public string MaterialName { get; set; } = string.Empty;
+	public string CalculationMode { get; set; } = PerimeterCalculationMode;
+	public decimal QuantityParameter { get; set; } = 1m;
+
+	public void Normalize()
+	{
+		if (LaborCatalogId <= 0)
+			LaborCatalogId = null;
+		if (MaterialCatalogId <= 0)
+			MaterialCatalogId = null;
+		LaborName = LaborName?.Trim() ?? string.Empty;
+		MaterialName = MaterialName?.Trim() ?? string.Empty;
+		CalculationMode = string.Equals(
+			CalculationMode?.Trim(),
+			FixedPerWindowCalculationMode,
+			StringComparison.OrdinalIgnoreCase)
+			? FixedPerWindowCalculationMode
+			: PerimeterCalculationMode;
+		if (!IsWindowAutomation)
+			CalculationMode = FixedPerWindowCalculationMode;
+		if (QuantityParameter <= 0)
+			QuantityParameter = 1m;
 	}
 }
 
@@ -481,6 +608,32 @@ public sealed class DatabaseSettingsModel
 		=> string.Equals(NormalizeProvider(provider), PostgreSqlProvider, StringComparison.Ordinal);
 
 	public bool UsesPostgreSql => IsPostgreSqlProvider(Provider);
+
+	public string GetCatalogIdentity()
+	{
+		string normalizedProvider = NormalizeProvider(Provider?.Trim());
+		bool usesPostgreSql = IsPostgreSqlProvider(normalizedProvider);
+		string provider = normalizedProvider.ToUpperInvariant();
+		string server = Server?.Trim().ToUpperInvariant() ?? string.Empty;
+		string databaseName = Database?.Trim() ?? string.Empty;
+		bool hasConfiguredCoordinates =
+			server.Length > 0 || databaseName.Length > 0 || Port is > 0;
+		if (!hasConfiguredCoordinates)
+			return string.Empty;
+
+		string database = usesPostgreSql
+			? databaseName
+			: databaseName.ToUpperInvariant();
+		string port = Port is > 0
+			? Port.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+			: usesPostgreSql
+				? "5432"
+				: string.Empty;
+
+		string canonicalIdentity = string.Join('\n', provider, server, port, database);
+		byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(canonicalIdentity));
+		return $"sha256:{Convert.ToHexString(hash).ToLowerInvariant()}";
+	}
 
 	public string BuildConnectionString()
 		=> UsesPostgreSql ? BuildPostgreSqlConnectionString() : BuildSqlServerConnectionString();

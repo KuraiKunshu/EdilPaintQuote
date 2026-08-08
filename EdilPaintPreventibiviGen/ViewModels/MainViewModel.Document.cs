@@ -481,6 +481,7 @@ public partial class MainViewModel
         {
             Materials.Add(new Item
             {
+                PersistentId = m.PersistentId,
                 Name = m.Name,
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
@@ -495,6 +496,7 @@ public partial class MainViewModel
         {
             Labors.Add(new Item
             {
+                PersistentId = l.PersistentId,
                 Name = l.Name,
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,

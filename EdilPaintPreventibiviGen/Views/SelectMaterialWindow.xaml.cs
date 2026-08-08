@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -13,6 +14,7 @@ public partial class SelectMaterialWindow : Window
 {
     private readonly MainViewModel _vm;
     private Item? _editingMaterial;
+    private bool _isSaving;
 
     public SelectMaterialWindow(MainViewModel vm)
     {
@@ -36,11 +38,15 @@ public partial class SelectMaterialWindow : Window
 
     private void FilterList(string query)
     {
-        var source = _vm.PersonalMaterialsView;
+        // La sorgente del ViewModel e' una List modificabile. Collegarla
+        // direttamente al DataGrid lascia l'ItemContainerGenerator senza
+        // notifiche quando viene aggiunto il materiale successivo. Usiamo
+        // sempre uno snapshot stabile e sostituiamolo dopo ogni salvataggio.
+        var sourceSnapshot = _vm.PersonalMaterialsView.ToList();
 
         GridMaterials.ItemsSource = string.IsNullOrWhiteSpace(query)
-            ? source
-            : source.Where(m =>
+            ? sourceSnapshot
+            : sourceSnapshot.Where(m =>
                 (!string.IsNullOrWhiteSpace(m.Name) && m.Name.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
                 (!string.IsNullOrWhiteSpace(m.Description) && m.Description.Contains(query, StringComparison.OrdinalIgnoreCase)))
               .ToList();
@@ -66,7 +72,7 @@ public partial class SelectMaterialWindow : Window
         }
     }
 
-    private void OnSaveMaterialClick(object sender, RoutedEventArgs e)
+    private async void OnSaveMaterialClick(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(TxtName.Text))
         {
@@ -84,30 +90,40 @@ public partial class SelectMaterialWindow : Window
             return;
         }
 
-        if (_editingMaterial != null)
+        _isSaving = true;
+        IsEnabled = false;
+        try
         {
-            _editingMaterial.Name = TxtName.Text;
-            _editingMaterial.Description = TxtDesc.Text;
-            _editingMaterial.UnitPrice = price;
-            _editingMaterial.IsSignificant = ChkSignificant.IsChecked ?? false;
-            _editingMaterial.IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false;
-        }
-        else
-        {
-            _vm.AddPersonalMaterial(new Item
+            if (_editingMaterial != null)
             {
-                Name = TxtName.Text,
-                Description = TxtDesc.Text,
-                UnitPrice = price,
-                Quantity = 1,
-                IsSignificant = ChkSignificant.IsChecked ?? false,
-                IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false
-            });
-        }
+                _editingMaterial.Name = TxtName.Text.Trim();
+                _editingMaterial.Description = TxtDesc.Text;
+                _editingMaterial.UnitPrice = price;
+                _editingMaterial.IsSignificant = ChkSignificant.IsChecked ?? false;
+                _editingMaterial.IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false;
+            }
+            else
+            {
+                _vm.AddPersonalMaterial(new Item
+                {
+                    Name = TxtName.Text.Trim(),
+                    Description = TxtDesc.Text,
+                    UnitPrice = price,
+                    Quantity = 1,
+                    IsSignificant = ChkSignificant.IsChecked ?? false,
+                    IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false
+                });
+            }
 
-        _vm.SavePersonalMaterialsPublic();
-        ResetInputs();
-        FilterList(TxtSearch.Text);
+            await _vm.SavePersonalMaterialsPublicAsync();
+            ResetInputs();
+            FilterList(TxtSearch.Text);
+        }
+        finally
+        {
+            IsEnabled = true;
+            _isSaving = false;
+        }
     }
 
     private async void OnDeleteMaterialClick(object sender, RoutedEventArgs e)
@@ -145,4 +161,11 @@ public partial class SelectMaterialWindow : Window
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e) => Close();
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (_isSaving)
+            e.Cancel = true;
+        base.OnClosing(e);
+    }
 }

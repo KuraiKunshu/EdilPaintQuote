@@ -100,7 +100,9 @@ public partial class MainViewModel
                     m.Name.Contains(text, StringComparison.OrdinalIgnoreCase))
                 .Select(p => new VeluxResult
                 {
-                    Id = "LOCAL_" + p.Name,
+                    Id = p.PersistentId > 0
+                        ? $"LOCAL_ID_{p.PersistentId}"
+                        : "LOCAL_NAME_" + p.Name,
                     Label = $"[Locale] {p.Name} - EUR {p.UnitPrice:N2}",
                     Value = p.Name
                 })

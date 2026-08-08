@@ -8,25 +8,26 @@ namespace EdilPaintPreventibiviGen.Services;
 internal static class QuoteSyncHashService
 {
     public static string Compute(QuoteHistoryEntry entry) =>
-        ComputeCore(entry, includeCustomerIdentity: true);
+        ComputeCore(entry, includeCustomerIdentity: true, includeCatalogIdentity: true);
 
     public static string ComputeLegacy(QuoteHistoryEntry entry) =>
-        ComputeCore(entry, includeCustomerIdentity: false);
+        ComputeCore(entry, includeCustomerIdentity: false, includeCatalogIdentity: false);
 
     private static string ComputeCore(
         QuoteHistoryEntry entry,
-        bool includeCustomerIdentity)
+        bool includeCustomerIdentity,
+        bool includeCatalogIdentity)
     {
         static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
         var materialsHash = string.Join("|", entry.Materials
             .OrderBy(m => m.SortOrder)
             .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(m => $"{m.SortOrder}:{m.Name}:{m.Description}:{Number(m.UnitPrice)}:{m.Quantity}:{Number(m.Discount)}:{m.IsSignificant}"));
+            .Select(m => $"{(includeCatalogIdentity ? $"{m.PersistentId}:" : string.Empty)}{m.SortOrder}:{m.Name}:{m.Description}:{Number(m.UnitPrice)}:{m.Quantity}:{Number(m.Discount)}:{m.IsSignificant}"));
 
         var laborsHash = string.Join("|", entry.Labors
             .OrderBy(l => l.SortOrder)
             .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(l => $"{l.SortOrder}:{l.Name}:{l.Description}:{Number(l.UnitPrice)}:{l.Quantity}:{Number(l.Discount)}:{l.IsSignificant}"));
+            .Select(l => $"{(includeCatalogIdentity ? $"{l.PersistentId}:" : string.Empty)}{l.SortOrder}:{l.Name}:{l.Description}:{Number(l.UnitPrice)}:{l.Quantity}:{Number(l.Discount)}:{l.IsSignificant}"));
 
         var costsHash =
             string.Join("|", entry.OurCosts.Select(c => $"{c.Description}:{Number(c.Amount)}:{c.Notes}")) + "|" +

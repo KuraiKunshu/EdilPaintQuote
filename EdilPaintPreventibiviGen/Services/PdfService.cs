@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
+using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -855,6 +856,287 @@ public class PdfService
                 {
                     x.Span("Pagina "); x.CurrentPageNumber(); x.Span(" di "); x.TotalPages();
                     x.Span("    —    Documento riservato, uso interno esclusivo").FontSize(8).Italic().FontColor(PdfPalette.GreyMedium);
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
+    /// <summary>
+    /// Genera il riepilogo riservato del guadagno reale mostrato nella relativa finestra.
+    /// </summary>
+    public void GenerateRealProfitPdf(RealProfitPdfContext ctx, string filePath)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        QuestPDF.Settings.License = LicenseType.Community;
+
+        string? outputFolder = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrWhiteSpace(outputFolder))
+            Directory.CreateDirectory(outputFolder);
+
+        var culture = CultureInfo.GetCultureInfo("it-IT");
+        static Color Hex(string value) => Color.FromHex(value);
+        Color navy = Hex("#2C3E50");
+        Color blue = Hex("#3498DB");
+        Color green = Hex("#27AE60");
+        Color darkGreen = Hex("#1E8449");
+        Color red = Hex("#C0392B");
+        Color orange = Hex("#E67E22");
+        Color purple = Hex("#7D3C98");
+        Color muted = Hex("#7F8C8D");
+        Color border = Hex("#D9DEE5");
+        Color soft = Hex("#F3F6FA");
+        Color white = Hex("#FFFFFF");
+
+        string Money(double value) => $"{value.ToString("N2", culture)} €";
+        string Percentage(double value) => $"{value.ToString("N1", culture)}%";
+        RealProfitInput input = ctx.Input ?? new RealProfitInput();
+        RealProfitResult result = ctx.Result ?? new RealProfitResult();
+        IReadOnlyList<ProfitMaterialCost> materials = input.Materials ?? [];
+        IReadOnlyList<CompanyMaterialCost> companyMaterials = input.CompanyMaterials ?? [];
+
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(1.0f, Unit.Centimetre);
+                page.PageColor(white);
+                page.DefaultTextStyle(text => text.FontSize(9).FontFamily("Segoe UI").FontColor(navy));
+
+                page.Header().Column(header =>
+                {
+                    header.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(left =>
+                        {
+                            left.Item().Text(string.IsNullOrWhiteSpace(ctx.CompanyName)
+                                    ? "Edil Paint Srl"
+                                    : ctx.CompanyName.Trim())
+                                .FontSize(13).Bold().FontColor(red);
+                            left.Item().Text("ANALISI GUADAGNO REALE")
+                                .FontSize(18).Bold().FontColor(navy);
+                            left.Item().Text($"Preventivo n. {ctx.QuoteNumber} - {ctx.QuoteDate:dd/MM/yyyy}")
+                                .FontSize(9).FontColor(muted);
+                        });
+                        row.ConstantItem(190).AlignRight().Column(right =>
+                        {
+                            right.Item().AlignRight().Text("DOCUMENTO RISERVATO")
+                                .FontSize(11).Bold().FontColor(orange);
+                            right.Item().AlignRight().Text("Uso interno - non consegnare al cliente")
+                                .FontSize(8.5f).FontColor(muted);
+                            right.Item().PaddingTop(4).AlignRight().Text($"Generato: {ctx.GeneratedAt:dd/MM/yyyy HH:mm}")
+                                .FontSize(8).FontColor(muted);
+                        });
+                    });
+                    header.Item().PaddingTop(5).LineHorizontal(1.5f).LineColor(blue);
+                });
+
+                page.Content().PaddingVertical(8).Column(col =>
+                {
+                    col.Spacing(7);
+
+                    col.Item().Background(soft).Border(1).BorderColor(border).Padding(8).Row(row =>
+                    {
+                        row.RelativeItem().Column(left =>
+                        {
+                            left.Item().Text("CLIENTE").FontSize(8).Bold().FontColor(muted);
+                            left.Item().Text(string.IsNullOrWhiteSpace(ctx.CustomerName) ? "-" : ctx.CustomerName)
+                                .FontSize(11).Bold();
+                            if (ctx.CustomerIsSupplier)
+                                left.Item().PaddingTop(2).Text("Cliente fornitore: materiali esclusi dal calcolo")
+                                    .FontSize(8.5f).Bold().FontColor(orange);
+                        });
+                        row.RelativeItem().Column(right =>
+                        {
+                            right.Item().AlignRight().Text("RICAVO IMPONIBILE").FontSize(8).Bold().FontColor(muted);
+                            right.Item().AlignRight().Text(Money(input.QuoteRevenue)).FontSize(14).Bold().FontColor(blue);
+                        });
+                    });
+
+                    col.Item().Text("PARAMETRI DI CALCOLO").FontSize(11).Bold().FontColor(navy);
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                        });
+
+                        void Parameter(string label, string value)
+                        {
+                            table.Cell().Border(1).BorderColor(border).Padding(5).Column(cell =>
+                            {
+                                cell.Item().Text(label).FontSize(7.5f).Bold().FontColor(muted);
+                                cell.Item().PaddingTop(1).Text(value).FontSize(9.5f).Bold();
+                            });
+                        }
+
+                        Parameter("SCONTO FORNITORE", Percentage(input.SupplierDiscount));
+                        Parameter("RIDUZIONE UTILE", Percentage(input.ProfitReductionPercentage));
+                        Parameter("OPERAI", input.Workers.ToString(culture));
+                        Parameter("GIORNI", input.Days.ToString("0.##", culture));
+                        Parameter("ORE AL GIORNO", input.HoursPerDay.ToString("0.##", culture));
+                        Parameter("COSTO ORARIO", Money(input.HourlyCost));
+                        Parameter("COSTO MANODOPERA", Money(result.LaborCost));
+                        Parameter("COSTI AZIENDALI", Money(result.CompanyMaterialCost));
+                    });
+
+                    col.Item().Text("MATERIALI DEL PREVENTIVO").FontSize(11).Bold().FontColor(navy);
+                    if (input.ExcludeMaterials)
+                    {
+                        col.Item().Background(Hex("#FFF8E1")).Border(1).BorderColor(Hex("#F6C453"))
+                            .Padding(9).Text("Materiali esclusi: il cliente è configurato come fornitore.")
+                            .Bold().FontColor(orange);
+                    }
+                    else
+                    {
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(4);
+                                columns.ConstantColumn(42);
+                                columns.ConstantColumn(76);
+                                columns.ConstantColumn(60);
+                                columns.ConstantColumn(84);
+                                columns.ConstantColumn(88);
+                            });
+
+                            static IContainer Cell(IContainer cell) =>
+                                cell.BorderBottom(0.5f).BorderColor(Hex("#D9DEE5")).PaddingVertical(3).PaddingHorizontal(3);
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(Cell).Text("Materiale").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(Cell).AlignRight().Text("Q.tà").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(Cell).AlignRight().Text("Prezzo cliente").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(Cell).AlignRight().Text("Sconto").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(Cell).AlignRight().Text("Ricavo").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(Cell).AlignRight().Text("Costo acquisto").Bold().FontSize(8).FontColor(muted);
+                            });
+
+                            if (materials.Count == 0)
+                            {
+                                table.Cell().ColumnSpan(6).Padding(8).Text("Nessun materiale nel preventivo.")
+                                    .Italic().FontColor(muted);
+                            }
+                            else
+                            {
+                                foreach (ProfitMaterialCost material in materials)
+                                {
+                                    double purchaseCost = Math.Max(0, material.CustomerUnitPrice) *
+                                                          Math.Max(0, material.Quantity) *
+                                                          (1 - Math.Clamp(input.SupplierDiscount, 0, 100) / 100);
+                                    table.Cell().Element(Cell).Text(material.Name);
+                                    table.Cell().Element(Cell).AlignRight().Text(Math.Max(0, material.Quantity).ToString(culture));
+                                    table.Cell().Element(Cell).AlignRight().Text(Money(Math.Max(0, material.CustomerUnitPrice)));
+                                    table.Cell().Element(Cell).AlignRight().Text(Percentage(Math.Clamp(material.CustomerDiscount, 0, 100)));
+                                    table.Cell().Element(Cell).AlignRight().Text(Money(material.CustomerTotal));
+                                    table.Cell().Element(Cell).AlignRight().Text(Money(purchaseCost));
+                                }
+                            }
+                        });
+
+                        col.Item().Row(row =>
+                        {
+                            row.RelativeItem().Text("Ricavo materiali cliente").Bold();
+                            row.ConstantItem(110).AlignRight().Text(Money(result.CustomerMaterialRevenue)).Bold().FontColor(blue);
+                            row.ConstantItem(18);
+                            row.RelativeItem().AlignRight().Text("Costo fornitore").Bold();
+                            row.ConstantItem(110).AlignRight().Text(Money(result.SupplierMaterialCost)).Bold().FontColor(orange);
+                        });
+                    }
+
+                    col.Item().Text("COSTI MATERIALI AZIENDALI").FontSize(11).Bold().FontColor(navy);
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(4);
+                            columns.RelativeColumn(1.3f);
+                            columns.ConstantColumn(55);
+                            columns.ConstantColumn(90);
+                            columns.ConstantColumn(90);
+                        });
+
+                        static IContainer Cell(IContainer cell) =>
+                            cell.BorderBottom(0.5f).BorderColor(Hex("#D9DEE5")).PaddingVertical(3).PaddingHorizontal(3);
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(Cell).Text("Materiale / costo").Bold().FontSize(8).FontColor(muted);
+                            header.Cell().Element(Cell).Text("Origine").Bold().FontSize(8).FontColor(muted);
+                            header.Cell().Element(Cell).AlignRight().Text("Q.tà").Bold().FontSize(8).FontColor(muted);
+                            header.Cell().Element(Cell).AlignRight().Text("Costo unitario").Bold().FontSize(8).FontColor(muted);
+                            header.Cell().Element(Cell).AlignRight().Text("Totale").Bold().FontSize(8).FontColor(muted);
+                        });
+
+                        if (companyMaterials.Count == 0)
+                        {
+                            table.Cell().ColumnSpan(5).Padding(8).Text("Nessun costo materiale aziendale.")
+                                .Italic().FontColor(muted);
+                        }
+                        else
+                        {
+                            foreach (CompanyMaterialCost material in companyMaterials)
+                            {
+                                table.Cell().Element(Cell).Text(material.Name);
+                                table.Cell().Element(Cell).Text(material.Source).FontSize(8.5f).FontColor(muted);
+                                table.Cell().Element(Cell).AlignRight().Text(Math.Max(0, material.Quantity).ToString(culture));
+                                table.Cell().Element(Cell).AlignRight().Text(Money(Math.Max(0, material.UnitCost)));
+                                table.Cell().Element(Cell).AlignRight().Text(Money(material.Total));
+                            }
+                        }
+                    });
+
+                    col.Item().ShowEntire().Background(soft).Border(1).BorderColor(border).Padding(8).Column(summary =>
+                    {
+                        void SummaryRow(string label, double amount, Color color, bool bold = false)
+                        {
+                            summary.Item().PaddingVertical(1).Row(row =>
+                            {
+                                var labelText = row.RelativeItem().Text(label);
+                                var valueText = row.ConstantItem(145).AlignRight().Text(Money(amount)).FontColor(color);
+                                if (bold)
+                                {
+                                    labelText.Bold();
+                                    valueText.Bold();
+                                }
+                            });
+                        }
+
+                        SummaryRow("Ricavo imponibile", input.QuoteRevenue, blue, true);
+                        SummaryRow("Margine materiali", result.MaterialMargin, result.MaterialMargin >= 0 ? green : red);
+                        SummaryRow("Costo manodopera", -result.LaborCost, purple);
+                        SummaryRow("Costi materiali aziendali", -result.CompanyMaterialCost, purple);
+                        SummaryRow("Totale costi", -result.TotalCosts, orange, true);
+                        SummaryRow("Utile prima della riduzione", result.ProfitBeforeReduction,
+                            result.ProfitBeforeReduction >= 0 ? green : red);
+                        if (result.ProfitReductionAmount > 0)
+                            SummaryRow("Riduzione prudenziale", -result.ProfitReductionAmount, orange);
+
+                        summary.Item().PaddingTop(4).BorderTop(1.5f).BorderColor(navy).PaddingTop(5).Row(row =>
+                        {
+                            row.RelativeItem().Text(result.Profit >= 0 ? "UTILE REALE STIMATO" : "PERDITA STIMATA")
+                                .FontSize(12).Bold();
+                            row.ConstantItem(230).AlignRight()
+                                .Text($"{Money(result.Profit)} ({Percentage(result.ProfitPercentage)})")
+                                .FontSize(14).Bold().FontColor(result.Profit >= 0 ? darkGreen : red);
+                        });
+                    });
+                });
+
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.DefaultTextStyle(style => style.FontSize(8).FontColor(muted));
+                    text.Span("Pagina ");
+                    text.CurrentPageNumber();
+                    text.Span(" di ");
+                    text.TotalPages();
+                    text.Span(" - Documento riservato, uso interno esclusivo");
                 });
             });
         }).GeneratePdf(filePath);

@@ -5,6 +5,7 @@ public class QuoteLaborEntity
 	public int Id { get; set; }
 	public int QuoteId { get; set; }
 	public QuoteEntity Quote { get; set; } = null!;
+	public int CatalogItemId { get; set; }
 
 	public string Name { get; set; } = string.Empty;
 	public string Description { get; set; } = string.Empty;

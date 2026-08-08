@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -13,6 +14,7 @@ public partial class SelectLaborWindow : Window
 {
     private readonly MainViewModel _vm;
     private Item? _editingLabor;
+    private bool _isSaving;
 
     public SelectLaborWindow(MainViewModel vm)
     {
@@ -72,7 +74,7 @@ public partial class SelectLaborWindow : Window
         }
     }
 
-    private void OnSaveLaborClick(object sender, RoutedEventArgs e)
+    private async void OnSaveLaborClick(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(TxtName.Text))
         {
@@ -90,26 +92,36 @@ public partial class SelectLaborWindow : Window
             return;
         }
 
-        if (_editingLabor != null)
+        _isSaving = true;
+        IsEnabled = false;
+        try
         {
-            _editingLabor.Name = TxtName.Text;
-            _editingLabor.Description = TxtDesc.Text;
-            _editingLabor.UnitPrice = price;
-        }
-        else
-        {
-            _vm.AllCatalogLabors.Add(new Item
+            if (_editingLabor != null)
             {
-                Name = TxtName.Text,
-                Description = TxtDesc.Text,
-                UnitPrice = price,
-                Quantity = 1
-            });
-        }
+                _editingLabor.Name = TxtName.Text.Trim();
+                _editingLabor.Description = TxtDesc.Text;
+                _editingLabor.UnitPrice = price;
+            }
+            else
+            {
+                _vm.AllCatalogLabors.Add(new Item
+                {
+                    Name = TxtName.Text.Trim(),
+                    Description = TxtDesc.Text,
+                    UnitPrice = price,
+                    Quantity = 1
+                });
+            }
 
-        _vm.SaveLaborsJson();
-        ResetInputs();
-        FilterList(TxtSearch.Text);
+            await _vm.SaveLaborsJsonAsync();
+            ResetInputs();
+            FilterList(TxtSearch.Text);
+        }
+        finally
+        {
+            IsEnabled = true;
+            _isSaving = false;
+        }
     }
 
     private async void OnDeleteLaborClick(object sender, RoutedEventArgs e)
@@ -157,5 +169,12 @@ public partial class SelectLaborWindow : Window
     {
         if (e.Key == Key.Escape)
             Close();
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (_isSaving)
+            e.Cancel = true;
+        base.OnClosing(e);
     }
 }

@@ -698,6 +698,7 @@ public partial class MainViewModel
     {
         return new Item
         {
+            PersistentId = item.PersistentId,
             Name = item.Name,
             Description = item.Description,
             UnitPrice = item.UnitPrice,

@@ -143,6 +143,145 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public void QuoteMapperPreservesCatalogItemIds()
+    {
+        var entity = new EdilPaintPreventibiviGen.Data.Entities.QuoteEntity
+        {
+            QuoteNumber = "CATALOG-IDS-MAP",
+            Materials =
+            [
+                new EdilPaintPreventibiviGen.Data.Entities.QuoteMaterialEntity
+                {
+                    CatalogItemId = 41,
+                    Name = "Perline"
+                }
+            ],
+            Labors =
+            [
+                new EdilPaintPreventibiviGen.Data.Entities.QuoteLaborEntity
+                {
+                    CatalogItemId = 73,
+                    Name = "Finitura interna"
+                }
+            ]
+        };
+
+        QuoteHistoryEntry model = entity.ToModel();
+
+        Assert.Equal(41, Assert.Single(model.Materials).PersistentId);
+        Assert.Equal(73, Assert.Single(model.Labors).PersistentId);
+    }
+
+    [Fact]
+    public void QuoteSyncHashIncludesCatalogItemIdsButLegacyHashDoesNot()
+    {
+        DateTime quoteDate = new(2026, 8, 7, 10, 0, 0, DateTimeKind.Utc);
+        var first = new QuoteHistoryEntry
+        {
+            QuoteNumber = "CATALOG-IDS-HASH",
+            Date = quoteDate,
+            Materials = [new Item { PersistentId = 10, Name = "Perline", Quantity = 1 }],
+            Labors = [new Item { PersistentId = 20, Name = "Finitura interna", Quantity = 1 }]
+        };
+        var second = new QuoteHistoryEntry
+        {
+            QuoteNumber = first.QuoteNumber,
+            Date = quoteDate,
+            Materials = [new Item { PersistentId = 11, Name = "Perline", Quantity = 1 }],
+            Labors = [new Item { PersistentId = 21, Name = "Finitura interna", Quantity = 1 }]
+        };
+
+        Type hashService = typeof(SyncService).Assembly.GetType(
+            "EdilPaintPreventibiviGen.Services.QuoteSyncHashService",
+            throwOnError: true)!;
+        var compute = hashService.GetMethod("Compute")!;
+        var computeLegacy = hashService.GetMethod("ComputeLegacy")!;
+
+        Assert.NotEqual(
+            Assert.IsType<string>(compute.Invoke(null, [first])),
+            Assert.IsType<string>(compute.Invoke(null, [second])));
+        Assert.Equal(
+            Assert.IsType<string>(computeLegacy.Invoke(null, [first])),
+            Assert.IsType<string>(computeLegacy.Invoke(null, [second])));
+    }
+
+    [Fact]
+    public void PendingCatalogIdentityChangeIsNotTreatedAsLegacyHashMigration()
+    {
+        var local = new QuoteHistoryEntry
+        {
+            HasPendingDatabaseWrite = true,
+            Materials =
+            [
+                new Item
+                {
+                    PersistentId = 31,
+                    Name = "Perline",
+                    Quantity = 4,
+                    SortOrder = 0
+                }
+            ],
+            Labors =
+            [
+                new Item
+                {
+                    PersistentId = 47,
+                    Name = "Finitura interna",
+                    Quantity = 1,
+                    SortOrder = 0
+                }
+            ]
+        };
+        var database = new QuoteHistoryEntry
+        {
+            Materials =
+            [
+                new Item
+                {
+                    PersistentId = 0,
+                    Name = "Perline",
+                    Quantity = 4,
+                    SortOrder = 0
+                }
+            ],
+            Labors =
+            [
+                new Item
+                {
+                    PersistentId = 99,
+                    Name = "Finitura interna",
+                    Quantity = 1,
+                    SortOrder = 0
+                }
+            ]
+        };
+
+        Assert.True(HasExplicitPendingIdentityChange(local, database));
+    }
+
+    [Fact]
+    public void LegacyZeroCatalogIdsCanStillBeHydratedFromDatabase()
+    {
+        var local = new QuoteHistoryEntry
+        {
+            HasPendingDatabaseWrite = true,
+            Materials = [new Item { PersistentId = 0, Name = "Perline", Quantity = 4 }],
+            Labors = [new Item { PersistentId = 0, Name = "Finitura interna", Quantity = 1 }]
+        };
+        var database = new QuoteHistoryEntry
+        {
+            Materials = [new Item { PersistentId = 31, Name = "Perline", Quantity = 4 }],
+            Labors = [new Item { PersistentId = 47, Name = "Finitura interna", Quantity = 1 }]
+        };
+
+        Assert.False(HasExplicitPendingIdentityChange(local, database));
+
+        local.HasPendingDatabaseWrite = false;
+        local.Materials[0].PersistentId = 88;
+        Assert.False(HasExplicitPendingIdentityChange(local, database));
+    }
+
+    [Fact]
     public void PdfTemplateNormalizesLegacyCombinedTitleToCustomerNotesTitle()
     {
         var template = new PdfTemplateSettingsModel
@@ -720,6 +859,35 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public async Task LaborCatalogPersistentIdSurvivesLegacyWrapperRoundTrip()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            var store = new LocalJsonStoreService(temporaryPath);
+            await store.SaveLaborCatalogAsync([
+                new Item
+                {
+                    PersistentId = 73,
+                    Name = "Finitura interna",
+                    Description = "Perimetro interno",
+                    UnitPrice = 42.5
+                }
+            ]);
+
+            Item restored = Assert.Single(await store.LoadLaborCatalogAsync());
+            Assert.Equal(73, restored.PersistentId);
+            Assert.Equal("Finitura interna", restored.Name);
+            Assert.Equal("Perimetro interno", restored.Description);
+            Assert.Equal(42.5, restored.UnitPrice);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
     public void SmtpDebugLogWritesToPrimaryMailLogsFolder()
     {
         var log = new SmtpEmailDebugLog();
@@ -737,6 +905,17 @@ public sealed class RegressionTests
 
     private static string CreateTemporaryTestPath() =>
         Path.Combine(Path.GetTempPath(), "EdilPaintPreventivi.Tests", Guid.NewGuid().ToString("N"));
+
+    private static bool HasExplicitPendingIdentityChange(
+        QuoteHistoryEntry local,
+        QuoteHistoryEntry database)
+    {
+        var method = typeof(SyncService).GetMethod(
+            "HasExplicitPendingIdentityChange",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return Assert.IsType<bool>(method.Invoke(null, [local, database]));
+    }
 
     private static void DeleteTemporaryTestPath(string path)
     {

@@ -416,6 +416,8 @@
                                     <ColumnDefinition Width="210"/>
                                     <ColumnDefinition Width="14"/>
                                     <ColumnDefinition Width="210"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="180"/>
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel VerticalAlignment="Center">
@@ -424,7 +426,7 @@
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource DefaultTextBrush}"/>
                                     <TextBlock Margin="0,4,0,0"
-                                               Text="Definiscono il ricavo di partenza e il costo effettivo dei materiali."
+                                               Text="Definiscono ricavo, costo dei materiali e margine prudenziale."
                                                FontSize="11.5"
                                                Foreground="{StaticResource MutedTextBrush}"
                                                TextWrapping="Wrap"/>
@@ -442,6 +444,14 @@
                                     <TextBlock Text="Sconto fornitore (%)"
                                                Style="{StaticResource FieldLabelStyle}"/>
                                     <TextBox x:Name="TxtSupplierDiscount"
+                                             Style="{StaticResource ProfitTextBoxStyle}"
+                                             TextAlignment="Right"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="6">
+                                    <TextBlock Text="Riduzione utile (%)"
+                                               Style="{StaticResource FieldLabelStyle}"/>
+                                    <TextBox x:Name="TxtProfitReduction"
                                              Style="{StaticResource ProfitTextBoxStyle}"
                                              TextAlignment="Right"/>
                                 </StackPanel>
@@ -654,19 +664,20 @@
                                 </Grid>
                             </TabItem>
 
-                            <TabItem Header="Costi aziendali">
+                            <TabItem x:Name="TabCompanyCosts" Header="Costi aziendali">
                                 <Grid Margin="16">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="6"/>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="6"/>
                                         <RowDefinition Height="*"/>
-                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="6"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
-                                    <Border Style="{StaticResource InfoBannerStyle}">
+                                    <Border Style="{StaticResource InfoBannerStyle}"
+                                            Padding="12,8">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="4"/>
@@ -675,55 +686,82 @@
                                             </Grid.ColumnDefinitions>
                                             <Border Background="{StaticResource CostsAdditionalBrush}"
                                                     CornerRadius="2"/>
-                                            <TextBlock Grid.Column="2"
-                                                       VerticalAlignment="Center"
-                                                       Text="Queste voci sono costi interni: non vengono aggiunte al catalogo né mostrate nel preventivo cliente."
-                                                       FontSize="11.5"
-                                                       Foreground="{StaticResource MutedTextBrush}"
-                                                       TextWrapping="Wrap"/>
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                <TextBlock x:Name="TxtCompanyCostsHint"
+                                                           Text="Queste voci sono costi interni: non vengono aggiunte al catalogo né mostrate nel preventivo cliente."
+                                                           FontSize="11.5"
+                                                           Foreground="{StaticResource MutedTextBrush}"
+                                                           TextWrapping="Wrap"/>
+                                                <ScrollViewer x:Name="ScrollAutomaticMaterialsInfo"
+                                                              Visibility="Collapsed"
+                                                              Margin="0,5,0,0"
+                                                               MaxHeight="44"
+                                                              VerticalScrollBarVisibility="Auto"
+                                                              HorizontalScrollBarVisibility="Disabled">
+                                                    <TextBlock x:Name="TxtAutomaticMaterialsInfo"
+                                                               FontSize="11.5"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource PrimaryBlueBrush}"
+                                                               TextWrapping="Wrap"/>
+                                                </ScrollViewer>
+                                            </StackPanel>
                                         </Grid>
                                     </Border>
 
                                     <Border Grid.Row="2"
                                             Style="{StaticResource SectionCardStyle}"
                                             Background="{StaticResource SectionPanelBackgroundBrush}"
-                                            Padding="12">
+                                            Padding="12,6">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="12"/>
                                                 <ColumnDefinition Width="178"/>
+                                                <ColumnDefinition Width="10"/>
+                                                <ColumnDefinition Width="194"/>
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Text="Cerca nel catalogo aziendale"
-                                                           Style="{StaticResource FieldLabelStyle}"/>
-                                                <ComboBox x:Name="CboCompanyMaterialSearch"
-                                                          Style="{StaticResource ProfitComboBoxStyle}"
-                                                          IsEditable="True"
-                                                          IsTextSearchEnabled="False"
-                                                          DisplayMemberPath="Name"
-                                                          StaysOpenOnEdit="True"
-                                                          KeyUp="OnCompanyMaterialSearchKeyUp"
-                                                          SelectionChanged="OnCompanyMaterialSelected"/>
-                                            </StackPanel>
-                                            <Button Grid.Column="2"
-                                                    VerticalAlignment="Bottom"
+                                            <ComboBox x:Name="CboCompanyMaterialSearch"
+                                                      Height="34"
+                                                      VerticalAlignment="Center"
+                                                      ToolTip="Cerca nel catalogo aziendale"
+                                                      Style="{StaticResource ProfitComboBoxStyle}"
+                                                      IsEditable="True"
+                                                      IsTextSearchEnabled="False"
+                                                      DisplayMemberPath="Name"
+                                                      StaysOpenOnEdit="True"
+                                                      KeyUp="OnCompanyMaterialSearchKeyUp"
+                                                      SelectionChanged="OnCompanyMaterialSelected"/>
+                                             <Button Grid.Column="2"
+                                                    Height="34"
+                                                    VerticalAlignment="Center"
                                                     Content="Aggiungi selezionato"
                                                     Style="{StaticResource SecondaryActionButtonStyle}"
                                                     Click="OnAddSelectedCompanyMaterialClick"/>
+                                             <Button Grid.Column="4"
+                                                    Height="34"
+                                                    VerticalAlignment="Center"
+                                                    Content="+ Aggiungi costo manuale"
+                                                    Style="{StaticResource SecondaryActionButtonStyle}"
+                                                    Click="OnAddCompanyCostClick"/>
                                         </Grid>
                                     </Border>
 
                                     <DataGrid Grid.Row="4"
                                               x:Name="GridCompanyMaterials"
                                               Style="{StaticResource ProfitDataGridStyle}"
+                                              RowHeight="32"
+                                              ColumnHeaderHeight="30"
                                               AutoGenerateColumns="False"
                                               CanUserAddRows="False"
                                               CanUserDeleteRows="False">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Materiale / costo aziendale"
                                                                 Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                                                Width="*"/>
+                                                                Width="280"/>
+                                            <DataGridTextColumn Header="Origine"
+                                                                Binding="{Binding Source}"
+                                                                IsReadOnly="True"
+                                                                Width="110"/>
                                             <DataGridTextColumn Header="Quantità"
                                                                 Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
                                                                 ElementStyle="{StaticResource NumericCellTextStyle}"
@@ -750,13 +788,6 @@
                                             </DataGridTemplateColumn>
                                         </DataGrid.Columns>
                                     </DataGrid>
-
-                                    <Button Grid.Row="6"
-                                            Content="+ Aggiungi costo manuale"
-                                            Width="194"
-                                            HorizontalAlignment="Left"
-                                            Style="{StaticResource SecondaryActionButtonStyle}"
-                                            Click="OnAddCompanyCostClick"/>
                                 </Grid>
                             </TabItem>
                         </TabControl>
@@ -786,18 +817,23 @@
                                 <ColumnDefinition Width="1.3*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Border Style="{StaticResource MetricCardStyle}"
+                            <Border x:Name="MaterialMarginCard"
+                                    Style="{StaticResource MetricCardStyle}"
                                     BorderBrush="{StaticResource PrimaryBlueBrush}">
                                 <StackPanel>
-                                    <TextBlock Text="RICAVO MATERIALI"
+                                    <TextBlock Text="MARGINE MATERIALI"
                                                FontSize="10"
                                                FontWeight="Bold"
                                                Foreground="{StaticResource MutedTextBrush}"/>
                                     <TextBlock x:Name="TxtCustomerMaterials"
                                                Margin="0,5,0,0"
                                                FontSize="17"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource PrimaryBlueBrush}"/>
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="TxtMaterialMarginBreakdown"
+                                               Margin="0,3,0,0"
+                                               FontSize="9"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Border>
 
@@ -843,6 +879,7 @@
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
                                     <Grid>
@@ -861,6 +898,13 @@
                                                    Foreground="{StaticResource MutedTextBrush}"/>
                                     </Grid>
                                     <TextBlock Grid.Row="1"
+                                               x:Name="TxtProfitBreakdown"
+                                               Margin="0,3,0,0"
+                                               HorizontalAlignment="Right"
+                                               FontSize="10.5"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               TextAlignment="Right"/>
+                                    <TextBlock Grid.Row="2"
                                                x:Name="TxtProfit"
                                                Margin="0,3,0,0"
                                                HorizontalAlignment="Right"
@@ -879,17 +923,25 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock VerticalAlignment="Center"
-                                       Text="Modifica i parametri e premi Ricalcola per aggiornare il risultato."
+                                       Text="Esporta PDF ricalcola i dati e crea il riepilogo riservato."
                                        FontSize="11"
                                        Foreground="{StaticResource MutedTextBrush}"
                                        TextWrapping="Wrap"/>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <Button Content="Chiudi"
+                                        IsCancel="True"
                                         Style="{StaticResource SecondaryActionButtonStyle}"
                                         Click="OnCloseClick"/>
+                                <Button Content="Esporta PDF"
+                                        Margin="10,0,0,0"
+                                        MinWidth="126"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        ToolTip="Crea il PDF riservato del guadagno reale"
+                                        Click="OnExportPdfClick"/>
                                 <Button Content="Ricalcola"
                                         Margin="10,0,0,0"
                                         MinWidth="126"
+                                        IsDefault="True"
                                         Style="{StaticResource PrimaryActionButtonStyle}"
                                         Click="OnCalculateClick"/>
                             </StackPanel>
