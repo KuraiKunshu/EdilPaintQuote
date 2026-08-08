@@ -128,6 +128,7 @@ public partial class SqlDataService
                     .OrderBy(m => m.SortOrder)
                     .Select(m => new Item
                     {
+                        PersistentId = m.CatalogItemId,
                         Name = m.Name,
                         Description = m.Description,
                         UnitPrice = m.UnitPrice,
@@ -141,6 +142,7 @@ public partial class SqlDataService
                     .OrderBy(l => l.SortOrder)
                     .Select(l => new Item
                     {
+                        PersistentId = l.CatalogItemId,
                         Name = l.Name,
                         Description = l.Description,
                         UnitPrice = l.UnitPrice,
@@ -326,6 +328,7 @@ public partial class SqlDataService
             AdditionalCosts = DeserializeCostAllocations(x.CostAllocationsJson)?.AdditionalCosts ?? new(),
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
+                PersistentId = m.CatalogItemId,
                 Name = m.Name,
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
@@ -336,6 +339,7 @@ public partial class SqlDataService
             }).ToList(),
             Labors = x.Labors.OrderBy(l => l.SortOrder).Select(l => new Item
             {
+                PersistentId = l.CatalogItemId,
                 Name = l.Name,
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,
@@ -424,6 +428,7 @@ public partial class SqlDataService
             MaterialStatus = x.MaterialStatus,
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
+                PersistentId = m.CatalogItemId,
                 Name = m.Name,
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
@@ -434,6 +439,7 @@ public partial class SqlDataService
             }).ToList(),
             Labors = x.Labors.OrderBy(l => l.SortOrder).Select(l => new Item
             {
+                PersistentId = l.CatalogItemId,
                 Name = l.Name,
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,
@@ -506,6 +512,7 @@ public partial class SqlDataService
             SyncHash = x.SyncHash,
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
+                PersistentId = m.CatalogItemId,
                 Name = m.Name,
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
@@ -516,6 +523,7 @@ public partial class SqlDataService
             }).ToList(),
             Labors = x.Labors.OrderBy(l => l.SortOrder).Select(l => new Item
             {
+                PersistentId = l.CatalogItemId,
                 Name = l.Name,
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,
@@ -908,12 +916,14 @@ public partial class SqlDataService
             AdditionalCosts = DeserializeCostAllocations(q.CostAllocationsJson)?.AdditionalCosts ?? new(),
             Materials = q.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
+                PersistentId = m.CatalogItemId,
                 Name = m.Name, Description = m.Description, UnitPrice = m.UnitPrice,
                 Quantity = m.Quantity, Discount = m.Discount, IsSignificant = m.IsSignificant,
                 SortOrder = m.SortOrder
             }).ToList(),
             Labors = q.Labors.OrderBy(l => l.SortOrder).Select(l => new Item
             {
+                PersistentId = l.CatalogItemId,
                 Name = l.Name, Description = l.Description, UnitPrice = l.UnitPrice,
                 Quantity = l.Quantity, Discount = l.Discount, IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
@@ -1277,6 +1287,7 @@ public partial class SqlDataService
 
                     existing.Materials = quote.Materials.Select(m => new QuoteMaterialEntity
                     {
+                        CatalogItemId = m.PersistentId,
                         Name = m.Name,
                         Description = m.Description,
                         UnitPrice = m.UnitPrice,
@@ -1288,6 +1299,7 @@ public partial class SqlDataService
 
                     existing.Labors = quote.Labors.Select(l => new QuoteLaborEntity
                     {
+                        CatalogItemId = l.PersistentId,
                         Name = l.Name,
                         Description = l.Description,
                         UnitPrice = l.UnitPrice,
@@ -1358,6 +1370,7 @@ public partial class SqlDataService
                         }),
                         Materials = quote.Materials.Select(m => new QuoteMaterialEntity
                         {
+                            CatalogItemId = m.PersistentId,
                             Name = m.Name,
                             Description = m.Description,
                             UnitPrice = m.UnitPrice,
@@ -1368,6 +1381,7 @@ public partial class SqlDataService
                         }).ToList(),
                         Labors = quote.Labors.Select(l => new QuoteLaborEntity
                         {
+                            CatalogItemId = l.PersistentId,
                             Name = l.Name,
                             Description = l.Description,
                             UnitPrice = l.UnitPrice,

@@ -470,7 +470,7 @@ public partial class MainViewModel
         }
     }
 
-    public void SaveLaborsJson() => _ = SaveLaborsAsync();
+    public Task SaveLaborsJsonAsync() => SaveLaborsAsync();
 
     private async Task SaveLaborsAsync()
     {
@@ -533,8 +533,6 @@ public partial class MainViewModel
             Debug.WriteLine($"[SAVE COMPANY] Error: {ex.Message}");
         }
     }
-
-    private void SavePersonalMaterials() => _ = SavePersonalMaterialsAsync();
 
     private async Task SavePersonalMaterialsAsync()
     {

@@ -23,7 +23,6 @@ public partial class MainViewModel
     public void AddPersonalMaterial(Item item)
     {
         _personalMaterials.Add(item);
-        SavePersonalMaterials();
     }
 
     public async Task RemovePersonalMaterialAsync(Item item)
@@ -64,16 +63,36 @@ public partial class MainViewModel
         }
     }
 
-    public void SavePersonalMaterialsPublic() => SavePersonalMaterials();
+    public Task SavePersonalMaterialsPublicAsync() => SavePersonalMaterialsAsync();
 
-    public void AddMaterial()
+    public async Task AddMaterialAsync()
     {
         if (string.IsNullOrWhiteSpace(InputName))
             return;
 
+        string materialName = InputName.Trim();
+        Item? selectedLocalCatalogMaterial = SelectedCatalogMaterial == null
+            ? null
+            : FindLocalCatalogMaterial(SelectedCatalogMaterial.Id);
+        var existingCatalogMaterial = selectedLocalCatalogMaterial ?? _personalMaterials.FirstOrDefault(m =>
+            m.Name.Equals(materialName, StringComparison.OrdinalIgnoreCase));
+        bool selectedCatalogMaterialStillMatches =
+            selectedLocalCatalogMaterial != null &&
+            string.Equals(
+                selectedLocalCatalogMaterial.Name.Trim(),
+                materialName,
+                StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(
+                SelectedCatalogMaterial?.Value?.Trim(),
+                materialName,
+                StringComparison.OrdinalIgnoreCase);
+
         var newItem = new Item
         {
-            Name = InputName.Trim(),
+            PersistentId = selectedCatalogMaterialStillMatches
+                ? selectedLocalCatalogMaterial!.PersistentId
+                : 0,
+            Name = materialName,
             Description = InputDescription,
             UnitPrice = InputValue,
             Quantity = InputQuantity,
@@ -85,12 +104,13 @@ public partial class MainViewModel
 
         bool isVeluxMaterial = SelectedCatalogMaterial != null &&
             !SelectedCatalogMaterial.Id.StartsWith("LOCAL_", StringComparison.OrdinalIgnoreCase);
-        var existingCatalogMaterial = _personalMaterials.FirstOrDefault(m =>
-            m.Name.Equals(newItem.Name, StringComparison.OrdinalIgnoreCase));
 
         if (existingCatalogMaterial != null)
         {
-            UpdateExistingLocalMaterialFromVelux(existingCatalogMaterial, newItem, isVeluxMaterial);
+            await UpdateExistingLocalMaterialFromVeluxAsync(
+                existingCatalogMaterial,
+                newItem,
+                isVeluxMaterial);
         }
         else if (
             MessageBox.Show(
@@ -99,7 +119,7 @@ public partial class MainViewModel
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question) == MessageBoxResult.Yes)
         {
-            _personalMaterials.Add(new Item
+            var catalogItem = new Item
             {
                 Name = newItem.Name,
                 Description = newItem.Description,
@@ -107,16 +127,19 @@ public partial class MainViewModel
                 Quantity = 1,
                 IsSignificant = newItem.IsSignificant,
                 SortOrder = _personalMaterials.Count
-            });
+            };
+            _personalMaterials.Add(catalogItem);
 
-            SavePersonalMaterials();
+            await SavePersonalMaterialsAsync();
+            if (catalogItem.PersistentId > 0)
+                newItem.PersistentId = catalogItem.PersistentId;
         }
 
         ResetInputs();
-        _ = SaveDraftAsync();
+        await SaveDraftAsync();
     }
 
-    private void UpdateExistingLocalMaterialFromVelux(
+    private async Task UpdateExistingLocalMaterialFromVeluxAsync(
         Item existingCatalogMaterial,
         Item veluxMaterial,
         bool isVeluxMaterial)
@@ -133,7 +156,7 @@ public partial class MainViewModel
         existingCatalogMaterial.Description = veluxMaterial.Description;
         existingCatalogMaterial.UnitPrice = veluxMaterial.UnitPrice;
         existingCatalogMaterial.IsSignificant = veluxMaterial.IsSignificant;
-        SavePersonalMaterials();
+        await SavePersonalMaterialsAsync();
     }
 
     public void AddLabor()
@@ -141,9 +164,20 @@ public partial class MainViewModel
         if (string.IsNullOrWhiteSpace(InputName))
             return;
 
+        string laborName = InputName.Trim();
+        bool selectedCatalogLaborStillMatches =
+            SelectedCatalogLabor != null &&
+            string.Equals(
+                SelectedCatalogLabor.Name?.Trim(),
+                laborName,
+                StringComparison.OrdinalIgnoreCase);
+
         Labors.Add(new Item
         {
-            Name = InputName,
+            PersistentId = selectedCatalogLaborStillMatches
+                ? SelectedCatalogLabor!.PersistentId
+                : 0,
+            Name = laborName,
             Description = InputDescription,
             UnitPrice = InputValue,
             Quantity = InputQuantity,
@@ -173,10 +207,9 @@ public partial class MainViewModel
         if (cancellationToken.IsCancellationRequested)
             return;
 
-        if (uuid.StartsWith("LOCAL_"))
+        if (uuid.StartsWith("LOCAL_", StringComparison.OrdinalIgnoreCase))
         {
-            string nameToFind = uuid.Substring(6);
-            var localItem = _personalMaterials.FirstOrDefault(m => m.Name == nameToFind);
+            Item? localItem = FindLocalCatalogMaterial(uuid);
 
             if (localItem != null)
             {
@@ -192,8 +225,9 @@ public partial class MainViewModel
                 OnPropertyChanged(nameof(InputDescription));
                 OnPropertyChanged(nameof(InputValue));
                 OnPropertyChanged(nameof(IsSignificant));
-                return;
             }
+
+            return;
         }
 
         if (!App.AppSettings.App.UseVeluxLogin)
@@ -227,6 +261,41 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(InputValue));
             OnPropertyChanged(nameof(IsSignificant));
         }
+    }
+
+    private Item? FindLocalCatalogMaterial(string selectionId)
+    {
+        const string idPrefix = "LOCAL_ID_";
+        const string namePrefix = "LOCAL_NAME_";
+        const string legacyPrefix = "LOCAL_";
+
+        if (selectionId.StartsWith(idPrefix, StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(
+                selectionId[idPrefix.Length..],
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out int persistentId) &&
+            persistentId > 0)
+        {
+            return _personalMaterials.FirstOrDefault(item => item.PersistentId == persistentId);
+        }
+
+        string? materialName = selectionId.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase)
+            ? selectionId[namePrefix.Length..]
+            : selectionId.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase)
+                ? selectionId[legacyPrefix.Length..]
+                : null;
+        if (string.IsNullOrWhiteSpace(materialName))
+            return null;
+
+        Item[] exactMatches = _personalMaterials
+            .Where(item => string.Equals(
+                item.Name.Trim(),
+                materialName.Trim(),
+                StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToArray();
+        return exactMatches.Length == 1 ? exactMatches[0] : null;
     }
     #endregion
 }

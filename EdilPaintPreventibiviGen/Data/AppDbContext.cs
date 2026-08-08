@@ -118,6 +118,7 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.Id).ValueGeneratedOnAdd();
+            entity.Property(x => x.CatalogItemId).HasDefaultValue(0);
             entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
 
             entity.HasOne(x => x.Quote)
@@ -132,6 +133,7 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.Id).ValueGeneratedOnAdd();
+            entity.Property(x => x.CatalogItemId).HasDefaultValue(0);
             entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
 
             entity.HasOne(x => x.Quote)

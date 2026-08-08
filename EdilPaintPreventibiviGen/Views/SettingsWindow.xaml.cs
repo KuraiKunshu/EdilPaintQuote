@@ -1,10 +1,14 @@
 using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 using Microsoft.Win32;
 
@@ -12,12 +16,35 @@ namespace EdilPaintPreventibiviGen.Views;
 
 public partial class SettingsWindow : Window
 {
-    public SettingsWindow()
+    private readonly ObservableCollection<WindowMaterialRuleEditor> _windowMaterialRuleEditors = [];
+    private readonly string _displayedCatalogIdentity;
+    private bool _catalogIdsCompatible;
+
+    public IReadOnlyList<Item> LaborCatalog { get; }
+    public IReadOnlyList<Item> CompanyMaterialCatalog { get; }
+    public IReadOnlyList<WindowMaterialCalculationModeOption> WindowMaterialCalculationModes { get; } =
+    [
+        new(WindowMaterialRuleSettingsModel.PerimeterCalculationMode, "Perimetro finestra"),
+        new(WindowMaterialRuleSettingsModel.FixedPerWindowCalculationMode, "Quantità fissa per finestra")
+    ];
+
+    public SettingsWindow() : this(Array.Empty<Item>(), Array.Empty<Item>())
     {
+    }
+
+    public SettingsWindow(IEnumerable<Item> laborCatalog, IEnumerable<Item> companyMaterials)
+    {
+        _displayedCatalogIdentity = App.AppSettings.Database.GetCatalogIdentity();
+        LaborCatalog = CreateCatalogSnapshot(laborCatalog, companyMaterialsOnly: false);
+        CompanyMaterialCatalog = CreateCatalogSnapshot(companyMaterials, companyMaterialsOnly: true);
         InitializeComponent();
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         CmbDatabaseProvider.ItemsSource = DatabaseSettingsModel.AvailableProviders;
         CmbPdfTemplate.ItemsSource = PdfTemplateSettingsModel.AvailableTemplates;
+        ItemsWindowMaterialRules.ItemsSource = _windowMaterialRuleEditors;
+        TxtNoCompanyMaterials.Visibility = CompanyMaterialCatalog.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         LoadSettings();
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
@@ -63,6 +90,29 @@ public partial class SettingsWindow : Window
         TxtDefaultProfitDays.Text = realProfit.Days.ToString("0.##", CultureInfo.CurrentCulture);
         TxtDefaultProfitHoursPerDay.Text = realProfit.HoursPerDay.ToString("0.##", CultureInfo.CurrentCulture);
         TxtDefaultProfitHourlyCost.Text = realProfit.HourlyCost.ToString("0.##", CultureInfo.CurrentCulture);
+        TxtDefaultProfitReductionPercentage.Text = realProfit.ProfitReductionPercentage.ToString("0.##", CultureInfo.CurrentCulture);
+        TxtWindowProductPrefixes.Text = string.Join(Environment.NewLine, realProfit.WindowProductPrefixes);
+        _catalogIdsCompatible = string.IsNullOrWhiteSpace(realProfit.WindowMaterialCatalogIdentity) ||
+            string.Equals(
+                realProfit.WindowMaterialCatalogIdentity,
+                _displayedCatalogIdentity,
+                StringComparison.OrdinalIgnoreCase);
+        BorderWindowMaterialCatalogIdentityWarning.Visibility = _catalogIdsCompatible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        TxtWindowMaterialCatalogIdentityWarning.Text = _catalogIdsCompatible
+            ? string.Empty
+            : "Queste regole provengono da un altro catalogo. Gli ID salvati non vengono usati: verifica e riseleziona le regole attive. Le regole disattivate manterranno i nomi, ma gli ID non risolti del vecchio catalogo saranno rimossi.";
+        _windowMaterialRuleEditors.Clear();
+        foreach (WindowMaterialRuleSettingsModel rule in realProfit.WindowMaterialRules)
+        {
+            _windowMaterialRuleEditors.Add(WindowMaterialRuleEditor.FromSettings(
+                rule,
+                LaborCatalog,
+                CompanyMaterialCatalog,
+                useCatalogIds: _catalogIdsCompatible));
+        }
+        UpdateWindowMaterialRulesEmptyState();
 
         TxtPdfRootPath.Text = pdf.RootPath;
         TxtHistorySubFolder.Text = pdf.HistorySubFolder ?? string.Empty;
@@ -197,6 +247,34 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        if (!TryParseSettingsDouble(
+                TxtDefaultProfitReductionPercentage.Text,
+                allowZero: true,
+                out double defaultProfitReductionPercentage) ||
+            defaultProfitReductionPercentage > 100)
+        {
+            ShowValidationError(
+                TabGeneralSettings,
+                TxtDefaultProfitReductionPercentage,
+                "La riduzione prudenziale deve essere compresa tra 0 e 100.");
+            return;
+        }
+
+        List<string> windowProductPrefixes = TxtWindowProductPrefixes.Text
+            .Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(prefix => prefix.ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (!TryBuildWindowMaterialRules(
+                out List<WindowMaterialRuleSettingsModel> windowMaterialRules,
+                out WindowMaterialRuleEditor? invalidRule,
+                out string windowMaterialRuleError))
+        {
+            ShowWindowMaterialRuleValidationError(invalidRule, windowMaterialRuleError);
+            return;
+        }
+
         if (!int.TryParse(TxtMailPort.Text, out int mailPort) || mailPort <= 0 || mailPort > 65535)
         {
             ShowValidationError(
@@ -275,6 +353,11 @@ public partial class SettingsWindow : Window
             realProfit.Days = defaultProfitDays;
             realProfit.HoursPerDay = defaultProfitHoursPerDay;
             realProfit.HourlyCost = defaultProfitHourlyCost;
+            realProfit.ProfitReductionPercentage = defaultProfitReductionPercentage;
+            realProfit.WindowProductPrefixes = windowProductPrefixes;
+            realProfit.WindowMaterialCatalogIdentity = _displayedCatalogIdentity;
+            realProfit.WindowMaterialRulesSchemaVersion = RealProfitSettingsModel.CurrentWindowMaterialRulesSchemaVersion;
+            realProfit.WindowMaterialRules = windowMaterialRules;
             realProfit.Normalize();
 
             pdf.RootPath = TxtPdfRootPath.Text.Trim();
@@ -311,6 +394,160 @@ public partial class SettingsWindow : Window
 
     private void OnBrowsePdfRootClick(object sender, RoutedEventArgs e)
         => BrowseFolder(TxtPdfRootPath);
+
+    private void OnAddWindowMaterialRuleClick(object sender, RoutedEventArgs e)
+    {
+        var editor = WindowMaterialRuleEditor.CreateNew();
+        _windowMaterialRuleEditors.Add(editor);
+        UpdateWindowMaterialRulesEmptyState();
+        UpdateLayout();
+        if (ItemsWindowMaterialRules.ItemContainerGenerator.ContainerFromItem(editor) is FrameworkElement container)
+            container.BringIntoView();
+    }
+
+    private void OnRemoveWindowMaterialRuleClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.DataContext is WindowMaterialRuleEditor editor)
+        {
+            _windowMaterialRuleEditors.Remove(editor);
+            UpdateWindowMaterialRulesEmptyState();
+        }
+    }
+
+    private void UpdateWindowMaterialRulesEmptyState()
+    {
+        TxtNoWindowMaterialRules.Visibility = _windowMaterialRuleEditors.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private bool TryBuildWindowMaterialRules(
+        out List<WindowMaterialRuleSettingsModel> rules,
+        out WindowMaterialRuleEditor? invalidRule,
+        out string error)
+    {
+        rules = [];
+        invalidRule = null;
+        error = string.Empty;
+
+        foreach (WindowMaterialRuleEditor editor in _windowMaterialRuleEditors)
+        {
+            bool hasSelectedLabor = editor.SelectedLabor != null &&
+                LaborCatalog.Contains(editor.SelectedLabor);
+            bool hasSelectedMaterial = editor.SelectedMaterial != null &&
+                CompanyMaterialCatalog.Contains(editor.SelectedMaterial);
+
+            if (editor.Enabled &&
+                (!hasSelectedLabor || editor.SelectedLabor!.PersistentId <= 0))
+            {
+                invalidRule = editor;
+                error = "Per una regola attiva devi selezionare una lavorazione con ID valido dall'elenco del catalogo.";
+                return false;
+            }
+
+            if (editor.Enabled &&
+                (!hasSelectedMaterial || editor.SelectedMaterial!.PersistentId <= 0))
+            {
+                invalidRule = editor;
+                error = "Per una regola attiva devi selezionare un materiale aziendale con ID valido dall'elenco del catalogo.";
+                return false;
+            }
+
+            if (!TryParseSettingsDecimal(editor.QuantityParameterText, out decimal quantityParameter))
+            {
+                invalidRule = editor;
+                error = "Il parametro quantità deve essere un numero maggiore di zero.";
+                return false;
+            }
+
+            if (!string.Equals(
+                    editor.CalculationMode,
+                    WindowMaterialRuleSettingsModel.PerimeterCalculationMode,
+                    StringComparison.Ordinal) &&
+                !string.Equals(
+                    editor.CalculationMode,
+                    WindowMaterialRuleSettingsModel.FixedPerWindowCalculationMode,
+                    StringComparison.Ordinal))
+            {
+                invalidRule = editor;
+                error = "Seleziona un tipo di calcolo valido.";
+                return false;
+            }
+
+            WindowMaterialRuleSettingsModel rule = editor.CreateSettingsRule(
+                quantityParameter,
+                discardUnresolvedCatalogIds: !_catalogIdsCompatible);
+            rule.Normalize();
+
+            if (rules.Any(existing => AreIdenticalRules(existing, rule)))
+            {
+                invalidRule = editor;
+                error = $"Esiste già una regola identica per “{rule.LaborName}” e “{rule.MaterialName}”.";
+                return false;
+            }
+
+            rules.Add(rule);
+        }
+
+        return true;
+    }
+
+    private void ShowWindowMaterialRuleValidationError(
+        WindowMaterialRuleEditor? invalidRule,
+        string message)
+    {
+        SettingsTabs.SelectedItem = TabGeneralSettings;
+        UpdateLayout();
+        if (invalidRule != null &&
+            ItemsWindowMaterialRules.ItemContainerGenerator.ContainerFromItem(invalidRule) is FrameworkElement container)
+        {
+            container.BringIntoView();
+        }
+        else
+        {
+            ItemsWindowMaterialRules.BringIntoView();
+        }
+
+        MessageBox.Show(
+            message,
+            "Impostazioni non valide",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+        ItemsWindowMaterialRules.Focus();
+    }
+
+    private static bool AreIdenticalRules(
+        WindowMaterialRuleSettingsModel left,
+        WindowMaterialRuleSettingsModel right)
+    {
+        bool sameLabor = left.LaborCatalogId.HasValue && right.LaborCatalogId.HasValue
+            ? left.LaborCatalogId == right.LaborCatalogId
+            : string.Equals(left.LaborName, right.LaborName, StringComparison.OrdinalIgnoreCase);
+        bool sameMaterial = left.MaterialCatalogId.HasValue && right.MaterialCatalogId.HasValue
+            ? left.MaterialCatalogId == right.MaterialCatalogId
+            : string.Equals(left.MaterialName, right.MaterialName, StringComparison.OrdinalIgnoreCase);
+        return sameLabor &&
+               sameMaterial &&
+               left.IsWindowAutomation == right.IsWindowAutomation &&
+               (!left.IsWindowAutomation ||
+                string.Equals(left.CalculationMode, right.CalculationMode, StringComparison.OrdinalIgnoreCase)) &&
+               left.QuantityParameter == right.QuantityParameter;
+    }
+
+    private static IReadOnlyList<Item> CreateCatalogSnapshot(
+        IEnumerable<Item> source,
+        bool companyMaterialsOnly)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return source
+            .Where(item =>
+                item != null &&
+                !string.IsNullOrWhiteSpace(item.Name) &&
+                (!companyMaterialsOnly || item.IsCompanyMaterial))
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.PersistentId)
+            .ToArray();
+    }
 
     private void OnBrowseTempPathClick(object sender, RoutedEventArgs e)
         => BrowseFolder(TxtTempPath);
@@ -479,4 +716,272 @@ public partial class SettingsWindow : Window
 
         return allowZero ? value >= 0 : value > 0;
     }
+
+    private static bool TryParseSettingsDecimal(string? text, out decimal value)
+    {
+        string normalized = (text ?? string.Empty).Trim().Replace(',', '.');
+        return decimal.TryParse(
+                   normalized,
+                   NumberStyles.Number,
+                   CultureInfo.InvariantCulture,
+                   out value) &&
+               value > 0;
+    }
+}
+
+public sealed record WindowMaterialCalculationModeOption(string Value, string Label);
+
+public sealed class WindowMaterialRuleEditor : INotifyPropertyChanged
+{
+    private bool _enabled = true;
+    private bool _isWindowAutomation = true;
+    private int? _laborCatalogId;
+    private string _laborName = string.Empty;
+    private Item? _selectedLabor;
+    private int? _materialCatalogId;
+    private string _materialName = string.Empty;
+    private Item? _selectedMaterial;
+    private string _calculationMode = WindowMaterialRuleSettingsModel.PerimeterCalculationMode;
+    private string _quantityParameterText = "1";
+
+    public bool Enabled
+    {
+        get => _enabled;
+        set => SetField(ref _enabled, value);
+    }
+
+    public bool IsWindowAutomation
+    {
+        get => _isWindowAutomation;
+        set
+        {
+            if (!SetField(ref _isWindowAutomation, value))
+                return;
+
+            OnPropertyChanged(nameof(CalculationHint));
+        }
+    }
+
+    public string LaborName
+    {
+        get => _laborName;
+        set
+        {
+            string normalized = value ?? string.Empty;
+            if (_laborName == normalized)
+                return;
+
+            _laborName = normalized;
+            if (_selectedLabor != null &&
+                !string.Equals(_selectedLabor.Name, normalized, StringComparison.Ordinal))
+            {
+                _selectedLabor = null;
+                _laborCatalogId = null;
+                OnPropertyChanged(nameof(SelectedLabor));
+                OnPropertyChanged(nameof(LaborCatalogInfo));
+            }
+            else if (_selectedLabor == null)
+            {
+                _laborCatalogId = null;
+                OnPropertyChanged(nameof(LaborCatalogInfo));
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
+    public Item? SelectedLabor
+    {
+        get => _selectedLabor;
+        set
+        {
+            if (ReferenceEquals(_selectedLabor, value))
+                return;
+
+            _selectedLabor = value;
+            _laborCatalogId = value?.PersistentId > 0 ? value.PersistentId : null;
+            if (value != null)
+            {
+                _laborName = value.Name;
+                OnPropertyChanged(nameof(LaborName));
+            }
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LaborCatalogInfo));
+        }
+    }
+
+    public int? LaborCatalogId => _laborCatalogId;
+
+    public string MaterialName
+    {
+        get => _materialName;
+        set
+        {
+            string normalized = value ?? string.Empty;
+            if (_materialName == normalized)
+                return;
+
+            _materialName = normalized;
+            if (_selectedMaterial != null &&
+                !string.Equals(_selectedMaterial.Name, normalized, StringComparison.Ordinal))
+            {
+                _selectedMaterial = null;
+                _materialCatalogId = null;
+                OnPropertyChanged(nameof(SelectedMaterial));
+                OnPropertyChanged(nameof(MaterialCatalogInfo));
+            }
+            else if (_selectedMaterial == null)
+            {
+                _materialCatalogId = null;
+                OnPropertyChanged(nameof(MaterialCatalogInfo));
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
+    public Item? SelectedMaterial
+    {
+        get => _selectedMaterial;
+        set
+        {
+            if (ReferenceEquals(_selectedMaterial, value))
+                return;
+
+            _selectedMaterial = value;
+            _materialCatalogId = value?.PersistentId > 0 ? value.PersistentId : null;
+            if (value != null)
+            {
+                _materialName = value.Name;
+                OnPropertyChanged(nameof(MaterialName));
+            }
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MaterialCatalogInfo));
+        }
+    }
+
+    public int? MaterialCatalogId => _materialCatalogId;
+
+    public string CalculationMode
+    {
+        get => _calculationMode;
+        set => SetField(ref _calculationMode, value ?? WindowMaterialRuleSettingsModel.PerimeterCalculationMode);
+    }
+
+    public string QuantityParameterText
+    {
+        get => _quantityParameterText;
+        set => SetField(ref _quantityParameterText, value ?? string.Empty);
+    }
+
+    public string CalculationHint => IsWindowAutomation
+        ? "Perimetro: unità di materiale per ogni metro. Quantità fissa: unità per finestra. " +
+          "Il numero di finestre elaborate è determinato dalla quantità della lavorazione."
+        : "Automazione generica: parametro × quantità della lavorazione. " +
+          "Non richiede un prodotto finestra nel preventivo.";
+
+    public string LaborCatalogInfo => _selectedLabor != null
+        ? _selectedLabor.PersistentId > 0
+            ? $"ID catalogo {_selectedLabor.PersistentId}"
+            : "Selezionata dal catalogo · ID non ancora assegnato"
+        : _laborCatalogId.HasValue
+            ? $"ID catalogo {_laborCatalogId.Value} non trovato: seleziona di nuovo"
+            : "Digita per cercare, poi seleziona la lavorazione dall'elenco";
+
+    public string MaterialCatalogInfo => _selectedMaterial != null
+        ? _selectedMaterial.PersistentId > 0
+            ? $"ID catalogo {_selectedMaterial.PersistentId} · costo {_selectedMaterial.UnitPrice:N2} €"
+            : $"Selezionato dal catalogo · costo {_selectedMaterial.UnitPrice:N2} €"
+        : _materialCatalogId.HasValue
+            ? $"ID catalogo {_materialCatalogId.Value} non trovato: seleziona di nuovo"
+            : "Digita per cercare, poi seleziona il materiale dall'elenco";
+
+    public static WindowMaterialRuleEditor CreateNew() => new();
+
+    public WindowMaterialRuleSettingsModel CreateSettingsRule(
+        decimal quantityParameter,
+        bool discardUnresolvedCatalogIds = false) => new()
+    {
+        Enabled = Enabled,
+        IsWindowAutomation = IsWindowAutomation,
+        LaborCatalogId = SelectedLabor?.PersistentId > 0
+            ? SelectedLabor.PersistentId
+            : discardUnresolvedCatalogIds
+                ? null
+                : LaborCatalogId,
+        LaborName = SelectedLabor?.Name.Trim() ?? LaborName.Trim(),
+        MaterialCatalogId = SelectedMaterial?.PersistentId > 0
+            ? SelectedMaterial.PersistentId
+            : discardUnresolvedCatalogIds
+                ? null
+                : MaterialCatalogId,
+        MaterialName = SelectedMaterial?.Name.Trim() ?? MaterialName.Trim(),
+        CalculationMode = IsWindowAutomation
+            ? CalculationMode
+            : WindowMaterialRuleSettingsModel.FixedPerWindowCalculationMode,
+        QuantityParameter = quantityParameter
+    };
+
+    public static WindowMaterialRuleEditor FromSettings(
+        WindowMaterialRuleSettingsModel rule,
+        IReadOnlyList<Item> laborCatalog,
+        IReadOnlyList<Item> materialCatalog,
+        bool useCatalogIds = true)
+    {
+        Item? selectedLabor = useCatalogIds
+            ? ResolveCatalogItem(laborCatalog, rule.LaborCatalogId, rule.LaborName)
+            : null;
+        Item? selectedMaterial = useCatalogIds
+            ? ResolveCatalogItem(materialCatalog, rule.MaterialCatalogId, rule.MaterialName)
+            : null;
+
+        return new WindowMaterialRuleEditor
+        {
+            _enabled = rule.Enabled,
+            _isWindowAutomation = rule.IsWindowAutomation,
+            _laborCatalogId = rule.LaborCatalogId,
+            _laborName = selectedLabor?.Name ?? rule.LaborName,
+            _selectedLabor = selectedLabor,
+            _materialCatalogId = rule.MaterialCatalogId,
+            _materialName = selectedMaterial?.Name ?? rule.MaterialName,
+            _selectedMaterial = selectedMaterial,
+            _calculationMode = rule.CalculationMode,
+            _quantityParameterText = rule.QuantityParameter.ToString("0.###", CultureInfo.CurrentCulture)
+        };
+    }
+
+    private static Item? ResolveCatalogItem(
+        IReadOnlyList<Item> catalog,
+        int? catalogId,
+        string? snapshotName)
+    {
+        if (catalogId > 0)
+            return catalog.FirstOrDefault(item => item.PersistentId == catalogId.Value);
+
+        string name = snapshotName?.Trim() ?? string.Empty;
+        if (name.Length == 0)
+            return null;
+
+        Item[] exactMatches = catalog
+            .Where(item => string.Equals(item.Name.Trim(), name, StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToArray();
+        return exactMatches.Length == 1 ? exactMatches[0] : null;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return false;
+        field = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

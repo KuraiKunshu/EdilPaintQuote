@@ -222,6 +222,8 @@ public partial class SqlDataService
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "IsSupplier" boolean NOT NULL DEFAULT FALSE;
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "SupplierDiscount" double precision NOT NULL DEFAULT 0;
         ALTER TABLE "PersonalMaterials" ADD COLUMN IF NOT EXISTS "IsCompanyMaterial" boolean NOT NULL DEFAULT FALSE;
+        ALTER TABLE "QuoteMaterials" ADD COLUMN IF NOT EXISTS "CatalogItemId" integer NOT NULL DEFAULT 0;
+        ALTER TABLE "QuoteLabors" ADD COLUMN IF NOT EXISTS "CatalogItemId" integer NOT NULL DEFAULT 0;
         UPDATE "Quotes" SET "Revision" = 1 WHERE "Revision" = 0;
 
         CREATE TABLE IF NOT EXISTS "QuoteAttachments"
@@ -324,6 +326,7 @@ public partial class SqlDataService
         CancellationToken cancellationToken)
     {
         await EnsureColumnAsync(db, tableName, "Name", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, tableName, "CatalogItemId", "INT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, tableName, "Description", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, tableName, "UnitPrice", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, tableName, "Quantity", "INT NOT NULL DEFAULT 0", cancellationToken);

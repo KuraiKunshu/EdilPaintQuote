@@ -591,7 +591,12 @@ public partial class MainWindow : Window
     }
     private void OnOpenSettingsClick(object sender, RoutedEventArgs e)
     {
-        var win = new SettingsWindow { Owner = this };
+        var win = DataContext is MainViewModel vm
+            ? new SettingsWindow(
+                vm.AllCatalogLabors,
+                vm.PersonalMaterialsView.Where(material => material.IsCompanyMaterial))
+            : new SettingsWindow();
+        win.Owner = this;
         win.ShowDialog();
     }
     private void OnOpenDashboardClick(object sender, RoutedEventArgs e)
@@ -676,7 +681,24 @@ public partial class MainWindow : Window
     }
     private void OnOpenCustomerFolderClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.OpenCustomerFolder();
     private void OnOpenReferenceFolderClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.OpenReferenceFolder();
-    private void OnAddMaterialClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.AddMaterial();
+    private async void OnAddMaterialClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm)
+            return;
+
+        Button? button = sender as Button;
+        if (button != null)
+            button.IsEnabled = false;
+        try
+        {
+            await vm.AddMaterialAsync();
+        }
+        finally
+        {
+            if (button != null)
+                button.IsEnabled = true;
+        }
+    }
     private void OnAddLaborClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.AddLabor();
     private void OnComboDropDownOpened(object sender, EventArgs e)
     {

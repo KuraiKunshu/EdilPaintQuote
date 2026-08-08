@@ -527,13 +527,7 @@ public class SyncService
                     QuoteSyncHashService.ComputeLegacy(dbSnapshot),
                     StringComparison.Ordinal);
                 bool hasExplicitPendingIdentityChange =
-                    jsonQuote.HasPendingDatabaseWrite &&
-                    ((jsonQuote.CustomerSyncId != Guid.Empty &&
-                      jsonQuote.CustomerSyncId != dbSnapshot.CustomerSyncId) ||
-                     (jsonQuote.ReferenceCustomerSyncId != Guid.Empty &&
-                      jsonQuote.ReferenceCustomerSyncId != dbSnapshot.ReferenceCustomerSyncId) ||
-                     (jsonQuote.BillingCustomerSyncId != Guid.Empty &&
-                      jsonQuote.BillingCustomerSyncId != dbSnapshot.BillingCustomerSyncId));
+                    HasExplicitPendingIdentityChange(jsonQuote, dbSnapshot);
 
                 if (!legacyHashesMatch || hasExplicitPendingIdentityChange)
                     continue;
@@ -598,6 +592,83 @@ public class SyncService
 
         return normalizedKeys;
     }
+
+    private static bool HasExplicitPendingIdentityChange(
+        QuoteHistoryEntry localQuote,
+        QuoteHistoryEntry databaseQuote)
+    {
+        if (!localQuote.HasPendingDatabaseWrite)
+            return false;
+
+        bool hasCustomerIdentityChange =
+            (localQuote.CustomerSyncId != Guid.Empty &&
+             localQuote.CustomerSyncId != databaseQuote.CustomerSyncId) ||
+            (localQuote.ReferenceCustomerSyncId != Guid.Empty &&
+             localQuote.ReferenceCustomerSyncId != databaseQuote.ReferenceCustomerSyncId) ||
+            (localQuote.BillingCustomerSyncId != Guid.Empty &&
+             localQuote.BillingCustomerSyncId != databaseQuote.BillingCustomerSyncId);
+
+        return hasCustomerIdentityChange ||
+               HasExplicitPendingCatalogIdentityChange(localQuote.Materials, databaseQuote.Materials) ||
+               HasExplicitPendingCatalogIdentityChange(localQuote.Labors, databaseQuote.Labors);
+    }
+
+    private static bool HasExplicitPendingCatalogIdentityChange(
+        IEnumerable<Item> localItems,
+        IEnumerable<Item> databaseItems)
+    {
+        Dictionary<QuoteLineContentKey, Dictionary<int, int>> databaseIdsByContent = databaseItems
+            .GroupBy(CreateQuoteLineContentKey)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Where(item => item.PersistentId > 0)
+                    .GroupBy(item => item.PersistentId)
+                    .ToDictionary(ids => ids.Key, ids => ids.Count()));
+
+        foreach (IGrouping<QuoteLineContentKey, Item> localGroup in
+                 localItems.GroupBy(CreateQuoteLineContentKey))
+        {
+            if (!databaseIdsByContent.TryGetValue(
+                    localGroup.Key,
+                    out Dictionary<int, int>? availableDatabaseIds))
+            {
+                // Le differenze di contenuto sono già gestite dall'hash legacy.
+                continue;
+            }
+
+            foreach (Item localItem in localGroup.Where(item => item.PersistentId > 0))
+            {
+                if (!availableDatabaseIds.TryGetValue(localItem.PersistentId, out int availableCount) ||
+                    availableCount <= 0)
+                {
+                    return true;
+                }
+
+                availableDatabaseIds[localItem.PersistentId] = availableCount - 1;
+            }
+        }
+
+        return false;
+    }
+
+    private static QuoteLineContentKey CreateQuoteLineContentKey(Item item) => new(
+        item.SortOrder,
+        item.Name,
+        item.Description,
+        item.UnitPrice,
+        item.Quantity,
+        item.Discount,
+        item.IsSignificant);
+
+    private sealed record QuoteLineContentKey(
+        int SortOrder,
+        string Name,
+        string Description,
+        double UnitPrice,
+        int Quantity,
+        double Discount,
+        bool IsSignificant);
 
     private async Task FlushPendingDeletesAsync(CancellationToken cancellationToken)
     {

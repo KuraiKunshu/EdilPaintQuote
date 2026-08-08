@@ -7,7 +7,8 @@ namespace EdilPaintPreventibiviGen.Views;
 
 public partial class EditItemWindow : Window
 {
-    private Item _item;
+    private readonly Item _item;
+    private readonly string _originalName;
     public bool Success { get; private set; } = false;
 
     public EditItemWindow(Item item)
@@ -15,6 +16,7 @@ public partial class EditItemWindow : Window
         InitializeComponent();
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         _item = item;
+        _originalName = item.Name?.Trim() ?? string.Empty;
         
         TxtName.Text = _item.Name;
         TxtDescription.Text = _item.Description;
@@ -40,7 +42,11 @@ public partial class EditItemWindow : Window
         if (double.TryParse(priceText, NumberStyles.Any, CultureInfo.InvariantCulture, out double price) && 
             int.TryParse(TxtQty.Text, out int qty))
         {
-            _item.Name = TxtName.Text;
+            string newName = TxtName.Text.Trim();
+            if (!string.Equals(_originalName, newName, StringComparison.OrdinalIgnoreCase))
+                _item.PersistentId = 0;
+
+            _item.Name = newName;
             _item.Description = TxtDescription.Text;
             _item.UnitPrice = price;
             _item.Quantity = qty;

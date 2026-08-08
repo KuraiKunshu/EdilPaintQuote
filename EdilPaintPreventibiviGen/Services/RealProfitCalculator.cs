@@ -25,7 +25,14 @@ public static class RealProfitCalculator
             Math.Max(0, input.HourlyCost);
         double companyMaterialCost = input.CompanyMaterials.Sum(cost => cost.Total);
         double totalCosts = supplierMaterialCost + laborCost + companyMaterialCost;
-        double profit = input.QuoteRevenue - totalCosts;
+        double profitBeforeReduction = input.QuoteRevenue - totalCosts;
+        double profitReductionPercentage = double.IsFinite(input.ProfitReductionPercentage)
+            ? Math.Clamp(input.ProfitReductionPercentage, 0, 100)
+            : 0;
+        double profitReductionAmount = profitBeforeReduction > 0
+            ? profitBeforeReduction * profitReductionPercentage / 100
+            : 0;
+        double profitAfterReduction = profitBeforeReduction - profitReductionAmount;
 
         return new RealProfitResult
         {
@@ -35,8 +42,13 @@ public static class RealProfitCalculator
             LaborCost = laborCost,
             CompanyMaterialCost = companyMaterialCost,
             TotalCosts = totalCosts,
-            Profit = profit,
-            ProfitPercentage = input.QuoteRevenue == 0 ? 0 : profit / input.QuoteRevenue * 100
+            ProfitBeforeReduction = profitBeforeReduction,
+            ProfitReductionAmount = profitReductionAmount,
+            ProfitAfterReduction = profitAfterReduction,
+            Profit = profitAfterReduction,
+            ProfitPercentage = input.QuoteRevenue == 0
+                ? 0
+                : profitAfterReduction / input.QuoteRevenue * 100
         };
     }
 }

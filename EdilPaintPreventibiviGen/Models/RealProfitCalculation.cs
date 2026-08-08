@@ -20,6 +20,8 @@ public sealed class CompanyMaterialCost : INotifyPropertyChanged
     private int _quantity = 1;
     private double _unitCost;
 
+    public string Source { get; set; } = "Manuale";
+
     public string Name
     {
         get => _name;
@@ -58,6 +60,7 @@ public sealed class CompanyMaterialCost : INotifyPropertyChanged
 public sealed class RealProfitInput
 {
     public double QuoteRevenue { get; set; }
+    public double ProfitReductionPercentage { get; set; }
     public bool ExcludeMaterials { get; set; }
     public double SupplierDiscount { get; set; }
     public int Workers { get; set; }
@@ -76,6 +79,21 @@ public sealed class RealProfitResult
     public double LaborCost { get; init; }
     public double CompanyMaterialCost { get; init; }
     public double TotalCosts { get; init; }
+    public double ProfitBeforeReduction { get; init; }
+    public double ProfitReductionAmount { get; init; }
+    public double ProfitAfterReduction { get; init; }
     public double Profit { get; init; }
     public double ProfitPercentage { get; init; }
+}
+
+public sealed class RealProfitPdfContext
+{
+    public string CompanyName { get; init; } = "Edil Paint Srl";
+    public string QuoteNumber { get; init; } = string.Empty;
+    public DateTime QuoteDate { get; init; }
+    public string CustomerName { get; init; } = string.Empty;
+    public bool CustomerIsSupplier { get; init; }
+    public DateTime GeneratedAt { get; init; } = DateTime.Now;
+    public RealProfitInput Input { get; init; } = new();
+    public RealProfitResult Result { get; init; } = new();
 }

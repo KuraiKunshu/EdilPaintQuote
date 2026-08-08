@@ -481,6 +481,13 @@
                                                             <TextBox x:Name="TxtDefaultProfitHourlyCost"/>
                                                         </StackPanel>
                                                     </Grid>
+
+                                                    <TextBlock Style="{StaticResource LabelStyle}"
+                                                               Text="Riduzione prudenziale utile (%)"
+                                                               Margin="0,12,0,6"/>
+                                                    <TextBox x:Name="TxtDefaultProfitReductionPercentage"/>
+                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                               Text="Riduce soltanto gli utili positivi. Con 10%, un utile calcolato di 1.000 € diventa 900 €."/>
                                                 </StackPanel>
                                             </Border>
 
@@ -514,6 +521,241 @@
                                             </Border>
                                         </StackPanel>
                                     </Grid>
+
+                                    <Border Style="{StaticResource SectionStyle}">
+                                        <StackPanel>
+                                            <TextBlock Text="Materiali automatici"
+                                                       Style="{StaticResource SectionTitleStyle}"/>
+                                            <TextBlock Style="{StaticResource HintStyle}"
+                                                       Margin="0,0,0,12"
+                                                       Text="Quando una lavorazione configurata è presente, il Guadagno reale aggiunge i materiali selezionati ai costi aziendali. Ogni regola può usare le misure delle finestre oppure la sola quantità della lavorazione."/>
+
+                                            <Border x:Name="BorderWindowMaterialCatalogIdentityWarning"
+                                                    Background="{StaticResource DangerSoftBackgroundBrush}"
+                                                    BorderBrush="{StaticResource DangerSoftBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="7"
+                                                    Padding="12,9"
+                                                    Margin="0,0,0,12"
+                                                    Visibility="Collapsed">
+                                                <TextBlock x:Name="TxtWindowMaterialCatalogIdentityWarning"
+                                                           Foreground="{StaticResource DangerRedBrush}"
+                                                           FontSize="11.5"
+                                                           FontWeight="SemiBold"
+                                                           TextWrapping="Wrap"/>
+                                            </Border>
+
+                                            <Border Background="{StaticResource WhiteBrush}"
+                                                    BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="7"
+                                                    Padding="12"
+                                                    Margin="0,0,0,14">
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource LabelStyle}"
+                                                               Text="Prefissi prodotti finestra"/>
+                                                    <TextBox x:Name="TxtWindowProductPrefixes"
+                                                             Height="82"
+                                                             AcceptsReturn="True"
+                                                             TextWrapping="Wrap"
+                                                             VerticalContentAlignment="Top"
+                                                             VerticalScrollBarVisibility="Auto"/>
+                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                               Text="Uno per riga. Il nome prodotto deve iniziare con uno di questi codici, ad esempio GGL, Q4 o R8. Se la lista è vuota vengono ripristinati i valori predefiniti."/>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <DockPanel Margin="0,0,0,10" LastChildFill="True">
+                                                <Button DockPanel.Dock="Right"
+                                                        Content="+ Aggiungi regola"
+                                                        Style="{StaticResource CompactActionButtonStyle}"
+                                                        Click="OnAddWindowMaterialRuleClick"/>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="Regole materiali"
+                                                               FontSize="13.5"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource DefaultTextBrush}"/>
+                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                               Margin="0,2,12,0"
+                                                               Text="Ogni regola collega una lavorazione a uno specifico materiale aziendale."/>
+                                                </StackPanel>
+                                            </DockPanel>
+
+                                            <TextBlock x:Name="TxtNoCompanyMaterials"
+                                                       Foreground="{StaticResource DangerRedBrush}"
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,8"
+                                                       Visibility="Collapsed"
+                                                       Text="Non ci sono materiali aziendali selezionabili. Contrassegna prima almeno un materiale come materiale aziendale."/>
+
+                                            <TextBlock x:Name="TxtNoWindowMaterialRules"
+                                                       Style="{StaticResource HintStyle}"
+                                                       Margin="0,4,0,8"
+                                                       Visibility="Collapsed"
+                                                       Text="Nessuna regola configurata. Il calcolo non aggiungerà materiali automatici."/>
+
+                                            <ItemsControl x:Name="ItemsWindowMaterialRules">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="{StaticResource WhiteBrush}"
+                                                                BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="7"
+                                                                Padding="12"
+                                                                Margin="0,0,0,9">
+                                                            <Grid>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                </Grid.RowDefinitions>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="30"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <CheckBox Grid.Column="0"
+                                                                          Content="Attiva"
+                                                                          IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                                                          VerticalAlignment="Center"
+                                                                          Margin="0,17,14,0"/>
+
+                                                                <StackPanel Grid.Column="1" IsEnabled="{Binding Enabled}">
+                                                                    <TextBlock Style="{StaticResource LabelStyle}"
+                                                                               Text="Se è presente la lavorazione"/>
+                                                                    <ComboBox ItemsSource="{Binding LaborCatalog, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                                              IsEditable="True"
+                                                                              IsTextSearchEnabled="True"
+                                                                              TextSearch.TextPath="Name"
+                                                                              StaysOpenOnEdit="True"
+                                                                              SelectedItem="{Binding SelectedLabor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                              Text="{Binding LaborName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                                                        <ComboBox.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <Grid MinWidth="280">
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition Width="*"/>
+                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                    </Grid.ColumnDefinitions>
+                                                                                    <TextBlock Text="{Binding Name}"
+                                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                                    <TextBlock Grid.Column="1"
+                                                                                               Text="{Binding PersistentId, StringFormat=ID {0}}"
+                                                                                               Foreground="{StaticResource MutedTextBrush}"
+                                                                                               Margin="12,0,0,0"/>
+                                                                                </Grid>
+                                                                            </DataTemplate>
+                                                                        </ComboBox.ItemTemplate>
+                                                                    </ComboBox>
+                                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                                               Text="{Binding LaborCatalogInfo}"/>
+                                                                </StackPanel>
+
+                                                                <TextBlock Grid.Column="2"
+                                                                           Text="→"
+                                                                           FontSize="18"
+                                                                           Foreground="{StaticResource MutedTextBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           Margin="0,17,0,0"/>
+
+                                                                <StackPanel Grid.Column="3" IsEnabled="{Binding Enabled}">
+                                                                    <TextBlock Style="{StaticResource LabelStyle}"
+                                                                               Text="Aggiungi il materiale aziendale"/>
+                                                                    <ComboBox ItemsSource="{Binding CompanyMaterialCatalog, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                                              IsEditable="True"
+                                                                              IsTextSearchEnabled="True"
+                                                                              TextSearch.TextPath="Name"
+                                                                              StaysOpenOnEdit="True"
+                                                                              SelectedItem="{Binding SelectedMaterial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                              Text="{Binding MaterialName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                                                        <ComboBox.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <Grid MinWidth="320">
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition Width="*"/>
+                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                    </Grid.ColumnDefinitions>
+                                                                                    <TextBlock Text="{Binding Name}"
+                                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                                    <TextBlock Grid.Column="1"
+                                                                                               Text="{Binding PersistentId, StringFormat=ID {0}}"
+                                                                                               Foreground="{StaticResource MutedTextBrush}"
+                                                                                               Margin="12,0,0,0"/>
+                                                                                    <TextBlock Grid.Column="2"
+                                                                                               Text="{Binding UnitPrice, StringFormat={}{0:N2} €}"
+                                                                                               Foreground="{StaticResource MutedTextBrush}"
+                                                                                               Margin="12,0,0,0"/>
+                                                                                </Grid>
+                                                                            </DataTemplate>
+                                                                        </ComboBox.ItemTemplate>
+                                                                    </ComboBox>
+                                                                    <TextBlock Style="{StaticResource HintStyle}"
+                                                                               Text="{Binding MaterialCatalogInfo}"/>
+                                                                </StackPanel>
+
+                                                                <Button Grid.Column="4"
+                                                                        Content="×"
+                                                                        Width="34"
+                                                                        MinWidth="34"
+                                                                        Height="34"
+                                                                        Padding="0"
+                                                                        Margin="12,18,0,0"
+                                                                        VerticalAlignment="Top"
+                                                                        ToolTip="Rimuovi regola"
+                                                                        Style="{StaticResource DangerCompactButtonStyle}"
+                                                                        Click="OnRemoveWindowMaterialRuleClick"/>
+
+                                                                <Grid Grid.Row="1"
+                                                                      Grid.Column="1"
+                                                                      Grid.ColumnSpan="3"
+                                                                      Margin="0,12,0,0"
+                                                                      IsEnabled="{Binding Enabled}">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="190"/>
+                                                                        <ColumnDefinition Width="12"/>
+                                                                        <ColumnDefinition Width="220"/>
+                                                                        <ColumnDefinition Width="12"/>
+                                                                        <ColumnDefinition Width="150"/>
+                                                                        <ColumnDefinition Width="12"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <CheckBox Content="Automazione per finestra"
+                                                                              IsChecked="{Binding IsWindowAutomation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                              VerticalAlignment="Center"
+                                                                              Margin="0,20,0,0"
+                                                                              ToolTip="Se attiva usa misure e quantità delle finestre; altrimenti usa solo la quantità della lavorazione."/>
+                                                                    <StackPanel Grid.Column="2">
+                                                                        <TextBlock Style="{StaticResource LabelStyle}"
+                                                                                   Text="Tipo di calcolo"/>
+                                                                        <ComboBox ItemsSource="{Binding WindowMaterialCalculationModes, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                                                  DisplayMemberPath="Label"
+                                                                                  SelectedValuePath="Value"
+                                                                                  IsEnabled="{Binding IsWindowAutomation}"
+                                                                                  SelectedValue="{Binding CalculationMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="4">
+                                                                        <TextBlock Style="{StaticResource LabelStyle}"
+                                                                                   Text="Parametro quantità"/>
+                                                                        <TextBox Text="{Binding QuantityParameterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                                    </StackPanel>
+                                                                    <TextBlock Grid.Column="6"
+                                                                               Style="{StaticResource HintStyle}"
+                                                                               Margin="0,22,0,0"
+                                                                               VerticalAlignment="Center"
+                                                                               Text="{Binding CalculationHint}"/>
+                                                                </Grid>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>

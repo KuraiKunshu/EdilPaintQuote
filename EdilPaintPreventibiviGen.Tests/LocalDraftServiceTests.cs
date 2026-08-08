@@ -232,6 +232,34 @@ public sealed class LocalDraftServiceTests
         }
     }
 
+    [Fact]
+    public async Task DraftRoundTripPreservesCatalogItemIds()
+    {
+        string temporaryPath = Path.Combine(
+            Path.GetTempPath(),
+            "EdilPaintPreventivi.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new LocalDraftService(temporaryPath);
+            var draft = CreateDraft([], DateTime.UtcNow);
+            draft.Materials.Add(new Item { PersistentId = 31, Name = "Perline" });
+            draft.Labors.Add(new Item { PersistentId = 47, Name = "Finitura interna" });
+
+            Assert.True(await service.SaveIfChangedAsync(draft));
+
+            var restored = Assert.IsType<QuoteHistoryEntry>(await service.LoadAsync());
+            Assert.Equal(31, Assert.Single(restored.Materials).PersistentId);
+            Assert.Equal(47, Assert.Single(restored.Labors).PersistentId);
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryPath))
+                Directory.Delete(temporaryPath, recursive: true);
+        }
+    }
+
     private static QuoteHistoryEntry CreateDraft(byte[] attachmentContent, DateTime timestamp) => new()
     {
         QuoteNumber = "BOZZA-TEST",

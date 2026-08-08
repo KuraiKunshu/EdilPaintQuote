@@ -92,7 +92,14 @@ public static class AppSettingsFileService
                 Workers = RealProfitSettingsModel.DefaultWorkers,
                 Days = RealProfitSettingsModel.DefaultDays,
                 HoursPerDay = RealProfitSettingsModel.DefaultHoursPerDay,
-                HourlyCost = RealProfitSettingsModel.DefaultHourlyCost
+                HourlyCost = RealProfitSettingsModel.DefaultHourlyCost,
+                ProfitReductionPercentage = RealProfitSettingsModel.DefaultProfitReductionPercentage,
+                WindowProductPrefixes = RealProfitSettingsModel.CreateDefaultWindowProductPrefixes(),
+                WindowMaterialCatalogIdentity = string.Empty,
+                WindowMaterialRulesSchemaVersion = RealProfitSettingsModel.CurrentWindowMaterialRulesSchemaVersion,
+                WindowMaterialRules = RealProfitSettingsModel.CreateDefaultWindowMaterialRules(),
+                InternalFinishLaborKeyword = RealProfitSettingsModel.DefaultInternalFinishLaborKeyword,
+                InternalFinishMaterialName = RealProfitSettingsModel.DefaultInternalFinishMaterialName
             },
             PdfStorage = new
             {
