@@ -95,6 +95,26 @@ public class StoragePathService
         return Path.Combine(folder, fileName);
     }
 
+    /// <summary>
+    /// Determina la destinazione effettiva del PDF. In assenza di una destinazione
+    /// esplicita, il percorso costruito dalla configurazione corrente e' sempre
+    /// autorevole: un percorso storico salvato da un altro PC non deve essere
+    /// riutilizzato quando il preventivo viene modificato.
+    /// </summary>
+    public static string ResolveQuotePdfTargetPath(
+        string configuredPath,
+        string? explicitTargetPath = null)
+    {
+        string resolvedPath = string.IsNullOrWhiteSpace(explicitTargetPath)
+            ? configuredPath
+            : explicitTargetPath.Trim();
+
+        if (string.IsNullOrWhiteSpace(resolvedPath))
+            throw new ArgumentException("Il percorso di destinazione del PDF non e' valido.", nameof(configuredPath));
+
+        return resolvedPath;
+    }
+
     public string BuildQuoteCostsPdfPath(string customerName, string quoteNumber, DateTime date, string? referenceName = null)
     {
         string quotePath = BuildQuotePdfPath(customerName, quoteNumber, date, referenceName);

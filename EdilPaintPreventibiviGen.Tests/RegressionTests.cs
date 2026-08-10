@@ -8,6 +8,34 @@ namespace EdilPaintPreventibiviGen.Tests;
 public sealed class RegressionTests
 {
     [Fact]
+    public void QuotePdfTargetUsesCurrentConfiguredPathInsteadOfHistoricalComputerPath()
+    {
+        const string currentConfiguredPath =
+            @"D:\Edilpaint Condiviso\Preventivi\Mauro Bossini\Preventivo.pdf";
+
+        string resolvedPath = StoragePathService.ResolveQuotePdfTargetPath(
+            currentConfiguredPath);
+
+        Assert.Equal(currentConfiguredPath, resolvedPath);
+        Assert.False(resolvedPath.StartsWith(
+            @"C:\Users\edilp\",
+            StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void QuotePdfTargetHonorsIntentionalExplicitDestination()
+    {
+        const string currentConfiguredPath = @"D:\Preventivi\Preventivo.pdf";
+        const string explicitPath = @"D:\Esportazioni\Preventivo.pdf";
+
+        string resolvedPath = StoragePathService.ResolveQuotePdfTargetPath(
+            currentConfiguredPath,
+            explicitPath);
+
+        Assert.Equal(explicitPath, resolvedPath);
+    }
+
+    [Fact]
     public void QuoteSyncHashDistinguishesStableCustomerIdentityAndKeepsLegacyComparison()
     {
         DateTime quoteDate = new(2026, 7, 31, 10, 0, 0, DateTimeKind.Utc);

@@ -46,7 +46,6 @@ public partial class MainViewModel
         _isEditingExistingQuote = false;
         _hasPersistedCurrentQuote = false;
         _loadedQuoteDate = null;
-        _loadedQuotePdfPath = string.Empty;
         _loadedQuoteBaseVersionUtc = default;
         _loadedQuoteBaseRevision = 0;
         _lastSharedDraftContentHash = string.Empty;
@@ -312,15 +311,18 @@ public partial class MainViewModel
                 ?? (_isEditingExistingQuote ? _loadedQuoteDate : null)
                 ?? DateTime.Now;
 
-            string targetPath = !string.IsNullOrWhiteSpace(forceTargetPath)
-                ? forceTargetPath
-                : _isEditingExistingQuote && !string.IsNullOrWhiteSpace(_loadedQuotePdfPath)
-                    ? _loadedQuotePdfPath
-                    : _storagePathService.BuildQuotePdfPath(
-                        SelectedCustomer.BusinessName,
-                        QuoteNumber,
-                        effectiveDate,
-                        IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
+            // Il percorso configurato su questo PC e' autorevole anche quando il
+            // preventivo caricato conserva nel database il vecchio PdfPath di
+            // un'altra postazione. forceTargetPath resta disponibile soltanto
+            // per i flussi che richiedono intenzionalmente una destinazione precisa.
+            string configuredTargetPath = _storagePathService.BuildQuotePdfPath(
+                SelectedCustomer.BusinessName,
+                QuoteNumber,
+                effectiveDate,
+                IsSecondCustomerEnabled ? SelectedSecondCustomer?.BusinessName : null);
+            string targetPath = StoragePathService.ResolveQuotePdfTargetPath(
+                configuredTargetPath,
+                forceTargetPath);
 
             string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
             Directory.CreateDirectory(tempRoot);
@@ -331,6 +333,7 @@ public partial class MainViewModel
             _pdfService.GenerateQuote(this, _companyData, pathToGenerate, effectiveDate);
 
             bool copiedToTarget = false;
+            Exception? targetCopyException = null;
             try
             {
                 string? targetFolder = Path.GetDirectoryName(targetPath);
@@ -343,6 +346,7 @@ public partial class MainViewModel
             }
             catch (Exception ex)
             {
+                targetCopyException = ex;
                 Debug.WriteLine($"ERRORE copia PDF su share: {targetPath} -> {ex.Message}");
             }
 
@@ -363,9 +367,12 @@ public partial class MainViewModel
 
             if (!copiedToTarget)
             {
+                string failureDetail = targetCopyException == null
+                    ? string.Empty
+                    : $"\n\nDettaglio: {targetCopyException.Message}";
                 MessageBox.Show(
-                    $"La cartella condivisa non e' disponibile. Il PDF e' stato salvato localmente qui:\n\n{persistedPdfPath}",
-                    "Cartella condivisa non disponibile",
+                    $"Non e' stato possibile salvare il PDF nella destinazione configurata:\n\n{targetPath}{failureDetail}\n\nUna copia e' stata salvata localmente qui:\n\n{persistedPdfPath}",
+                    "Salvataggio PDF nella destinazione configurata non riuscito",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -453,7 +460,6 @@ public partial class MainViewModel
         _isEditingExistingQuote = isEdit;
         _hasPersistedCurrentQuote = isEdit;
         _loadedQuoteDate = isEdit ? entry.Date : null;
-        _loadedQuotePdfPath = isEdit ? entry.PdfPath : string.Empty;
         _loadedQuoteBaseVersionUtc = isEdit ? entry.BaseVersionUtc : default;
         _loadedQuoteBaseRevision = isEdit ? entry.BaseRevision : 0;
         _lastSharedDraftContentHash = string.Empty;

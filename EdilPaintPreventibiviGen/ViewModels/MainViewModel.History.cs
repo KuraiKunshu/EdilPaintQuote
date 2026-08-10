@@ -341,7 +341,6 @@ public partial class MainViewModel
 
         _isEditingExistingQuote = true;
         _loadedQuoteDate = entry.Date;
-        _loadedQuotePdfPath = entry.PdfPath;
         _loadedQuoteBaseVersionUtc = persistedVersion;
         _loadedQuoteBaseRevision = entry.BaseRevision;
         _isDraftQuoteNumberAllocated = true;
