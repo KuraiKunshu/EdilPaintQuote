@@ -4,6 +4,7 @@
              x:Class="EdilPaintPreventibiviGen.Android.QuoteDetailPage"
              BackgroundColor="#F8F3F1"
              Title="Dettaglio">
+    <Grid RowDefinitions="*,Auto">
     <ScrollView>
         <VerticalStackLayout Padding="18"
                              Spacing="14">
@@ -116,7 +117,7 @@
                            FontAttributes="Bold"
                            TextColor="#221614"/>
                     <Grid ColumnDefinitions="*,*"
-                          RowDefinitions="Auto,Auto,Auto"
+                          RowDefinitions="Auto,Auto,Auto,Auto"
                           ColumnSpacing="12"
                           RowSpacing="10">
                         <VerticalStackLayout Spacing="2">
@@ -135,7 +136,15 @@
                             <Label Text="PC" FontSize="12" TextColor="#7B6661"/>
                             <Label Text="{Binding LastModifiedByDeviceDisplay}" FontAttributes="Bold" TextColor="#221614"/>
                         </VerticalStackLayout>
-                        <VerticalStackLayout Grid.Row="2" Grid.ColumnSpan="2" Spacing="2">
+                        <VerticalStackLayout Grid.Row="2" Spacing="2">
+                            <Label Text="Cantiere" FontSize="12" TextColor="#7B6661"/>
+                            <Label Text="{Binding SiteDisplay}" FontAttributes="Bold" TextColor="#221614"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2">
+                            <Label Text="Intestatario" FontSize="12" TextColor="#7B6661"/>
+                            <Label Text="{Binding BillingCustomerDisplay}" FontAttributes="Bold" TextColor="#221614"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Grid.ColumnSpan="2" Spacing="2">
                             <Label Text="Pagamento" FontSize="12" TextColor="#7B6661"/>
                             <Label Text="{Binding PaymentTermsDisplay}" FontAttributes="Bold" TextColor="#221614"/>
                         </VerticalStackLayout>
@@ -368,4 +377,17 @@
             </VerticalStackLayout>
         </VerticalStackLayout>
     </ScrollView>
+        <Border Grid.Row="1"
+                Stroke="#E6D6D2"
+                StrokeThickness="1"
+                BackgroundColor="#FFFFFF"
+                Padding="16,12">
+            <Button Text="Modifica preventivo"
+                    Clicked="OnEditClicked"
+                    BackgroundColor="#B3261E"
+                    TextColor="#FFFFFF"
+                    CornerRadius="8"
+                    HeightRequest="50"/>
+        </Border>
+    </Grid>
 </ContentPage>

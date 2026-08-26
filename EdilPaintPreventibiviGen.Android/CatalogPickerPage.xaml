@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EdilPaintPreventibiviGen.Android.CatalogPickerPage"
+             BackgroundColor="#F8F3F1"
+             Title="Catalogo">
+    <Grid RowDefinitions="Auto,Auto,*"
+          Padding="16,14,16,10"
+          RowSpacing="10">
+        <SearchBar x:Name="SearchBox"
+                   Placeholder="Cerca nel catalogo"
+                   SearchButtonPressed="OnSearchRequested"
+                   TextChanged="OnSearchTextChanged"
+                   BackgroundColor="#FFFFFF"
+                   TextColor="#221614"
+                   PlaceholderColor="#7B6661"/>
+
+        <Label x:Name="CountLabel"
+               Grid.Row="1"
+               Text="0 voci"
+               FontSize="12"
+               TextColor="#7B6661"/>
+
+        <CollectionView x:Name="CatalogList"
+                        Grid.Row="2"
+                        SelectionMode="Single"
+                        SelectionChanged="OnItemSelected">
+            <CollectionView.EmptyView>
+                <Label Text="Nessuna voce trovata"
+                       Padding="20,36"
+                       HorizontalTextAlignment="Center"
+                       TextColor="#7B6661"/>
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="#E6D6D2"
+                            StrokeThickness="1"
+                            BackgroundColor="#FFFFFF"
+                            Margin="0,0,0,10"
+                            Padding="13"
+                            StrokeShape="RoundRectangle 8">
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="{Binding Name}"
+                                       FontSize="16"
+                                       FontAttributes="Bold"
+                                       TextColor="#221614"
+                                       LineBreakMode="TailTruncation"/>
+                                <Label Text="{Binding DescriptionDisplay}"
+                                       FontSize="12"
+                                       TextColor="#7B6661"
+                                       MaxLines="2"
+                                       LineBreakMode="TailTruncation"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1"
+                                   Text="{Binding PriceDisplay}"
+                                   FontSize="15"
+                                   FontAttributes="Bold"
+                                   TextColor="#B3261E"
+                                   VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <ActivityIndicator x:Name="Busy"
+                           Grid.RowSpan="3"
+                           IsVisible="False"
+                           IsRunning="False"
+                           Color="#B3261E"
+                           WidthRequest="44"
+                           HeightRequest="44"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+    </Grid>
+</ContentPage>

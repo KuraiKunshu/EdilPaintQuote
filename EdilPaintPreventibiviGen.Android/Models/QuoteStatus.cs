@@ -33,4 +33,6 @@ public static class QuoteStatusOptions
         new("Da sollecitare", QuoteStatus.DaSollecitare),
         new("Archiviato", QuoteStatus.Archiviato)
     ];
+
+    public static IReadOnlyList<QuoteStatusOption> Editable { get; } = All.Skip(1).ToList();
 }

@@ -3,21 +3,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="EdilPaintPreventibiviGen.Android.MainPage"
              BackgroundColor="#F8F3F1"
-             Shell.NavBarIsVisible="False"
              NavigationPage.HasNavigationBar="False">
 
-    <Grid RowDefinitions="Auto,*"
-          Padding="18,20,18,12"
-          RowSpacing="14">
+    <Grid RowDefinitions="Auto,Auto,*"
+          Padding="16,18,16,12"
+          RowSpacing="12">
         <Grid ColumnDefinitions="*,Auto"
               ColumnSpacing="12">
-            <VerticalStackLayout Spacing="2">
+            <VerticalStackLayout Spacing="1">
                 <Label Text="EdilPaint"
                        FontSize="13"
                        FontAttributes="Bold"
                        TextColor="#B3261E"/>
-                <Label Text="Preventivi"
-                       FontSize="30"
+                <Label x:Name="PageTitleLabel"
+                       Text="Preventivi"
+                       FontSize="29"
                        FontAttributes="Bold"
                        TextColor="#221614"/>
                 <Label x:Name="SubtitleLabel"
@@ -43,25 +43,50 @@
                     HeightRequest="46"/>
         </Grid>
 
-        <Grid Grid.Row="1">
+        <Border x:Name="SectionBar"
+                Grid.Row="1"
+                IsVisible="False"
+                Stroke="#E6D6D2"
+                StrokeThickness="1"
+                BackgroundColor="#FFFFFF"
+                Padding="4"
+                StrokeShape="RoundRectangle 8">
+            <Grid ColumnDefinitions="*,*"
+                  ColumnSpacing="4">
+                <Button x:Name="QuotesSectionButton"
+                        Text="Preventivi"
+                        Clicked="OnQuotesSectionClicked"
+                        CornerRadius="6"
+                        HeightRequest="44"/>
+                <Button x:Name="CustomersSectionButton"
+                        Grid.Column="1"
+                        Text="Clienti"
+                        Clicked="OnCustomersSectionClicked"
+                        CornerRadius="6"
+                        HeightRequest="44"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
             <ScrollView x:Name="SetupPanel">
                 <VerticalStackLayout Spacing="14">
                     <Border Stroke="#E6D6D2"
                             StrokeThickness="1"
                             BackgroundColor="#FFFFFF"
-                            Padding="14"
+                            Padding="16"
                             StrokeShape="RoundRectangle 8">
                         <VerticalStackLayout Spacing="12">
                             <Label Text="Accesso Neon"
-                                   FontSize="18"
+                                   FontSize="19"
                                    FontAttributes="Bold"
                                    TextColor="#221614"/>
-                            <Label Text="La connection string viene salvata nel Keystore Android."
+                            <Label Text="La connection string viene protetta dal Keystore Android."
                                    FontSize="13"
                                    TextColor="#7B6661"/>
                             <Entry x:Name="ConnectionStringEntry"
                                    Placeholder="postgresql://utente:password@host/neondb?sslmode=require"
                                    Keyboard="Url"
+                                   IsPassword="True"
                                    ClearButtonVisibility="WhileEditing"
                                    TextColor="#221614"/>
                             <Button Text="Salva e accedi"
@@ -76,12 +101,12 @@
 
             <Grid x:Name="QuotesPanel"
                   IsVisible="False"
-                  RowDefinitions="Auto,Auto,*"
+                  RowDefinitions="Auto,Auto,Auto,*"
                   RowSpacing="10">
-                <SearchBar x:Name="SearchBox"
-                           Placeholder="Cerca cliente o numero"
-                           SearchButtonPressed="OnSearchRequested"
-                           TextChanged="OnSearchTextChanged"
+                <SearchBar x:Name="QuoteSearchBox"
+                           Placeholder="Cerca cliente, cantiere o numero"
+                           SearchButtonPressed="OnQuoteSearchRequested"
+                           TextChanged="OnQuoteSearchTextChanged"
                            BackgroundColor="#FFFFFF"
                            TextColor="#221614"
                            PlaceholderColor="#7B6661"/>
@@ -95,27 +120,55 @@
                             BackgroundColor="#FFFFFF"
                             TextColor="#221614"/>
                     <Button Grid.Column="1"
-                            Text="Aggiorna"
-                            Clicked="OnRefreshClicked"
-                            BackgroundColor="#FFFFFF"
-                            BorderColor="#E6D6D2"
-                            BorderWidth="1"
-                            TextColor="#B3261E"
-                            CornerRadius="8"/>
+                            Text="+ Preventivo"
+                            Clicked="OnAddQuoteClicked"
+                            BackgroundColor="#B3261E"
+                            TextColor="#FFFFFF"
+                            CornerRadius="8"
+                            Padding="14,8"/>
                 </Grid>
 
-                <RefreshView Grid.Row="2"
-                             x:Name="Refresh"
-                             Refreshing="OnRefreshViewRefreshing">
+                <Grid Grid.Row="2"
+                      ColumnDefinitions="*,Auto">
+                    <Label x:Name="QuoteCountLabel"
+                           Text="0 preventivi"
+                           FontSize="12"
+                           TextColor="#7B6661"
+                           VerticalOptions="Center"/>
+                    <Button Grid.Column="1"
+                            Text="Aggiorna"
+                            Clicked="OnRefreshQuotesClicked"
+                            BackgroundColor="Transparent"
+                            TextColor="#B3261E"
+                            Padding="10,4"
+                            HeightRequest="36"/>
+                </Grid>
+
+                <RefreshView Grid.Row="3"
+                             x:Name="QuoteRefresh"
+                             Refreshing="OnQuoteRefreshViewRefreshing">
                     <CollectionView x:Name="QuoteList"
                                     SelectionMode="Single"
                                     SelectionChanged="OnQuoteSelected">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout Padding="20,36"
+                                                 Spacing="5">
+                                <Label Text="Nessun preventivo"
+                                       HorizontalTextAlignment="Center"
+                                       FontAttributes="Bold"
+                                       TextColor="#221614"/>
+                                <Label Text="Modifica la ricerca oppure creane uno nuovo."
+                                       HorizontalTextAlignment="Center"
+                                       FontSize="13"
+                                       TextColor="#7B6661"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
                                 <Border Stroke="#E6D6D2"
                                         StrokeThickness="1"
                                         BackgroundColor="#FFFFFF"
-                                        Margin="0,0,0,12"
+                                        Margin="0,0,0,10"
                                         Padding="14"
                                         StrokeShape="RoundRectangle 8">
                                     <Grid RowDefinitions="Auto,Auto,Auto"
@@ -152,9 +205,9 @@
                                                 BackgroundColor="#FCEDEA"
                                                 Padding="8,3"
                                                 HorizontalOptions="End"
-                                                StrokeShape="RoundRectangle 10">
+                                                StrokeShape="RoundRectangle 6">
                                             <Label Text="{Binding StatusText}"
-                                                   FontSize="12"
+                                                   FontSize="11"
                                                    FontAttributes="Bold"
                                                    TextColor="#B3261E"/>
                                         </Border>
@@ -162,8 +215,92 @@
                                         <BoxView Grid.Row="2"
                                                  Grid.ColumnSpan="2"
                                                  HeightRequest="1"
-                                                 Color="#F0DFDB"/>
+                                                 Margin="0,3,0,0"
+                                                 BackgroundColor="#F2E7E4"/>
                                     </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </RefreshView>
+            </Grid>
+
+            <Grid x:Name="CustomersPanel"
+                  IsVisible="False"
+                  RowDefinitions="Auto,Auto,*"
+                  RowSpacing="10">
+                <SearchBar x:Name="CustomerSearchBox"
+                           Placeholder="Cerca nome, indirizzo o contatto"
+                           SearchButtonPressed="OnCustomerSearchRequested"
+                           TextChanged="OnCustomerSearchTextChanged"
+                           BackgroundColor="#FFFFFF"
+                           TextColor="#221614"
+                           PlaceholderColor="#7B6661"/>
+
+                <Grid Grid.Row="1"
+                      ColumnDefinitions="*,Auto"
+                      ColumnSpacing="10">
+                    <Label x:Name="CustomerCountLabel"
+                           Text="0 clienti"
+                           FontSize="12"
+                           TextColor="#7B6661"
+                           VerticalOptions="Center"/>
+                    <Button Grid.Column="1"
+                            Text="+ Cliente"
+                            Clicked="OnAddCustomerClicked"
+                            BackgroundColor="#B3261E"
+                            TextColor="#FFFFFF"
+                            CornerRadius="8"
+                            Padding="16,8"/>
+                </Grid>
+
+                <RefreshView Grid.Row="2"
+                             x:Name="CustomerRefresh"
+                             Refreshing="OnCustomerRefreshViewRefreshing">
+                    <CollectionView x:Name="CustomerList"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnCustomerSelected">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout Padding="20,36"
+                                                 Spacing="5">
+                                <Label Text="Nessun cliente"
+                                       HorizontalTextAlignment="Center"
+                                       FontAttributes="Bold"
+                                       TextColor="#221614"/>
+                                <Label Text="Modifica la ricerca oppure aggiungi un cliente."
+                                       HorizontalTextAlignment="Center"
+                                       FontSize="13"
+                                       TextColor="#7B6661"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Stroke="#E6D6D2"
+                                        StrokeThickness="1"
+                                        BackgroundColor="#FFFFFF"
+                                        Margin="0,0,0,10"
+                                        Padding="14"
+                                        StrokeShape="RoundRectangle 8">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="{Binding BusinessName}"
+                                               FontSize="18"
+                                               FontAttributes="Bold"
+                                               TextColor="#221614"
+                                               LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding AddressDisplay}"
+                                               FontSize="13"
+                                               TextColor="#7B6661"
+                                               LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding ContactDisplay}"
+                                               FontSize="13"
+                                               TextColor="#7B6661"
+                                               LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding DiscountsDisplay}"
+                                               Margin="0,3,0,0"
+                                               FontSize="12"
+                                               FontAttributes="Bold"
+                                               TextColor="#B3261E"/>
+                                    </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
@@ -175,6 +312,8 @@
                                IsVisible="False"
                                IsRunning="False"
                                Color="#B3261E"
+                               WidthRequest="44"
+                               HeightRequest="44"
                                HorizontalOptions="Center"
                                VerticalOptions="Center"/>
         </Grid>

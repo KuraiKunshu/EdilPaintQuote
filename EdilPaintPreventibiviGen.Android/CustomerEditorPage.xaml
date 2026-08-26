@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EdilPaintPreventibiviGen.Android.CustomerEditorPage"
+             BackgroundColor="#F8F3F1"
+             Title="Cliente">
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView>
+            <VerticalStackLayout Padding="16"
+                                 Spacing="14">
+                <Border StrokeThickness="0"
+                        BackgroundColor="#B3261E"
+                        Padding="16"
+                        StrokeShape="RoundRectangle 8">
+                    <VerticalStackLayout Spacing="3">
+                        <Label x:Name="HeaderTitleLabel"
+                               Text="Nuovo cliente"
+                               FontSize="23"
+                               FontAttributes="Bold"
+                               TextColor="#FFFFFF"/>
+                        <Label x:Name="HeaderSubtitleLabel"
+                               Text="Dati anagrafici e sconti predefiniti"
+                               FontSize="13"
+                               TextColor="#FCEDEA"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="Ragione sociale *"
+                           FontSize="12"
+                           FontAttributes="Bold"
+                           TextColor="#7B6661"/>
+                    <Border Stroke="#E6D6D2"
+                            BackgroundColor="#FFFFFF"
+                            Padding="10,1"
+                            StrokeShape="RoundRectangle 8">
+                        <Entry x:Name="BusinessNameEntry"
+                               Placeholder="Nome o ragione sociale"
+                               ReturnType="Next"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="Indirizzo"
+                           FontSize="12"
+                           FontAttributes="Bold"
+                           TextColor="#7B6661"/>
+                    <Border Stroke="#E6D6D2"
+                            BackgroundColor="#FFFFFF"
+                            Padding="10,1"
+                            StrokeShape="RoundRectangle 8">
+                        <Entry x:Name="AddressEntry"
+                               Placeholder="Via, numero civico, città"
+                               ReturnType="Next"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="Telefono"
+                           FontSize="12"
+                           FontAttributes="Bold"
+                           TextColor="#7B6661"/>
+                    <Border Stroke="#E6D6D2"
+                            BackgroundColor="#FFFFFF"
+                            Padding="10,1"
+                            StrokeShape="RoundRectangle 8">
+                        <Entry x:Name="PhoneEntry"
+                               Placeholder="Numero di telefono"
+                               Keyboard="Telephone"
+                               ReturnType="Next"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="Email"
+                           FontSize="12"
+                           FontAttributes="Bold"
+                           TextColor="#7B6661"/>
+                    <Border Stroke="#E6D6D2"
+                            BackgroundColor="#FFFFFF"
+                            Padding="10,1"
+                            StrokeShape="RoundRectangle 8">
+                        <Entry x:Name="EmailEntry"
+                               Placeholder="nome@dominio.it"
+                               Keyboard="Email"
+                               ReturnType="Done"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <Border Stroke="#E6D6D2"
+                        BackgroundColor="#FFFFFF"
+                        Padding="14"
+                        StrokeShape="RoundRectangle 8">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Sconti predefiniti"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="#221614"/>
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="Materiali (%)"
+                                       FontSize="12"
+                                       TextColor="#7B6661"/>
+                                <Entry x:Name="MaterialDiscountEntry"
+                                       Text="0"
+                                       Keyboard="Numeric"
+                                       BackgroundColor="#F8F3F1"
+                                       HorizontalTextAlignment="Center"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1"
+                                                 Spacing="6">
+                                <Label Text="Lavorazioni (%)"
+                                       FontSize="12"
+                                       TextColor="#7B6661"/>
+                                <Entry x:Name="LaborDiscountEntry"
+                                       Text="0"
+                                       Keyboard="Numeric"
+                                       BackgroundColor="#F8F3F1"
+                                       HorizontalTextAlignment="Center"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Border Grid.Row="1"
+                Stroke="#E6D6D2"
+                StrokeThickness="1"
+                BackgroundColor="#FFFFFF"
+                Padding="16,12">
+            <Button x:Name="SaveButton"
+                    Text="Salva cliente"
+                    Clicked="OnSaveClicked"
+                    BackgroundColor="#B3261E"
+                    TextColor="#FFFFFF"
+                    CornerRadius="8"
+                    HeightRequest="50"/>
+        </Border>
+
+        <ActivityIndicator x:Name="Busy"
+                           Grid.RowSpan="2"
+                           IsVisible="False"
+                           IsRunning="False"
+                           Color="#B3261E"
+                           WidthRequest="48"
+                           HeightRequest="48"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EdilPaintPreventibiviGen.Android.QuoteLineEditorPage"
+             BackgroundColor="#F8F3F1"
+             Title="Voce">
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView>
+            <VerticalStackLayout Padding="16"
+                                 Spacing="14">
+                <Border StrokeThickness="0"
+                        BackgroundColor="#B3261E"
+                        Padding="16"
+                        StrokeShape="RoundRectangle 8">
+                    <VerticalStackLayout Spacing="3">
+                        <Label x:Name="HeaderTitleLabel"
+                               Text="Nuovo materiale"
+                               FontSize="23"
+                               FontAttributes="Bold"
+                               TextColor="#FFFFFF"/>
+                        <Label Text="Quantità, prezzo e sconto della singola voce"
+                               FontSize="13"
+                               TextColor="#FCEDEA"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Button x:Name="CatalogButton"
+                        Text="Scegli dal catalogo"
+                        Clicked="OnCatalogClicked"
+                        BackgroundColor="#FFFFFF"
+                        BorderColor="#B3261E"
+                        BorderWidth="1"
+                        TextColor="#B3261E"
+                        CornerRadius="8"/>
+
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="Nome *"
+                           FontSize="12"
+                           FontAttributes="Bold"
+                           TextColor="#7B6661"/>
+                    <Border Stroke="#E6D6D2"
+                            BackgroundColor="#FFFFFF"
+                            Padding="10,1"
+                            StrokeShape="RoundRectangle 8">
+                        <Entry x:Name="NameEntry"
+                               Placeholder="Nome della voce"
+                               ReturnType="Next"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="Descrizione"
+                           FontSize="12"
+                           FontAttributes="Bold"
+                           TextColor="#7B6661"/>
+                    <Border Stroke="#E6D6D2"
+                            BackgroundColor="#FFFFFF"
+                            Padding="10,5"
+                            StrokeShape="RoundRectangle 8">
+                        <Editor x:Name="DescriptionEditor"
+                                Placeholder="Dettagli della voce"
+                                AutoSize="TextChanges"
+                                MinimumHeightRequest="82"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <Grid ColumnDefinitions="*,*"
+                      RowDefinitions="Auto,Auto"
+                      ColumnSpacing="10"
+                      RowSpacing="10">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Prezzo unitario *"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#7B6661"/>
+                        <Entry x:Name="UnitPriceEntry"
+                               Text="0"
+                               Keyboard="Numeric"
+                               TextChanged="OnValueChanged"
+                               BackgroundColor="#FFFFFF"
+                               HorizontalTextAlignment="Center"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1"
+                                         Spacing="6">
+                        <Label Text="Quantità *"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#7B6661"/>
+                        <Entry x:Name="QuantityEntry"
+                               Text="1"
+                               Keyboard="Numeric"
+                               TextChanged="OnValueChanged"
+                               BackgroundColor="#FFFFFF"
+                               HorizontalTextAlignment="Center"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Row="1"
+                                         Spacing="6">
+                        <Label Text="Sconto (%)"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="#7B6661"/>
+                        <Entry x:Name="DiscountEntry"
+                               Text="0"
+                               Keyboard="Numeric"
+                               TextChanged="OnValueChanged"
+                               BackgroundColor="#FFFFFF"
+                               HorizontalTextAlignment="Center"/>
+                    </VerticalStackLayout>
+                    <Border Grid.Row="1"
+                            Grid.Column="1"
+                            Stroke="#E6D6D2"
+                            BackgroundColor="#FFFFFF"
+                            Padding="11"
+                            StrokeShape="RoundRectangle 8">
+                        <VerticalStackLayout Spacing="2"
+                                             VerticalOptions="Center">
+                            <Label Text="Totale riga"
+                                   FontSize="11"
+                                   TextColor="#7B6661"/>
+                            <Label x:Name="TotalLabel"
+                                   Text="0,00 €"
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="#B3261E"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,*"
+                      ColumnSpacing="8">
+                    <CheckBox x:Name="SignificantCheckBox"
+                              Color="#B3261E"/>
+                    <Label x:Name="SignificantLabel"
+                           Grid.Column="1"
+                           Text="Bene significativo"
+                           VerticalOptions="Center"
+                           TextColor="#221614"/>
+                </Grid>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Border Grid.Row="1"
+                Stroke="#E6D6D2"
+                StrokeThickness="1"
+                BackgroundColor="#FFFFFF"
+                Padding="16,12">
+            <Button Text="Salva voce"
+                    Clicked="OnSaveClicked"
+                    BackgroundColor="#B3261E"
+                    TextColor="#FFFFFF"
+                    CornerRadius="8"
+                    HeightRequest="50"/>
+        </Border>
+    </Grid>
+</ContentPage>

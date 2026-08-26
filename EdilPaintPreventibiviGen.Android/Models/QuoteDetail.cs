@@ -6,10 +6,19 @@ public sealed class QuoteDetail
 {
     private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
 
+    public int Id { get; init; }
     public string QuoteNumber { get; init; } = string.Empty;
     public DateTime Date { get; init; }
+    public int? CustomerId { get; init; }
+    public Guid CustomerSyncId { get; init; }
     public string CustomerName { get; init; } = string.Empty;
+    public int? ReferenceCustomerId { get; init; }
+    public Guid ReferenceCustomerSyncId { get; init; }
     public string ReferenceName { get; init; } = string.Empty;
+    public int? BillingCustomerId { get; init; }
+    public Guid BillingCustomerSyncId { get; init; }
+    public string BillingCustomerName { get; init; } = string.Empty;
+    public string SiteName { get; init; } = string.Empty;
     public string PaymentTerms { get; init; } = string.Empty;
     public string CustomerNotes { get; init; } = string.Empty;
     public string IvaType { get; init; } = string.Empty;
@@ -22,6 +31,8 @@ public sealed class QuoteDetail
     public DateTime? SentAtUtc { get; init; }
     public string SentRecipient { get; init; } = string.Empty;
     public string LastModifiedByDevice { get; init; } = string.Empty;
+    public DateTime LastModifiedUtc { get; init; }
+    public long Revision { get; init; }
     public List<QuoteLine> Materials { get; init; } = [];
     public List<QuoteLine> Labors { get; init; } = [];
 
@@ -43,8 +54,12 @@ public sealed class QuoteDetail
         ? SentAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy", ItalianCulture)
         : "Non inviato";
     public string CustomerReferenceDisplay => string.IsNullOrWhiteSpace(ReferenceName)
-        ? CustomerName
-        : $"{CustomerName} - Rif. {ReferenceName}";
+        ? "Nessun riferimento"
+        : $"Rif. {ReferenceName}";
+    public string SiteDisplay => string.IsNullOrWhiteSpace(SiteName) ? "-" : SiteName.Trim();
+    public string BillingCustomerDisplay => string.IsNullOrWhiteSpace(BillingCustomerName)
+        ? "-"
+        : BillingCustomerName.Trim();
     public string StatusText => Status switch
     {
         QuoteStatus.DaInviare => "Da inviare",
