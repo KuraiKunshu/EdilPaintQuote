@@ -17,6 +17,7 @@ $ErrorActionPreference = "Stop"
 $targetScript = Join-Path $UpdaterPath "Update-EdilPaint.ps1"
 $settingsPath = Join-Path $UpdaterPath "updater-settings.json"
 $sourceScript = Join-Path $PSScriptRoot "Update-EdilPaint.ps1"
+$updaterLocationFile = Join-Path $InstallPath "updater-path.txt"
 
 if (-not (Test-Path -LiteralPath $sourceScript)) {
     throw "Update-EdilPaint.ps1 non trovato in $PSScriptRoot"
@@ -54,6 +55,15 @@ if (-not (Test-Path -LiteralPath $settingsPath) -or $OverwriteSettings) {
 }
 else {
     Write-Host "File impostazioni gia' presente, lo mantengo: $settingsPath"
+}
+
+try {
+    New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+    Set-Content -LiteralPath $updaterLocationFile -Value $targetScript -Encoding UTF8
+    Write-Host "Collegamento updater creato: $updaterLocationFile"
+}
+catch {
+    Write-Warning "Impossibile creare $updaterLocationFile. Il programma provera' comunque i percorsi updater standard. Errore: $($_.Exception.Message)"
 }
 
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -132,3 +142,4 @@ catch {
 
 Write-Host "Script: $targetScript"
 Write-Host "Impostazioni: $settingsPath"
+Write-Host "Collegamento programma: $updaterLocationFile"

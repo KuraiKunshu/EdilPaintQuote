@@ -10,6 +10,12 @@ C:\EdilPaintUpdater\updater-settings.json
 
 Quel file non va committato.
 
+L'installer salva inoltre `updater-path.txt` accanto al programma. Il file contiene
+il percorso dello script updater e permette al pulsante `Aggiorna ora` di funzionare
+anche quando programma e updater sono su dischi o cartelle differenti. In assenza
+del file, il programma controlla anche `C:\EdilPaintUpdater` e le cartelle standard
+di Windows.
+
 Nel repository c'e' anche `updater-settings.example.json`, utile come modello da copiare e modificare su ogni PC.
 
 ## Installazione PC 1
