@@ -18,6 +18,7 @@ public partial class App : Application
     public static SyncService SyncService { get; private set; } = null!;
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
+    public static bool IsOfflineMode { get; private set; }
 
     private const int ShutdownSyncTimeoutSeconds = 2;
     private const int ShutdownBackgroundTimeoutSeconds = 2;
@@ -64,8 +65,9 @@ public partial class App : Application
             var quotePatchOutbox = new LocalQuotePatchOutboxService(localDataPath);
             var deletionOutbox = new LocalDeletionOutboxService(localDataPath);
 
-            DataService = new FallbackDataService(
+            var fallbackDataService = new FallbackDataService(
                 sqlService, localStore, quotePatchOutbox, deletionOutbox);
+            DataService = fallbackDataService;
             SyncService = new SyncService(
                 DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox);
             SyncService.SyncCompleted += OnSyncCompleted;
@@ -83,8 +85,15 @@ public partial class App : Application
             {
                 await SetLoadingStatusAsync(loadingWindow, "1/5 - Connessione al database...");
                 await DataService.InitializeAsync(shutdownToken);
+                IsOfflineMode = fallbackDataService.IsOfflineMode;
 
-                if (AppSettings.App.FirstStartup)
+                if (IsOfflineMode)
+                {
+                    await SetLoadingStatusAsync(
+                        loadingWindow,
+                        "2/5 - Database non raggiungibile: avvio offline...");
+                }
+                else if (AppSettings.App.FirstStartup)
                 {
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Import dati legacy...");
                     var importer = new JsonImportService(sqlService);
@@ -95,8 +104,17 @@ public partial class App : Application
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Database pronto");
                 }
 
-                await SetLoadingStatusAsync(loadingWindow, "3/5 - Sincronizzazione dati...");
-                await RunStartupSyncAsync(shutdownToken);
+                if (IsOfflineMode)
+                {
+                    await SetLoadingStatusAsync(
+                        loadingWindow,
+                        "3/5 - Modalita' offline: sincronizzazione rinviata");
+                }
+                else
+                {
+                    await SetLoadingStatusAsync(loadingWindow, "3/5 - Sincronizzazione dati...");
+                    await RunStartupSyncAsync(shutdownToken);
+                }
 
                 await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
                 MainVm = new MainViewModel();
@@ -106,11 +124,14 @@ public partial class App : Application
                 await ForceUiRefreshAsync(loadingWindow);
 
                 var mainWindow = new MainWindow(MainVm);
+                if (IsOfflineMode)
+                    mainWindow.Title = "Gestione Preventivi - EdilPaint (OFFLINE)";
                 MainWindow = mainWindow;
                 mainWindow.Show();
 
                 StartPeriodicSyncIfEnabled();
-                _ = RunStartupPdfGenerationAsync(shutdownToken);
+                if (!IsOfflineMode)
+                    _ = RunStartupPdfGenerationAsync(shutdownToken);
 
                 Debug.WriteLine($"[STARTUP] Startup completato in {startupWatch.Elapsed}");
             }
@@ -219,6 +240,16 @@ public partial class App : Application
 
     private static void OnSyncCompleted(object? sender, SyncCompletedEventArgs e)
     {
+        if (IsOfflineMode)
+        {
+            IsOfflineMode = false;
+            if (Current.MainWindow is Window mainWindow)
+            {
+                _ = mainWindow.Dispatcher.InvokeAsync(() =>
+                    mainWindow.Title = "Gestione Preventivi - EdilPaint");
+            }
+        }
+
         var viewModel = MainVm;
         if (viewModel == null || _isShuttingDown || e.Result.CustomersSynced == 0)
             return;

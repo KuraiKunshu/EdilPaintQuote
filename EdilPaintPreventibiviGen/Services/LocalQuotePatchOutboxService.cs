@@ -242,6 +242,7 @@ public sealed class LocalQuotePatchOutboxService
     private static bool SupplierInfoEquals(QuoteSupplierInfo? current, QuoteSupplierInfo applied) =>
         current != null &&
         string.Equals(current.SupplierName, applied.SupplierName, StringComparison.Ordinal) &&
+        current.MaterialsOrderedByCustomer == applied.MaterialsOrderedByCustomer &&
         current.MaterialOrderDate == applied.MaterialOrderDate &&
         current.ExpectedDeliveryDate == applied.ExpectedDeliveryDate &&
         string.Equals(current.MaterialStatus, applied.MaterialStatus, StringComparison.Ordinal) &&

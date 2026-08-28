@@ -21,7 +21,7 @@ public class PdfGenerationContext
     public List<StoredFile> Attachments { get; set; } = new();
     public List<Customer> AllCustomers { get; set; } = new();
     public string PdfTemplateName { get; set; } = "Standard";
-    public string PdfNotesTitle { get; set; } = "NOTE PER IL CLIENTE";
+    public string PdfNotesTitle { get; set; } = "NOTE";
     public string PdfFooterText { get; set; } = string.Empty;
     public string PdfSignatureText { get; set; } = "Firma per accettazione";
     public bool PdfShowTemplateName { get; set; }

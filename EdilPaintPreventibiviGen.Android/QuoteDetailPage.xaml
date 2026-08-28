@@ -149,7 +149,7 @@
                     Padding="12"
                     StrokeShape="RoundRectangle 8">
                 <VerticalStackLayout Spacing="6">
-                    <Label Text="Note per il cliente"
+                    <Label Text="NOTE"
                            FontSize="16"
                            FontAttributes="Bold"
                            TextColor="#B3261E"/>

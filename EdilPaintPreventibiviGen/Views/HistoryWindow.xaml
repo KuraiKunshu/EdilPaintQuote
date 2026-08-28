@@ -1055,19 +1055,43 @@
                                                    Margin="0,0,0,10"/>
 
                                         <TextBlock Text="Fornitore" Style="{StaticResource DetailCaptionStyle}"/>
+                                        <CheckBox Content="Il cliente ordina direttamente i materiali"
+                                                  IsChecked="{Binding MaterialsOrderedByCustomer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  Margin="0,2,0,10"
+                                                  FontWeight="SemiBold"
+                                                  Click="OnMaterialsOrderedByCustomerClick"/>
                                         <Grid Margin="0,0,0,8">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="8"/>
                                                 <ColumnDefinition Width="92"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Text="{Binding SupplierName, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <TextBox Text="{Binding SupplierName, UpdateSourceTrigger=PropertyChanged}">
+                                                <TextBox.Style>
+                                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding MaterialsOrderedByCustomer}" Value="True">
+                                                                <Setter Property="IsReadOnly" Value="True"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
                                             <Button Grid.Column="2"
                                                     Content="Seleziona"
-                                                    Style="{StaticResource DetailActionButtonStyle}"
                                                     MinWidth="92"
                                                     Margin="0"
-                                                    Click="OnSelectSupplierClick"/>
+                                                    Click="OnSelectSupplierClick">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource DetailActionButtonStyle}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding MaterialsOrderedByCustomer}" Value="True">
+                                                                <Setter Property="IsEnabled" Value="False"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
                                         </Grid>
 
                                         <Grid Margin="0,0,0,8">

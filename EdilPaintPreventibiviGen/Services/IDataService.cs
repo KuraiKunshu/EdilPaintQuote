@@ -54,6 +54,7 @@ public interface IDataService
     Task UpdateQuoteSendInfoAsync(string quoteNumber, QuoteSendInfo sendInfo, CancellationToken cancellationToken = default);
     Task RegisterQuoteReminderAsync(string quoteNumber, QuoteReminderInfo reminderInfo, CancellationToken cancellationToken = default);
     Task UpdateQuoteSupplierInfoAsync(string quoteNumber, QuoteSupplierInfo supplierInfo, CancellationToken cancellationToken = default);
+    Task UpdateQuoteRealProfitAsync(string quoteNumber, RealProfitSnapshot snapshot, CancellationToken cancellationToken = default);
     
     // Utilities
     Task<int> GetNextQuoteNumberAsync(CancellationToken cancellationToken = default);

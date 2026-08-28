@@ -119,6 +119,8 @@ public partial class SqlDataService
                 x.MaterialOrderDate,
                 x.ExpectedDeliveryDate,
                 x.MaterialStatus,
+                x.MaterialsOrderedByCustomer,
+                x.RealProfitJson,
                 x.LastModifiedUtc,
                 x.Revision,
                 x.IsJointVenture,
@@ -193,6 +195,8 @@ public partial class SqlDataService
                 MaterialOrderDate = x.MaterialOrderDate,
                 ExpectedDeliveryDate = x.ExpectedDeliveryDate,
                 MaterialStatus = x.MaterialStatus,
+                MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer,
+                RealProfit = DeserializeRealProfit(x.RealProfitJson),
                 IsJointVenture = x.IsJointVenture,
                 PartnerCompanyName = x.PartnerCompanyName,
                 OurCosts = costs?.OurCosts ?? [],
@@ -316,6 +320,8 @@ public partial class SqlDataService
             MaterialOrderDate = x.MaterialOrderDate,
             ExpectedDeliveryDate = x.ExpectedDeliveryDate,
             MaterialStatus = x.MaterialStatus,
+            MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer,
+            RealProfit = DeserializeRealProfit(x.RealProfitJson),
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
             Revision = x.Revision,
@@ -426,6 +432,8 @@ public partial class SqlDataService
             MaterialOrderDate = x.MaterialOrderDate,
             ExpectedDeliveryDate = x.ExpectedDeliveryDate,
             MaterialStatus = x.MaterialStatus,
+            MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer,
+            RealProfit = DeserializeRealProfit(x.RealProfitJson),
             Materials = x.Materials.OrderBy(m => m.SortOrder).Select(m => new Item
             {
                 PersistentId = m.CatalogItemId,
@@ -505,6 +513,8 @@ public partial class SqlDataService
             MaterialOrderDate = x.MaterialOrderDate,
             ExpectedDeliveryDate = x.ExpectedDeliveryDate,
             MaterialStatus = x.MaterialStatus,
+            MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer,
+            RealProfit = DeserializeRealProfit(x.RealProfitJson),
             LastModifiedUtc = x.LastModifiedUtc,
             BaseVersionUtc = x.LastModifiedUtc,
             Revision = x.Revision,
@@ -578,7 +588,8 @@ public partial class SqlDataService
                 SupplierName = x.SupplierName,
                 MaterialOrderDate = x.MaterialOrderDate,
                 ExpectedDeliveryDate = x.ExpectedDeliveryDate,
-                MaterialStatus = x.MaterialStatus
+                MaterialStatus = x.MaterialStatus,
+                MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer
             })
             .ToListAsync(cancellationToken);
     }
@@ -636,7 +647,8 @@ public partial class SqlDataService
                 SupplierName = x.SupplierName,
                 MaterialOrderDate = x.MaterialOrderDate,
                 ExpectedDeliveryDate = x.ExpectedDeliveryDate,
-                MaterialStatus = x.MaterialStatus
+                MaterialStatus = x.MaterialStatus,
+                MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer
             })
             .ToListAsync(cancellationToken);
     }
@@ -698,7 +710,8 @@ public partial class SqlDataService
                 SupplierName = x.SupplierName,
                 MaterialOrderDate = x.MaterialOrderDate,
                 ExpectedDeliveryDate = x.ExpectedDeliveryDate,
-                MaterialStatus = x.MaterialStatus
+                MaterialStatus = x.MaterialStatus,
+                MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer
             })
             .ToListAsync(cancellationToken);
     }
@@ -715,11 +728,12 @@ public partial class SqlDataService
             .Include(x => x.Customer)
             .Include(x => x.ReferenceCustomer)
             .Where(x =>
-                x.Status == QuoteStatus.Confermato &&
-                (x.SupplierName != string.Empty ||
-                 x.MaterialOrderDate.HasValue ||
-                 x.ExpectedDeliveryDate.HasValue ||
-                 x.MaterialStatus != string.Empty));
+                x.MaterialsOrderedByCustomer ||
+                (x.Status == QuoteStatus.Confermato &&
+                 (x.SupplierName != string.Empty ||
+                  x.MaterialOrderDate.HasValue ||
+                  x.ExpectedDeliveryDate.HasValue ||
+                  x.MaterialStatus != string.Empty)));
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
@@ -766,7 +780,8 @@ public partial class SqlDataService
                 SupplierName = x.SupplierName,
                 MaterialOrderDate = x.MaterialOrderDate,
                 ExpectedDeliveryDate = x.ExpectedDeliveryDate,
-                MaterialStatus = x.MaterialStatus
+                MaterialStatus = x.MaterialStatus,
+                MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer
             })
             .ToListAsync(cancellationToken);
     }
@@ -830,7 +845,8 @@ public partial class SqlDataService
                 SupplierName = x.SupplierName,
                 MaterialOrderDate = x.MaterialOrderDate,
                 ExpectedDeliveryDate = x.ExpectedDeliveryDate,
-                MaterialStatus = x.MaterialStatus
+                MaterialStatus = x.MaterialStatus,
+                MaterialsOrderedByCustomer = x.MaterialsOrderedByCustomer
             })
             .ToListAsync(cancellationToken);
     }
@@ -904,6 +920,8 @@ public partial class SqlDataService
             MaterialOrderDate = q.MaterialOrderDate,
             ExpectedDeliveryDate = q.ExpectedDeliveryDate,
             MaterialStatus = q.MaterialStatus,
+            MaterialsOrderedByCustomer = q.MaterialsOrderedByCustomer,
+            RealProfit = DeserializeRealProfit(q.RealProfitJson),
             LastModifiedUtc = q.LastModifiedUtc,
             BaseVersionUtc = q.LastModifiedUtc,
             Revision = q.Revision,
@@ -1059,6 +1077,7 @@ public partial class SqlDataService
                 : supplierInfo.DeviceName.Trim();
 
             quote.SupplierName = supplierInfo.SupplierName?.Trim() ?? string.Empty;
+            quote.MaterialsOrderedByCustomer = supplierInfo.MaterialsOrderedByCustomer;
             quote.MaterialOrderDate = supplierInfo.MaterialOrderDate;
             quote.ExpectedDeliveryDate = supplierInfo.ExpectedDeliveryDate;
             quote.MaterialStatus = supplierInfo.MaterialStatus?.Trim() ?? string.Empty;
@@ -1069,6 +1088,34 @@ public partial class SqlDataService
                 $"Dati fornitori aggiornati: {FormatSupplierEventDescription(quote)}",
                 deviceName);
         }, cancellationToken);
+
+    public Task UpdateQuoteRealProfitAsync(
+        string quoteNumber,
+        RealProfitSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(snapshot.CalculatedByDevice)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : snapshot.CalculatedByDevice.Trim();
+
+            snapshot.CalculatedByDevice = deviceName;
+            snapshot.CalculatedAtUtc = snapshot.CalculatedAtUtc == default
+                ? DateTime.UtcNow
+                : snapshot.CalculatedAtUtc.ToUniversalTime();
+            quote.RealProfitJson = JsonSerializer.Serialize(snapshot);
+            quote.LastModifiedByDevice = deviceName;
+            AppendQuoteEvent(
+                quote,
+                "guadagno-reale",
+                $"Guadagno reale ricalcolato: {snapshot.Result.Profit:N2} euro",
+                deviceName,
+                snapshot.CalculatedAtUtc);
+        }, cancellationToken);
+    }
 
     private async Task UpdateQuoteMetadataAsync(
         string quoteNumber,
@@ -1128,6 +1175,8 @@ public partial class SqlDataService
             MaterialOrderDate = entry.MaterialOrderDate,
             ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
             MaterialStatus = entry.MaterialStatus,
+            MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
+            RealProfit = entry.RealProfit,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             Revision = entry.Revision,
@@ -1257,6 +1306,8 @@ public partial class SqlDataService
                     existing.MaterialOrderDate = quote.MaterialOrderDate;
                     existing.ExpectedDeliveryDate = quote.ExpectedDeliveryDate;
                     existing.MaterialStatus = quote.MaterialStatus;
+                    existing.MaterialsOrderedByCustomer = quote.MaterialsOrderedByCustomer;
+                    existing.RealProfitJson = SerializeRealProfit(quote.RealProfit);
                     existing.LastModifiedUtc = savedAtUtc;
                     existing.Revision += 1;
                     existing.SyncHash = quote.SyncHash;
@@ -1357,6 +1408,8 @@ public partial class SqlDataService
                         MaterialOrderDate = quote.MaterialOrderDate,
                         ExpectedDeliveryDate = quote.ExpectedDeliveryDate,
                         MaterialStatus = quote.MaterialStatus,
+                        MaterialsOrderedByCustomer = quote.MaterialsOrderedByCustomer,
+                        RealProfitJson = SerializeRealProfit(quote.RealProfit),
                         LastModifiedUtc = savedAtUtc,
                         Revision = 1,
                         SyncHash = quote.SyncHash,
@@ -1521,6 +1574,18 @@ public partial class SqlDataService
         catch { return null; }
     }
 
+    private static RealProfitSnapshot? DeserializeRealProfit(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try { return JsonSerializer.Deserialize<RealProfitSnapshot>(json); }
+        catch { return null; }
+    }
+
+    private static string SerializeRealProfit(RealProfitSnapshot? snapshot) =>
+        snapshot == null ? string.Empty : JsonSerializer.Serialize(snapshot);
+
     private static List<QuoteEventEntry> DeserializeQuoteEvents(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -1559,6 +1624,8 @@ public partial class SqlDataService
     private static string FormatSupplierEventDescription(QuoteEntity quote)
     {
         var parts = new List<string>();
+        if (quote.MaterialsOrderedByCustomer)
+            parts.Add("materiali ordinati dal cliente");
         if (!string.IsNullOrWhiteSpace(quote.SupplierName))
             parts.Add($"fornitore {quote.SupplierName}");
         if (quote.MaterialOrderDate.HasValue)

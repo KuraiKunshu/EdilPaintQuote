@@ -142,6 +142,13 @@ public static class EntityModelMapper
             catch { /* ignora JSON malformato */ }
         }
 
+        RealProfitSnapshot? realProfit = null;
+        if (!string.IsNullOrWhiteSpace(entity.RealProfitJson))
+        {
+            try { realProfit = JsonSerializer.Deserialize<RealProfitSnapshot>(entity.RealProfitJson); }
+            catch { /* ignora JSON malformato */ }
+        }
+
         return new QuoteHistoryEntry
         {
             QuoteNumber = entity.QuoteNumber,
@@ -174,9 +181,11 @@ public static class EntityModelMapper
             LastReminderByDevice = entity.LastReminderByDevice,
             Events = events,
             SupplierName = entity.SupplierName,
+            MaterialsOrderedByCustomer = entity.MaterialsOrderedByCustomer,
             MaterialOrderDate = entity.MaterialOrderDate,
             ExpectedDeliveryDate = entity.ExpectedDeliveryDate,
             MaterialStatus = entity.MaterialStatus,
+            RealProfit = realProfit,
             IsJointVenture = entity.IsJointVenture,
             PartnerCompanyName = entity.PartnerCompanyName,
             OurCosts = costAlloc?.OurCosts ?? new(),

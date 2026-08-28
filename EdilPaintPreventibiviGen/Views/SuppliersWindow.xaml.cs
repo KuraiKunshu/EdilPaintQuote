@@ -106,9 +106,12 @@ public partial class SuppliersWindow : Window
             CommitPendingEdits();
 
             string deviceName = DeviceNameService.GetCurrentDeviceName();
+            if (summary.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(summary, orderedByCustomer: true);
             await _historyService.UpdateSupplierInfoAsync(summary.QuoteNumber, new QuoteSupplierInfo
             {
                 SupplierName = summary.SupplierName,
+                MaterialsOrderedByCustomer = summary.MaterialsOrderedByCustomer,
                 MaterialOrderDate = summary.MaterialOrderDate,
                 ExpectedDeliveryDate = summary.ExpectedDeliveryDate,
                 MaterialStatus = summary.MaterialStatus,
@@ -145,6 +148,7 @@ public partial class SuppliersWindow : Window
         if (win.ShowDialog() != true || win.SelectedResult == null)
             return;
 
+        summary.MaterialsOrderedByCustomer = false;
         summary.SupplierName = win.SelectedResult.BusinessName;
     }
 
@@ -153,6 +157,9 @@ public partial class SuppliersWindow : Window
         try
         {
             CommitPendingEdits();
+            if (summary.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(summary, orderedByCustomer: true);
+
             var fullEntry = await _historyService.GetQuoteByNumberAsync(summary.QuoteNumber);
             if (fullEntry == null)
             {
@@ -165,6 +172,7 @@ public partial class SuppliersWindow : Window
             }
 
             fullEntry.SupplierName = summary.SupplierName;
+            fullEntry.MaterialsOrderedByCustomer = summary.MaterialsOrderedByCustomer;
             fullEntry.MaterialOrderDate = summary.MaterialOrderDate;
             fullEntry.ExpectedDeliveryDate = summary.ExpectedDeliveryDate;
             fullEntry.MaterialStatus = summary.MaterialStatus;
@@ -238,6 +246,19 @@ public partial class SuppliersWindow : Window
     {
         if (sender is FrameworkElement element && element.DataContext is QuoteHistorySummary summary)
             await PrepareOrderMailAsync(summary);
+    }
+
+    private void OnMaterialsOrderedByCustomerClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox checkBox ||
+            checkBox.DataContext is not QuoteHistorySummary summary)
+        {
+            return;
+        }
+
+        SupplierOrderAssignmentService.ApplyCustomerOrderChoice(
+            summary,
+            checkBox.IsChecked == true);
     }
 
     private async void OnSearchClick(object sender, RoutedEventArgs e)

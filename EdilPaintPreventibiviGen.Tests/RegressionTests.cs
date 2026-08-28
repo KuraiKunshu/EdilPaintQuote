@@ -1,6 +1,7 @@
 using EdilPaintPreventibiviGen.Data.Mappers;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
+using System.Text.Json;
 using Xunit;
 
 namespace EdilPaintPreventibiviGen.Tests;
@@ -171,6 +172,56 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public void QuoteMapperRestoresSavedRealProfit()
+    {
+        var snapshot = new RealProfitSnapshot
+        {
+            CalculatedAtUtc = new DateTime(2026, 8, 27, 12, 30, 0, DateTimeKind.Utc),
+            CalculatedByDevice = "PC test",
+            Input = new RealProfitInput
+            {
+                QuoteRevenue = 2500,
+                Workers = 2,
+                Days = 3,
+                CompanyMaterials =
+                [
+                    new CompanyMaterialCost { Name = "Teli", Quantity = 4, UnitCost = 12.5 }
+                ]
+            },
+            Result = new RealProfitResult { Profit = 875, ProfitPercentage = 35 }
+        };
+        var entity = new EdilPaintPreventibiviGen.Data.Entities.QuoteEntity
+        {
+            QuoteNumber = "REAL-PROFIT-MAP",
+            RealProfitJson = JsonSerializer.Serialize(snapshot)
+        };
+
+        QuoteHistoryEntry model = entity.ToModel();
+
+        Assert.NotNull(model.RealProfit);
+        Assert.Equal(2500, model.RealProfit.Input.QuoteRevenue);
+        Assert.Equal(875, model.RealProfit.Result.Profit);
+        Assert.Equal("Teli", Assert.Single(model.RealProfit.Input.CompanyMaterials).Name);
+        Assert.Equal("PC test", model.RealProfit.CalculatedByDevice);
+    }
+
+    [Fact]
+    public void QuoteMapperRestoresCustomerMaterialOrderFlag()
+    {
+        var entity = new EdilPaintPreventibiviGen.Data.Entities.QuoteEntity
+        {
+            QuoteNumber = "CUSTOMER-ORDER-MAP",
+            SupplierName = "Cliente diretto",
+            MaterialsOrderedByCustomer = true
+        };
+
+        QuoteHistoryEntry model = entity.ToModel();
+
+        Assert.True(model.MaterialsOrderedByCustomer);
+        Assert.Equal("Cliente diretto", model.SupplierName);
+    }
+
+    [Fact]
     public void QuoteMapperPreservesCatalogItemIds()
     {
         var entity = new EdilPaintPreventibiviGen.Data.Entities.QuoteEntity
@@ -231,6 +282,74 @@ public sealed class RegressionTests
         Assert.Equal(
             Assert.IsType<string>(computeLegacy.Invoke(null, [first])),
             Assert.IsType<string>(computeLegacy.Invoke(null, [second])));
+    }
+
+    [Fact]
+    public void QuoteSyncHashIncludesSavedRealProfit()
+    {
+        DateTime calculatedAt = new(2026, 8, 27, 12, 30, 0, DateTimeKind.Utc);
+        var baseline = new QuoteHistoryEntry
+        {
+            QuoteNumber = "REAL-PROFIT-HASH",
+            Date = calculatedAt,
+            RealProfit = new RealProfitSnapshot
+            {
+                CalculatedAtUtc = calculatedAt,
+                Input = new RealProfitInput { QuoteRevenue = 2000 },
+                Result = new RealProfitResult { Profit = 750 }
+            }
+        };
+        var changed = new QuoteHistoryEntry
+        {
+            QuoteNumber = baseline.QuoteNumber,
+            Date = baseline.Date,
+            RealProfit = new RealProfitSnapshot
+            {
+                CalculatedAtUtc = calculatedAt,
+                Input = new RealProfitInput { QuoteRevenue = 2000 },
+                Result = new RealProfitResult { Profit = 620 }
+            }
+        };
+
+        Type hashService = typeof(SyncService).Assembly.GetType(
+            "EdilPaintPreventibiviGen.Services.QuoteSyncHashService",
+            throwOnError: true)!;
+        var compute = hashService.GetMethod("Compute")!;
+
+        Assert.NotEqual(
+            Assert.IsType<string>(compute.Invoke(null, [baseline])),
+            Assert.IsType<string>(compute.Invoke(null, [changed])));
+    }
+
+    [Fact]
+    public void QuoteSyncHashIncludesCustomerMaterialOrderFlag()
+    {
+        DateTime quoteDate = new(2026, 8, 27, 12, 30, 0, DateTimeKind.Utc);
+        var supplierOrder = new QuoteHistoryEntry
+        {
+            QuoteNumber = "CUSTOMER-ORDER-HASH",
+            Date = quoteDate,
+            CustomerName = "Cliente diretto",
+            SupplierName = "Cliente diretto",
+            MaterialsOrderedByCustomer = true
+        };
+        var regularOrder = new QuoteHistoryEntry
+        {
+            QuoteNumber = supplierOrder.QuoteNumber,
+            Date = supplierOrder.Date,
+            CustomerName = supplierOrder.CustomerName,
+            SupplierName = supplierOrder.SupplierName,
+            MaterialsOrderedByCustomer = false
+        };
+
+        Type hashService = typeof(SyncService).Assembly.GetType(
+            "EdilPaintPreventibiviGen.Services.QuoteSyncHashService",
+            throwOnError: true)!;
+        var compute = hashService.GetMethod("Compute")!;
+
+        Assert.NotEqual(
+            Assert.IsType<string>(compute.Invoke(null, [supplierOrder])),
+            Assert.IsType<string>(compute.Invoke(null, [regularOrder])));
     }
 
     [Fact]
@@ -309,12 +428,14 @@ public sealed class RegressionTests
         Assert.False(HasExplicitPendingIdentityChange(local, database));
     }
 
-    [Fact]
-    public void PdfTemplateNormalizesLegacyCombinedTitleToCustomerNotesTitle()
+    [Theory]
+    [InlineData("NOTE E TERMINI DI PAGAMENTO")]
+    [InlineData("NOTE PER IL CLIENTE")]
+    public void PdfTemplateNormalizesLegacyNoteTitles(string legacyTitle)
     {
         var template = new PdfTemplateSettingsModel
         {
-            NotesTitle = "NOTE E TERMINI DI PAGAMENTO"
+            NotesTitle = legacyTitle
         };
 
         template.Normalize();
@@ -481,6 +602,7 @@ public sealed class RegressionTests
         };
         var settings = new MailSettingsModel
         {
+            SenderEmail = "ordini@edilpaint.test",
             SupplierOrderSubjectTemplate = "Ordine {OrderReference} - {SupplierName}",
             SupplierOrderBodyTemplate =
                 "Cliente: {CustomerName}\nPreventivo: {QuoteNumber}\nData: {Date}\n\n{Materials}"
@@ -489,12 +611,14 @@ public sealed class RegressionTests
         var draft = SupplierOrderMailService.CreateDraft(quote, suppliers, settings);
 
         Assert.Equal("ordini@fornitore.test", draft.Recipient);
+        Assert.Equal("ordini@edilpaint.test", draft.CcRecipients);
+        Assert.Contains("cc=ordini%40edilpaint.test", draft.MailToUri);
         Assert.Equal("Ordine Cantiere Alfa - Fornitore Test", draft.Subject);
         Assert.Contains("Cliente: Cliente Uno", draft.Body);
         Assert.Contains("Preventivo: PREV/42", draft.Body);
         Assert.Contains("Data: 25/07/2026", draft.Body);
-        Assert.Contains("- Vernice bianca — Quantità: 2", draft.Body);
-        Assert.Contains("- Pennello — Quantità: 3", draft.Body);
+        Assert.Contains("N.2 Vernice bianca", draft.Body);
+        Assert.Contains("N.3 Pennello", draft.Body);
         Assert.DoesNotContain("Confezione da 10 L", draft.Body);
     }
 
@@ -511,7 +635,54 @@ public sealed class RegressionTests
         var draft = SupplierOrderMailService.CreateDraft(quote, [], new MailSettingsModel());
 
         Assert.Equal("Ordine Riferimento Cliente Due", draft.Subject);
-        Assert.Equal("- Silicone — Quantità: 4", draft.Body);
+        Assert.Equal("N.4 Silicone", draft.Body);
+    }
+
+    [Fact]
+    public void SupplierOrderMailDoesNotDuplicateSenderInRecipients()
+    {
+        var settings = new MailSettingsModel { SenderEmail = "ordini@edilpaint.test" };
+
+        string copies = SupplierOrderMailService.EnsureSenderCopy(
+            "ordini@fornitore.test",
+            "ordini@edilpaint.test; amministrazione@edilpaint.test",
+            settings);
+        string senderAsRecipientCopies = SupplierOrderMailService.EnsureSenderCopy(
+            "ordini@edilpaint.test",
+            string.Empty,
+            settings);
+
+        Assert.Equal(
+            "ordini@edilpaint.test; amministrazione@edilpaint.test",
+            copies);
+        Assert.Equal(string.Empty, senderAsRecipientCopies);
+    }
+
+    [Fact]
+    public void CustomerMaterialOrderUsesCustomerOnlyForTheQuote()
+    {
+        var customer = new Customer
+        {
+            BusinessName = "Cliente diretto",
+            IsSupplier = false
+        };
+        var summary = new QuoteHistorySummary
+        {
+            CustomerName = customer.BusinessName,
+            SupplierName = "Fornitore precedente"
+        };
+
+        SupplierOrderAssignmentService.ApplyCustomerOrderChoice(summary, orderedByCustomer: true);
+
+        Assert.True(summary.MaterialsOrderedByCustomer);
+        Assert.Equal("Cliente diretto", summary.SupplierName);
+        Assert.False(customer.IsSupplier);
+
+        SupplierOrderAssignmentService.ApplyCustomerOrderChoice(summary, orderedByCustomer: false);
+
+        Assert.False(summary.MaterialsOrderedByCustomer);
+        Assert.Equal(string.Empty, summary.SupplierName);
+        Assert.False(customer.IsSupplier);
     }
 
     [Fact]
@@ -710,7 +881,14 @@ public sealed class RegressionTests
                 Revision = 7,
                 BaseRevision = 7,
                 HasPendingDatabaseWrite = true,
-                IsEditingExistingQuoteDraft = true
+                IsEditingExistingQuoteDraft = true,
+                MaterialsOrderedByCustomer = true,
+                RealProfit = new RealProfitSnapshot
+                {
+                    CalculatedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+                    Input = new RealProfitInput { QuoteRevenue = 1800, Workers = 2 },
+                    Result = new RealProfitResult { Profit = 640 }
+                }
             };
 
             await service.SaveAsync(draft);
@@ -722,6 +900,86 @@ public sealed class RegressionTests
             Assert.Equal(7, restored.Revision);
             Assert.Equal(7, restored.BaseRevision);
             Assert.True(restored.HasPendingDatabaseWrite);
+            Assert.True(restored.MaterialsOrderedByCustomer);
+            Assert.NotNull(restored.RealProfit);
+            Assert.Equal(1800, restored.RealProfit.Input.QuoteRevenue);
+            Assert.Equal(640, restored.RealProfit.Result.Profit);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
+    public async Task LocalQuoteStorePersistsRecalculatedRealProfit()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            var store = new LocalJsonStoreService(temporaryPath);
+            await store.SaveOrUpdateQuoteAsync(new QuoteHistoryEntry
+            {
+                QuoteNumber = "PREV/REAL-PROFIT",
+                Date = DateTime.Today
+            });
+            var snapshot = new RealProfitSnapshot
+            {
+                CalculatedAtUtc = DateTime.UtcNow,
+                CalculatedByDevice = "PC test",
+                Input = new RealProfitInput
+                {
+                    QuoteRevenue = 3200,
+                    Workers = 3,
+                    CompanyMaterials =
+                    [
+                        new CompanyMaterialCost { Name = "Nastro", Quantity = 6, UnitCost = 4.5 }
+                    ]
+                },
+                Result = new RealProfitResult { Profit = 1100, ProfitPercentage = 34.375 }
+            };
+
+            await store.UpdateQuoteRealProfitAsync("PREV/REAL-PROFIT", snapshot);
+            QuoteHistoryEntry restored = Assert.Single(await store.LoadHistoryAsync());
+
+            Assert.NotNull(restored.RealProfit);
+            Assert.Equal(3200, restored.RealProfit.Input.QuoteRevenue);
+            Assert.Equal(1100, restored.RealProfit.Result.Profit);
+            Assert.Equal("Nastro", Assert.Single(restored.RealProfit.Input.CompanyMaterials).Name);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
+    public async Task LocalQuoteStorePersistsCustomerMaterialOrderAssignment()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            var store = new LocalJsonStoreService(temporaryPath);
+            await store.SaveOrUpdateQuoteAsync(new QuoteHistoryEntry
+            {
+                QuoteNumber = "PREV/CUSTOMER-ORDER",
+                Date = DateTime.Today,
+                CustomerName = "Cliente diretto"
+            });
+
+            await store.UpdateQuoteSupplierInfoAsync(
+                "PREV/CUSTOMER-ORDER",
+                new QuoteSupplierInfo
+                {
+                    SupplierName = "Cliente diretto",
+                    MaterialsOrderedByCustomer = true,
+                    MaterialStatus = "Da ordinare"
+                });
+            QuoteHistoryEntry restored = Assert.Single(await store.LoadHistoryAsync());
+
+            Assert.True(restored.MaterialsOrderedByCustomer);
+            Assert.Equal("Cliente diretto", restored.SupplierName);
+            Assert.Equal("Da ordinare", restored.MaterialStatus);
         }
         finally
         {

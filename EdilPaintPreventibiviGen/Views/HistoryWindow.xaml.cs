@@ -372,6 +372,7 @@ public partial class HistoryWindow : Window
                 supplierDiscount,
                 customerIsSupplier,
                 _vm.PersonalMaterialsView,
+                snapshot => _historyService.UpdateRealProfitAsync(fullEntry.QuoteNumber, snapshot),
                 App.AppSettings.RealProfit)
             {
                 Owner = this
@@ -401,7 +402,23 @@ public partial class HistoryWindow : Window
         };
 
         if (win.ShowDialog() == true && win.SelectedResult != null)
+        {
+            entry.MaterialsOrderedByCustomer = false;
             entry.SupplierName = win.SelectedResult.BusinessName;
+        }
+    }
+
+    private void OnMaterialsOrderedByCustomerClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox checkBox ||
+            checkBox.DataContext is not QuoteHistorySummary entry)
+        {
+            return;
+        }
+
+        SupplierOrderAssignmentService.ApplyCustomerOrderChoice(
+            entry,
+            checkBox.IsChecked == true);
     }
 
     private async void OnSaveSupplierInfoClick(object sender, RoutedEventArgs e)
@@ -413,10 +430,13 @@ public partial class HistoryWindow : Window
         {
             _isSavingSupplierInfo = true;
             Mouse.OverrideCursor = Cursors.Wait;
+            if (entry.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(entry, orderedByCustomer: true);
 
             await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
             {
                 SupplierName = entry.SupplierName,
+                MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
                 MaterialOrderDate = entry.MaterialOrderDate,
                 ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
                 MaterialStatus = entry.MaterialStatus,
@@ -452,6 +472,9 @@ public partial class HistoryWindow : Window
 
         try
         {
+            if (entry.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(entry, orderedByCustomer: true);
+
             var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
             if (fullEntry == null)
             {
@@ -464,6 +487,7 @@ public partial class HistoryWindow : Window
             }
 
             fullEntry.SupplierName = entry.SupplierName;
+            fullEntry.MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer;
             fullEntry.MaterialOrderDate = entry.MaterialOrderDate;
             fullEntry.ExpectedDeliveryDate = entry.ExpectedDeliveryDate;
             fullEntry.MaterialStatus = entry.MaterialStatus;
@@ -499,6 +523,7 @@ public partial class HistoryWindow : Window
                 await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
                 {
                     SupplierName = entry.SupplierName,
+                    MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
                     MaterialOrderDate = entry.MaterialOrderDate,
                     ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
                     MaterialStatus = entry.MaterialStatus,

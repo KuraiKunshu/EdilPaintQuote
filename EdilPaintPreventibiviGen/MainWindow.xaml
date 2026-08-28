@@ -1271,7 +1271,7 @@
                     </Border>
                 </GroupBox>
 
-                <GroupBox Grid.Row="2" Header="Note per il cliente" Margin="0,10,0,0">
+                <GroupBox Grid.Row="2" Header="NOTE" Margin="0,10,0,0">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
