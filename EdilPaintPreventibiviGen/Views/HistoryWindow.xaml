@@ -1048,7 +1048,7 @@
                                     <Separator Margin="0,16,0,14"/>
 
                                     <StackPanel>
-                                        <TextBlock Text="Fornitori"
+                                        <TextBlock Text="Ordine materiali"
                                                    FontSize="15"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource DefaultTextBrush}"
@@ -1116,7 +1116,7 @@
                                                   Text="{Binding MaterialStatus, UpdateSourceTrigger=PropertyChanged}"
                                                   Margin="0,0,0,12"/>
 
-                                        <Button Content="Salva fornitori"
+                                        <Button Content="Salva ordine"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 HorizontalAlignment="Left"
                                                 Click="OnSaveSupplierInfoClick"/>

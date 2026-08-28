@@ -445,8 +445,8 @@ public partial class HistoryWindow : Window
 
             entry.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
             MessageBox.Show(
-                "Dati fornitori salvati.",
-                "Fornitori",
+                "Dati dell'ordine salvati.",
+                "Ordini",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -454,8 +454,8 @@ public partial class HistoryWindow : Window
         {
             Debug.WriteLine($"[SupplierInfo] Errore salvataggio: {ex.Message}");
             MessageBox.Show(
-                $"Errore durante il salvataggio dei dati fornitori:\n\n{ex.Message}",
-                "Fornitori",
+                $"Errore durante il salvataggio dell'ordine:\n\n{ex.Message}",
+                "Ordini",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -480,7 +480,7 @@ public partial class HistoryWindow : Window
             {
                 MessageBox.Show(
                     "Preventivo non trovato nello storico.",
-                    "Fornitori",
+                    "Ordini",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -496,7 +496,7 @@ public partial class HistoryWindow : Window
             {
                 MessageBox.Show(
                     "Seleziona prima un fornitore.",
-                    "Fornitori",
+                    "Ordini",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -507,7 +507,7 @@ public partial class HistoryWindow : Window
             {
                 MessageBox.Show(
                     "Il fornitore selezionato non ha un indirizzo email in anagrafica. La finestra verra' preparata senza destinatario.",
-                    "Fornitori",
+                    "Ordini",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -537,7 +537,7 @@ public partial class HistoryWindow : Window
             Debug.WriteLine($"[SupplierMail] Errore preparazione mail: {ex.Message}");
             MessageBox.Show(
                 $"Errore durante la gestione dell'ordine.\n\n{ex.Message}",
-                "Fornitori",
+                "Ordini",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
