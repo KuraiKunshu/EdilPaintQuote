@@ -245,11 +245,6 @@
             </Grid.RowDefinitions>
 
             <Grid Margin="0,0,0,14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
                 <Border BorderBrush="{StaticResource DangerRedBrush}"
                         BorderThickness="4,0,0,0"
                         Padding="14,2,0,2">
@@ -265,13 +260,6 @@
                                    Text="Caricamento..."/>
                     </StackPanel>
                 </Border>
-
-                <Button Grid.Column="1"
-                        Content="&#xE711;"
-                        Style="{StaticResource IconButtonStyle}"
-                        VerticalAlignment="Top"
-                        ToolTip="Chiudi"
-                        Click="OnCloseClick"/>
             </Grid>
 
             <Border Grid.Row="1"

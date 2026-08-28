@@ -342,5 +342,4 @@ public partial class SuppliersWindow : Window
         await RefreshAsync(TxtSearch.Text?.Trim() ?? string.Empty);
     }
 
-    private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 }
