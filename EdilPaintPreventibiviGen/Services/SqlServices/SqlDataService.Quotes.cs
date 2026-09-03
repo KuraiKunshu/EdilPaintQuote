@@ -749,7 +749,9 @@ public partial class SqlDataService
         }
 
         return await query
-            .OrderByDescending(x => x.Date)
+            .OrderByDescending(x => x.MaterialOrderDate.HasValue)
+            .ThenByDescending(x => x.MaterialOrderDate)
+            .ThenByDescending(x => x.Date)
             .Take(Math.Max(1, take))
             .Select(x => new QuoteHistorySummary
             {

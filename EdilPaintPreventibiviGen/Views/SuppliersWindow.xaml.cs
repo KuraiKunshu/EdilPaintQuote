@@ -49,6 +49,8 @@ public partial class SuppliersWindow : Window
         GridSuppliers.ItemsSource = _quotes;
         CmbStatusFilter.ItemsSource = MaterialStatusFilterOptions;
         CmbStatusFilter.SelectedIndex = 0;
+        CmbSortOrder.ItemsSource = SupplierOrderSortService.Options;
+        CmbSortOrder.SelectedIndex = 0;
         Loaded += async (_, _) => await RefreshAsync();
         Closed += (_, _) =>
         {
@@ -78,6 +80,7 @@ public partial class SuppliersWindow : Window
             BtnSearch.IsEnabled = false;
             BtnRefresh.IsEnabled = false;
             CmbStatusFilter.IsEnabled = false;
+            CmbSortOrder.IsEnabled = false;
 
             int take = Math.Clamp(App.AppSettings.App.NumberOfQuote <= 0 ? 100 : App.AppSettings.App.NumberOfQuote, 1, 250);
             var summaries = await _historyService.LoadSupplierOrderSummariesAsync(
@@ -89,7 +92,7 @@ public partial class SuppliersWindow : Window
 
             _loadedQuotes.Clear();
             _loadedQuotes.AddRange(summaries);
-            ApplyStatusFilter();
+            ApplyOrderView();
             TxtFooterStatus.Text = $"Aggiornato alle {DateTime.Now:HH:mm}";
         }
         catch (OperationCanceledException)
@@ -112,10 +115,11 @@ public partial class SuppliersWindow : Window
             BtnSearch.IsEnabled = true;
             BtnRefresh.IsEnabled = true;
             CmbStatusFilter.IsEnabled = true;
+            CmbSortOrder.IsEnabled = true;
         }
     }
 
-    private void ApplyStatusFilter()
+    private void ApplyOrderView()
     {
         string selectedStatus = CmbStatusFilter.SelectedItem as string ?? "Tutti gli stati";
         IEnumerable<QuoteHistorySummary> filtered = _loadedQuotes;
@@ -132,8 +136,12 @@ public partial class SuppliersWindow : Window
                 StringComparison.OrdinalIgnoreCase));
         }
 
+        SupplierOrderSortMode sortMode = CmbSortOrder.SelectedItem is SupplierOrderSortOption sortOption
+            ? sortOption.Mode
+            : SupplierOrderSortMode.OrderDateDescending;
+
         _quotes.Clear();
-        foreach (QuoteHistorySummary summary in filtered)
+        foreach (QuoteHistorySummary summary in SupplierOrderSortService.Sort(filtered, sortMode))
             _quotes.Add(summary);
 
         string visibleLabel = _quotes.Count == 1 ? "1 ordine" : $"{_quotes.Count} ordini";
@@ -175,7 +183,7 @@ public partial class SuppliersWindow : Window
 
             summary.LastModifiedByDevice = deviceName;
             TxtFooterStatus.Text = $"Ordine del preventivo {summary.QuoteNumber} salvato";
-            ApplyStatusFilter();
+            ApplyOrderView();
         }
         catch (Exception ex)
         {
@@ -330,7 +338,13 @@ public partial class SuppliersWindow : Window
     private void OnStatusFilterChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_isRefreshing)
-            ApplyStatusFilter();
+            ApplyOrderView();
+    }
+
+    private void OnSortOrderChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isRefreshing)
+            ApplyOrderView();
     }
 
     private async void OnSearchKeyDown(object sender, KeyEventArgs e)

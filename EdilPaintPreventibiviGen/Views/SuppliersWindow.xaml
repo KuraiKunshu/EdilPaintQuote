@@ -272,7 +272,9 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="190"/>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="220"/>
                         <ColumnDefinition Width="12"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="8"/>
@@ -298,15 +300,24 @@
                                   SelectionChanged="OnStatusFilterChanged"/>
                     </StackPanel>
 
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="ORDINA PER" Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="CmbSortOrder"
+                                  Height="38"
+                                  Padding="8,5"
+                                  VerticalContentAlignment="Center"
+                                  SelectionChanged="OnSortOrderChanged"/>
+                    </StackPanel>
+
                     <Button x:Name="BtnSearch"
-                            Grid.Column="4"
+                            Grid.Column="6"
                             Content="Cerca"
                             Style="{StaticResource ActionButtonStyle}"
                             Background="{StaticResource DangerRedBrush}"
                             VerticalAlignment="Bottom"
                             Click="OnSearchClick"/>
                     <Button x:Name="BtnRefresh"
-                            Grid.Column="6"
+                            Grid.Column="8"
                             Content="Aggiorna"
                             Style="{StaticResource SecondaryActionButtonStyle}"
                             VerticalAlignment="Bottom"
