@@ -419,25 +419,36 @@
                                             </Border>
 
                                             <Border Style="{StaticResource SectionStyle}">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <StackPanel>
-                                                        <TextBlock Text="Aggiornamenti"
-                                                                   Style="{StaticResource SectionTitleStyle}"/>
-                                                        <TextBlock Style="{StaticResource HintStyle}"
-                                                                   Margin="0"
-                                                                   Text="Avvia lo script updater configurato. L'app verrà chiusa durante la sostituzione dei file."/>
-                                                    </StackPanel>
-                                                    <Button Grid.Column="1"
-                                                            Content="Aggiorna ora"
-                                                            Margin="14,0,0,0"
-                                                            VerticalAlignment="Center"
-                                                            Style="{StaticResource CompactActionButtonStyle}"
-                                                            Click="OnRunUpdaterClick"/>
-                                                </Grid>
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="Aggiornamenti"
+                                                                       Style="{StaticResource SectionTitleStyle}"/>
+                                                            <TextBlock Style="{StaticResource HintStyle}"
+                                                                       Margin="0"
+                                                                       Text="Avvia lo script updater configurato. L'app verrà chiusa durante la sostituzione dei file."/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1"
+                                                                Content="Aggiorna ora"
+                                                                Margin="14,0,0,0"
+                                                                VerticalAlignment="Center"
+                                                                Style="{StaticResource CompactActionButtonStyle}"
+                                                                Click="OnRunUpdaterClick"/>
+                                                    </Grid>
+
+                                                    <CheckBox x:Name="ChkAutomaticUpdates"
+                                                              Margin="0,14,0,0"
+                                                              Content="Cerca e installa automaticamente gli aggiornamenti all'accesso a Windows"
+                                                              Checked="OnAutomaticUpdatesChanged"
+                                                              Unchecked="OnAutomaticUpdatesChanged"/>
+                                                    <TextBlock x:Name="TxtAutomaticUpdatesStatus"
+                                                               Style="{StaticResource HintStyle}"
+                                                               Text="Verifica configurazione aggiornamenti automatici..."/>
+                                                </StackPanel>
                                             </Border>
                                         </StackPanel>
 

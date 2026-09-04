@@ -6,6 +6,18 @@ namespace EdilPaintPreventibiviGen.Tests;
 public sealed class UpdaterLauncherServiceTests
 {
     [Fact]
+    public void AutoUpdaterArgumentsQuoteTheResolvedScriptPath()
+    {
+        string scriptPath = Path.Combine("C:\\Program Files", "EdilPaint", "Update-EdilPaint.ps1");
+
+        string arguments = UpdaterAutoUpdateService.BuildUpdaterArguments(scriptPath);
+
+        Assert.Equal(
+            "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\\Program Files\\EdilPaint\\Update-EdilPaint.ps1\"",
+            arguments);
+    }
+
+    [Fact]
     public void ResolverUsesLocationFileWhenUpdaterIsOutsideInstallTree()
     {
         string root = Path.Combine(

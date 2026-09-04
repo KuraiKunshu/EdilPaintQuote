@@ -19,6 +19,7 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<WindowMaterialRuleEditor> _windowMaterialRuleEditors = [];
     private readonly string _displayedCatalogIdentity;
     private bool _catalogIdsCompatible;
+    private bool _updatingAutomaticUpdatesControl;
 
     public IReadOnlyList<Item> LaborCatalog { get; }
     public IReadOnlyList<Item> CompanyMaterialCatalog { get; }
@@ -125,6 +126,7 @@ public partial class SettingsWindow : Window
         TxtPdfFooterText.Text = template.FooterText;
         TxtPdfSignatureText.Text = template.SignatureText;
         ChkPdfShowTemplateName.IsChecked = template.ShowTemplateName;
+        RefreshAutomaticUpdateStatus();
 
         if (database.RequiresCredentialReset)
         {
@@ -638,6 +640,86 @@ public partial class SettingsWindow : Window
                 "Aggiornamento",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+        }
+    }
+
+    private async void OnAutomaticUpdatesChanged(object sender, RoutedEventArgs e)
+    {
+        if (_updatingAutomaticUpdatesControl)
+            return;
+
+        try
+        {
+            if (ChkAutomaticUpdates.IsChecked == true)
+            {
+                string? scriptPath = GetConfiguredUpdaterScriptPath();
+                if (string.IsNullOrWhiteSpace(scriptPath))
+                    return;
+
+                AutomaticUpdateStatus status = await Task.Run(
+                    () => UpdaterAutoUpdateService.Enable(scriptPath));
+                TxtAutomaticUpdatesStatus.Text = status.Description;
+            }
+            else
+            {
+                await Task.Run(UpdaterAutoUpdateService.Disable);
+                TxtAutomaticUpdatesStatus.Text = "Disattivati su questo PC.";
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"Impossibile modificare gli aggiornamenti automatici.\n\n{ex.Message}",
+                "Aggiornamenti automatici",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            RefreshAutomaticUpdateStatus();
+        }
+    }
+
+    private string? GetConfiguredUpdaterScriptPath()
+    {
+        string? scriptPath = UpdaterLauncherService.ResolveUpdaterScriptPath();
+        if (string.IsNullOrWhiteSpace(scriptPath))
+        {
+            MessageBox.Show(
+                this,
+                "Script updater non trovato. Prima installa o configura l'updater, poi potrai attivare gli aggiornamenti automatici.",
+                "Aggiornamenti automatici",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return null;
+        }
+
+        string settingsPath = Path.Combine(Path.GetDirectoryName(scriptPath)!, "updater-settings.json");
+        if (File.Exists(settingsPath))
+            return scriptPath;
+
+        MessageBox.Show(
+            this,
+            $"File updater-settings.json non trovato accanto allo script.\n\nPercorso atteso:\n{settingsPath}",
+            "Aggiornamenti automatici",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+        return null;
+    }
+
+    private void RefreshAutomaticUpdateStatus()
+    {
+        _updatingAutomaticUpdatesControl = true;
+        try
+        {
+            AutomaticUpdateStatus status = UpdaterAutoUpdateService.GetStatus();
+            ChkAutomaticUpdates.IsChecked = status.IsEnabled;
+            TxtAutomaticUpdatesStatus.Text = status.Description;
+        }
+        finally
+        {
+            _updatingAutomaticUpdatesControl = false;
         }
     }
 
