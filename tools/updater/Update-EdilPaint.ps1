@@ -56,23 +56,56 @@ function New-DefaultSettingsFile {
 function Exit-Updater {
     param([int]$Code)
 
-    if ($WindowCloseDelaySeconds -gt 0) {
-        Write-Host ""
-        Write-Host "La finestra si chiudera' tra $WindowCloseDelaySeconds secondi..."
-        Start-Sleep -Seconds $WindowCloseDelaySeconds
-    }
-
     exit $Code
 }
 
-if (-not (Test-Path -LiteralPath $SettingsPath)) {
-    New-DefaultSettingsFile -Path $SettingsPath
-    Write-Host "Creato file impostazioni: $SettingsPath"
-    Write-Host "Imposta InstallPath e rilancia lo script."
-    Exit-Updater 1
+function Show-UpdateFailure {
+    param(
+        [Parameter(Mandatory = $true)][string]$Message,
+        [Parameter(Mandatory = $true)][string]$LogPath
+    )
+
+    $dialogMessage = "L'aggiornamento di EdilPaint non e' stato completato.`n`nDettagli:`n$Message`n`nLog:`n$LogPath"
+
+    try {
+        Add-Type -AssemblyName PresentationFramework
+        [System.Windows.MessageBox]::Show(
+            $dialogMessage,
+            "Aggiornamento EdilPaint non riuscito",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error) | Out-Null
+    }
+    catch {
+        try {
+            $shell = New-Object -ComObject WScript.Shell
+            $shell.Popup($dialogMessage, 0, "Aggiornamento EdilPaint non riuscito", 16) | Out-Null
+        }
+        catch {
+            # Il log rimane disponibile anche sui PC dove Windows non puo' mostrare finestre.
+        }
+    }
 }
 
-$settings = Get-Content -LiteralPath $SettingsPath -Raw | ConvertFrom-Json
+$logPath = Join-Path $scriptRoot "logs\update.log"
+
+function Write-Log {
+    param([string]$Message)
+
+    $line = "[{0:yyyy-MM-dd HH:mm:ss}] {1}" -f (Get-Date), $Message
+    Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8
+}
+
+try {
+    New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
+
+    if (-not (Test-Path -LiteralPath $SettingsPath)) {
+        New-DefaultSettingsFile -Path $SettingsPath
+        Write-Log "ERRORE: creato file impostazioni; configura InstallPath e rilancia lo script."
+        Show-UpdateFailure -Message "Creato il file updater-settings.json. Configura InstallPath e riprova." -LogPath $logPath
+        Exit-Updater 1
+    }
+
+    $settings = Get-Content -LiteralPath $SettingsPath -Raw | ConvertFrom-Json
 
 function Get-Setting {
     param(
@@ -105,16 +138,19 @@ $logPath = Expand-ConfiguredPath ([string](Get-Setting -Name "LogPath" -DefaultV
 $statePath = Join-Path $scriptRoot "state"
 $publishPath = Join-Path $scriptRoot "publish"
 $deployedCommitFile = Join-Path $statePath "deployed-commit.txt"
+$lastUpdateFile = Join-Path $scriptRoot "ultimo-aggiornamento.txt"
 $sourceGitSafeDirectory = [System.IO.Path]::GetFullPath($sourcePath).Replace("\", "/")
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
 
-function Write-Log {
-    param([string]$Message)
+function Save-LastUpdateInfo {
+    param([Parameter(Mandatory = $true)][string]$Commit)
 
-    $line = "[{0:yyyy-MM-dd HH:mm:ss}] {1}" -f (Get-Date), $Message
-    Write-Host $line
-    Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8
+    $contents = @(
+        "Ultimo aggiornamento completato: {0:yyyy-MM-dd HH:mm:ss}" -f (Get-Date),
+        "Commit: $Commit"
+    )
+    Set-Content -LiteralPath $lastUpdateFile -Value $contents -Encoding UTF8
 }
 
 function Invoke-External {
@@ -200,7 +236,6 @@ function Copy-PublishedFiles {
     }
 }
 
-try {
     if ([string]::IsNullOrWhiteSpace($installPath)) {
         throw "InstallPath non e' configurato in $SettingsPath"
     }
@@ -291,12 +326,15 @@ try {
     Copy-PublishedFiles -From $publishPath -To $installPath
 
     New-Item -ItemType Directory -Path $statePath -Force | Out-Null
+    Save-LastUpdateInfo -Commit $remoteCommit
     Set-Content -LiteralPath $deployedCommitFile -Value $remoteCommit -Encoding UTF8
 
     Write-Log "Aggiornamento completato."
     Exit-Updater 0
 }
 catch {
-    Write-Log "ERRORE: $($_.Exception.Message)"
+    $errorMessage = $_.Exception.Message
+    Write-Log "ERRORE: $errorMessage"
+    Show-UpdateFailure -Message $errorMessage -LogPath $logPath
     Exit-Updater 1
 }

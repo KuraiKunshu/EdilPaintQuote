@@ -63,7 +63,7 @@ public static class UpdaterLauncherService
         if (string.IsNullOrWhiteSpace(workingDirectory))
             workingDirectory = AppContext.BaseDirectory;
 
-        string arguments = $"-NoProfile -ExecutionPolicy Bypass -File {QuoteArgument(scriptPath)}";
+        string arguments = $"-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File {QuoteArgument(scriptPath)}";
         if (windowCloseDelaySeconds > 0)
             arguments += $" -WindowCloseDelaySeconds {windowCloseDelaySeconds}";
 
@@ -73,7 +73,7 @@ public static class UpdaterLauncherService
             Arguments = arguments,
             WorkingDirectory = workingDirectory,
             UseShellExecute = true,
-            WindowStyle = ProcessWindowStyle.Normal
+            WindowStyle = ProcessWindowStyle.Hidden
         });
 
         if (process == null)

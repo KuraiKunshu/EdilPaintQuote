@@ -193,7 +193,7 @@ public static class UpdaterAutoUpdateService
             throw new ArgumentException("Il percorso dello script updater è obbligatorio.", nameof(updaterScriptPath));
 
         string fullPath = Path.GetFullPath(updaterScriptPath);
-        return $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File {QuoteArgument(fullPath)}";
+        return $"-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File {QuoteArgument(fullPath)}";
     }
 
     private static dynamic CreateSchedulerService()

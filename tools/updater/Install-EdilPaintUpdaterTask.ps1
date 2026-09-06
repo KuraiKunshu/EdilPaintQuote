@@ -67,7 +67,7 @@ catch {
 }
 
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-$actionArgument = "-NoProfile -ExecutionPolicy Bypass -File `"$targetScript`""
+$actionArgument = "-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$targetScript`""
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgument
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited

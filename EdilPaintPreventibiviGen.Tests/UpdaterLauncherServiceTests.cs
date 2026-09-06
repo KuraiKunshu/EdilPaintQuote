@@ -13,7 +13,7 @@ public sealed class UpdaterLauncherServiceTests
         string arguments = UpdaterAutoUpdateService.BuildUpdaterArguments(scriptPath);
 
         Assert.Equal(
-            "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\\Program Files\\EdilPaint\\Update-EdilPaint.ps1\"",
+            "-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File \"C:\\Program Files\\EdilPaint\\Update-EdilPaint.ps1\"",
             arguments);
     }
 
