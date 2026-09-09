@@ -17,6 +17,7 @@ public partial class RealProfitWindow : Window
     private readonly ObservableCollection<ProfitMaterialCost> _materials;
     private readonly ObservableCollection<CompanyMaterialCost> _companyMaterials = [];
     private readonly List<Item> _availableCompanyMaterials;
+    private readonly Func<RealProfitSnapshot, Task> _saveCalculation;
 
     private readonly bool _excludeMaterials;
 
@@ -25,19 +26,23 @@ public partial class RealProfitWindow : Window
         double supplierDiscount,
         bool customerIsSupplier,
         IEnumerable<Item> companyMaterials,
+        Func<RealProfitSnapshot, Task> saveCalculation,
         RealProfitSettingsModel? defaults = null)
     {
         InitializeComponent();
         defaults ??= new RealProfitSettingsModel();
         defaults.Normalize();
         _quote = quote;
-        _excludeMaterials = customerIsSupplier;
+        _saveCalculation = saveCalculation ?? throw new ArgumentNullException(nameof(saveCalculation));
+        RealProfitSnapshot? savedCalculation = quote.RealProfit;
+        RealProfitInput? savedInput = savedCalculation?.Input;
+        _excludeMaterials = savedInput?.ExcludeMaterials ?? customerIsSupplier;
         _availableCompanyMaterials = companyMaterials
             .Where(material => material.IsCompanyMaterial)
             .OrderBy(material => material.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        _materials = new ObservableCollection<ProfitMaterialCost>(quote.Materials.Select(material =>
-            new ProfitMaterialCost
+        IEnumerable<ProfitMaterialCost> materialCosts = savedInput == null
+            ? quote.Materials.Select(material => new ProfitMaterialCost
             {
                 Name = material.Name,
                 Quantity = material.Quantity,
@@ -46,30 +51,68 @@ public partial class RealProfitWindow : Window
                     (1 - Math.Clamp(material.Discount, 0, 100) / 100) *
                     (1 - Math.Clamp(quote.MaterialDiscount, 0, 100) / 100) *
                     100
-            }));
+            })
+            : (savedInput.Materials ?? []).Select(material => new ProfitMaterialCost
+            {
+                Name = material.Name,
+                Quantity = material.Quantity,
+                CustomerUnitPrice = material.CustomerUnitPrice,
+                CustomerDiscount = material.CustomerDiscount
+            });
+        _materials = new ObservableCollection<ProfitMaterialCost>(materialCosts);
 
-        if (!_excludeMaterials)
+        if (savedInput != null)
+        {
+            foreach (CompanyMaterialCost material in savedInput.CompanyMaterials ?? [])
+            {
+                _companyMaterials.Add(new CompanyMaterialCost
+                {
+                    Name = material.Name,
+                    Quantity = material.Quantity,
+                    UnitCost = material.UnitCost,
+                    Source = material.Source
+                });
+            }
+        }
+
+        if (!_excludeMaterials && savedInput == null)
             AddAutomaticWindowMaterials(defaults);
 
         GridMaterialCosts.ItemsSource = _materials;
         CboCompanyMaterialSearch.ItemsSource = _availableCompanyMaterials;
         GridCompanyMaterials.ItemsSource = _companyMaterials;
-        TxtQuoteInfo.Text = customerIsSupplier
+        TxtQuoteInfo.Text = _excludeMaterials
             ? $"Preventivo {quote.QuoteNumber} — cliente fornitore: conteggiata solo la manodopera"
             : $"Preventivo {quote.QuoteNumber} — {quote.CustomerName}";
-        double revenue = customerIsSupplier
+        double defaultRevenue = customerIsSupplier
             ? quote.Labors.Sum(labor => labor.TotalPrice) *
               (1 - Math.Clamp(quote.LaborDiscount, 0, 100) / 100)
             : quote.Imponibile;
-        TxtRevenue.Text = revenue.ToString("0.00", CultureInfo.CurrentCulture);
-        TxtSupplierDiscount.Text = supplierDiscount.ToString("0.##", CultureInfo.CurrentCulture);
-        TxtProfitReduction.Text = defaults.ProfitReductionPercentage.ToString("0.##", CultureInfo.CurrentCulture);
-        TxtWorkers.Text = defaults.Workers.ToString(CultureInfo.CurrentCulture);
-        TxtDays.Text = defaults.Days.ToString("0.##", CultureInfo.CurrentCulture);
-        TxtHoursPerDay.Text = defaults.HoursPerDay.ToString("0.##", CultureInfo.CurrentCulture);
-        TxtHourlyCost.Text = defaults.HourlyCost.ToString("0.##", CultureInfo.CurrentCulture);
-        TabMaterials.IsEnabled = !customerIsSupplier;
-        ShowResult(RealProfitCalculator.Calculate(BuildInput()));
+        TxtRevenue.Text = (savedInput?.QuoteRevenue ?? defaultRevenue)
+            .ToString("0.00", CultureInfo.CurrentCulture);
+        TxtSupplierDiscount.Text = (savedInput?.SupplierDiscount ?? supplierDiscount)
+            .ToString("0.##", CultureInfo.CurrentCulture);
+        TxtProfitReduction.Text = (savedInput?.ProfitReductionPercentage ?? defaults.ProfitReductionPercentage)
+            .ToString("0.##", CultureInfo.CurrentCulture);
+        TxtWorkers.Text = (savedInput?.Workers ?? defaults.Workers)
+            .ToString(CultureInfo.CurrentCulture);
+        TxtDays.Text = (savedInput?.Days ?? defaults.Days)
+            .ToString("0.##", CultureInfo.CurrentCulture);
+        TxtHoursPerDay.Text = (savedInput?.HoursPerDay ?? defaults.HoursPerDay)
+            .ToString("0.##", CultureInfo.CurrentCulture);
+        TxtHourlyCost.Text = (savedInput?.HourlyCost ?? defaults.HourlyCost)
+            .ToString("0.##", CultureInfo.CurrentCulture);
+        TabMaterials.IsEnabled = !_excludeMaterials;
+
+        if (savedCalculation != null)
+        {
+            ShowResult(savedCalculation.Result);
+            ShowSavedStatus(savedCalculation);
+        }
+        else
+        {
+            ShowResult(RealProfitCalculator.Calculate(BuildInput()));
+        }
     }
 
     private RealProfitInput BuildInput() => new()
@@ -88,15 +131,52 @@ public partial class RealProfitWindow : Window
             .ToList()
     };
 
-    private void OnCalculateClick(object sender, RoutedEventArgs e)
+    private async void OnCalculateClick(object sender, RoutedEventArgs e)
     {
+        RealProfitInput currentInput;
+        RealProfitResult currentResult;
         try
         {
-            ShowResult(RealProfitCalculator.Calculate(BuildInput()));
+            currentInput = BuildInput();
+            currentResult = RealProfitCalculator.Calculate(currentInput);
+            ShowResult(currentResult);
         }
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message, "Dati non validi", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        BtnCalculate.IsEnabled = false;
+        TxtSaveStatus.Text = "Salvataggio del calcolo in corso...";
+        TxtSaveStatus.Foreground = (Brush)FindResource("PrimaryBlueBrush");
+        try
+        {
+            var snapshot = new RealProfitSnapshot
+            {
+                CalculatedAtUtc = DateTime.UtcNow,
+                CalculatedByDevice = DeviceNameService.GetCurrentDeviceName(),
+                Input = CloneRealProfitInput(currentInput),
+                Result = currentResult
+            };
+
+            await _saveCalculation(snapshot);
+            _quote.RealProfit = snapshot;
+            ShowSavedStatus(snapshot);
+        }
+        catch (Exception ex)
+        {
+            TxtSaveStatus.Text = "Calcolo aggiornato, ma non salvato.";
+            TxtSaveStatus.Foreground = (Brush)FindResource("DangerRedBrush");
+            MessageBox.Show(
+                $"Il guadagno è stato ricalcolato, ma non è stato possibile salvarlo.\n\n{ex.Message}",
+                "Salvataggio non riuscito",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            BtnCalculate.IsEnabled = true;
         }
     }
 
@@ -235,6 +315,16 @@ public partial class RealProfitWindow : Window
         TxtProfitState.Foreground = resultBrush;
         TxtProfit.Foreground = resultBrush;
         ProfitCard.BorderBrush = resultBrush;
+    }
+
+    private void ShowSavedStatus(RealProfitSnapshot snapshot)
+    {
+        DateTime savedAt = snapshot.CalculatedAtUtc.ToLocalTime();
+        string device = string.IsNullOrWhiteSpace(snapshot.CalculatedByDevice)
+            ? string.Empty
+            : $" da {snapshot.CalculatedByDevice}";
+        TxtSaveStatus.Text = $"Salvato il {savedAt:dd/MM/yyyy 'alle' HH:mm}{device}.";
+        TxtSaveStatus.Foreground = (Brush)FindResource("SuccessGreenBrush");
     }
 
     private void AddAutomaticWindowMaterials(RealProfitSettingsModel settings)

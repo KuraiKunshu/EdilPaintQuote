@@ -24,7 +24,7 @@ public class FallbackDataService : IDataService
     private DateTime _databaseUnavailableSince = DateTime.MinValue;
     private static readonly TimeSpan DbRetryCooldown = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan DbConnectionAttemptTimeout = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan DbStartupWakeupTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan DbStartupTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan DbInteractiveWakeupTimeout = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan DbWakeupRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DbSchemaInitializationTimeout = TimeSpan.FromSeconds(60);
@@ -63,14 +63,20 @@ public class FallbackDataService : IDataService
     }
 
     public bool CanSynchronize => IsDatabaseAvailable();
+    public bool IsOfflineMode => !_isDatabaseAvailable;
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         Debug.WriteLine("[FallbackDataService] InitializeAsync starting...");
+        using var startupTimeoutCts = new CancellationTokenSource(DbStartupTimeout);
+        using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            startupTimeoutCts.Token);
+
         try
         {
-            await EnsureDatabaseReachableAsync(cancellationToken);
-            await InitializeDatabaseSchemaAsync(cancellationToken);
+            await EnsureDatabaseReachableAsync(startupCts.Token);
+            await InitializeDatabaseSchemaAsync(startupCts.Token);
             
             _isDatabaseAvailable = true;
             Debug.WriteLine("[FallbackDataService] ✅ Database initialized successfully");
@@ -78,7 +84,7 @@ public class FallbackDataService : IDataService
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             SetDatabaseUnavailable(
-                $"Timeout inizializzazione SQL. Risveglio: {DbStartupWakeupTimeout.TotalSeconds:F0}s; schema: {DbSchemaInitializationTimeout.TotalSeconds:F0}s.");
+                $"Timeout inizializzazione SQL dopo {DbStartupTimeout.TotalSeconds:F0}s.");
             Debug.WriteLine("[FallbackDataService] Database initialization timed out. Using local fallback.");
         }
         catch (TimeoutException ex)
@@ -98,7 +104,7 @@ public class FallbackDataService : IDataService
 
     private async Task EnsureDatabaseReachableAsync(CancellationToken cancellationToken)
     {
-        await EnsureDatabaseReachableAsync(DbStartupWakeupTimeout, cancellationToken);
+        await EnsureDatabaseReachableAsync(DbStartupTimeout, cancellationToken);
     }
 
     private async Task EnsureDatabaseReachableAsync(TimeSpan wakeupTimeout, CancellationToken cancellationToken)
@@ -922,6 +928,8 @@ public class FallbackDataService : IDataService
             MaterialOrderDate = entry.MaterialOrderDate,
             ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
             MaterialStatus = entry.MaterialStatus,
+            MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
+            RealProfit = entry.RealProfit,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             Revision = entry.Revision,
@@ -1227,6 +1235,39 @@ public class FallbackDataService : IDataService
         }
     }
 
+    public async Task UpdateQuoteRealProfitAsync(
+        string quoteNumber,
+        RealProfitSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (string.IsNullOrWhiteSpace(snapshot.CalculatedByDevice))
+            snapshot.CalculatedByDevice = DeviceNameService.GetCurrentDeviceName();
+        if (snapshot.CalculatedAtUtc == default)
+            snapshot.CalculatedAtUtc = DateTime.UtcNow;
+
+        await EnsureDatabaseRequiredAsync(
+            $"Salvataggio guadagno reale preventivo {quoteNumber}",
+            cancellationToken);
+
+        try
+        {
+            await _sqlService.UpdateQuoteRealProfitAsync(quoteNumber, snapshot, cancellationToken);
+            QuoteHistoryEntry? databaseVersion = await _sqlService.GetQuoteByNumberAsync(
+                quoteNumber,
+                cancellationToken,
+                includeAttachments: false);
+            if (databaseVersion != null)
+                await _localStore.BulkUpdateQuotesAsync([databaseVersion], cancellationToken);
+            InvalidateQuoteNumbersCaches();
+        }
+        catch (Exception ex)
+        {
+            HandleDatabaseException("UpdateQuoteRealProfitAsync", ex);
+            throw;
+        }
+    }
+
     public async Task<HashSet<string>> GetAllQuoteNumbersAsync()
     {
         await EnsureDatabaseRequiredAsync("Caricamento numeri preventivo");
@@ -1246,8 +1287,6 @@ public class FallbackDataService : IDataService
 
     public async Task<List<Customer>> GetCustomersAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureDatabaseRequiredAsync("Caricamento clienti", cancellationToken);
-
         if (IsDatabaseAvailable())
         {
             try
@@ -1260,10 +1299,18 @@ public class FallbackDataService : IDataService
                     .Kept
                     .ToList();
             }
-            catch(Exception ex) { HandleDatabaseException("GetCustomersAsync", ex); }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (IsDatabaseConnectivityException(ex))
+            {
+                HandleDatabaseException("GetCustomersAsync", ex);
+            }
         }
 
-        throw CreateDatabaseUnavailableException("Caricamento clienti");
+        Debug.WriteLine("[FallbackDataService] Caricamento clienti dalla cache locale.");
+        return await _localStore.LoadCustomersAsync(cancellationToken);
     }
 
     public async Task<Customer> AddCustomerAsync(Customer customer, CancellationToken cancellationToken = default)
@@ -1382,8 +1429,6 @@ public class FallbackDataService : IDataService
 
     public async Task<Company?> GetCompanyAsync()
     {
-        await EnsureDatabaseRequiredAsync("Caricamento impostazioni azienda");
-
         if (IsDatabaseAvailable())
         {
             try
@@ -1400,14 +1445,14 @@ public class FallbackDataService : IDataService
 
                 return company;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsDatabaseConnectivityException(ex))
             {
                 HandleDatabaseException("GetCompanyAsync", ex);
-                throw;
             }
         }
 
-        throw CreateDatabaseUnavailableException("Caricamento impostazioni azienda");
+        Debug.WriteLine("[FallbackDataService] Caricamento impostazioni azienda dalla cache locale.");
+        return await _localStore.LoadCompanyAsync();
     }
 
     public async Task SaveCompanyAsync(Company company, string selectedLogo)
@@ -1428,8 +1473,6 @@ public class FallbackDataService : IDataService
 
     public async Task<List<Item>> GetLaborCatalogAsync()
     {
-        await EnsureDatabaseRequiredAsync("Caricamento catalogo lavorazioni");
-
         if (IsDatabaseAvailable())
         {
             try
@@ -1440,14 +1483,14 @@ public class FallbackDataService : IDataService
                     await _localStore.SaveLaborCatalogAsync(labors);
                 return labors;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsDatabaseConnectivityException(ex))
             {
                 HandleDatabaseException("GetLaborCatalogAsync", ex);
-                throw;
             }
         }
 
-        throw CreateDatabaseUnavailableException("Caricamento catalogo lavorazioni");
+        Debug.WriteLine("[FallbackDataService] Caricamento lavorazioni dalla cache locale.");
+        return await _localStore.LoadLaborCatalogAsync();
     }
 
     public async Task SaveLaborCatalogAsync(IEnumerable<Item> labors)
@@ -1478,8 +1521,6 @@ public class FallbackDataService : IDataService
 
     public async Task<List<Item>> GetPersonalMaterialsAsync()
     {
-        await EnsureDatabaseRequiredAsync("Caricamento materiali personali");
-
         if (IsDatabaseAvailable())
         {
             try
@@ -1490,14 +1531,14 @@ public class FallbackDataService : IDataService
                     await _localStore.SavePersonalMaterialsAsync(materials);
                 return materials;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (IsDatabaseConnectivityException(ex))
             {
                 HandleDatabaseException("GetPersonalMaterialsAsync", ex);
-                throw;
             }
         }
 
-        throw CreateDatabaseUnavailableException("Caricamento materiali personali");
+        Debug.WriteLine("[FallbackDataService] Caricamento materiali dalla cache locale.");
+        return await _localStore.LoadPersonalMaterialsAsync();
     }
 
     public async Task SavePersonalMaterialsAsync(IEnumerable<Item> materials)

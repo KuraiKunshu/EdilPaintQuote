@@ -42,9 +42,14 @@ public class QuoteEntity
 	public string LastReminderByDevice { get; set; } = string.Empty;
 	public string EventsJson { get; set; } = string.Empty;
 	public string SupplierName { get; set; } = string.Empty;
+	public bool MaterialsOrderedByCustomer { get; set; }
 	public DateTime? MaterialOrderDate { get; set; }
 	public DateTime? ExpectedDeliveryDate { get; set; }
 	public string MaterialStatus { get; set; } = string.Empty;
+	/// <summary>
+	/// Snapshot JSON riservato dell'ultimo calcolo del guadagno reale.
+	/// </summary>
+	public string RealProfitJson { get; set; } = string.Empty;
 	
 	// Collaborazione con altra ditta
 	public bool IsJointVenture { get; set; }

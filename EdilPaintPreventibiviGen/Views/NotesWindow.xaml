@@ -131,7 +131,7 @@
                              HorizontalContentAlignment="Left"/>
 
                     <TextBlock Grid.Row="4"
-                               Text="Queste note restano interne e non vengono mai stampate. Per il PDF usa il campo 'Note per il cliente' nel preventivo."
+                               Text="Queste note restano interne e non vengono mai stampate. Per il PDF usa il campo 'NOTE' nel preventivo."
                                FontSize="12"
                                Foreground="{StaticResource MutedTextBrush}"/>
                 </Grid>

@@ -255,6 +255,8 @@ public sealed class LocalDraftService
         MaterialOrderDate = draft.MaterialOrderDate,
         ExpectedDeliveryDate = draft.ExpectedDeliveryDate,
         MaterialStatus = draft.MaterialStatus,
+        MaterialsOrderedByCustomer = draft.MaterialsOrderedByCustomer,
+        RealProfit = draft.RealProfit,
         IsJointVenture = draft.IsJointVenture,
         PartnerCompanyName = draft.PartnerCompanyName,
         OurCosts = draft.OurCosts,

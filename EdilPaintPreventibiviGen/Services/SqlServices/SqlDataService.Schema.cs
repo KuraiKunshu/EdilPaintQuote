@@ -151,9 +151,11 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Quotes", "LastReminderByDevice", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "EventsJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "SupplierName", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "MaterialsOrderedByCustomer", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "MaterialOrderDate", "DATETIME2 NULL", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "ExpectedDeliveryDate", "DATETIME2 NULL", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "MaterialStatus", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "RealProfitJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
 
         await EnsureQuoteNumberColumnDefinitionAsync(db, cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "PdfPath", "NVARCHAR(1000) NOT NULL", cancellationToken);
@@ -176,6 +178,7 @@ public partial class SqlDataService
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "EventsJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "SupplierName", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "Quotes", "MaterialStatus", "NVARCHAR(120) NOT NULL", cancellationToken);
+        await EnsureTextColumnDefinitionAsync(db, "Quotes", "RealProfitJson", "NVARCHAR(MAX) NOT NULL", cancellationToken);
         await EnsureBillingCustomerRelationAsync(db, cancellationToken);
     }
 
@@ -216,9 +219,11 @@ public partial class SqlDataService
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "BillingCustomerId" integer NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "Revision" bigint NOT NULL DEFAULT 0;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "SupplierName" character varying(250) NOT NULL DEFAULT '';
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialsOrderedByCustomer" boolean NOT NULL DEFAULT FALSE;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialOrderDate" timestamp with time zone NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "ExpectedDeliveryDate" timestamp with time zone NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialStatus" character varying(120) NOT NULL DEFAULT '';
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "RealProfitJson" text NOT NULL DEFAULT '';
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "IsSupplier" boolean NOT NULL DEFAULT FALSE;
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "SupplierDiscount" double precision NOT NULL DEFAULT 0;
         ALTER TABLE "PersonalMaterials" ADD COLUMN IF NOT EXISTS "IsCompanyMaterial" boolean NOT NULL DEFAULT FALSE;

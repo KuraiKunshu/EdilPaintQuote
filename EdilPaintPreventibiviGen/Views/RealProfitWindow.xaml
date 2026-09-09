@@ -922,11 +922,19 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center"
-                                       Text="Esporta PDF ricalcola i dati e crea il riepilogo riservato."
-                                       FontSize="11"
-                                       Foreground="{StaticResource MutedTextBrush}"
-                                       TextWrapping="Wrap"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Ricalcola salva dati e guadagno nel preventivo."
+                                           FontSize="11"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtSaveStatus"
+                                           Margin="0,3,12,0"
+                                           Text="Non ancora salvato."
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <Button Content="Chiudi"
                                         IsCancel="True"
@@ -938,9 +946,10 @@
                                         Style="{StaticResource SecondaryActionButtonStyle}"
                                         ToolTip="Crea il PDF riservato del guadagno reale"
                                         Click="OnExportPdfClick"/>
-                                <Button Content="Ricalcola"
+                                <Button x:Name="BtnCalculate"
+                                        Content="Ricalcola e salva"
                                         Margin="10,0,0,0"
-                                        MinWidth="126"
+                                        MinWidth="154"
                                         IsDefault="True"
                                         Style="{StaticResource PrimaryActionButtonStyle}"
                                         Click="OnCalculateClick"/>

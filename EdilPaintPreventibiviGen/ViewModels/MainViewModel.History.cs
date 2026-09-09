@@ -148,6 +148,8 @@ public partial class MainViewModel
                 entry.MaterialOrderDate = existingEntry.MaterialOrderDate;
                 entry.ExpectedDeliveryDate = existingEntry.ExpectedDeliveryDate;
                 entry.MaterialStatus = existingEntry.MaterialStatus;
+                entry.MaterialsOrderedByCustomer = existingEntry.MaterialsOrderedByCustomer;
+                entry.RealProfit = existingEntry.RealProfit;
                 // La versione caricata quando e' iniziata la modifica e' quella
                 // autorevole. Una voce History locale puo' essere piu' vecchia.
                 if (entry.BaseVersionUtc == default)
@@ -181,6 +183,8 @@ public partial class MainViewModel
                 existingEntry.MaterialOrderDate = entry.MaterialOrderDate;
                 existingEntry.ExpectedDeliveryDate = entry.ExpectedDeliveryDate;
                 existingEntry.MaterialStatus = entry.MaterialStatus;
+                existingEntry.MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer;
+                existingEntry.RealProfit = entry.RealProfit;
                 existingEntry.Materials = entry.Materials;
                 existingEntry.Labors = entry.Labors;
                 existingEntry.Imponibile = entry.Imponibile;
@@ -328,6 +332,8 @@ public partial class MainViewModel
         target.MaterialOrderDate = source.MaterialOrderDate;
         target.ExpectedDeliveryDate = source.ExpectedDeliveryDate;
         target.MaterialStatus = source.MaterialStatus;
+        target.MaterialsOrderedByCustomer = source.MaterialsOrderedByCustomer;
+        target.RealProfit = source.RealProfit;
     }
 
     private void RememberPersistedQuote(QuoteHistoryEntry entry)
@@ -455,6 +461,8 @@ public partial class MainViewModel
             MaterialOrderDate = entry.MaterialOrderDate,
             ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
             MaterialStatus = entry.MaterialStatus,
+            MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
+            RealProfit = entry.RealProfit,
             LastModifiedUtc = entry.LastModifiedUtc,
             BaseVersionUtc = entry.BaseVersionUtc,
             Revision = entry.Revision,

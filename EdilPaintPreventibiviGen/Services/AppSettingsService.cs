@@ -475,8 +475,9 @@ public sealed class PdfStorageSettingsModel
 
 public sealed class PdfTemplateSettingsModel
 {
-	public const string DefaultNotesTitle = "NOTE PER IL CLIENTE";
+	public const string DefaultNotesTitle = "NOTE";
 	private const string LegacyCombinedNotesTitle = "NOTE E TERMINI DI PAGAMENTO";
+	private const string LegacyCustomerNotesTitle = "NOTE PER IL CLIENTE";
 
 	public static readonly string[] AvailableTemplates =
 	[
@@ -499,7 +500,8 @@ public sealed class PdfTemplateSettingsModel
 			ActiveTemplate = "Standard";
 		NotesTitle = NotesTitle?.Trim() ?? string.Empty;
 		if (string.IsNullOrWhiteSpace(NotesTitle) ||
-		    string.Equals(NotesTitle, LegacyCombinedNotesTitle, StringComparison.OrdinalIgnoreCase))
+		    string.Equals(NotesTitle, LegacyCombinedNotesTitle, StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(NotesTitle, LegacyCustomerNotesTitle, StringComparison.OrdinalIgnoreCase))
 		{
 			NotesTitle = DefaultNotesTitle;
 		}

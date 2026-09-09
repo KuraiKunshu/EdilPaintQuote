@@ -32,6 +32,7 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     private int _reminderCount;
     private string _lastReminderByDevice = string.Empty;
     private string _supplierName = string.Empty;
+    private bool _materialsOrderedByCustomer;
     private DateTime? _materialOrderDate;
     private DateTime? _expectedDeliveryDate;
     private string _materialStatus = string.Empty;
@@ -311,6 +312,12 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     {
         get => _supplierName;
         set { _supplierName = value; OnPropertyChanged(); OnPropertyChanged(nameof(SupplierDisplay)); }
+    }
+
+    public bool MaterialsOrderedByCustomer
+    {
+        get => _materialsOrderedByCustomer;
+        set { _materialsOrderedByCustomer = value; OnPropertyChanged(); }
     }
 
     public DateTime? MaterialOrderDate

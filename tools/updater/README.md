@@ -10,7 +10,17 @@ C:\EdilPaintUpdater\updater-settings.json
 
 Quel file non va committato.
 
+L'installer salva inoltre `updater-path.txt` accanto al programma. Il file contiene
+il percorso dello script updater e permette al pulsante `Aggiorna ora` di funzionare
+anche quando programma e updater sono su dischi o cartelle differenti. In assenza
+del file, il programma controlla anche `C:\EdilPaintUpdater` e le cartelle standard
+di Windows.
+
 Nel repository c'e' anche `updater-settings.example.json`, utile come modello da copiare e modificare su ogni PC.
+
+## Aggiornare un updater già installato
+
+Per copiare la versione più recente di `Update-EdilPaint.ps1` mantenendo le impostazioni locali esistenti, rieseguire l'installer con lo stesso `InstallPath`, senza l'opzione `-OverwriteSettings`.
 
 ## Installazione PC 1
 
@@ -39,6 +49,8 @@ Da PowerShell, nella cartella `tools\updater` del progetto:
 7. Copia i file pubblicati nella cartella locale del PC.
 8. Non sovrascrive `appsettings.json`.
 9. Se il programma e' gia' aperto, salta l'aggiornamento.
+10. Dopo un aggiornamento riuscito salva data, ora e commit in `ultimo-aggiornamento.txt` nella cartella dell'updater.
+11. Se l'aggiornamento fallisce mostra un messaggio bloccante con il percorso del log; se non sono disponibili aggiornamenti non mostra finestre.
 
 Per cambiare l'attesa iniziale:
 
@@ -60,4 +72,10 @@ Il log resta qui:
 
 ```text
 C:\EdilPaintUpdater\logs\update.log
+```
+
+L'ultimo aggiornamento riuscito resta qui:
+
+```text
+C:\EdilPaintUpdater\ultimo-aggiornamento.txt
 ```

@@ -61,8 +61,35 @@ public static class SupplierOrderMailService
         string materials = BuildMaterialsList(quote);
         string subject = FormatTemplate(subjectTemplate, quote, supplier, materials);
         string body = FormatTemplate(bodyTemplate, quote, supplier, materials);
+        string ccRecipients = EnsureSenderCopy(recipient, string.Empty, mailSettings);
 
-        return CreateDraft(recipient, subject, body);
+        return CreateDraft(recipient, subject, body, ccRecipients);
+    }
+
+    public static string EnsureSenderCopy(
+        string recipient,
+        string ccRecipients,
+        MailSettingsModel mailSettings)
+    {
+        ArgumentNullException.ThrowIfNull(mailSettings);
+
+        var recipientAddresses = EmailAddressParser.ExtractEmails(recipient)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var copies = EmailAddressParser.ExtractEmails(ccRecipients)
+            .Where(address => !recipientAddresses.Contains(address))
+            .ToList();
+        string? senderAddress = EmailAddressParser
+            .ExtractEmails(mailSettings.EffectiveSenderEmail)
+            .FirstOrDefault();
+
+        if (!string.IsNullOrWhiteSpace(senderAddress) &&
+            !recipientAddresses.Contains(senderAddress))
+        {
+            copies.Add(senderAddress);
+        }
+
+        return EmailAddressParser.Join(
+            copies.Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     public static void OpenDraft(SupplierOrderMailDraft draft)
@@ -129,7 +156,7 @@ public static class SupplierOrderMailService
         else
         {
             foreach (var material in materials)
-                body.AppendLine($"- {material.Name.Trim()} — Quantità: {material.Quantity}");
+                body.AppendLine($"N.{material.Quantity} {material.Name.Trim()}");
         }
 
         return body.ToString().TrimEnd();

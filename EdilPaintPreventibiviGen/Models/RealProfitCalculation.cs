@@ -86,6 +86,14 @@ public sealed class RealProfitResult
     public double ProfitPercentage { get; init; }
 }
 
+public sealed class RealProfitSnapshot
+{
+    public DateTime CalculatedAtUtc { get; set; } = DateTime.UtcNow;
+    public string CalculatedByDevice { get; set; } = string.Empty;
+    public RealProfitInput Input { get; set; } = new();
+    public RealProfitResult Result { get; set; } = new();
+}
+
 public sealed class RealProfitPdfContext
 {
     public string CompanyName { get; init; } = "Edil Paint Srl";

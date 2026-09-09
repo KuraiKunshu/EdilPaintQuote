@@ -111,6 +111,11 @@ public sealed class QuoteHistoryService
             $"Aggiornamento fornitore preventivo {quoteNumber}",
             () => _dataService.UpdateQuoteSupplierInfoAsync(quoteNumber, supplierInfo));
 
+    public Task UpdateRealProfitAsync(string quoteNumber, RealProfitSnapshot snapshot) =>
+        ExecuteCoordinatedMutationAsync(
+            $"Salvataggio guadagno reale preventivo {quoteNumber}",
+            () => _dataService.UpdateQuoteRealProfitAsync(quoteNumber, snapshot));
+
     public async Task DeleteQuoteAsync(string quoteNumber)
     {
         await ExecuteCoordinatedMutationAsync(

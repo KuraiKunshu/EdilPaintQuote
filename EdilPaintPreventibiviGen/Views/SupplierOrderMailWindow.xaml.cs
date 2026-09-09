@@ -64,14 +64,18 @@ public partial class SupplierOrderMailWindow : Window
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        string ccRecipients = SupplierOrderMailService.EnsureSenderCopy(
+            normalizedPrimary,
+            EmailAddressParser.Join(normalizedCopies),
+            App.AppSettings.Mail);
         TxtRecipient.Text = normalizedPrimary;
-        TxtCcRecipients.Text = EmailAddressParser.Join(normalizedCopies);
+        TxtCcRecipients.Text = ccRecipients;
 
         var draft = SupplierOrderMailService.CreateDraft(
             normalizedPrimary,
             TxtSubject.Text,
             TxtBody.Text,
-            EmailAddressParser.Join(normalizedCopies));
+            ccRecipients);
 
         try
         {

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
@@ -39,6 +40,10 @@ internal static class QuoteSyncHashService
             .ThenBy(e => e.EventType, StringComparer.OrdinalIgnoreCase)
             .Select(e => $"{e.CreatedAtUtc.ToUniversalTime():O}:{e.DeviceName}:{e.EventType}:{e.Description}"));
 
+        string realProfitHash = entry.RealProfit == null
+            ? string.Empty
+            : JsonSerializer.Serialize(entry.RealProfit);
+
         var commonPrefix = string.Join("|",
             entry.QuoteNumber,
             entry.Date.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
@@ -66,6 +71,7 @@ internal static class QuoteSyncHashService
             entry.ReminderCount.ToString(CultureInfo.InvariantCulture),
             entry.LastReminderByDevice,
             entry.SupplierName,
+            entry.MaterialsOrderedByCustomer,
             entry.MaterialOrderDate?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
             entry.ExpectedDeliveryDate?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
             entry.MaterialStatus,
@@ -74,6 +80,7 @@ internal static class QuoteSyncHashService
             materialsHash,
             laborsHash,
             costsHash,
+            realProfitHash,
             eventsHash);
         var data = includeCustomerIdentity
             ? string.Join(

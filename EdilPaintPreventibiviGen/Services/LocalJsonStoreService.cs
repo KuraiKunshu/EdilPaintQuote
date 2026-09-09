@@ -409,11 +409,35 @@ public class LocalJsonStoreService
                 : supplierInfo.DeviceName.Trim();
 
             quote.SupplierName = supplierInfo.SupplierName?.Trim() ?? string.Empty;
+            quote.MaterialsOrderedByCustomer = supplierInfo.MaterialsOrderedByCustomer;
             quote.MaterialOrderDate = supplierInfo.MaterialOrderDate;
             quote.ExpectedDeliveryDate = supplierInfo.ExpectedDeliveryDate;
             quote.MaterialStatus = supplierInfo.MaterialStatus?.Trim() ?? string.Empty;
             quote.LastModifiedByDevice = deviceName;
             AddEvent(quote, "fornitori", "Dati fornitori aggiornati", deviceName);
+        });
+
+    public Task<QuoteHistoryEntry?> UpdateQuoteRealProfitAsync(
+        string quoteNumber,
+        RealProfitSnapshot snapshot) =>
+        UpdateQuoteMetadataAsync(quoteNumber, quote =>
+        {
+            string deviceName = string.IsNullOrWhiteSpace(snapshot.CalculatedByDevice)
+                ? DeviceNameService.GetCurrentDeviceName()
+                : snapshot.CalculatedByDevice.Trim();
+
+            snapshot.CalculatedByDevice = deviceName;
+            snapshot.CalculatedAtUtc = snapshot.CalculatedAtUtc == default
+                ? DateTime.UtcNow
+                : snapshot.CalculatedAtUtc.ToUniversalTime();
+            quote.RealProfit = snapshot;
+            quote.LastModifiedByDevice = deviceName;
+            AddEvent(
+                quote,
+                "guadagno-reale",
+                $"Guadagno reale ricalcolato: {snapshot.Result.Profit:N2} euro",
+                deviceName,
+                snapshot.CalculatedAtUtc);
         });
 
     public async Task ArchiveQuoteConflictAsync(
@@ -957,6 +981,8 @@ public class LocalJsonStoreService
             MaterialOrderDate = entry.MaterialOrderDate,
             ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
             MaterialStatus = entry.MaterialStatus,
+            MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
+            RealProfit = entry.RealProfit,
             IsJointVenture = entry.IsJointVenture,
             PartnerCompanyName = entry.PartnerCompanyName,
             OurCosts = entry.OurCosts,

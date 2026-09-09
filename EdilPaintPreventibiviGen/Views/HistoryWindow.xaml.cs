@@ -372,6 +372,7 @@ public partial class HistoryWindow : Window
                 supplierDiscount,
                 customerIsSupplier,
                 _vm.PersonalMaterialsView,
+                snapshot => _historyService.UpdateRealProfitAsync(fullEntry.QuoteNumber, snapshot),
                 App.AppSettings.RealProfit)
             {
                 Owner = this
@@ -401,7 +402,23 @@ public partial class HistoryWindow : Window
         };
 
         if (win.ShowDialog() == true && win.SelectedResult != null)
+        {
+            entry.MaterialsOrderedByCustomer = false;
             entry.SupplierName = win.SelectedResult.BusinessName;
+        }
+    }
+
+    private void OnMaterialsOrderedByCustomerClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox checkBox ||
+            checkBox.DataContext is not QuoteHistorySummary entry)
+        {
+            return;
+        }
+
+        SupplierOrderAssignmentService.ApplyCustomerOrderChoice(
+            entry,
+            checkBox.IsChecked == true);
     }
 
     private async void OnSaveSupplierInfoClick(object sender, RoutedEventArgs e)
@@ -413,10 +430,13 @@ public partial class HistoryWindow : Window
         {
             _isSavingSupplierInfo = true;
             Mouse.OverrideCursor = Cursors.Wait;
+            if (entry.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(entry, orderedByCustomer: true);
 
             await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
             {
                 SupplierName = entry.SupplierName,
+                MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
                 MaterialOrderDate = entry.MaterialOrderDate,
                 ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
                 MaterialStatus = entry.MaterialStatus,
@@ -425,8 +445,8 @@ public partial class HistoryWindow : Window
 
             entry.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
             MessageBox.Show(
-                "Dati fornitori salvati.",
-                "Fornitori",
+                "Dati dell'ordine salvati.",
+                "Ordini",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -434,8 +454,8 @@ public partial class HistoryWindow : Window
         {
             Debug.WriteLine($"[SupplierInfo] Errore salvataggio: {ex.Message}");
             MessageBox.Show(
-                $"Errore durante il salvataggio dei dati fornitori:\n\n{ex.Message}",
-                "Fornitori",
+                $"Errore durante il salvataggio dell'ordine:\n\n{ex.Message}",
+                "Ordini",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -452,18 +472,22 @@ public partial class HistoryWindow : Window
 
         try
         {
+            if (entry.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(entry, orderedByCustomer: true);
+
             var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
             if (fullEntry == null)
             {
                 MessageBox.Show(
                     "Preventivo non trovato nello storico.",
-                    "Fornitori",
+                    "Ordini",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
             }
 
             fullEntry.SupplierName = entry.SupplierName;
+            fullEntry.MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer;
             fullEntry.MaterialOrderDate = entry.MaterialOrderDate;
             fullEntry.ExpectedDeliveryDate = entry.ExpectedDeliveryDate;
             fullEntry.MaterialStatus = entry.MaterialStatus;
@@ -472,7 +496,7 @@ public partial class HistoryWindow : Window
             {
                 MessageBox.Show(
                     "Seleziona prima un fornitore.",
-                    "Fornitori",
+                    "Ordini",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -483,7 +507,7 @@ public partial class HistoryWindow : Window
             {
                 MessageBox.Show(
                     "Il fornitore selezionato non ha un indirizzo email in anagrafica. La finestra verra' preparata senza destinatario.",
-                    "Fornitori",
+                    "Ordini",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -499,6 +523,7 @@ public partial class HistoryWindow : Window
                 await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
                 {
                     SupplierName = entry.SupplierName,
+                    MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
                     MaterialOrderDate = entry.MaterialOrderDate,
                     ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
                     MaterialStatus = entry.MaterialStatus,
@@ -512,7 +537,7 @@ public partial class HistoryWindow : Window
             Debug.WriteLine($"[SupplierMail] Errore preparazione mail: {ex.Message}");
             MessageBox.Show(
                 $"Errore durante la gestione dell'ordine.\n\n{ex.Message}",
-                "Fornitori",
+                "Ordini",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }

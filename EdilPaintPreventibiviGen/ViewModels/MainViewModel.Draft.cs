@@ -525,6 +525,8 @@ public partial class MainViewModel
             draft.MaterialOrderDate = existing.MaterialOrderDate;
             draft.ExpectedDeliveryDate = existing.ExpectedDeliveryDate;
             draft.MaterialStatus = existing.MaterialStatus;
+            draft.MaterialsOrderedByCustomer = existing.MaterialsOrderedByCustomer;
+            draft.RealProfit = existing.RealProfit;
 
             // Mantiene la versione dalla quale l'utente ha iniziato a lavorare.
             // Non usiamo il timestamp appena letto, altrimenti perderemmo il
