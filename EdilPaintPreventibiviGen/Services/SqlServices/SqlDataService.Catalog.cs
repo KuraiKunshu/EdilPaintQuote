@@ -41,6 +41,7 @@ public partial class SqlDataService
             entity.Name = labor.Name.Trim();
             entity.Description = labor.Description?.Trim() ?? string.Empty;
             entity.UnitPrice = labor.UnitPrice;
+            entity.ExcludeFromWorkSheet = labor.ExcludeFromWorkSheet;
             labor.PersistentId = entity.Id;
         }
 

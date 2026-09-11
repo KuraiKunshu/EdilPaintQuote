@@ -13,7 +13,7 @@ using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
 
-public class PdfService
+public partial class PdfService
 {
     private static class PdfPalette
     {

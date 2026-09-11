@@ -148,6 +148,10 @@ public class StoragePathService
             Directory.CreateDirectory(folderPath);
     }
 
+    public string BuildWorkSheetPdfPath(string customerName, string quoteNumber, string? referenceName = null) =>
+        Path.Combine(BuildCustomerPdfFolder(customerName, referenceName),
+            $"SchedaLavoro_{SanitizeFolderName(quoteNumber)}.pdf");
+
     public void OpenFolder(string folderPath)
     {
         EnsureFolderExists(folderPath);

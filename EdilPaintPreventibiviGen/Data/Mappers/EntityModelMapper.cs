@@ -111,7 +111,8 @@ public static class EntityModelMapper
             Name = entity.Name,
             Description = entity.Description,
             UnitPrice = entity.UnitPrice,
-            Quantity = 1
+            Quantity = 1,
+            ExcludeFromWorkSheet = entity.ExcludeFromWorkSheet
         };
     }
 
@@ -122,7 +123,8 @@ public static class EntityModelMapper
             Id = model.PersistentId,
             Name = model.Name,
             Description = model.Description,
-            UnitPrice = model.UnitPrice
+            UnitPrice = model.UnitPrice,
+            ExcludeFromWorkSheet = model.ExcludeFromWorkSheet
         };
     }
 

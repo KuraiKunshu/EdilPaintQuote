@@ -105,6 +105,7 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "LaborCatalog", "Name", "NVARCHAR(250) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "LaborCatalog", "Description", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "LaborCatalog", "UnitPrice", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "LaborCatalog", "ExcludeFromWorkSheet", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "LaborCatalog", "Name", "NVARCHAR(250) NOT NULL", cancellationToken);
         await EnsureTextColumnDefinitionAsync(db, "LaborCatalog", "Description", "NVARCHAR(MAX) NOT NULL", cancellationToken);
 
@@ -227,6 +228,7 @@ public partial class SqlDataService
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "IsSupplier" boolean NOT NULL DEFAULT FALSE;
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "SupplierDiscount" double precision NOT NULL DEFAULT 0;
         ALTER TABLE "PersonalMaterials" ADD COLUMN IF NOT EXISTS "IsCompanyMaterial" boolean NOT NULL DEFAULT FALSE;
+        ALTER TABLE "LaborCatalog" ADD COLUMN IF NOT EXISTS "ExcludeFromWorkSheet" boolean NOT NULL DEFAULT FALSE;
         ALTER TABLE "QuoteMaterials" ADD COLUMN IF NOT EXISTS "CatalogItemId" integer NOT NULL DEFAULT 0;
         ALTER TABLE "QuoteLabors" ADD COLUMN IF NOT EXISTS "CatalogItemId" integer NOT NULL DEFAULT 0;
         UPDATE "Quotes" SET "Revision" = 1 WHERE "Revision" = 0;

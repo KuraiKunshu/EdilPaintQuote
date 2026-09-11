@@ -27,6 +27,7 @@ public partial class HistoryWindow : Window
     private bool _isLoadingHistory;
     private bool _isSavingStatus;
     private bool _isSavingSupplierInfo;
+    private bool _isGeneratingWorkSheet;
     private readonly HashSet<string> _loadedQuoteNumbers = new();
     private readonly List<QuoteHistorySummary> _currentSummaries = new();
     private CancellationTokenSource? _searchCts;
@@ -968,6 +969,63 @@ public partial class HistoryWindow : Window
         await GenerateInstallationCertificateAsync(entry);
     }
 
+    private async void OnGenerateWorkSheetClick(object sender, RoutedEventArgs e)
+    {
+        if (TryGetSummary(sender, out var entry)) await GenerateWorkSheetAsync(entry);
+    }
+
+    private async Task GenerateWorkSheetAsync(QuoteHistorySummary entry)
+    {
+        if (_isGeneratingWorkSheet) return;
+        _isGeneratingWorkSheet = true;
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            var quote = await App.DataService.GetQuoteByNumberAsync(entry.QuoteNumber, includeAttachments: false)
+                ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
+            var catalog = await App.DataService.GetLaborCatalogAsync();
+            var customers = await App.DataService.GetCustomersAsync();
+            var company = await App.DataService.GetCompanyAsync() ?? new Company();
+            var context = WorkSheetService.CreateContext(quote, catalog, customers);
+            context.SelectedLogo = ResolveLogoForPdf(company);
+            context.IsOfflineSnapshot = App.DataService is FallbackDataService { IsOfflineMode: true };
+            if (context.IsOfflineSnapshot && MessageBox.Show(
+                "Il PC e' offline. La scheda usera' i dati disponibili su questo computer, che potrebbero non essere aggiornati. Continuare?",
+                "Scheda lavoro offline", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+
+            string expectedPath = StoragePathService.Instance.BuildWorkSheetPdfPath(quote.CustomerName, quote.QuoteNumber, quote.ReferenceName);
+            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
+            Directory.CreateDirectory(tempRoot);
+            string temporaryPath = Path.Combine(tempRoot, $"{Guid.NewGuid():N}_{Path.GetFileName(expectedPath)}");
+            await Task.Run(() => new PdfService().GenerateWorkSheet(context, company, temporaryPath));
+
+            string pathToOpen = temporaryPath;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(expectedPath)!);
+                File.Copy(temporaryPath, expectedPath, overwrite: true);
+                pathToOpen = expectedPath;
+                File.Delete(temporaryPath);
+            }
+            catch (Exception copyEx)
+            {
+                Debug.WriteLine($"[WorkSheet] Copia nella cartella cliente non riuscita: {copyEx.Message}");
+                MessageBox.Show($"La scheda e' stata generata, ma non e' stato possibile salvarla nella cartella cliente.\n\nCopia temporanea:\n{temporaryPath}",
+                    "Scheda lavoro generata", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            OpenFolderAndSelectFile(pathToOpen);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Impossibile generare la scheda lavoro.\n\n{ex.Message}", "Scheda lavoro", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _isGeneratingWorkSheet = false;
+            Mouse.OverrideCursor = null;
+        }
+    }
+
     private async Task GenerateInstallationCertificateAsync(QuoteHistorySummary entry)
     {
         var inputWindow = new InstallationCertificateWindow(entry) { Owner = this };
@@ -1150,6 +1208,7 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
         menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Genera scheda lavoro", async () => await GenerateWorkSheetAsync(entry)));
         menu.Items.Add(CreateMenuItem("Calcola guadagno reale", async () => await OpenRealProfitCalculatorAsync(entry)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));

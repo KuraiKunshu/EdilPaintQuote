@@ -969,6 +969,9 @@
                                         <Button Content="Certificato posa"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnGenerateInstallationCertificateClick"/>
+                                        <Button Content="Scheda lavoro"
+                                                Style="{StaticResource DetailActionButtonStyle}"
+                                                Click="OnGenerateWorkSheetClick"/>
                                         <Button Content="Cartella"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnOpenCustomerFolderClick"/>

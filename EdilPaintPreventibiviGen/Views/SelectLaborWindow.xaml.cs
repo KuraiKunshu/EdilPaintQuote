@@ -67,6 +67,7 @@ public partial class SelectLaborWindow : Window
             TxtName.Text = selected.Name;
             TxtDesc.Text = selected.Description;
             TxtPrice.Text = selected.UnitPrice.ToString(CultureInfo.InvariantCulture);
+            ChkExcludeFromWorkSheet.IsChecked = selected.ExcludeFromWorkSheet;
         }
         else
         {
@@ -101,6 +102,7 @@ public partial class SelectLaborWindow : Window
                 _editingLabor.Name = TxtName.Text.Trim();
                 _editingLabor.Description = TxtDesc.Text;
                 _editingLabor.UnitPrice = price;
+                _editingLabor.ExcludeFromWorkSheet = ChkExcludeFromWorkSheet.IsChecked == true;
             }
             else
             {
@@ -109,7 +111,8 @@ public partial class SelectLaborWindow : Window
                     Name = TxtName.Text.Trim(),
                     Description = TxtDesc.Text,
                     UnitPrice = price,
-                    Quantity = 1
+                    Quantity = 1,
+                    ExcludeFromWorkSheet = ChkExcludeFromWorkSheet.IsChecked == true
                 });
             }
 
@@ -157,6 +160,7 @@ public partial class SelectLaborWindow : Window
         TxtName.Text = string.Empty;
         TxtDesc.Text = string.Empty;
         TxtPrice.Text = "0";
+        ChkExcludeFromWorkSheet.IsChecked = false;
         GridLabors.SelectedItem = null;
     }
 

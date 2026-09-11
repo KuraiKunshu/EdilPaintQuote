@@ -127,7 +127,8 @@ public class LocalJsonStoreService
                     Name = GetJsonString(e, "nome", "Nome", "name", "Name"),
                     Description = GetJsonString(e, "descrizione", "Descrizione", "description", "Description"),
                     UnitPrice = GetJsonDouble(e, "valore", "Valore", "unitPrice", "UnitPrice"),
-                    Quantity = 1
+                    Quantity = 1,
+                    ExcludeFromWorkSheet = e.TryGetProperty("excludeFromWorkSheet", out var excluded) && excluded.ValueKind == JsonValueKind.True
                 });
             }
 
@@ -160,7 +161,8 @@ public class LocalJsonStoreService
                     persistentId = l.PersistentId,
                     nome = l.Name,
                     descrizione = l.Description,
-                    valore = l.UnitPrice
+                    valore = l.UnitPrice,
+                    excludeFromWorkSheet = l.ExcludeFromWorkSheet
                 }).ToList()
             };
 

@@ -56,6 +56,7 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("LaborCatalog");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.ExcludeFromWorkSheet).HasDefaultValue(false);
 
             entity.Property(x => x.Id).ValueGeneratedOnAdd();
             entity.Property(x => x.Name).HasMaxLength(250).IsRequired();

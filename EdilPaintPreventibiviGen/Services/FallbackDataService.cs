@@ -1600,6 +1600,7 @@ public class FallbackDataService : IDataService
             pair.First.Discount.Equals(pair.Second.Discount) &&
             pair.First.IsSignificant == pair.Second.IsSignificant &&
             pair.First.IsCompanyMaterial == pair.Second.IsCompanyMaterial &&
+            pair.First.ExcludeFromWorkSheet == pair.Second.ExcludeFromWorkSheet &&
             pair.First.SortOrder == pair.Second.SortOrder);
     }
 

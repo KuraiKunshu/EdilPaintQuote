@@ -339,6 +339,7 @@ public partial class MainViewModel
         left.Discount.Equals(right.Discount) &&
         left.IsSignificant == right.IsSignificant &&
         left.IsCompanyMaterial == right.IsCompanyMaterial &&
+        left.ExcludeFromWorkSheet == right.ExcludeFromWorkSheet &&
         left.SortOrder == right.SortOrder;
 
     private static bool ApplyCustomerSnapshot(Customer target, Customer source)
@@ -372,6 +373,7 @@ public partial class MainViewModel
         SetIfDifferent(target.Discount, source.Discount, value => target.Discount = value, ref changed);
         SetIfDifferent(target.IsSignificant, source.IsSignificant, value => target.IsSignificant = value, ref changed);
         SetIfDifferent(target.IsCompanyMaterial, source.IsCompanyMaterial, value => target.IsCompanyMaterial = value, ref changed);
+        SetIfDifferent(target.ExcludeFromWorkSheet, source.ExcludeFromWorkSheet, value => target.ExcludeFromWorkSheet = value, ref changed);
         SetIfDifferent(target.SortOrder, source.SortOrder, value => target.SortOrder = value, ref changed);
         return changed;
     }
@@ -715,6 +717,7 @@ public partial class MainViewModel
         Discount = source.Discount,
         IsSignificant = source.IsSignificant,
         IsCompanyMaterial = source.IsCompanyMaterial,
+        ExcludeFromWorkSheet = source.ExcludeFromWorkSheet,
         SortOrder = source.SortOrder
     };
 

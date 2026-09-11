@@ -304,6 +304,14 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
+                                <CheckBox x:Name="ChkExcludeFromWorkSheet"
+                                          Grid.Column="0"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,12,0"
+                                          ToolTip="Esclude questa voce dalle schede lavoro, anche dei preventivi gia' salvati. Il preventivo resta invariato.">
+                                    <TextBlock Text="Escludi dalla scheda lavoro" TextWrapping="Wrap"/>
+                                </CheckBox>
+
                                 <Button Grid.Column="1"
                                         Style="{StaticResource FooterButtonStyle}"
                                         Content="Nuovo"
@@ -391,6 +399,11 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
+
+                                <DataGridCheckBoxColumn Header="Esclusa scheda"
+                                                        Binding="{Binding ExcludeFromWorkSheet, Mode=OneWay}"
+                                                        Width="110"
+                                                        IsReadOnly="True"/>
 
                                 <DataGridTemplateColumn Header=""
                                                         Width="56"
