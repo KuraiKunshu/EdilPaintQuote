@@ -26,7 +26,9 @@ public sealed partial class MobileDatabaseService
                     count(*) filter (where not "IsDeleted" and "Status" = @confirmed),
                     count(*) filter (
                         where not "IsDeleted"
-                          and ("MaterialsOrderedByCustomer" or "SupplierName" <> '' or "MaterialStatus" <> '')
+                          and ("MaterialsOrderedByCustomer" or ("Status" = @confirmed and
+                              ("SupplierName" <> '' or "MaterialOrderDate" is not null or
+                               "ExpectedDeliveryDate" is not null or "MaterialStatus" <> '')))
                           and upper(coalesce("MaterialStatus", '')) not in ('CONSEGNATO', 'NON DISPONIBILE')),
                     coalesce(sum("Total") filter (
                         where not "IsDeleted" and "Status" in (@confirmed, @finished)), 0),

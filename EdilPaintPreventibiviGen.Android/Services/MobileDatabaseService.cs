@@ -106,10 +106,13 @@ public sealed partial class MobileDatabaseService
         CancellationToken cancellationToken)
     {
         await using var connection = await OpenConnectionAsync(connectionString, cancellationToken);
+        // Header, revision and lines must belong to the same database snapshot.
+        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         QuoteDetail detail;
 
         await using (var command = connection.CreateCommand())
         {
+            command.Transaction = transaction;
             command.CommandText = """
                 select
                     q."Id",
@@ -226,8 +229,9 @@ public sealed partial class MobileDatabaseService
             };
         }
 
-        detail.Materials.AddRange(await LoadLinesAsync(connection, detail.Id, "QuoteMaterials", cancellationToken));
-        detail.Labors.AddRange(await LoadLinesAsync(connection, detail.Id, "QuoteLabors", cancellationToken));
+        detail.Materials.AddRange(await LoadLinesAsync(connection, transaction, detail.Id, "QuoteMaterials", cancellationToken));
+        detail.Labors.AddRange(await LoadLinesAsync(connection, transaction, detail.Id, "QuoteLabors", cancellationToken));
+        await transaction.CommitAsync(cancellationToken);
         return detail;
     }
 
@@ -802,11 +806,13 @@ public sealed partial class MobileDatabaseService
 
     private static async Task<List<QuoteLine>> LoadLinesAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         int quoteId,
         string tableName,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = $"""
             select "CatalogItemId", "Name", "Description", "UnitPrice", "Quantity",
                    "Discount", "IsSignificant", "SortOrder"

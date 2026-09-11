@@ -9,6 +9,28 @@ namespace EdilPaintPreventibiviGen.Android.Tests;
 public class MobileDatabaseSafetyTests
 {
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void MissingLegacyJsonRemainsOptional(string? value)
+    {
+        var method = typeof(MobileDatabaseService).GetMethod("DeserializeJson", BindingFlags.Static | BindingFlags.NonPublic)!
+            .MakeGenericMethod(typeof(EdilPaintPreventibiviGen.Android.Models.CostAllocationSnapshot));
+        Assert.Null(method.Invoke(null, [value]));
+    }
+
+    [Fact]
+    public void MalformedStoredJsonBlocksEditingInsteadOfDiscardingCosts()
+    {
+        var method = typeof(MobileDatabaseService).GetMethod("DeserializeJson", BindingFlags.Static | BindingFlags.NonPublic)!
+            .MakeGenericMethod(typeof(EdilPaintPreventibiviGen.Android.Models.CostAllocationSnapshot));
+        var exception = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, ["{invalid-json"]));
+        var failure = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.IsType<System.Text.Json.JsonException>(failure.InnerException);
+        Assert.Contains("nessun dato", MobileDatabaseService.GetUserMessage(failure));
+    }
+
+    [Theory]
     [InlineData("postgresql://mobile:p%40ss%3Aword@demo.neon.tech/neondb?sslmode=disable")]
     [InlineData("Host=demo.neon.tech;Database=neondb;Username=mobile;Password=p@ss:word;SSL Mode=Disable")]
     public void NeonConnectionsVerifyCertificatesAndPreserveEncodedPasswords(string value)

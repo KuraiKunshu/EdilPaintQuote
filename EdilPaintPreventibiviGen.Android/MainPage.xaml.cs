@@ -465,10 +465,12 @@ public partial class MainPage : ContentPage
         try
         {
             SetBusy(true);
+            QuoteLineKind requestedKind = _catalogKind;
             IReadOnlyList<CatalogItem> items = await _databaseService.GetCatalogAsync(
                 _connectionString,
-                _catalogKind,
+                requestedKind,
                 CatalogSearchBox.Text?.Trim() ?? string.Empty);
+            if (requestedKind != _catalogKind) return;
             _catalogItems.Clear();
             foreach (CatalogItem item in items)
                 _catalogItems.Add(item);

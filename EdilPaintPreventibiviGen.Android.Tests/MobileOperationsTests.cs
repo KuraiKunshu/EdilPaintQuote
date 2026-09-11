@@ -8,6 +8,21 @@ namespace EdilPaintPreventibiviGen.Android.Tests;
 public class MobileOperationsTests
 {
     [Theory]
+    [InlineData("esclusa", 0)]
+    [InlineData("10%", 28.2)]
+    [InlineData("22%", 62.04)]
+    [InlineData("RC 10%+22%", 33.24)]
+    public void QuoteTotalsApplyLineAndGlobalDiscountsBeforeVat(string ivaType, double expectedVat)
+    {
+        var materials = new[] { new QuoteLine { Quantity = 2, UnitPrice = 100, Discount = 10, IsSignificant = true } };
+        var labors = new[] { new QuoteLine { Quantity = 3, UnitPrice = 50, IsSignificant = true } };
+        QuoteTotals totals = QuoteTotalsCalculator.Calculate(materials, labors, 10, 20, ivaType);
+        Assert.Equal(282, totals.Imponibile, 6);
+        Assert.Equal(expectedVat, totals.Iva, 6);
+        Assert.Equal(282 + expectedVat, totals.Total, 6);
+    }
+
+    [Theory]
     [InlineData("1.5", 1.5)]
     [InlineData("1,5", 1.5)]
     [InlineData("12", 12)]
