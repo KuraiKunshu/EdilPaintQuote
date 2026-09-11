@@ -35,8 +35,8 @@
 		<ApplicationId>it.edilpaint.preventivi.mobile</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>2.0</ApplicationDisplayVersion>
-		<ApplicationVersion>2</ApplicationVersion>
+		<ApplicationDisplayVersion>3.0</ApplicationDisplayVersion>
+		<ApplicationVersion>3</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
@@ -60,10 +60,26 @@
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
+	<PropertyGroup Condition="'$(EnableMobileSmokeTests)' == 'true'">
+		<DefineConstants>$(DefineConstants);MOBILE_SMOKE_TEST</DefineConstants>
+		<ApplicationId>it.edilpaint.preventivi.smoketest</ApplicationId>
+		<ApplicationTitle>EdilPaint TEST</ApplicationTitle>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageReference Include="Npgsql" Version="10.0.0" />
+		<PackageReference Include="MailKit" Version="4.17.0" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Include="..\EdilPaintPreventibiviGen\Models\RealProfitCalculation.cs" Link="Shared\RealProfitCalculation.cs" />
+		<Compile Include="..\EdilPaintPreventibiviGen\Services\RealProfitCalculator.cs" Link="Shared\RealProfitCalculator.cs" />
+		<Compile Include="..\EdilPaintPreventibiviGen\Models\AutomaticWindowMaterialCalculation.cs" Link="Shared\AutomaticWindowMaterialCalculation.cs" />
+		<Compile Include="..\EdilPaintPreventibiviGen\Models\WindowMaterialCalculation.cs" Link="Shared\WindowMaterialCalculation.cs" />
+		<Compile Include="..\EdilPaintPreventibiviGen\Services\AutomaticWindowMaterialCalculator.cs" Link="Shared\AutomaticWindowMaterialCalculator.cs" />
+		<Compile Include="..\EdilPaintPreventibiviGen\Services\WindowMaterialCalculator.cs" Link="Shared\WindowMaterialCalculator.cs" />
+		<MauiAsset Include="..\EdilPaintPreventibiviGen\Assets\Edilpaint.png" LogicalName="edilpaint.png" />
 	</ItemGroup>
 
 </Project>

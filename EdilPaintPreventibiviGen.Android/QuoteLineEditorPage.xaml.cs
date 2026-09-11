@@ -102,6 +102,5 @@ public partial class QuoteLineEditorPage : ContentPage
     }
 
     private static bool TryParseNumber(string? text, out double value) =>
-        double.TryParse(text, NumberStyles.Number, ItalianCulture, out value) ||
-        double.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
+        MobileNumber.TryParse(text, out value);
 }

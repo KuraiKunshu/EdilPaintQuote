@@ -37,6 +37,18 @@ public partial class CustomerEditorPage : ContentPage
         EmailEntry.Text = _customer.Email;
         MaterialDiscountEntry.Text = _customer.MaterialDiscount.ToString("0.##", ItalianCulture);
         LaborDiscountEntry.Text = _customer.LaborDiscount.ToString("0.##", ItalianCulture);
+        if (isEdit) ToolbarItems.Add(new ToolbarItem("Elimina", null, async () =>
+        {
+            if (_isSaving || !await DisplayAlertAsync("Elimina cliente", "Eliminare " + _customer.BusinessName + "? I preventivi esistenti restano conservati.", "Elimina", "Annulla")) return;
+            try
+            {
+                SetBusy(true);
+                await _databaseService.DeleteCustomerAsync(_connectionString, _customer);
+                await Navigation.PopAsync();
+            }
+            catch (Exception ex) { await DisplayAlertAsync("Cliente", MobileDatabaseService.GetUserMessage(ex), "OK"); }
+            finally { SetBusy(false); }
+        }) { Order = ToolbarItemOrder.Secondary });
     }
 
     private async void OnSaveClicked(object? sender, EventArgs e)
@@ -97,8 +109,7 @@ public partial class CustomerEditorPage : ContentPage
 
     private static bool TryParsePercentage(string? text, out double value)
     {
-        bool parsed = double.TryParse(text, NumberStyles.Number, ItalianCulture, out value) ||
-                      double.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
+        bool parsed = MobileNumber.TryParse(text, out value);
         return parsed && value >= 0 && value <= 100;
     }
 

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <PackageReference Include="Npgsql" Version="10.0.0" />
+    <Compile Include="../EdilPaintPreventibiviGen.Android/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
+    <Compile Include="../EdilPaintPreventibiviGen.Android/Services/MobileDocumentContent.cs" Link="Services/MobileDocumentContent.cs" />
+    <Compile Include="../EdilPaintPreventibiviGen.Android/Services/MobileMailService.cs" Link="Services/MobileMailService.cs" />
+    <Compile Include="../EdilPaintPreventibiviGen.Android/Services/MobileDatabaseService*.cs" Link="Services/%(Filename)%(Extension)" />
+    <Compile Include="../EdilPaintPreventibiviGen.Android/Services/Database*Exception.cs" Link="Services/%(Filename)%(Extension)" />
+    <Compile Include="../EdilPaintPreventibiviGen/Models/RealProfitCalculation.cs" Link="Shared/RealProfitCalculation.cs" />
+    <Compile Include="../EdilPaintPreventibiviGen/Services/RealProfitCalculator.cs" Link="Shared/RealProfitCalculator.cs" />
+  </ItemGroup>
+</Project>

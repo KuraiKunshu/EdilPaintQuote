@@ -1,7 +1,10 @@
 -- Eseguire nel SQL Editor di Neon come neondb_owner.
 -- Lo script trasforma edilpaint_mobile in un utente operativo limitato a
--- preventivi, clienti e cataloghi. Non concede la cancellazione di preventivi
--- o clienti e non concede alcun accesso alla gestione fornitori.
+-- preventivi, clienti, ordini, allegati e cataloghi (Android 3.0).
+-- Preventivi/clienti sono eliminati logicamente. Non concede DROP/TRUNCATE.
+-- Non crea o modifica anagrafiche fornitori automaticamente.
+
+BEGIN;
 
 DO $$
 BEGIN
@@ -27,7 +30,8 @@ GRANT SELECT ON TABLE
     "QuoteLabors",
     "PersonalMaterials",
     "LaborCatalog",
-    "CompanySettings"
+    "CompanySettings",
+    "QuoteAttachments"
 TO edilpaint_mobile;
 
 GRANT INSERT (
@@ -38,7 +42,7 @@ GRANT INSERT (
 
 GRANT UPDATE (
     "BusinessName", "Address", "Email", "Phone",
-    "MaterialDiscount", "LaborDiscount", "LastModifiedUtc"
+    "MaterialDiscount", "LaborDiscount", "LastModifiedUtc", "IsDeleted"
 ) ON TABLE "Customers" TO edilpaint_mobile;
 
 GRANT INSERT (
@@ -47,7 +51,7 @@ GRANT INSERT (
     "IvaType", "Notes", "Imponibile", "MaterialDiscount", "LaborDiscount", "Total",
     "Status", "CreatedByDevice", "LastModifiedByDevice", "SentMethod", "SentRecipient",
     "SentByDevice", "ReminderCount", "LastReminderByDevice", "EventsJson", "SupplierName",
-    "MaterialStatus", "IsJointVenture", "PartnerCompanyName", "CostAllocationsJson",
+    "MaterialStatus", "MaterialsOrderedByCustomer", "RealProfitJson", "IsJointVenture", "PartnerCompanyName", "CostAllocationsJson",
     "LastModifiedUtc", "Revision", "SyncHash", "IsDeleted"
 ) ON TABLE "Quotes" TO edilpaint_mobile;
 
@@ -55,7 +59,11 @@ GRANT UPDATE (
     "Date", "CustomerId", "ReferenceCustomerId", "BillingCustomerId",
     "SiteName", "BillingCustomerName", "PaymentTerms", "CustomerNotes", "IvaType",
     "Notes", "Imponibile", "MaterialDiscount", "LaborDiscount", "Total", "Status",
-    "LastModifiedByDevice", "LastModifiedUtc", "Revision", "SyncHash"
+    "LastModifiedByDevice", "LastModifiedUtc", "Revision", "SyncHash",
+    "SentAtUtc", "SentMethod", "SentRecipient", "SentByDevice",
+    "LastReminderAtUtc", "ReminderCount", "LastReminderByDevice", "EventsJson",
+    "SupplierName", "MaterialsOrderedByCustomer", "MaterialOrderDate", "ExpectedDeliveryDate", "MaterialStatus",
+    "RealProfitJson", "IsJointVenture", "PartnerCompanyName", "CostAllocationsJson", "IsDeleted"
 ) ON TABLE "Quotes" TO edilpaint_mobile;
 
 GRANT INSERT (
@@ -65,13 +73,17 @@ GRANT INSERT (
 
 GRANT DELETE ON TABLE "QuoteMaterials", "QuoteLabors" TO edilpaint_mobile;
 GRANT UPDATE ("Counter") ON TABLE "CompanySettings" TO edilpaint_mobile;
+GRANT INSERT, UPDATE, DELETE ON TABLE "PersonalMaterials", "LaborCatalog" TO edilpaint_mobile;
+GRANT INSERT ("QuoteId", "FileName", "ContentType", "Content", "ImportedAtUtc")
+ON TABLE "QuoteAttachments" TO edilpaint_mobile;
+GRANT DELETE ON TABLE "QuoteAttachments" TO edilpaint_mobile;
 
 DO $$
 DECLARE
     table_name text;
     sequence_name text;
 BEGIN
-    FOREACH table_name IN ARRAY ARRAY['Customers', 'Quotes', 'QuoteMaterials', 'QuoteLabors']
+    FOREACH table_name IN ARRAY ARRAY['Customers', 'Quotes', 'QuoteMaterials', 'QuoteLabors', 'PersonalMaterials', 'LaborCatalog', 'QuoteAttachments']
     LOOP
         sequence_name := pg_get_serial_sequence(format('public.%I', table_name), 'Id');
         IF sequence_name IS NOT NULL THEN
@@ -83,6 +95,8 @@ BEGIN
     END LOOP;
 END
 $$;
+
+COMMIT;
 
 -- Controllo finale: ogni colonna deve restituire true.
 SELECT

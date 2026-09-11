@@ -5,218 +5,145 @@
              BackgroundColor="#F8F3F1"
              NavigationPage.HasNavigationBar="False">
 
-    <Grid RowDefinitions="Auto,Auto,*"
-          Padding="16,18,16,12"
-          RowSpacing="12">
-        <Grid ColumnDefinitions="*,Auto"
-              ColumnSpacing="12">
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16,16,16,10" RowSpacing="10">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <VerticalStackLayout Spacing="1">
-                <Label Text="EdilPaint"
-                       FontSize="13"
-                       FontAttributes="Bold"
-                       TextColor="#B3261E"/>
-                <Label x:Name="PageTitleLabel"
-                       Text="Preventivi"
-                       FontSize="29"
-                       FontAttributes="Bold"
-                       TextColor="#221614"/>
-                <Label x:Name="SubtitleLabel"
-                       Text="Connessione a Neon"
-                       FontSize="13"
-                       TextColor="#7B6661"/>
+                <Label Text="EdilPaint" FontSize="13" FontAttributes="Bold" TextColor="#B3261E"/>
+                <Label x:Name="PageTitleLabel" Text="Dashboard" FontSize="27" FontAttributes="Bold" TextColor="#221614"/>
+                <Label x:Name="SubtitleLabel" Text="Centro operativo" FontSize="12" TextColor="#7B6661"/>
             </VerticalStackLayout>
-
-            <Button x:Name="ForgetButton"
-                    Grid.Column="1"
-                    Text="Esci"
-                    IsVisible="False"
-                    Clicked="OnForgetCredentialsClicked"
-                    BackgroundColor="#FFFFFF"
-                    BorderColor="#E6D6D2"
-                    BorderWidth="1"
-                    TextColor="#B3261E"
-                    CornerRadius="8"
-                    Padding="12,8"
-                    HorizontalOptions="End"
-                    VerticalOptions="Center"
-                    WidthRequest="72"
-                    HeightRequest="46"/>
+            <Button x:Name="ForgetButton" Grid.Column="1" Text="Altro" IsVisible="False"
+                    Clicked="OnForgetCredentialsClicked" BackgroundColor="#FFFFFF" BorderColor="#E6D6D2"
+                    BorderWidth="1" TextColor="#B3261E" CornerRadius="8" Padding="12,8"
+                    HorizontalOptions="End" VerticalOptions="Center" WidthRequest="72" HeightRequest="44"/>
         </Grid>
 
-        <Border x:Name="SectionBar"
-                Grid.Row="1"
-                IsVisible="False"
-                Stroke="#E6D6D2"
-                StrokeThickness="1"
-                BackgroundColor="#FFFFFF"
-                Padding="4"
-                StrokeShape="RoundRectangle 8">
-            <Grid ColumnDefinitions="*,*"
-                  ColumnSpacing="4">
-                <Button x:Name="QuotesSectionButton"
-                        Text="Preventivi"
-                        Clicked="OnQuotesSectionClicked"
-                        CornerRadius="6"
-                        HeightRequest="44"/>
-                <Button x:Name="CustomersSectionButton"
-                        Grid.Column="1"
-                        Text="Clienti"
-                        Clicked="OnCustomersSectionClicked"
-                        CornerRadius="6"
-                        HeightRequest="44"/>
-            </Grid>
+        <Border x:Name="SectionBar" Grid.Row="1" IsVisible="False" Stroke="#E6D6D2"
+                StrokeThickness="1" BackgroundColor="#FFFFFF" Padding="4" StrokeShape="RoundRectangle 8">
+            <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                <HorizontalStackLayout Spacing="4">
+                    <Button x:Name="DashboardSectionButton" Text="Dashboard" Clicked="OnDashboardSectionClicked" FontSize="11" WidthRequest="96" HeightRequest="42" CornerRadius="6"/>
+                    <Button x:Name="QuotesSectionButton" Text="Preventivi" Clicked="OnQuotesSectionClicked" FontSize="11" WidthRequest="96" HeightRequest="42" CornerRadius="6"/>
+                    <Button x:Name="CustomersSectionButton" Text="Clienti" Clicked="OnCustomersSectionClicked" FontSize="11" WidthRequest="82" HeightRequest="42" CornerRadius="6"/>
+                    <Button x:Name="OrdersSectionButton" Text="Ordini" Clicked="OnOrdersSectionClicked" FontSize="11" WidthRequest="82" HeightRequest="42" CornerRadius="6"/>
+                    <Button x:Name="CatalogSectionButton" Text="Cataloghi" Clicked="OnCatalogSectionClicked" FontSize="11" WidthRequest="92" HeightRequest="42" CornerRadius="6"/>
+                </HorizontalStackLayout>
+            </ScrollView>
         </Border>
 
         <Grid Grid.Row="2">
             <ScrollView x:Name="SetupPanel">
                 <VerticalStackLayout Spacing="14">
-                    <Border Stroke="#E6D6D2"
-                            StrokeThickness="1"
-                            BackgroundColor="#FFFFFF"
-                            Padding="16"
-                            StrokeShape="RoundRectangle 8">
+                    <Border Stroke="#E6D6D2" StrokeThickness="1" BackgroundColor="#FFFFFF" Padding="16" StrokeShape="RoundRectangle 8">
                         <VerticalStackLayout Spacing="12">
-                            <Label Text="Accesso Neon"
-                                   FontSize="19"
-                                   FontAttributes="Bold"
-                                   TextColor="#221614"/>
-                            <Label Text="La connection string viene protetta dal Keystore Android."
-                                   FontSize="13"
-                                   TextColor="#7B6661"/>
-                            <Entry x:Name="ConnectionStringEntry"
-                                   Placeholder="postgresql://utente:password@host/neondb?sslmode=require"
-                                   Keyboard="Url"
-                                   IsPassword="True"
-                                   ClearButtonVisibility="WhileEditing"
-                                   TextColor="#221614"/>
-                            <Button Text="Salva e accedi"
-                                    Clicked="OnSaveCredentialsClicked"
-                                    BackgroundColor="#B3261E"
-                                    TextColor="#FFFFFF"
-                                    CornerRadius="8"/>
+                            <Label Text="Accesso Neon" FontSize="19" FontAttributes="Bold" TextColor="#221614"/>
+                            <Label Text="La credenziale viene protetta dal Keystore Android. I dati restano nel database." FontSize="13" TextColor="#7B6661"/>
+                            <Entry x:Name="ConnectionStringEntry" Placeholder="postgresql://utente:password@host/neondb?sslmode=require"
+                                   Keyboard="Url" IsPassword="True" ClearButtonVisibility="WhileEditing" TextColor="#221614"/>
+                            <Button Text="Salva e accedi" Clicked="OnSaveCredentialsClicked" BackgroundColor="#B3261E" TextColor="#FFFFFF" CornerRadius="8"/>
                         </VerticalStackLayout>
                     </Border>
                 </VerticalStackLayout>
             </ScrollView>
 
-            <Grid x:Name="QuotesPanel"
-                  IsVisible="False"
-                  RowDefinitions="Auto,Auto,Auto,*"
-                  RowSpacing="10">
-                <SearchBar x:Name="QuoteSearchBox"
-                           Placeholder="Cerca cliente, cantiere o numero"
-                           SearchButtonPressed="OnQuoteSearchRequested"
-                           TextChanged="OnQuoteSearchTextChanged"
-                           BackgroundColor="#FFFFFF"
-                           TextColor="#221614"
-                           PlaceholderColor="#7B6661"/>
+            <RefreshView x:Name="DashboardPanel" IsVisible="False" Refreshing="OnDashboardRefreshViewRefreshing">
+                <ScrollView>
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Situazione aggiornata" FontSize="13" TextColor="#7B6661" VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="Aggiorna" Clicked="OnRefreshDashboardClicked" BackgroundColor="Transparent" TextColor="#B3261E" Padding="10,4" HeightRequest="36"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                            <Border Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Padding="12" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="Preventivi" FontSize="11" FontAttributes="Bold" TextColor="#7B6661"/>
+                                    <Label x:Name="DashboardQuotesLabel" Text="0" FontSize="25" FontAttributes="Bold" TextColor="#221614"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Padding="12" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="Clienti" FontSize="11" FontAttributes="Bold" TextColor="#7B6661"/>
+                                    <Label x:Name="DashboardCustomersLabel" Text="0" FontSize="25" FontAttributes="Bold" TextColor="#221614"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Row="1" Stroke="#F2B8B5" BackgroundColor="#FCEDEA" Padding="12" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="Da seguire" FontSize="11" FontAttributes="Bold" TextColor="#7B6661"/>
+                                    <Label x:Name="DashboardOpenLabel" Text="0" FontSize="25" FontAttributes="Bold" TextColor="#B3261E"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="1" Stroke="#F4D58D" BackgroundColor="#FFF8E6" Padding="12" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="Ordini aperti" FontSize="11" FontAttributes="Bold" TextColor="#7B6661"/>
+                                    <Label x:Name="DashboardOrdersLabel" Text="0" FontSize="25" FontAttributes="Bold" TextColor="#92400E"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Row="2" Grid.ColumnSpan="2" Stroke="#CBE6D0" BackgroundColor="#F0FAF2" Padding="12" StrokeShape="RoundRectangle 8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="Valore confermato e finito" FontSize="11" FontAttributes="Bold" TextColor="#4C6B52"/>
+                                        <Label x:Name="DashboardConfirmedCountLabel" Text="0 preventivi" FontSize="12" TextColor="#4C6B52"/>
+                                    </VerticalStackLayout>
+                                    <Label x:Name="DashboardValueLabel" Grid.Column="1" Text="0,00 €" FontSize="22" FontAttributes="Bold" TextColor="#166534" VerticalOptions="Center"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <Label Text="Preventivi recenti" Margin="0,6,0,0" FontSize="18" FontAttributes="Bold" TextColor="#221614"/>
+                        <VerticalStackLayout x:Name="DashboardRecentList" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Padding="12" StrokeShape="RoundRectangle 8">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnDashboardQuoteTapped" CommandParameter="{Binding .}"/>
+                                        </Border.GestureRecognizers>
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
+                                            <Label Text="{Binding CustomerName}" FontSize="16" FontAttributes="Bold" TextColor="#221614" LineBreakMode="TailTruncation"/>
+                                            <Label Grid.Column="1" Text="{Binding TotalDisplay}" FontSize="15" FontAttributes="Bold" TextColor="#B3261E"/>
+                                            <Label Grid.Row="1" Text="{Binding QuoteMetaDisplay}" FontSize="12" TextColor="#7B6661"/>
+                                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding StatusText}" FontSize="11" FontAttributes="Bold" TextColor="#7B6661"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </ScrollView>
+            </RefreshView>
 
-                <Grid Grid.Row="1"
-                      ColumnDefinitions="*,Auto"
-                      ColumnSpacing="10">
-                    <Picker x:Name="StatusPicker"
-                            Title="Tutti gli stati"
-                            SelectedIndexChanged="OnStatusChanged"
-                            BackgroundColor="#FFFFFF"
-                            TextColor="#221614"/>
-                    <Button Grid.Column="1"
-                            Text="+ Preventivo"
-                            Clicked="OnAddQuoteClicked"
-                            BackgroundColor="#B3261E"
-                            TextColor="#FFFFFF"
-                            CornerRadius="8"
-                            Padding="14,8"/>
+            <Grid x:Name="QuotesPanel" IsVisible="False" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+                <SearchBar x:Name="QuoteSearchBox" Placeholder="Cerca cliente, cantiere o numero" SearchButtonPressed="OnQuoteSearchRequested"
+                           TextChanged="OnQuoteSearchTextChanged" BackgroundColor="#FFFFFF" TextColor="#221614" PlaceholderColor="#7B6661"/>
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <Picker x:Name="StatusPicker" Title="Tutti gli stati" SelectedIndexChanged="OnStatusChanged" BackgroundColor="#FFFFFF" TextColor="#221614"/>
+                    <Button Grid.Column="1" Text="+ Preventivo" Clicked="OnAddQuoteClicked" BackgroundColor="#B3261E" TextColor="#FFFFFF" CornerRadius="8" Padding="14,8"/>
                 </Grid>
-
-                <Grid Grid.Row="2"
-                      ColumnDefinitions="*,Auto">
-                    <Label x:Name="QuoteCountLabel"
-                           Text="0 preventivi"
-                           FontSize="12"
-                           TextColor="#7B6661"
-                           VerticalOptions="Center"/>
-                    <Button Grid.Column="1"
-                            Text="Aggiorna"
-                            Clicked="OnRefreshQuotesClicked"
-                            BackgroundColor="Transparent"
-                            TextColor="#B3261E"
-                            Padding="10,4"
-                            HeightRequest="36"/>
+                <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto">
+                    <Label x:Name="QuoteCountLabel" Text="0 preventivi" FontSize="12" TextColor="#7B6661" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="Filtri" Clicked="OnQuoteFiltersClicked" BackgroundColor="Transparent" TextColor="#B3261E" Padding="10,4" HeightRequest="36"/>
+                    <Button Grid.Column="2" Text="Aggiorna" Clicked="OnRefreshQuotesClicked" BackgroundColor="Transparent" TextColor="#B3261E" Padding="10,4" HeightRequest="36"/>
                 </Grid>
-
-                <RefreshView Grid.Row="3"
-                             x:Name="QuoteRefresh"
-                             Refreshing="OnQuoteRefreshViewRefreshing">
-                    <CollectionView x:Name="QuoteList"
-                                    SelectionMode="Single"
-                                    SelectionChanged="OnQuoteSelected">
+                <RefreshView Grid.Row="3" x:Name="QuoteRefresh" Refreshing="OnQuoteRefreshViewRefreshing">
+                    <CollectionView x:Name="QuoteList" SelectionMode="Single" SelectionChanged="OnQuoteSelected">
                         <CollectionView.EmptyView>
-                            <VerticalStackLayout Padding="20,36"
-                                                 Spacing="5">
-                                <Label Text="Nessun preventivo"
-                                       HorizontalTextAlignment="Center"
-                                       FontAttributes="Bold"
-                                       TextColor="#221614"/>
-                                <Label Text="Modifica la ricerca oppure creane uno nuovo."
-                                       HorizontalTextAlignment="Center"
-                                       FontSize="13"
-                                       TextColor="#7B6661"/>
+                            <VerticalStackLayout Padding="20,36" Spacing="5">
+                                <Label Text="Nessun preventivo" HorizontalTextAlignment="Center" FontAttributes="Bold" TextColor="#221614"/>
+                                <Label Text="Modifica i filtri oppure creane uno nuovo." HorizontalTextAlignment="Center" FontSize="13" TextColor="#7B6661"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
-                                <Border Stroke="#E6D6D2"
-                                        StrokeThickness="1"
-                                        BackgroundColor="#FFFFFF"
-                                        Margin="0,0,0,10"
-                                        Padding="14"
-                                        StrokeShape="RoundRectangle 8">
-                                    <Grid RowDefinitions="Auto,Auto,Auto"
-                                          ColumnDefinitions="*,Auto"
-                                          ColumnSpacing="12"
-                                          RowSpacing="6">
+                                <Border Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Margin="0,0,0,10" Padding="14" StrokeShape="RoundRectangle 8">
+                                    <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="6">
                                         <VerticalStackLayout Spacing="2">
-                                            <Label Text="{Binding CustomerName}"
-                                                   FontSize="19"
-                                                   FontAttributes="Bold"
-                                                   TextColor="#221614"
-                                                   LineBreakMode="TailTruncation"/>
-                                            <Label Text="{Binding ReferenceDisplay}"
-                                                   FontSize="14"
-                                                   TextColor="#7B6661"
-                                                   LineBreakMode="TailTruncation"/>
+                                            <Label Text="{Binding CustomerName}" FontSize="19" FontAttributes="Bold" TextColor="#221614" LineBreakMode="TailTruncation"/>
+                                            <Label Text="{Binding ReferenceDisplay}" FontSize="14" TextColor="#7B6661" LineBreakMode="TailTruncation"/>
                                         </VerticalStackLayout>
-
-                                        <Label Grid.Column="1"
-                                               Text="{Binding TotalDisplay}"
-                                               FontSize="17"
-                                               FontAttributes="Bold"
-                                               TextColor="#B3261E"
-                                               HorizontalTextAlignment="End"/>
-
-                                        <Label Grid.Row="1"
-                                               Text="{Binding QuoteMetaDisplay}"
-                                               FontSize="12"
-                                               TextColor="#7B6661"/>
-
-                                        <Border Grid.Row="1"
-                                                Grid.Column="1"
-                                                StrokeThickness="0"
-                                                BackgroundColor="#FCEDEA"
-                                                Padding="8,3"
-                                                HorizontalOptions="End"
-                                                StrokeShape="RoundRectangle 6">
-                                            <Label Text="{Binding StatusText}"
-                                                   FontSize="11"
-                                                   FontAttributes="Bold"
-                                                   TextColor="#B3261E"/>
+                                        <Label Grid.Column="1" Text="{Binding TotalDisplay}" FontSize="17" FontAttributes="Bold" TextColor="#B3261E" HorizontalTextAlignment="End"/>
+                                        <Label Grid.Row="1" Text="{Binding QuoteMetaDisplay}" FontSize="12" TextColor="#7B6661"/>
+                                        <Border Grid.Row="1" Grid.Column="1" StrokeThickness="0" BackgroundColor="#FCEDEA" Padding="8,3" HorizontalOptions="End" StrokeShape="RoundRectangle 6">
+                                            <Label Text="{Binding StatusText}" FontSize="11" FontAttributes="Bold" TextColor="#B3261E"/>
                                         </Border>
-
-                                        <BoxView Grid.Row="2"
-                                                 Grid.ColumnSpan="2"
-                                                 HeightRequest="1"
-                                                 Margin="0,3,0,0"
-                                                 BackgroundColor="#F2E7E4"/>
+                                        <BoxView Grid.Row="2" Grid.ColumnSpan="2" HeightRequest="1" Margin="0,3,0,0" BackgroundColor="#F2E7E4"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -225,81 +152,29 @@
                 </RefreshView>
             </Grid>
 
-            <Grid x:Name="CustomersPanel"
-                  IsVisible="False"
-                  RowDefinitions="Auto,Auto,*"
-                  RowSpacing="10">
-                <SearchBar x:Name="CustomerSearchBox"
-                           Placeholder="Cerca nome, indirizzo o contatto"
-                           SearchButtonPressed="OnCustomerSearchRequested"
-                           TextChanged="OnCustomerSearchTextChanged"
-                           BackgroundColor="#FFFFFF"
-                           TextColor="#221614"
-                           PlaceholderColor="#7B6661"/>
-
-                <Grid Grid.Row="1"
-                      ColumnDefinitions="*,Auto"
-                      ColumnSpacing="10">
-                    <Label x:Name="CustomerCountLabel"
-                           Text="0 clienti"
-                           FontSize="12"
-                           TextColor="#7B6661"
-                           VerticalOptions="Center"/>
-                    <Button Grid.Column="1"
-                            Text="+ Cliente"
-                            Clicked="OnAddCustomerClicked"
-                            BackgroundColor="#B3261E"
-                            TextColor="#FFFFFF"
-                            CornerRadius="8"
-                            Padding="16,8"/>
+            <Grid x:Name="CustomersPanel" IsVisible="False" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+                <SearchBar x:Name="CustomerSearchBox" Placeholder="Cerca nome, indirizzo o contatto" SearchButtonPressed="OnCustomerSearchRequested"
+                           TextChanged="OnCustomerSearchTextChanged" BackgroundColor="#FFFFFF" TextColor="#221614" PlaceholderColor="#7B6661"/>
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <Label x:Name="CustomerCountLabel" Text="0 clienti" FontSize="12" TextColor="#7B6661" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="+ Cliente" Clicked="OnAddCustomerClicked" BackgroundColor="#B3261E" TextColor="#FFFFFF" CornerRadius="8" Padding="16,8"/>
                 </Grid>
-
-                <RefreshView Grid.Row="2"
-                             x:Name="CustomerRefresh"
-                             Refreshing="OnCustomerRefreshViewRefreshing">
-                    <CollectionView x:Name="CustomerList"
-                                    SelectionMode="Single"
-                                    SelectionChanged="OnCustomerSelected">
+                <RefreshView Grid.Row="2" x:Name="CustomerRefresh" Refreshing="OnCustomerRefreshViewRefreshing">
+                    <CollectionView x:Name="CustomerList" SelectionMode="Single" SelectionChanged="OnCustomerSelected">
                         <CollectionView.EmptyView>
-                            <VerticalStackLayout Padding="20,36"
-                                                 Spacing="5">
-                                <Label Text="Nessun cliente"
-                                       HorizontalTextAlignment="Center"
-                                       FontAttributes="Bold"
-                                       TextColor="#221614"/>
-                                <Label Text="Modifica la ricerca oppure aggiungi un cliente."
-                                       HorizontalTextAlignment="Center"
-                                       FontSize="13"
-                                       TextColor="#7B6661"/>
+                            <VerticalStackLayout Padding="20,36" Spacing="5">
+                                <Label Text="Nessun cliente" HorizontalTextAlignment="Center" FontAttributes="Bold" TextColor="#221614"/>
+                                <Label Text="Modifica la ricerca oppure aggiungi un cliente." HorizontalTextAlignment="Center" FontSize="13" TextColor="#7B6661"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
-                                <Border Stroke="#E6D6D2"
-                                        StrokeThickness="1"
-                                        BackgroundColor="#FFFFFF"
-                                        Margin="0,0,0,10"
-                                        Padding="14"
-                                        StrokeShape="RoundRectangle 8">
+                                <Border Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Margin="0,0,0,10" Padding="14" StrokeShape="RoundRectangle 8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="{Binding BusinessName}"
-                                               FontSize="18"
-                                               FontAttributes="Bold"
-                                               TextColor="#221614"
-                                               LineBreakMode="TailTruncation"/>
-                                        <Label Text="{Binding AddressDisplay}"
-                                               FontSize="13"
-                                               TextColor="#7B6661"
-                                               LineBreakMode="TailTruncation"/>
-                                        <Label Text="{Binding ContactDisplay}"
-                                               FontSize="13"
-                                               TextColor="#7B6661"
-                                               LineBreakMode="TailTruncation"/>
-                                        <Label Text="{Binding DiscountsDisplay}"
-                                               Margin="0,3,0,0"
-                                               FontSize="12"
-                                               FontAttributes="Bold"
-                                               TextColor="#B3261E"/>
+                                        <Label Text="{Binding BusinessName}" FontSize="18" FontAttributes="Bold" TextColor="#221614" LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding AddressDisplay}" FontSize="13" TextColor="#7B6661" LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding ContactDisplay}" FontSize="13" TextColor="#7B6661" LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding DiscountsDisplay}" Margin="0,3,0,0" FontSize="12" FontAttributes="Bold" TextColor="#B3261E"/>
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
@@ -308,14 +183,90 @@
                 </RefreshView>
             </Grid>
 
-            <ActivityIndicator x:Name="Busy"
-                               IsVisible="False"
-                               IsRunning="False"
-                               Color="#B3261E"
-                               WidthRequest="44"
-                               HeightRequest="44"
-                               HorizontalOptions="Center"
-                               VerticalOptions="Center"/>
+            <Grid x:Name="OrdersPanel" IsVisible="False" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+                <SearchBar x:Name="OrderSearchBox" Placeholder="Cerca cliente, preventivo o fornitore" SearchButtonPressed="OnOrderSearchRequested"
+                           TextChanged="OnOrderSearchTextChanged" BackgroundColor="#FFFFFF" TextColor="#221614" PlaceholderColor="#7B6661"/>
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Picker x:Name="OrderStatusPicker" Title="Tutti gli stati" SelectedIndexChanged="OnOrderFilterChanged" BackgroundColor="#FFFFFF" FontSize="12"/>
+                    <Picker x:Name="OrderSortPicker" Grid.Column="1" Title="Ordina per" SelectedIndexChanged="OnOrderSortChanged" BackgroundColor="#FFFFFF" FontSize="12"/>
+                </Grid>
+                <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+                    <Label x:Name="OrderCountLabel" Text="0 ordini" FontSize="12" TextColor="#7B6661" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="Aggiorna" Clicked="OnRefreshOrdersClicked" BackgroundColor="Transparent" TextColor="#B3261E" Padding="10,4" HeightRequest="36"/>
+                </Grid>
+                <RefreshView Grid.Row="3" x:Name="OrderRefresh" Refreshing="OnOrderRefreshViewRefreshing">
+                    <CollectionView x:Name="OrderList" SelectionMode="Single" SelectionChanged="OnOrderSelected">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout Padding="20,36" Spacing="5">
+                                <Label Text="Nessun ordine" HorizontalTextAlignment="Center" FontAttributes="Bold" TextColor="#221614"/>
+                                <Label Text="Gli ordini compaiono quando salvi i dati materiali di un preventivo." HorizontalTextAlignment="Center" FontSize="13" TextColor="#7B6661"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Margin="0,0,0,10" Padding="14" StrokeShape="RoundRectangle 8">
+                                    <VerticalStackLayout Spacing="7">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <Label Text="{Binding CustomerReferenceDisplay}" FontSize="17" FontAttributes="Bold" TextColor="#221614" LineBreakMode="TailTruncation"/>
+                                            <Border Grid.Column="1" StrokeThickness="0" BackgroundColor="{Binding StatusColor}" Padding="8,4" StrokeShape="RoundRectangle 6">
+                                                <Label Text="{Binding StatusDisplay}" FontSize="10" FontAttributes="Bold" TextColor="{Binding StatusTextColor}"/>
+                                            </Border>
+                                        </Grid>
+                                        <Label Text="{Binding QuoteDisplay}" FontSize="12" TextColor="#7B6661"/>
+                                        <Label Text="{Binding SupplierDisplay}" FontSize="14" FontAttributes="Bold" TextColor="#B3261E"/>
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                            <VerticalStackLayout Spacing="1">
+                                                <Label Text="DATA ORDINE" FontSize="10" FontAttributes="Bold" TextColor="#7B6661"/>
+                                                <Label Text="{Binding OrderDateDisplay}" FontSize="13" TextColor="#221614"/>
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="1">
+                                                <Label Text="CONSEGNA" FontSize="10" FontAttributes="Bold" TextColor="#7B6661"/>
+                                                <Label Text="{Binding DeliveryDateDisplay}" FontSize="13" TextColor="#221614"/>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </RefreshView>
+            </Grid>
+
+            <Grid x:Name="CatalogPanel" IsVisible="False" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+                <Border Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Padding="4" StrokeShape="RoundRectangle 8">
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                        <Button x:Name="MaterialCatalogButton" Text="Materiali" Clicked="OnMaterialCatalogClicked" CornerRadius="6" HeightRequest="42"/>
+                        <Button x:Name="LaborCatalogButton" Grid.Column="1" Text="Lavorazioni" Clicked="OnLaborCatalogClicked" CornerRadius="6" HeightRequest="42"/>
+                    </Grid>
+                </Border>
+                <SearchBar x:Name="CatalogSearchBox" Grid.Row="1" Placeholder="Cerca nel catalogo" SearchButtonPressed="OnCatalogSearchRequested"
+                           TextChanged="OnCatalogSearchTextChanged" BackgroundColor="#FFFFFF" TextColor="#221614" PlaceholderColor="#7B6661"/>
+                <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <Label x:Name="CatalogCountLabel" Text="0 voci" FontSize="12" TextColor="#7B6661" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="+ Voce" Clicked="OnAddCatalogItemClicked" BackgroundColor="#B3261E" TextColor="#FFFFFF" CornerRadius="8" Padding="16,8"/>
+                </Grid>
+                <RefreshView Grid.Row="3" x:Name="CatalogRefresh" Refreshing="OnCatalogRefreshViewRefreshing">
+                    <CollectionView x:Name="CatalogList" SelectionMode="Single" SelectionChanged="OnCatalogItemSelected">
+                        <CollectionView.EmptyView>
+                            <Label Text="Nessuna voce trovata" Padding="20,36" HorizontalTextAlignment="Center" FontAttributes="Bold" TextColor="#221614"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Stroke="#E6D6D2" BackgroundColor="#FFFFFF" Margin="0,0,0,10" Padding="14" StrokeShape="RoundRectangle 8">
+                                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="10" RowSpacing="4">
+                                        <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold" TextColor="#221614" LineBreakMode="TailTruncation"/>
+                                        <Label Grid.Column="1" Text="{Binding PriceDisplay}" FontSize="16" FontAttributes="Bold" TextColor="#B3261E"/>
+                                        <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding DescriptionDisplay}" FontSize="12" TextColor="#7B6661" MaxLines="2" LineBreakMode="TailTruncation"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </RefreshView>
+            </Grid>
+
+            <ActivityIndicator x:Name="Busy" IsVisible="False" IsRunning="False" Color="#B3261E"
+                               WidthRequest="44" HeightRequest="44" HorizontalOptions="Center" VerticalOptions="Center"/>
         </Grid>
     </Grid>
 </ContentPage>

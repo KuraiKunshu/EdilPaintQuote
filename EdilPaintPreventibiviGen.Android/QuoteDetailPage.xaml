@@ -26,6 +26,7 @@
                                FontAttributes="Bold"
                                TextColor="#FFFFFF"
                                BackgroundColor="#7F1D1D"
+                               VerticalOptions="Start"
                                Padding="8,4"/>
                     </Grid>
                     <Label Text="{Binding CustomerReferenceDisplay}"
@@ -186,6 +187,10 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Label Text="Gestione" FontSize="19" FontAttributes="Bold" TextColor="#221614"/>
+            <Label x:Name="OperationsInfo" FontSize="14" TextColor="#221614"/>
+            <Label Text="Attivita" FontSize="16" FontAttributes="Bold" TextColor="#221614"/>
+            <Label x:Name="EventsInfo" FontSize="12" TextColor="#616166"/>
             <Label Text="Materiali"
                    FontSize="19"
                    FontAttributes="Bold"
@@ -382,12 +387,17 @@
                 StrokeThickness="1"
                 BackgroundColor="#FFFFFF"
                 Padding="16,12">
-            <Button Text="Modifica preventivo"
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button Text="Modifica"
                     Clicked="OnEditClicked"
                     BackgroundColor="#B3261E"
                     TextColor="#FFFFFF"
                     CornerRadius="8"
                     HeightRequest="50"/>
+            <Button Grid.Column="1" Text="Azioni" Clicked="OnActionsClicked"
+                    BackgroundColor="#FFFFFF" TextColor="#B3261E" BorderColor="#B3261E"
+                    BorderWidth="1" CornerRadius="8" HeightRequest="50"/>
+            </Grid>
         </Border>
     </Grid>
 </ContentPage>

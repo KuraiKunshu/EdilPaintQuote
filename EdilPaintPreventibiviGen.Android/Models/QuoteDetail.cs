@@ -12,24 +12,46 @@ public sealed class QuoteDetail
     public int? CustomerId { get; init; }
     public Guid CustomerSyncId { get; init; }
     public string CustomerName { get; init; } = string.Empty;
+    public string CustomerEmail { get; init; } = string.Empty;
+    public string CustomerAddress { get; init; } = string.Empty;
     public int? ReferenceCustomerId { get; init; }
     public Guid ReferenceCustomerSyncId { get; init; }
     public string ReferenceName { get; init; } = string.Empty;
+    public string ReferenceEmail { get; init; } = string.Empty;
     public int? BillingCustomerId { get; init; }
     public Guid BillingCustomerSyncId { get; init; }
     public string BillingCustomerName { get; init; } = string.Empty;
+    public string BillingCustomerEmail { get; init; } = string.Empty;
     public string SiteName { get; init; } = string.Empty;
     public string PaymentTerms { get; init; } = string.Empty;
     public string CustomerNotes { get; init; } = string.Empty;
     public string IvaType { get; init; } = string.Empty;
     public string Notes { get; init; } = string.Empty;
+    public string PdfPath { get; init; } = string.Empty;
     public double Imponibile { get; init; }
     public double Total { get; init; }
     public double MaterialDiscount { get; init; }
     public double LaborDiscount { get; init; }
     public QuoteStatus Status { get; init; }
     public DateTime? SentAtUtc { get; init; }
+    public string SentMethod { get; init; } = string.Empty;
     public string SentRecipient { get; init; } = string.Empty;
+    public string SentByDevice { get; init; } = string.Empty;
+    public DateTime? LastReminderAtUtc { get; init; }
+    public int ReminderCount { get; init; }
+    public string LastReminderByDevice { get; init; } = string.Empty;
+    public List<QuoteEventRecord> Events { get; init; } = [];
+    public string SupplierName { get; init; } = string.Empty;
+    public bool MaterialsOrderedByCustomer { get; init; }
+    public DateTime? MaterialOrderDate { get; init; }
+    public DateTime? ExpectedDeliveryDate { get; init; }
+    public string MaterialStatus { get; init; } = string.Empty;
+    public RealProfitSnapshot? RealProfit { get; init; }
+    public bool IsJointVenture { get; init; }
+    public string PartnerCompanyName { get; init; } = string.Empty;
+    public List<CostAllocationItem> OurCosts { get; init; } = [];
+    public List<CostAllocationItem> PartnerCosts { get; init; } = [];
+    public List<CostAllocationItem> AdditionalCosts { get; init; } = [];
     public string LastModifiedByDevice { get; init; } = string.Empty;
     public DateTime LastModifiedUtc { get; init; }
     public long Revision { get; init; }
@@ -50,6 +72,13 @@ public sealed class QuoteDetail
     public bool HasNotes => !string.IsNullOrWhiteSpace(Notes);
     public bool HasMaterials => Materials.Count > 0;
     public bool HasLabors => Labors.Count > 0;
+    public bool HasOrderInfo => MaterialsOrderedByCustomer ||
+                                !string.IsNullOrWhiteSpace(SupplierName) ||
+                                MaterialOrderDate.HasValue ||
+                                ExpectedDeliveryDate.HasValue ||
+                                !string.IsNullOrWhiteSpace(MaterialStatus);
+    public bool HasRealProfit => RealProfit != null;
+    public bool HasReminder => LastReminderAtUtc.HasValue;
     public string SentDisplay => SentAtUtc.HasValue
         ? SentAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy", ItalianCulture)
         : "Non inviato";
@@ -60,6 +89,21 @@ public sealed class QuoteDetail
     public string BillingCustomerDisplay => string.IsNullOrWhiteSpace(BillingCustomerName)
         ? "-"
         : BillingCustomerName.Trim();
+    public string SupplierDisplay => MaterialsOrderedByCustomer
+        ? "Materiali ordinati dal cliente"
+        : string.IsNullOrWhiteSpace(SupplierName) ? "Non indicato" : SupplierName.Trim();
+    public string MaterialStatusDisplay => SupplierOrderStatusOptions.Normalize(MaterialStatus);
+    public string MaterialOrderDateDisplay => MaterialOrderDate?.ToLocalTime().ToString("dd/MM/yyyy", ItalianCulture) ?? "-";
+    public string ExpectedDeliveryDateDisplay => ExpectedDeliveryDate?.ToLocalTime().ToString("dd/MM/yyyy", ItalianCulture) ?? "-";
+    public string ReminderDisplay => LastReminderAtUtc.HasValue
+        ? $"{LastReminderAtUtc.Value.ToLocalTime():dd/MM/yyyy} (n. {ReminderCount})"
+        : "Nessun sollecito";
+    public string RealProfitDisplay => RealProfit == null
+        ? "Non calcolato"
+        : $"{RealProfit.Result.Profit.ToString("C", ItalianCulture)} ({RealProfit.Result.ProfitPercentage:0.#}%)";
+    public string CollaborationDisplay => IsJointVenture
+        ? string.IsNullOrWhiteSpace(PartnerCompanyName) ? "Collaborazione attiva" : PartnerCompanyName.Trim()
+        : "Nessuna collaborazione";
     public string StatusText => Status switch
     {
         QuoteStatus.DaInviare => "Da inviare",

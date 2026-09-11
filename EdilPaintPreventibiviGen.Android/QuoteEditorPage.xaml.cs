@@ -20,11 +20,23 @@ public partial class QuoteEditorPage : ContentPage
     private bool _initializingControls;
     private bool _isSaving;
 
-    public QuoteEditorPage(string connectionString, QuoteDetail? detail = null)
+    public QuoteEditorPage(string connectionString, QuoteDetail? detail = null, bool duplicate = false)
     {
         InitializeComponent();
         _connectionString = connectionString;
         _draft = detail == null ? new QuoteDraft() : QuoteDraft.FromDetail(detail);
+        if (duplicate)
+        {
+            _draft.Id = 0;
+            _draft.QuoteNumber = string.Empty;
+            _draft.Revision = 0;
+            _draft.Date = DateTime.Today;
+            _draft.Status = QuoteStatus.Bozza;
+        }
+        ToolbarItems.Add(new ToolbarItem("Collaborazione", null, async () =>
+            await Navigation.PushAsync(new CollaborationPage(_connectionString, _draft))) { Order = ToolbarItemOrder.Secondary });
+        ToolbarItems.Add(new ToolbarItem("Riordina voci", null, async () =>
+            await Navigation.PushAsync(new QuoteLineOrderPage(_draft))) { Order = ToolbarItemOrder.Secondary });
 
         HeaderTitleLabel.Text = _draft.IsNew ? "Nuovo preventivo" : "Modifica preventivo";
         QuoteNumberLabel.Text = _draft.QuoteNumberDisplay;
@@ -69,7 +81,7 @@ public partial class QuoteEditorPage : ContentPage
             if (defaultsTask != null)
             {
                 QuoteEditorDefaults defaults = await defaultsTask;
-                _draft.PaymentTerms = defaults.PaymentTerms;
+                if (string.IsNullOrWhiteSpace(_draft.PaymentTerms)) _draft.PaymentTerms = defaults.PaymentTerms;
             }
 
             PopulateControls();
@@ -383,6 +395,7 @@ public partial class QuoteEditorPage : ContentPage
         Busy.IsVisible = isBusy;
         Busy.IsRunning = isBusy;
         SaveButton.IsEnabled = !isBusy;
+        if (Content is Grid grid && grid.Children.FirstOrDefault() is View form) form.IsEnabled = !isBusy;
     }
 
     private static bool TryParsePercentage(string? text, out double value)
@@ -395,8 +408,7 @@ public partial class QuoteEditorPage : ContentPage
         TryParseNumber(text, out double value) ? value : 0;
 
     private static bool TryParseNumber(string? text, out double value) =>
-        double.TryParse(text, NumberStyles.Number, ItalianCulture, out value) ||
-        double.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
+        MobileNumber.TryParse(text, out value);
 
     private static string DisplayIva(string? value) => QuoteTotalsCalculator.NormalizeIvaType(value) switch
     {

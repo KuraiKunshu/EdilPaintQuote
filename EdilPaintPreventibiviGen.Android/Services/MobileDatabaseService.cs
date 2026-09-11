@@ -1,11 +1,12 @@
 using System.Data;
+using System.Text.Json;
 using EdilPaintPreventibiviGen.Android.Models;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace EdilPaintPreventibiviGen.Android.Services;
 
-public sealed class MobileDatabaseService
+public sealed partial class MobileDatabaseService
 {
     private const int CommandTimeoutSeconds = 20;
 
@@ -67,7 +68,7 @@ public sealed class MobileDatabaseService
             left join "Customers" b on b."Id" = q."BillingCustomerId"
             where {string.Join(" and ", where)}
             order by q."Date" desc, q."Id" desc
-            limit 200;
+            ;
             """;
 
         var quotes = new List<QuoteSummary>();
@@ -137,7 +138,27 @@ public sealed class MobileDatabaseService
                     q."SentRecipient",
                     q."LastModifiedByDevice",
                     q."LastModifiedUtc",
-                    q."Revision"
+                    q."Revision",
+                    q."PdfPath",
+                    q."SentMethod",
+                    q."SentByDevice",
+                    q."LastReminderAtUtc",
+                    q."ReminderCount",
+                    q."LastReminderByDevice",
+                    q."EventsJson",
+                    q."SupplierName",
+                    q."MaterialsOrderedByCustomer",
+                    q."MaterialOrderDate",
+                    q."ExpectedDeliveryDate",
+                    q."MaterialStatus",
+                    q."RealProfitJson",
+                    q."IsJointVenture",
+                    q."PartnerCompanyName",
+                    q."CostAllocationsJson",
+                    coalesce(c."Email", ''),
+                    coalesce(r."Email", ''),
+                    coalesce(b."Email", ''),
+                    coalesce(c."Address", '')
                 from "Quotes" q
                 left join "Customers" c on c."Id" = q."CustomerId"
                 left join "Customers" r on r."Id" = q."ReferenceCustomerId"
@@ -179,7 +200,29 @@ public sealed class MobileDatabaseService
                 SentRecipient = reader.GetString(23),
                 LastModifiedByDevice = reader.GetString(24),
                 LastModifiedUtc = reader.GetDateTime(25),
-                Revision = reader.GetInt64(26)
+                Revision = reader.GetInt64(26),
+                PdfPath = reader.GetString(27),
+                SentMethod = reader.GetString(28),
+                SentByDevice = reader.GetString(29),
+                LastReminderAtUtc = reader.IsDBNull(30) ? null : reader.GetDateTime(30),
+                ReminderCount = reader.GetInt32(31),
+                LastReminderByDevice = reader.GetString(32),
+                Events = DeserializeJson<List<QuoteEventRecord>>(reader.GetString(33)) ?? [],
+                SupplierName = reader.GetString(34),
+                MaterialsOrderedByCustomer = reader.GetBoolean(35),
+                MaterialOrderDate = reader.IsDBNull(36) ? null : reader.GetDateTime(36),
+                ExpectedDeliveryDate = reader.IsDBNull(37) ? null : reader.GetDateTime(37),
+                MaterialStatus = reader.GetString(38),
+                RealProfit = DeserializeJson<RealProfitSnapshot>(reader.GetString(39)),
+                IsJointVenture = reader.GetBoolean(40),
+                PartnerCompanyName = reader.GetString(41),
+                OurCosts = DeserializeJson<CostAllocationSnapshot>(reader.GetString(42))?.OurCosts ?? [],
+                PartnerCosts = DeserializeJson<CostAllocationSnapshot>(reader.GetString(42))?.PartnerCosts ?? [],
+                AdditionalCosts = DeserializeJson<CostAllocationSnapshot>(reader.GetString(42))?.AdditionalCosts ?? [],
+                CustomerEmail = reader.GetString(43),
+                ReferenceEmail = reader.GetString(44),
+                BillingCustomerEmail = reader.GetString(45),
+                CustomerAddress = reader.GetString(46)
             };
         }
 
@@ -216,7 +259,7 @@ public sealed class MobileDatabaseService
             from "Customers"
             where not "IsDeleted" and not "IsSupplier" {searchClause}
             order by "BusinessName"
-            limit 500;
+            ;
             """;
 
         var customers = new List<CustomerRecord>();
@@ -325,16 +368,16 @@ public sealed class MobileDatabaseService
 
         command.CommandText = kind == QuoteLineKind.Material
             ? $"""
-                select "Id", "Name", "Description", "UnitPrice", "IsSignificant"
+                select "Id", "Name", "Description", "UnitPrice", "IsSignificant", "IsCompanyMaterial"
                 from "PersonalMaterials" {searchClause}
                 order by "Name"
-                limit 200;
+                ;
                 """
             : $"""
-                select "Id", "Name", "Description", "UnitPrice", false
+                select "Id", "Name", "Description", "UnitPrice", false, false
                 from "LaborCatalog" {searchClause}
                 order by "Name"
-                limit 200;
+                ;
                 """;
 
         var items = new List<CatalogItem>();
@@ -347,7 +390,8 @@ public sealed class MobileDatabaseService
                 Name = reader.GetString(1),
                 Description = reader.GetString(2),
                 UnitPrice = reader.GetDouble(3),
-                IsSignificant = reader.GetBoolean(4)
+                IsSignificant = reader.GetBoolean(4),
+                IsCompanyMaterial = reader.GetBoolean(5)
             });
         }
 
@@ -466,6 +510,11 @@ public sealed class MobileDatabaseService
     public static string GetUserMessage(Exception exception)
     {
         Exception root = exception.GetBaseException();
+        if (exception is DatabaseReadTimeoutException)
+            return "Connessione non disponibile entro 20 secondi. I dati non sono stati aggiornati. Le credenziali restano salvate: riprova quando torna la rete.";
+        if (exception is InvalidOperationException && root is JsonException) return exception.Message;
+        if (root is TimeoutException or OperationCanceledException)
+            return "L'operazione e' scaduta o e' stata interrotta. Se stavi salvando o inviando, verifica l'esito prima di riprovare.";
         if (exception is DatabaseWriteConflictException || root is DatabaseWriteConflictException)
             return root.Message;
 
@@ -474,7 +523,7 @@ public sealed class MobileDatabaseService
             return postgres.SqlState switch
             {
                 PostgresErrorCodes.InsufficientPrivilege =>
-                    "L'utente Neon salvato sul dispositivo non ha ancora i permessi di scrittura per preventivi e clienti.",
+                    "L'utente Neon non ha i permessi per questa operazione. Aggiorna i permessi con lo script Neon-MobileWriter.sql.",
                 PostgresErrorCodes.UniqueViolation =>
                     "Esiste già un elemento con gli stessi dati. Aggiorna l'elenco e riprova.",
                 PostgresErrorCodes.ForeignKeyViolation =>
@@ -507,17 +556,19 @@ public sealed class MobileDatabaseService
                  "IvaType", "Notes", "Imponibile", "MaterialDiscount", "LaborDiscount", "Total",
                  "Status", "CreatedByDevice", "LastModifiedByDevice", "SentMethod", "SentRecipient",
                  "SentByDevice", "ReminderCount", "LastReminderByDevice", "EventsJson", "SupplierName",
-                 "MaterialStatus", "IsJointVenture", "PartnerCompanyName", "CostAllocationsJson",
+                 "MaterialStatus", "MaterialsOrderedByCustomer", "RealProfitJson", "IsJointVenture", "PartnerCompanyName", "CostAllocationsJson",
                  "LastModifiedUtc", "Revision", "SyncHash", "IsDeleted")
             values
                 (@quoteNumber, @date, @customerId, @referenceCustomerId, @billingCustomerId,
                  @siteName, @billingCustomerName, '', @paymentTerms, @customerNotes,
                  @ivaType, @notes, @imponibile, @materialDiscount, @laborDiscount, @total,
-                 @status, @deviceName, @deviceName, '', '', '', 0, '', '[]', '', '', false, '', '',
+                 @status, @deviceName, @deviceName, '', '', '', 0, '', @eventsJson, '', '', false, '', @isJointVenture, @partnerCompanyName, @costAllocationsJson,
                  @savedAtUtc, 1, '', false)
             returning "Id", "Revision";
             """;
         AddQuoteParameters(command, draft, customerId, referenceCustomerId, billingCustomerId, totals, deviceName, savedAtUtc);
+        command.Parameters.AddWithValue("eventsJson", JsonSerializer.Serialize(new[] { new QuoteEventRecord
+        { CreatedAtUtc = savedAtUtc, DeviceName = deviceName, EventType = "creazione", Description = "Preventivo creato dall'app Android" } }));
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
@@ -537,6 +588,15 @@ public sealed class MobileDatabaseService
         DateTime savedAtUtc,
         CancellationToken cancellationToken)
     {
+        List<QuoteEventRecord> events;
+        await using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "select \"EventsJson\" from \"Quotes\" where \"Id\" = @id and not \"IsDeleted\" for update;";
+            read.Parameters.AddWithValue("id", draft.Id);
+            events = DeserializeJson<List<QuoteEventRecord>>(await read.ExecuteScalarAsync(cancellationToken) as string) ?? [];
+        }
+        events.Add(new() { CreatedAtUtc = savedAtUtc, DeviceName = deviceName, EventType = "modifica", Description = "Preventivo aggiornato dall'app Android" });
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
@@ -556,6 +616,10 @@ public sealed class MobileDatabaseService
                 "LaborDiscount" = @laborDiscount,
                 "Total" = @total,
                 "Status" = @status,
+                "IsJointVenture" = @isJointVenture,
+                "PartnerCompanyName" = @partnerCompanyName,
+                "CostAllocationsJson" = @costAllocationsJson,
+                "EventsJson" = @eventsJson,
                 "LastModifiedByDevice" = @deviceName,
                 "LastModifiedUtc" = @savedAtUtc,
                 "Revision" = "Revision" + 1,
@@ -569,6 +633,7 @@ public sealed class MobileDatabaseService
         AddQuoteParameters(command, draft, customerId, referenceCustomerId, billingCustomerId, totals, deviceName, savedAtUtc);
         command.Parameters.AddWithValue("id", draft.Id);
         command.Parameters.AddWithValue("expectedRevision", draft.Revision);
+        command.Parameters.AddWithValue("eventsJson", JsonSerializer.Serialize(events));
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
@@ -606,6 +671,9 @@ public sealed class MobileDatabaseService
         command.Parameters.AddWithValue("laborDiscount", draft.LaborDiscount);
         command.Parameters.AddWithValue("total", totals.Total);
         command.Parameters.AddWithValue("status", (int)draft.Status);
+        command.Parameters.AddWithValue("isJointVenture", draft.IsJointVenture);
+        command.Parameters.AddWithValue("partnerCompanyName", draft.IsJointVenture ? draft.PartnerCompanyName : string.Empty);
+        command.Parameters.AddWithValue("costAllocationsJson", SerializeCostAllocations(draft));
         command.Parameters.AddWithValue("deviceName", deviceName);
         command.Parameters.AddWithValue("savedAtUtc", savedAtUtc);
     }
@@ -790,6 +858,7 @@ public sealed class MobileDatabaseService
         draft.PaymentTerms = (draft.PaymentTerms ?? string.Empty).Trim();
         draft.CustomerNotes = (draft.CustomerNotes ?? string.Empty).Trim();
         draft.Notes = (draft.Notes ?? string.Empty).Trim();
+        draft.PartnerCompanyName = (draft.PartnerCompanyName ?? string.Empty).Trim();
         draft.IvaType = QuoteTotalsCalculator.NormalizeIvaType(draft.IvaType);
         draft.MaterialDiscount = Math.Clamp(draft.MaterialDiscount, 0, 100);
         draft.LaborDiscount = Math.Clamp(draft.LaborDiscount, 0, 100);
@@ -806,8 +875,9 @@ public sealed class MobileDatabaseService
                 throw new InvalidOperationException("Ogni riga deve avere un nome.");
             if (line.Quantity <= 0)
                 throw new InvalidOperationException($"La quantità di '{line.Name}' deve essere maggiore di zero.");
-            if (line.UnitPrice < 0)
+            if (!double.IsFinite(line.UnitPrice) || !double.IsFinite(line.Discount) || !double.IsFinite(line.Total) || line.UnitPrice < 0)
                 throw new InvalidOperationException($"Il prezzo di '{line.Name}' non può essere negativo.");
+            if (line.Name.Length > 250) throw new InvalidOperationException("Il nome di una voce supera 250 caratteri.");
         }
     }
 
@@ -855,6 +925,7 @@ public sealed class MobileDatabaseService
         };
         if (builder.SslMode == SslMode.Prefer)
             builder.SslMode = SslMode.Require;
+        if (builder.Host?.EndsWith(".neon.tech", StringComparison.OrdinalIgnoreCase) == true) builder.SslMode = SslMode.VerifyFull;
         if (builder.Timeout <= 0)
             builder.Timeout = 15;
         if (builder.CommandTimeout <= 0)
@@ -903,6 +974,7 @@ public sealed class MobileDatabaseService
                 TrySetConnectionStringValue(builder, "Channel Binding", NormalizeRequirePreferDisable(value));
         }
 
+        if (builder.Host?.EndsWith(".neon.tech", StringComparison.OrdinalIgnoreCase) == true) builder.SslMode = SslMode.VerifyFull;
         return builder.ConnectionString;
     }
 
@@ -911,11 +983,17 @@ public sealed class MobileDatabaseService
         CancellationToken cancellationToken = default)
     {
         const int maxAttempts = 3;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(20));
         for (int attempt = 1; ; attempt++)
         {
             try
             {
-                return await operation(cancellationToken);
+                return await operation(deadline.Token).WaitAsync(deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new DatabaseReadTimeoutException();
             }
             catch (OperationCanceledException)
             {
@@ -927,7 +1005,8 @@ public sealed class MobileDatabaseService
             }
             catch (Exception exception) when (attempt < maxAttempts && IsRetryable(exception))
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(300 * attempt), cancellationToken);
+                try { await Task.Delay(TimeSpan.FromMilliseconds(300 * attempt), deadline.Token); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { throw new DatabaseReadTimeoutException(); }
             }
         }
     }
@@ -1007,8 +1086,34 @@ public sealed class MobileDatabaseService
 
     private static string GetDeviceName()
     {
+#if ANDROID
         string name = DeviceInfo.Current.Name;
+#else
+        string name = Environment.MachineName;
+#endif
         string value = string.IsNullOrWhiteSpace(name) ? "Android" : $"Android - {name.Trim()}";
         return value.Length <= 120 ? value : value[..120];
     }
+
+    private static T? DeserializeJson<T>(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return default;
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(value);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException("Il preventivo contiene dati salvati non validi. Correggili sul PC prima di modificarlo: nessun dato e' stato sovrascritto.", exception);
+        }
+    }
+
+    private static string SerializeCostAllocations(QuoteDraft draft) => JsonSerializer.Serialize(new CostAllocationSnapshot
+    {
+        OurCosts = draft.OurCosts.Select(cost => cost.Clone()).ToList(),
+        PartnerCosts = draft.PartnerCosts.Select(cost => cost.Clone()).ToList(),
+        AdditionalCosts = draft.AdditionalCosts.Select(cost => cost.Clone()).ToList()
+    });
 }

@@ -388,7 +388,7 @@
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Spacing="6">
-                        <Label Text="Note per il cliente"
+                        <Label Text="NOTE"
                                FontSize="12"
                                TextColor="#7B6661"/>
                         <Border Stroke="#E6D6D2"

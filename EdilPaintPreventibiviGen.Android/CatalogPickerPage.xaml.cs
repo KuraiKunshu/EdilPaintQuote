@@ -13,16 +13,20 @@ public partial class CatalogPickerPage : ContentPage
     private readonly ObservableCollection<CatalogItem> _items = [];
     private CancellationTokenSource? _searchCts;
     private bool _loaded;
+    private readonly bool _companyOnly;
+    private int _loadVersion;
 
     public CatalogPickerPage(
         string connectionString,
         QuoteLineKind kind,
-        Action<CatalogItem> onSelected)
+        Action<CatalogItem> onSelected,
+        bool companyOnly = false)
     {
         InitializeComponent();
         _connectionString = connectionString;
         _kind = kind;
         _onSelected = onSelected;
+        _companyOnly = companyOnly;
         Title = kind == QuoteLineKind.Material ? "Catalogo materiali" : "Catalogo lavorazioni";
         CatalogList.ItemsSource = _items;
     }
@@ -69,6 +73,7 @@ public partial class CatalogPickerPage : ContentPage
 
     private async Task LoadAsync()
     {
+        int version = ++_loadVersion;
         try
         {
             SetBusy(true);
@@ -76,13 +81,15 @@ public partial class CatalogPickerPage : ContentPage
                 _connectionString,
                 _kind,
                 SearchBox.Text?.Trim() ?? string.Empty);
+            if (version != _loadVersion) return;
             _items.Clear();
-            foreach (var item in items)
+            foreach (var item in items.Where(item => !_companyOnly || item.IsCompanyMaterial))
                 _items.Add(item);
             CountLabel.Text = _items.Count == 1 ? "1 voce" : $"{_items.Count} voci";
         }
         catch (Exception exception)
         {
+            if (version != _loadVersion) return;
             await DisplayAlertAsync(
                 "Catalogo non disponibile",
                 MobileDatabaseService.GetUserMessage(exception),
@@ -90,7 +97,7 @@ public partial class CatalogPickerPage : ContentPage
         }
         finally
         {
-            SetBusy(false);
+            if (version == _loadVersion) SetBusy(false);
         }
     }
 

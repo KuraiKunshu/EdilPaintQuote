@@ -21,6 +21,11 @@ public sealed class QuoteDraft
     public string CustomerNotes { get; set; } = string.Empty;
     public string IvaType { get; set; } = "esclusa";
     public string Notes { get; set; } = string.Empty;
+    public bool IsJointVenture { get; set; }
+    public string PartnerCompanyName { get; set; } = string.Empty;
+    public List<CostAllocationItem> OurCosts { get; } = [];
+    public List<CostAllocationItem> PartnerCosts { get; } = [];
+    public List<CostAllocationItem> AdditionalCosts { get; } = [];
     public double MaterialDiscount { get; set; }
     public double LaborDiscount { get; set; }
     public QuoteStatus Status { get; set; } = QuoteStatus.Bozza;
@@ -52,6 +57,8 @@ public sealed class QuoteDraft
             CustomerNotes = detail.CustomerNotes,
             IvaType = detail.IvaType,
             Notes = detail.Notes,
+            IsJointVenture = detail.IsJointVenture,
+            PartnerCompanyName = detail.PartnerCompanyName,
             MaterialDiscount = detail.MaterialDiscount,
             LaborDiscount = detail.LaborDiscount,
             Status = detail.Status,
@@ -62,6 +69,9 @@ public sealed class QuoteDraft
             draft.Materials.Add(line.Clone());
         foreach (var line in detail.Labors)
             draft.Labors.Add(line.Clone());
+        draft.OurCosts.AddRange(detail.OurCosts.Select(cost => cost.Clone()));
+        draft.PartnerCosts.AddRange(detail.PartnerCosts.Select(cost => cost.Clone()));
+        draft.AdditionalCosts.AddRange(detail.AdditionalCosts.Select(cost => cost.Clone()));
 
         return draft;
     }
