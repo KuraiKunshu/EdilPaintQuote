@@ -8,6 +8,7 @@ public static class UpdaterLauncherService
     private const string UpdaterScriptName = "Update-EdilPaint.ps1";
     private const string UpdaterLocationFileName = "updater-path.txt";
     private const string UpdaterPathEnvironmentVariable = "EDILPAINT_UPDATER_PATH";
+    private const string BundledUpdaterFolderName = "updater";
 
     public static string? ResolveUpdaterScriptPath(string? baseDirectory = null)
     {
@@ -34,7 +35,7 @@ public static class UpdaterLauncherService
             foreach (string relativePath in new[]
             {
                 UpdaterScriptName,
-                Path.Combine("updater", UpdaterScriptName),
+                Path.Combine(BundledUpdaterFolderName, UpdaterScriptName),
                 Path.Combine("tools", "updater", UpdaterScriptName)
             })
             {
@@ -54,7 +55,7 @@ public static class UpdaterLauncherService
         return null;
     }
 
-    public static void StartUpdater(string scriptPath, int windowCloseDelaySeconds = 0)
+    public static void StartUpdater(string scriptPath, int waitForApplicationExitSeconds = 15)
     {
         if (string.IsNullOrWhiteSpace(scriptPath) || !File.Exists(scriptPath))
             throw new FileNotFoundException("Script updater non trovato.", scriptPath);
@@ -63,9 +64,7 @@ public static class UpdaterLauncherService
         if (string.IsNullOrWhiteSpace(workingDirectory))
             workingDirectory = AppContext.BaseDirectory;
 
-        string arguments = $"-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File {QuoteArgument(scriptPath)}";
-        if (windowCloseDelaySeconds > 0)
-            arguments += $" -WindowCloseDelaySeconds {windowCloseDelaySeconds}";
+        string arguments = BuildManualUpdaterArguments(scriptPath, waitForApplicationExitSeconds);
 
         var process = Process.Start(new ProcessStartInfo
         {
@@ -78,6 +77,45 @@ public static class UpdaterLauncherService
 
         if (process == null)
             throw new InvalidOperationException("Impossibile avviare il processo updater.");
+    }
+
+    public static string BuildManualUpdaterArguments(string scriptPath, int waitForApplicationExitSeconds = 15)
+    {
+        if (string.IsNullOrWhiteSpace(scriptPath))
+            throw new ArgumentException("Il percorso dello script updater è obbligatorio.", nameof(scriptPath));
+
+        if (waitForApplicationExitSeconds < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(waitForApplicationExitSeconds),
+                "L'attesa per la chiusura dell'app non può essere negativa.");
+
+        string fullPath = Path.GetFullPath(scriptPath);
+        return $"-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File {QuoteArgument(fullPath)} -ManualUpdate -WaitForApplicationExitSeconds {waitForApplicationExitSeconds}";
+    }
+
+    /// <summary>
+    /// Aggiorna lo script installato con la copia distribuita assieme all'app.
+    /// Le impostazioni restano esterne allo script, quindi non vengono toccate.
+    /// </summary>
+    public static bool RefreshUpdaterScriptFromBundledCopy(string updaterScriptPath, string? baseDirectory = null)
+    {
+        if (string.IsNullOrWhiteSpace(updaterScriptPath))
+            throw new ArgumentException("Il percorso dello script updater è obbligatorio.", nameof(updaterScriptPath));
+
+        baseDirectory = string.IsNullOrWhiteSpace(baseDirectory)
+            ? AppContext.BaseDirectory
+            : Path.GetFullPath(baseDirectory);
+
+        string bundledScriptPath = Path.Combine(baseDirectory, BundledUpdaterFolderName, UpdaterScriptName);
+        if (!File.Exists(bundledScriptPath))
+            return false;
+
+        string targetPath = Path.GetFullPath(updaterScriptPath);
+        if (string.Equals(bundledScriptPath, targetPath, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        File.Copy(bundledScriptPath, targetPath, overwrite: true);
+        return true;
     }
 
     private static IEnumerable<string> EnumerateCandidateDirectories(string startDirectory)

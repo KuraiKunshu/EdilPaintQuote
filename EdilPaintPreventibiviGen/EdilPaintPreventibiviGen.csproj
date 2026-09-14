@@ -82,6 +82,10 @@
         <None Include="appsettings.json" Condition="Exists('appsettings.json')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
+        <Content Include="..\tools\updater\Update-EdilPaint.ps1"
+                 Link="updater\Update-EdilPaint.ps1">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
 
     </ItemGroup>
 

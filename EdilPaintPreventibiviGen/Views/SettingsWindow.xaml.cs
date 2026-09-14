@@ -606,6 +606,8 @@ public partial class SettingsWindow : Window
                 return;
             }
 
+            UpdaterLauncherService.RefreshUpdaterScriptFromBundledCopy(scriptPath);
+
             string settingsPath = Path.Combine(Path.GetDirectoryName(scriptPath)!, "updater-settings.json");
             if (!File.Exists(settingsPath))
             {
@@ -628,7 +630,7 @@ public partial class SettingsWindow : Window
             if (result != MessageBoxResult.Yes)
                 return;
 
-            UpdaterLauncherService.StartUpdater(scriptPath, windowCloseDelaySeconds: 10);
+            UpdaterLauncherService.StartUpdater(scriptPath);
             AppShutdownManager.RequestShutdown();
             Application.Current.Shutdown();
         }

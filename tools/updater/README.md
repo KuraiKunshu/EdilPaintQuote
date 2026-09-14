@@ -16,6 +16,11 @@ anche quando programma e updater sono su dischi o cartelle differenti. In assenz
 del file, il programma controlla anche `C:\EdilPaintUpdater` e le cartelle standard
 di Windows.
 
+Ogni versione pubblicata include inoltre una copia aggiornata dello script. Quando
+si preme **Aggiorna ora**, l'app aggiorna prima lo script esterno mantenendo intatto
+`updater-settings.json`: le correzioni dell'updater arrivano quindi insieme al
+programma.
+
 Nel repository c'e' anche `updater-settings.example.json`, utile come modello da copiare e modificare su ogni PC.
 
 ## Aggiornare un updater già installato
@@ -60,7 +65,12 @@ Per cambiare l'attesa iniziale:
 
 ## Esecuzione manuale
 
-Per provare subito l'aggiornamento:
+Il pulsante **Aggiorna ora** nell'app chiude il programma, attende che il processo
+sia terminato e poi avvia subito l'aggiornamento, senza l'attesa prevista per
+l'avvio automatico. Se il programma non riesce a chiudersi, viene mostrato il
+motivo nel messaggio di errore.
+
+Per provare subito l'aggiornamento da PowerShell (prima chiudere il programma):
 
 ```powershell
 & "C:\EdilPaintUpdater\Update-EdilPaint.ps1"

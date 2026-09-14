@@ -1,6 +1,8 @@
 param(
     [string]$SettingsPath = (Join-Path $PSScriptRoot "updater-settings.json"),
-    [int]$WindowCloseDelaySeconds = 0
+    [int]$WindowCloseDelaySeconds = 0,
+    [switch]$ManualUpdate,
+    [ValidateRange(0, 300)][int]$WaitForApplicationExitSeconds = 0
 )
 
 Set-StrictMode -Version Latest
@@ -205,6 +207,28 @@ function Test-ApplicationRunning {
     return $null -ne (Get-Process -Name $Name -ErrorAction SilentlyContinue)
 }
 
+function Wait-ForApplicationExit {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][int]$TimeoutSeconds
+    )
+
+    if ($TimeoutSeconds -le 0) {
+        return -not (Test-ApplicationRunning -Name $Name)
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while (Test-ApplicationRunning -Name $Name) {
+        if ((Get-Date) -ge $deadline) {
+            return $false
+        }
+
+        Start-Sleep -Milliseconds 250
+    }
+
+    return $true
+}
+
 function Copy-PublishedFiles {
     param(
         [Parameter(Mandatory = $true)][string]$From,
@@ -245,7 +269,31 @@ function Copy-PublishedFiles {
 
     Write-Log "Avvio controllo aggiornamenti EdilPaint."
 
-    if ($startDelaySeconds -gt 0) {
+    # Il pulsante dell'app avvia questo processo poco prima di chiudere l'EXE.
+    # Aspettiamo quindi esplicitamente la sua chiusura: senza questa attesa il
+    # controllo poteva vedere ancora il processo attivo e saltare l'aggiornamento.
+    # WindowCloseDelaySeconds mantiene la compatibilita' con le versioni dell'app
+    # precedenti a -ManualUpdate.
+    $applicationExitWaitSeconds = if ($ManualUpdate) {
+        $WaitForApplicationExitSeconds
+    }
+    else {
+        [Math]::Max(0, $WindowCloseDelaySeconds)
+    }
+
+    if ($applicationExitWaitSeconds -gt 0) {
+        Write-Log "Attendo fino a $applicationExitWaitSeconds secondi la chiusura del programma."
+        if (-not (Wait-ForApplicationExit -Name $processName -TimeoutSeconds $applicationExitWaitSeconds)) {
+            if ($ManualUpdate) {
+                throw "Il programma e' ancora aperto dopo $applicationExitWaitSeconds secondi. Chiudilo completamente e riprova."
+            }
+
+            Write-Log "Programma ancora aperto: salto aggiornamento per non sovrascrivere file in uso."
+            Exit-Updater 0
+        }
+    }
+
+    if (-not $ManualUpdate -and $startDelaySeconds -gt 0) {
         Write-Log "Attendo $startDelaySeconds secondi prima del controllo."
         Start-Sleep -Seconds $startDelaySeconds
     }
@@ -277,6 +325,10 @@ function Copy-PublishedFiles {
     }
 
     if (Test-ApplicationRunning -Name $processName) {
+        if ($ManualUpdate) {
+            throw "Il programma e' ancora aperto. Chiudilo completamente e riprova l'aggiornamento."
+        }
+
         Write-Log "Programma aperto: salto aggiornamento per non sovrascrivere file in uso."
         Exit-Updater 0
     }
@@ -318,6 +370,10 @@ function Copy-PublishedFiles {
     Invoke-External dotnet publish $projectFullPath --configuration $configuration --output $publishPath --no-restore --self-contained false
 
     if (Test-ApplicationRunning -Name $processName) {
+        if ($ManualUpdate) {
+            throw "Il programma e' stato riaperto durante l'aggiornamento. Chiudilo completamente e riprova."
+        }
+
         Write-Log "Programma aperto dopo la build: salto copia file. Riprovero' al prossimo login."
         Exit-Updater 0
     }

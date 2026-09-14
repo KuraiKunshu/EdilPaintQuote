@@ -28,6 +28,7 @@ public partial class HistoryWindow : Window
     private bool _isSavingStatus;
     private bool _isSavingSupplierInfo;
     private bool _isGeneratingWorkSheet;
+    private bool _isGeneratingInstallationCertificate;
     private readonly HashSet<string> _loadedQuoteNumbers = new();
     private readonly List<QuoteHistorySummary> _currentSummaries = new();
     private CancellationTokenSource? _searchCts;
@@ -1028,10 +1029,10 @@ public partial class HistoryWindow : Window
 
     private async Task GenerateInstallationCertificateAsync(QuoteHistorySummary entry)
     {
-        var inputWindow = new InstallationCertificateWindow(entry) { Owner = this };
-        if (inputWindow.ShowDialog() != true)
+        if (_isGeneratingInstallationCertificate)
             return;
 
+        _isGeneratingInstallationCertificate = true;
         string? temporaryPath = null;
         try
         {
@@ -1046,6 +1047,12 @@ public partial class HistoryWindow : Window
             if (materials.Count == 0)
                 throw new InvalidOperationException("Il preventivo non contiene materiali da inserire nel certificato.");
 
+            Mouse.OverrideCursor = null;
+            var inputWindow = new InstallationCertificateWindow(entry, materials) { Owner = this };
+            if (inputWindow.ShowDialog() != true)
+                return;
+
+            Mouse.OverrideCursor = Cursors.Wait;
             var company = await App.DataService.GetCompanyAsync() ?? new Company();
             string expectedPath = StoragePathService.Instance.BuildInstallationCertificatePdfPath(
                 fullEntry.CustomerName,
@@ -1066,7 +1073,7 @@ public partial class HistoryWindow : Window
                 CustomerName = fullEntry.CustomerName,
                 ReferenceName = fullEntry.ReferenceName,
                 SelectedLogo = ResolveLogoForPdf(company),
-                Materials = materials,
+                Materials = inputWindow.SelectedMaterials.ToList(),
                 AllCustomers = _vm.AllCustomers.ToList(),
                 PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
                 FooterText = App.AppSettings.PdfTemplate.FooterText
@@ -1108,6 +1115,7 @@ public partial class HistoryWindow : Window
         }
         finally
         {
+            _isGeneratingInstallationCertificate = false;
             Mouse.OverrideCursor = null;
         }
     }
