@@ -1,5 +1,6 @@
 using System.Windows;
 using EdilPaintPreventibiviGen.Models;
+using EdilPaintPreventibiviGen.Converters;
 using System.Windows.Input;
 using System.Globalization;
 
@@ -20,7 +21,7 @@ public partial class EditItemWindow : Window
         
         TxtName.Text = _item.Name;
         TxtDescription.Text = _item.Description;
-        TxtPrice.Text = _item.UnitPrice.ToString();
+        TxtPrice.Text = _item.UnitPrice.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
         TxtQty.Text = _item.Quantity.ToString();
         ChkSignificant.IsChecked = _item.IsSignificant;
     }
@@ -38,8 +39,7 @@ public partial class EditItemWindow : Window
     
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
-        string priceText = TxtPrice.Text.Replace(",", ".");
-        if (double.TryParse(priceText, NumberStyles.Any, CultureInfo.InvariantCulture, out double price) && 
+        if (FlexibleDoubleConverter.TryParse(TxtPrice.Text, out double price) &&
             int.TryParse(TxtQty.Text, out int qty))
         {
             string newName = TxtName.Text.Trim();

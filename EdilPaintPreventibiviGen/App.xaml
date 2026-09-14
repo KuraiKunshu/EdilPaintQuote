@@ -1,6 +1,7 @@
 <Application x:Class="EdilPaintPreventibiviGen.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:EdilPaintPreventibiviGen.Converters"
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         
@@ -8,6 +9,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Helpers/Colors.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <converters:FlexibleDoubleConverter x:Key="FlexibleDoubleConverter"/>
             <Style TargetType="TextBox">
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
                 <Setter Property="Padding" Value="5,2"/>

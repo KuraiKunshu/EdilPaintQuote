@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using EdilPaintPreventibiviGen.Converters;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.ViewModels;
 
@@ -62,7 +63,7 @@ public partial class SelectMaterialWindow : Window
 
             TxtName.Text = selected.Name;
             TxtDesc.Text = selected.Description;
-            TxtPrice.Text = selected.UnitPrice.ToString(CultureInfo.InvariantCulture);
+            TxtPrice.Text = selected.UnitPrice.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
             ChkSignificant.IsChecked = selected.IsSignificant;
             ChkCompanyMaterial.IsChecked = selected.IsCompanyMaterial;
         }
@@ -80,11 +81,7 @@ public partial class SelectMaterialWindow : Window
             return;
         }
 
-        if (!double.TryParse(
-                (TxtPrice.Text ?? string.Empty).Trim().Replace(',', '.'),
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out double price))
+        if (!FlexibleDoubleConverter.TryParse(TxtPrice.Text, out double price))
         {
             MessageBox.Show("Il prezzo inserito non è valido.");
             return;

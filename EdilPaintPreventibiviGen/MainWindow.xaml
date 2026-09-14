@@ -993,7 +993,7 @@
                                    Text="Valore (€):" VerticalAlignment="Center" Margin="0,0,5,5"/>
                         <TextBox Grid.Row="0" Grid.Column="3"
                                  Margin="0,0,10,5"
-                                 Text="{Binding InputValue, UpdateSourceTrigger=PropertyChanged}"/>
+                                 Text="{Binding InputValue, Mode=TwoWay, Converter={StaticResource FlexibleDoubleConverter}, UpdateSourceTrigger=LostFocus}"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Descrizione:" VerticalAlignment="Center" Margin="0,0,5,5"/>
@@ -1107,7 +1107,7 @@
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
                                 <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
-                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
+                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, Converter={StaticResource FlexibleDoubleConverter}, UpdateSourceTrigger=LostFocus}" Width="100"/>
                                 <DataGridTextColumn Header="Totale" Binding="{Binding TotalPrice, StringFormat=N2}" IsReadOnly="True" Width="100"/>
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -1190,7 +1190,7 @@
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
                                 <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
-                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
+                                <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, Converter={StaticResource FlexibleDoubleConverter}, UpdateSourceTrigger=LostFocus}" Width="100"/>
                                 <DataGridTextColumn Header="Totale" Binding="{Binding TotalPrice, StringFormat=N2}" IsReadOnly="True" Width="100"/>
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>

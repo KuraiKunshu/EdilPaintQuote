@@ -11,6 +11,8 @@ public sealed class WorkSheetContext
     public string ReferenceName { get; init; } = string.Empty;
     public string WorkSite { get; init; } = string.Empty;
     public string ContactPhone { get; init; } = string.Empty;
+    public string CustomerNotes { get; init; } = string.Empty;
+    public string Notes { get; init; } = string.Empty;
     public string SelectedLogo { get; set; } = string.Empty;
     public bool IsOfflineSnapshot { get; set; }
     public bool MaterialsOrderedByCustomer { get; init; }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using EdilPaintPreventibiviGen.Models;
 using QuestPDF.Fluent;
@@ -77,20 +78,21 @@ public partial class PdfService
                     row.RelativeItem().Text("Squadra: ________________________");
                 });
 
+                WorkSheetNotes(column, "NOTE", context.CustomerNotes);
+                WorkSheetNotes(column, "NOTE INTERNE", context.Notes);
+
                 if (context.Materials.Count > 0)
                 {
-                    column.Item().EnsureSpace(95).Column(materialInfo =>
+                    column.Item().EnsureSpace(105).Column(materialInfo =>
                     {
                         Section(materialInfo, "MATERIALI");
-                        materialInfo.Item().PaddingTop(6).Text($"Stato materiale: {context.MaterialStatus}")
-                            .Bold().FontColor(MaterialStateColor(context.MaterialStatus));
-                        materialInfo.Item().Text(context.MaterialsOrderedByCustomer
-                            ? $"Ordine a carico del cliente: {context.CustomerName}"
-                            : $"Fornitore: {Empty(context.SupplierName)}");
-                        materialInfo.Item().Text($"Data ordine: {Date(context.MaterialOrderDate)}   |   Consegna prevista: {Date(context.ExpectedDeliveryDate)}")
-                            .FontSize(9);
+                        MaterialSummary(materialInfo, context);
                     });
-                    column.Item().Element(container => WorkLines(container, context.Materials, checkboxes: false));
+                    column.Item().Element(container => WorkLines(
+                        container,
+                        context.Materials,
+                        checkboxes: false,
+                        itemHeader: "Materiale"));
                 }
 
                 column.Item().EnsureSpace(70).Column(labors =>
@@ -99,7 +101,11 @@ public partial class PdfService
                     if (context.Labors.Count == 0) labors.Item().PaddingTop(8).Text("Nessuna lavorazione da riportare nella scheda.");
                 });
                 if (context.Labors.Count > 0)
-                    column.Item().Element(container => WorkLines(container, context.Labors, checkboxes: true));
+                    column.Item().Element(container => WorkLines(
+                        container,
+                        context.Labors,
+                        checkboxes: true,
+                        itemHeader: "Lavorazione / descrizione"));
 
                 column.Item().EnsureSpace(115).Column(notes =>
                 {
@@ -124,13 +130,69 @@ public partial class PdfService
         })).GeneratePdf(filePath);
 
         static string Empty(string value) => string.IsNullOrWhiteSpace(value) ? "Non indicato" : value;
-        static string Date(DateTime? value) => value?.ToString("dd/MM/yyyy") ?? "Non indicata";
     }
 
     private static void Field(ColumnDescriptor column, string label, string value)
     {
         column.Item().PaddingTop(5).Text(label).FontSize(8).FontColor(WorkSheetPalette.GreyDarken1);
         column.Item().Text(value).FontSize(11).SemiBold();
+    }
+
+    private static void WorkSheetNotes(ColumnDescriptor column, string title, string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return;
+        column.Item().EnsureSpace(60).Column(notes =>
+        {
+            Section(notes, title);
+            notes.Item().PaddingTop(6).Text(content);
+        });
+    }
+
+    private static void MaterialSummary(ColumnDescriptor column, WorkSheetContext context)
+    {
+        Color stateColor = MaterialStateColor(context.MaterialStatus);
+        column.Item().PaddingTop(8)
+            .Border(1).BorderColor(stateColor)
+            .Background(WorkSheetPalette.GreyLighten3)
+            .Padding(8)
+            .Column(summary =>
+            {
+                summary.Item().Text($"STATO MATERIALE: {context.MaterialStatus}")
+                    .FontSize(13).Bold().FontColor(stateColor);
+                summary.Item().PaddingTop(4).Text(MaterialLocation(context)).FontSize(10).SemiBold();
+
+                string[] dates = MaterialDates(context);
+                if (dates.Length > 0)
+                {
+                    summary.Item().PaddingTop(4).Text(string.Join("   |   ", dates))
+                        .FontSize(9).FontColor(WorkSheetPalette.GreyDarken1);
+                }
+            });
+    }
+
+    private static string MaterialLocation(WorkSheetContext context)
+    {
+        if (context.MaterialsOrderedByCustomer)
+        {
+            string customerName = string.IsNullOrWhiteSpace(context.CustomerName)
+                ? "Non indicato"
+                : context.CustomerName;
+            return $"POSIZIONE: gestito dal cliente - {customerName}";
+        }
+
+        return string.IsNullOrWhiteSpace(context.SupplierName)
+            ? "POSIZIONE: non indicata"
+            : $"POSIZIONE: presso il fornitore - {context.SupplierName.Trim()}";
+    }
+
+    private static string[] MaterialDates(WorkSheetContext context)
+    {
+        var dates = new List<string>(2);
+        if (context.MaterialOrderDate.HasValue)
+            dates.Add($"ORDINATO IL {context.MaterialOrderDate.Value:dd/MM/yyyy}");
+        if (context.ExpectedDeliveryDate.HasValue)
+            dates.Add($"CONSEGNA PREVISTA {context.ExpectedDeliveryDate.Value:dd/MM/yyyy}");
+        return dates.ToArray();
     }
 
     private static void Section(ColumnDescriptor column, string title) =>
@@ -141,12 +203,16 @@ public partial class PdfService
     {
         "CONSEGNATO" or "IN MAGAZZINO" => WorkSheetPalette.GreenDarken2,
         "ORDINATO" => WorkSheetPalette.BlueDarken1,
-        "DA RITIRARE" => WorkSheetPalette.OrangeMedium,
+        "DA ORDINARE" or "DA RITIRARE" => WorkSheetPalette.OrangeMedium,
         "NON DISPONIBILE" => WorkSheetPalette.RedDarken2,
         _ => WorkSheetPalette.GreyDarken3
     };
 
-    private static void WorkLines(IContainer container, IReadOnlyList<WorkSheetLine> lines, bool checkboxes)
+    private static void WorkLines(
+        IContainer container,
+        IReadOnlyList<WorkSheetLine> lines,
+        bool checkboxes,
+        string itemHeader)
     {
         container.Table(table =>
         {
@@ -160,7 +226,7 @@ public partial class PdfService
             {
                 if (checkboxes) header.Cell().Element(Head).Text("Fatto");
                 header.Cell().Element(Head).Text("Q.ta");
-                header.Cell().Element(Head).Text(checkboxes ? "Lavorazione / descrizione" : "Materiale / descrizione");
+                header.Cell().Element(Head).Text(itemHeader);
             });
             foreach (WorkSheetLine line in lines)
             {
