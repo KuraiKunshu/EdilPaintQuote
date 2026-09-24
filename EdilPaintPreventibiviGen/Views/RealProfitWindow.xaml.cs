@@ -82,7 +82,7 @@ public partial class RealProfitWindow : Window
         CboCompanyMaterialSearch.ItemsSource = _availableCompanyMaterials;
         GridCompanyMaterials.ItemsSource = _companyMaterials;
         TxtQuoteInfo.Text = _excludeMaterials
-            ? $"Preventivo {quote.QuoteNumber} — cliente fornitore: conteggiata solo la manodopera"
+            ? $"Preventivo {quote.QuoteNumber} — cliente fornitore: materiali acquistati esclusi dal calcolo"
             : $"Preventivo {quote.QuoteNumber} — {quote.CustomerName}";
         double defaultRevenue = customerIsSupplier
             ? quote.Labors.Sum(labor => labor.TotalPrice) *
@@ -193,11 +193,11 @@ public partial class RealProfitWindow : Window
             string safeCustomer = StoragePathService.SanitizeFolderName(_quote.CustomerName);
             if (safeCustomer.Length > 60)
                 safeCustomer = safeCustomer[..60].Trim();
-            string suggestedName = $"GuadagnoReale_Preventivo_{safeQuoteNumber}_{safeCustomer}.pdf";
+            string suggestedName = $"CostiGuadagno_Preventivo_{safeQuoteNumber}_{safeCustomer}.pdf";
 
             var dialog = new SaveFileDialog
             {
-                Title = "Salva PDF del guadagno reale",
+                Title = "Salva riepilogo costi e guadagno",
                 Filter = "Documento PDF (*.pdf)|*.pdf",
                 DefaultExt = ".pdf",
                 AddExtension = true,
@@ -227,7 +227,7 @@ public partial class RealProfitWindow : Window
             await Task.Run(() => new PdfService().GenerateRealProfitPdf(context, dialog.FileName));
 
             MessageBox.Show(
-                $"PDF del guadagno reale creato correttamente.\n\n{dialog.FileName}",
+                $"PDF dei costi e del guadagno creato correttamente.\n\n{dialog.FileName}",
                 "PDF creato",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -248,7 +248,7 @@ public partial class RealProfitWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Impossibile creare il PDF del guadagno reale.\n\n{ex.Message}",
+                $"Impossibile creare il PDF dei costi e del guadagno.\n\n{ex.Message}",
                 "Errore PDF",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -297,11 +297,12 @@ public partial class RealProfitWindow : Window
         MaterialMarginCard.BorderBrush = materialMarginBrush;
         TxtSupplierMaterials.Text = $"{result.SupplierMaterialCost:N2} €";
         TxtOtherCosts.Text = $"{result.LaborCost + result.CompanyMaterialCost:N2} €";
+        TxtOtherCosts.ToolTip = $"Costo della squadra: {result.LaborCost:N2} €\nAltri costi del lavoro: {result.CompanyMaterialCost:N2} €";
         TxtProfit.Text = $"{result.Profit:N2} € ({result.ProfitPercentage:N1}%)";
         if (result.ProfitReductionAmount > 0)
         {
             TxtProfitBreakdown.Text =
-                $"Prima: {result.ProfitBeforeReduction:N2} € · Riduzione: −{result.ProfitReductionAmount:N2} €";
+                $"Guadagno iniziale: {result.ProfitBeforeReduction:N2} € · Riduzione: −{result.ProfitReductionAmount:N2} €";
             TxtProfitBreakdown.Visibility = Visibility.Visible;
         }
         else
@@ -311,7 +312,7 @@ public partial class RealProfitWindow : Window
 
         bool isProfit = result.Profit >= 0;
         Brush resultBrush = (Brush)FindResource(isProfit ? "SuccessGreenBrush" : "DangerRedBrush");
-        TxtProfitState.Text = isProfit ? "UTILE STIMATO" : "PERDITA STIMATA";
+        TxtProfitState.Text = isProfit ? "GUADAGNO STIMATO" : "PERDITA STIMATA";
         TxtProfitState.Foreground = resultBrush;
         TxtProfit.Foreground = resultBrush;
         ProfitCard.BorderBrush = resultBrush;

@@ -15,6 +15,50 @@ namespace EdilPaintPreventibiviGen.Tests;
 public sealed class WorkSheetTests
 {
     [Fact]
+    public void InterventionOptionsAreOptionalAndDoNotReplaceQuoteNotes()
+    {
+        var quote = SampleQuote();
+        var empty = WorkSheetService.CreateContext(quote, [], []);
+        Assert.Empty(empty.EmployeeNames);
+        Assert.Null(empty.InterventionDate);
+        Assert.Equal(string.Empty, empty.AdditionalNotes);
+
+        var names = new List<string> { " Mario Rossi ", "Luca", " " };
+        var result = WorkSheetService.CreateContext(quote, [], [], new WorkSheetOptions
+        {
+            EmployeeNames = names,
+            InterventionDate = new DateTime(2026, 9, 28, 10, 30, 0),
+            AdditionalNotes = " Portare la scala. "
+        });
+        names.Clear();
+        Assert.Equal(new[] { "Mario Rossi", "Luca" }, result.EmployeeNames);
+        Assert.Equal(new DateTime(2026, 9, 28), result.InterventionDate);
+        Assert.Equal("Portare la scala.", result.AdditionalNotes);
+        Assert.Equal(quote.Notes, result.Notes);
+        Assert.Equal(quote.CustomerNotes, result.CustomerNotes);
+    }
+
+    [Fact]
+    public void WorkSheetPdfHandlesLongInterventionNotesAndManyEmployees()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "EdilPaintWorkSheetPdf_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var context = WorkSheetService.CreateContext(SampleQuote(), [], [], new WorkSheetOptions
+            {
+                EmployeeNames = Enumerable.Range(1, 100).Select(i => $"Dipendente {i} Cognome lungo").ToArray(),
+                InterventionDate = new DateTime(2026, 9, 28),
+                AdditionalNotes = string.Join("\n", Enumerable.Range(1, 100).Select(i => $"Nota {i}: proteggere il pavimento e verificare la chiusura."))
+            });
+            string path = Path.Combine(folder, "intervento.pdf");
+            new PdfService().GenerateWorkSheet(context, new Company { Nome = "EdilPaint" }, path);
+            Assert.True(new FileInfo(path).Length > 4000);
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
     public void CatalogExclusionsApplyToOldQuotesAndRenamedLaborsWithoutChangingQuote()
     {
         var quote = new QuoteHistoryEntry { Labors =

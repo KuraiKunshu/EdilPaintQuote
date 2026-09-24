@@ -17,6 +17,7 @@ namespace EdilPaintPreventibiviGen.Views;
 public partial class SettingsWindow : Window
 {
     private readonly ObservableCollection<WindowMaterialRuleEditor> _windowMaterialRuleEditors = [];
+    private readonly ObservableCollection<EmployeeSettingsModel> _employees = [];
     private readonly string _displayedCatalogIdentity;
     private bool _catalogIdsCompatible;
     private bool _updatingAutomaticUpdatesControl;
@@ -43,6 +44,7 @@ public partial class SettingsWindow : Window
         CmbDatabaseProvider.ItemsSource = DatabaseSettingsModel.AvailableProviders;
         CmbPdfTemplate.ItemsSource = PdfTemplateSettingsModel.AvailableTemplates;
         ItemsWindowMaterialRules.ItemsSource = _windowMaterialRuleEditors;
+        ItemsEmployees.ItemsSource = _employees;
         TxtNoCompanyMaterials.Visibility = CompanyMaterialCatalog.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -52,6 +54,14 @@ public partial class SettingsWindow : Window
 
     private void LoadSettings()
     {
+        foreach (var employee in App.AppSettings.Employees)
+            _employees.Add(new EmployeeSettingsModel
+            {
+                Id = employee.Id,
+                FirstName = employee.FirstName,
+                LastName = employee.LastName
+            });
+        UpdateEmployeesEmptyState();
         var app = App.AppSettings.App;
         var realProfit = App.AppSettings.RealProfit;
         var pdf = App.AppSettings.PdfStorage;
@@ -149,6 +159,18 @@ public partial class SettingsWindow : Window
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
+        var invalidEmployee = _employees.FirstOrDefault(employee => string.IsNullOrWhiteSpace(employee.FirstName));
+        if (invalidEmployee != null)
+        {
+            TabEmployees.IsSelected = true;
+            UpdateLayout();
+            FocusEmployee(invalidEmployee);
+            MessageBox.Show(this, "Inserisci il nome di ogni dipendente. Il cognome è facoltativo.",
+                "Dipendenti", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var employees = _employees.Select(employee => employee.CreateValidatedCopy()).ToList();
+
         if (string.IsNullOrWhiteSpace(TxtPdfRootPath.Text))
         {
             ShowValidationError(TabPdfSettings, TxtPdfRootPath, "Inserisci la cartella principale dei PDF.");
@@ -373,7 +395,17 @@ public partial class SettingsWindow : Window
             template.ShowTemplateName = ChkPdfShowTemplateName.IsChecked == true;
             template.Normalize();
 
-            App.AppSettings.Save();
+            var previousEmployees = App.AppSettings.Employees;
+            App.AppSettings.Employees = employees;
+            try
+            {
+                App.AppSettings.Save();
+            }
+            catch
+            {
+                App.AppSettings.Employees = previousEmployees;
+                throw;
+            }
 
             MessageBox.Show(
                 "Impostazioni salvate. Riavvia l'applicazione se hai modificato la connessione al database.",
@@ -396,6 +428,36 @@ public partial class SettingsWindow : Window
 
     private void OnBrowsePdfRootClick(object sender, RoutedEventArgs e)
         => BrowseFolder(TxtPdfRootPath);
+
+    private void OnAddEmployeeClick(object sender, RoutedEventArgs e)
+    {
+        var employee = new EmployeeSettingsModel();
+        _employees.Add(employee);
+        UpdateEmployeesEmptyState();
+        UpdateLayout();
+        FocusEmployee(employee);
+    }
+
+    private void OnRemoveEmployeeClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: EmployeeSettingsModel employee })
+            _employees.Remove(employee);
+        UpdateEmployeesEmptyState();
+    }
+
+    private void UpdateEmployeesEmptyState()
+        => TxtNoEmployees.Visibility = _employees.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    private void FocusEmployee(EmployeeSettingsModel employee)
+    {
+        if (ItemsEmployees.ItemContainerGenerator.ContainerFromItem(employee) is ContentPresenter container)
+        {
+            container.BringIntoView();
+            container.ApplyTemplate();
+            if (container.ContentTemplate.FindName("TxtEmployeeFirstName", container) is TextBox textBox)
+                textBox.Focus();
+        }
+    }
 
     private void OnAddWindowMaterialRuleClick(object sender, RoutedEventArgs e)
     {

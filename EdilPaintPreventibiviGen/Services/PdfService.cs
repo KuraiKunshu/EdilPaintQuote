@@ -914,7 +914,7 @@ public partial class PdfService
                                     ? "Edil Paint Srl"
                                     : ctx.CompanyName.Trim())
                                 .FontSize(13).Bold().FontColor(red);
-                            left.Item().Text("ANALISI GUADAGNO REALE")
+                            left.Item().Text("COSTI E GUADAGNO DEL LAVORO")
                                 .FontSize(18).Bold().FontColor(navy);
                             left.Item().Text($"Preventivo n. {ctx.QuoteNumber} - {ctx.QuoteDate:dd/MM/yyyy}")
                                 .FontSize(9).FontColor(muted);
@@ -949,7 +949,7 @@ public partial class PdfService
                         });
                         row.RelativeItem().Column(right =>
                         {
-                            right.Item().AlignRight().Text("RICAVO IMPONIBILE").FontSize(8).Bold().FontColor(muted);
+                            right.Item().AlignRight().Text("RICAVO DEL LAVORO (IVA ESCLUSA)").FontSize(8).Bold().FontColor(muted);
                             right.Item().AlignRight().Text(Money(input.QuoteRevenue)).FontSize(14).Bold().FontColor(blue);
                         });
                     });
@@ -975,16 +975,16 @@ public partial class PdfService
                         }
 
                         Parameter("SCONTO FORNITORE", Percentage(input.SupplierDiscount));
-                        Parameter("RIDUZIONE UTILE", Percentage(input.ProfitReductionPercentage));
-                        Parameter("OPERAI", input.Workers.ToString(culture));
+                        Parameter("RIDUZIONE PRUDENZIALE", Percentage(input.ProfitReductionPercentage));
+                        Parameter("PERSONE IN SQUADRA", input.Workers.ToString(culture));
                         Parameter("GIORNI", input.Days.ToString("0.##", culture));
                         Parameter("ORE AL GIORNO", input.HoursPerDay.ToString("0.##", culture));
-                        Parameter("COSTO ORARIO", Money(input.HourlyCost));
-                        Parameter("COSTO MANODOPERA", Money(result.LaborCost));
-                        Parameter("COSTI AZIENDALI", Money(result.CompanyMaterialCost));
+                        Parameter("COSTO ORARIO PER PERSONA", Money(input.HourlyCost));
+                        Parameter("COSTO DELLA SQUADRA", Money(result.LaborCost));
+                        Parameter("ALTRI COSTI DEL LAVORO", Money(result.CompanyMaterialCost));
                     });
 
-                    col.Item().Text("MATERIALI DEL PREVENTIVO").FontSize(11).Bold().FontColor(navy);
+                    col.Item().Text("MATERIALI ACQUISTATI").FontSize(11).Bold().FontColor(navy);
                     if (input.ExcludeMaterials)
                     {
                         col.Item().Background(Hex("#FFF8E1")).Border(1).BorderColor(Hex("#F6C453"))
@@ -1050,7 +1050,7 @@ public partial class PdfService
                         });
                     }
 
-                    col.Item().Text("COSTI MATERIALI AZIENDALI").FontSize(11).Bold().FontColor(navy);
+                    col.Item().Text("ALTRI COSTI DEL LAVORO").FontSize(11).Bold().FontColor(navy);
                     col.Item().Table(table =>
                     {
                         table.ColumnsDefinition(columns =>
@@ -1108,19 +1108,19 @@ public partial class PdfService
                             });
                         }
 
-                        SummaryRow("Ricavo imponibile", input.QuoteRevenue, blue, true);
-                        SummaryRow("Margine materiali", result.MaterialMargin, result.MaterialMargin >= 0 ? green : red);
-                        SummaryRow("Costo manodopera", -result.LaborCost, purple);
-                        SummaryRow("Costi materiali aziendali", -result.CompanyMaterialCost, purple);
+                        SummaryRow("Ricavo del lavoro (IVA esclusa)", input.QuoteRevenue, blue, true);
+                        SummaryRow("Guadagno sui materiali", result.MaterialMargin, result.MaterialMargin >= 0 ? green : red);
+                        SummaryRow("Costo della squadra", -result.LaborCost, purple);
+                        SummaryRow("Altri costi del lavoro", -result.CompanyMaterialCost, purple);
                         SummaryRow("Totale costi", -result.TotalCosts, orange, true);
-                        SummaryRow("Utile prima della riduzione", result.ProfitBeforeReduction,
+                        SummaryRow("Guadagno prima della riduzione", result.ProfitBeforeReduction,
                             result.ProfitBeforeReduction >= 0 ? green : red);
                         if (result.ProfitReductionAmount > 0)
                             SummaryRow("Riduzione prudenziale", -result.ProfitReductionAmount, orange);
 
                         summary.Item().PaddingTop(4).BorderTop(1.5f).BorderColor(navy).PaddingTop(5).Row(row =>
                         {
-                            row.RelativeItem().Text(result.Profit >= 0 ? "UTILE REALE STIMATO" : "PERDITA STIMATA")
+                            row.RelativeItem().Text(result.Profit >= 0 ? "GUADAGNO STIMATO" : "PERDITA STIMATA")
                                 .FontSize(12).Bold();
                             row.ConstantItem(230).AlignRight()
                                 .Text($"{Money(result.Profit)} ({Percentage(result.ProfitPercentage)})")

@@ -455,7 +455,7 @@
                                         <StackPanel Grid.Column="2">
                                             <Border Style="{StaticResource SectionStyle}">
                                                 <StackPanel>
-                                                    <TextBlock Text="Calcolo guadagno reale"
+                                                    <TextBlock Text="Costi e guadagno del lavoro"
                                                                Style="{StaticResource SectionTitleStyle}"/>
                                                     <TextBlock Style="{StaticResource HintStyle}"
                                                                Margin="0,0,0,12"
@@ -539,7 +539,7 @@
                                                        Style="{StaticResource SectionTitleStyle}"/>
                                             <TextBlock Style="{StaticResource HintStyle}"
                                                        Margin="0,0,0,12"
-                                                       Text="Quando una lavorazione configurata è presente, il Guadagno reale aggiunge i materiali selezionati ai costi aziendali. Ogni regola può usare le misure delle finestre oppure la sola quantità della lavorazione."/>
+                                                       Text="Quando una lavorazione configurata è presente, la scheda Costi e guadagno aggiunge i materiali selezionati agli altri costi del lavoro. Ogni regola può usare le misure delle finestre oppure la sola quantità della lavorazione."/>
 
                                             <Border x:Name="BorderWindowMaterialCatalogIdentityWarning"
                                                     Background="{StaticResource DangerSoftBackgroundBrush}"
@@ -767,6 +767,49 @@
                                             </ItemsControl>
                                         </StackPanel>
                                     </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem x:Name="TabEmployees" Header="Di_pendenti">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                                <StackPanel Margin="18,16,18,6">
+                                    <TextBlock Text="Dipendenti" Style="{StaticResource PageTitleStyle}"/>
+                                    <TextBlock Text="Gestisci i dipendenti. Il nome è obbligatorio, il cognome è facoltativo. Conferma le modifiche con Salva."
+                                               Style="{StaticResource PageSubtitleStyle}" TextWrapping="Wrap"/>
+                                    <Button Content="Aggiungi dipendente" HorizontalAlignment="Left" Margin="0,16,0,12"
+                                            Style="{StaticResource PrimaryActionButtonStyle}" Click="OnAddEmployeeClick"/>
+                                    <TextBlock x:Name="TxtNoEmployees" Text="Nessun dipendente inserito. Usa Aggiungi dipendente per iniziare."
+                                               Foreground="{StaticResource MutedTextBrush}" Margin="0,8" TextWrapping="Wrap"/>
+                                    <ItemsControl x:Name="ItemsEmployees">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource SectionStyle}" Margin="0,0,0,12">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="16"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="16"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="Nome (obbligatorio)" Margin="0,0,0,6"/>
+                                                            <TextBox x:Name="TxtEmployeeFirstName" Text="{Binding FirstName, UpdateSourceTrigger=PropertyChanged}"
+                                                                     AutomationProperties.Name="Nome dipendente (obbligatorio)"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Text="Cognome (facoltativo)" Margin="0,0,0,6"/>
+                                                            <TextBox Text="{Binding LastName, UpdateSourceTrigger=PropertyChanged}"
+                                                                     AutomationProperties.Name="Cognome dipendente (facoltativo)"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="4" Content="Rimuovi" VerticalAlignment="Bottom"
+                                                                Style="{StaticResource SecondaryActionButtonStyle}" Click="OnRemoveEmployeeClick"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>

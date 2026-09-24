@@ -53,6 +53,27 @@ public partial class PdfService
             page.Content().Column(column =>
             {
                 column.Spacing(12);
+                column.Item().EnsureSpace(90).Border(1.5f).BorderColor(WorkSheetPalette.AccentRed)
+                    .Background(WorkSheetPalette.GreyLighten3).Padding(12).Row(row =>
+                    {
+                        row.ConstantItem(160).Column(dateColumn =>
+                        {
+                            dateColumn.Item().Text("DATA INTERVENTO").FontSize(10).Bold().FontColor(WorkSheetPalette.AccentRed);
+                            if (context.InterventionDate is { } date)
+                                dateColumn.Item().PaddingTop(7).Text($"{date:dd/MM/yyyy}").FontSize(22).Bold();
+                            else
+                                dateColumn.Item().Height(32).AlignBottom().LineHorizontal(1).LineColor(WorkSheetPalette.GreyDarken2);
+                        });
+                        row.ConstantItem(18);
+                        row.RelativeItem().Column(team =>
+                        {
+                            team.Item().Text("CHI ESEGUE IL LAVORO").FontSize(10).Bold().FontColor(WorkSheetPalette.AccentRed);
+                            if (context.EmployeeNames.Count > 0)
+                                team.Item().PaddingTop(7).Text(string.Join(", ", context.EmployeeNames)).FontSize(16).Bold();
+                            else
+                                team.Item().Height(32).AlignBottom().LineHorizontal(1).LineColor(WorkSheetPalette.GreyDarken2);
+                        });
+                    });
                 if (context.IsOfflineSnapshot)
                     column.Item().Text("COPIA OFFLINE - Verificare dati e stato del materiale prima dell'intervento.")
                         .Bold().FontColor(WorkSheetPalette.RedDarken2);
@@ -70,12 +91,6 @@ public partial class PdfService
                         Field(right, "CANTIERE", Empty(context.WorkSite));
                         Field(right, "TELEFONO", Empty(context.ContactPhone));
                     });
-                });
-
-                column.Item().Row(row =>
-                {
-                    row.RelativeItem().Text("Data intervento: __________________");
-                    row.RelativeItem().Text("Squadra: ________________________");
                 });
 
                 WorkSheetNotes(column, "NOTE", context.CustomerNotes);
@@ -110,6 +125,8 @@ public partial class PdfService
                 column.Item().EnsureSpace(115).Column(notes =>
                 {
                     Section(notes, "NOTE DI INTERVENTO");
+                    if (!string.IsNullOrWhiteSpace(context.AdditionalNotes))
+                        notes.Item().PaddingTop(6).Text(context.AdditionalNotes);
                     for (int i = 0; i < 3; i++)
                         notes.Item().Height(22).AlignBottom().LineHorizontal(0.5f).LineColor(WorkSheetPalette.GreyLighten1);
                     notes.Item().PaddingTop(12).Text("Fine lavori: __________________   Operatore: __________________________").FontSize(9);

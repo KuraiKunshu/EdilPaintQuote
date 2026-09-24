@@ -10,9 +10,9 @@
         RenderOptions.BitmapScalingMode="HighQuality"
         Icon="pack://application:,,,/Assets/Windowsicon/storico.png"
         Title="Storico Preventivi"
-        Width="1220"
+        Width="1280"
         Height="760"
-        MinWidth="1080"
+        MinWidth="1120"
         MinHeight="640"
         MaxWidth="1800"
         WindowStartupLocation="CenterOwner"
@@ -545,9 +545,9 @@
                         Padding="0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" MinWidth="650"/>
+                            <ColumnDefinition Width="*" MinWidth="360"/>
                             <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="300"/>
+                            <ColumnDefinition Width="360" MinWidth="344"/>
                         </Grid.ColumnDefinitions>
                         <DataGrid x:Name="GridHistory"
                                   Grid.Column="0"
@@ -929,16 +929,21 @@
                                       ShowsPreview="True"
                                       ToolTip="Trascina per allargare la lista o il dettaglio"/>
 
-                        <Border Grid.Column="2"
-                                MinWidth="260"
+                        <Border x:Name="HistoryDetailPanel" Grid.Column="2"
+                                MinWidth="344"
                                 Background="{StaticResource SectionPanelBackgroundBrush}"
                                 BorderBrush="{StaticResource SubtleBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="10"
                                 Padding="16"
                                 DataContext="{Binding SelectedItem, ElementName=GridHistory}">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <StackPanel>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0">
                                     <TextBlock Text="Dettaglio preventivo"
                                                FontSize="16"
                                                FontWeight="SemiBold"
@@ -951,9 +956,20 @@
                                     <TextBlock Text="{Binding CustomerReferenceDisplay}"
                                                Margin="0,2,0,14"
                                                Foreground="{StaticResource MutedTextBrush}"
-                                               TextWrapping="Wrap"/>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="36"
+                                               ToolTip="{Binding CustomerReferenceDisplay}"/>
+                                </StackPanel>
 
-                                    <WrapPanel Margin="0,0,0,8">
+                                    <UniformGrid x:Name="HistoryActionsPanel" Grid.Row="1" Columns="2" Margin="0,0,-8,0">
+                                        <UniformGrid.Style>
+                                            <Style TargetType="UniformGrid">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                                                        <Setter Property="IsEnabled" Value="False"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </UniformGrid.Style>
                                         <Button Content="Apri PDF"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnOpenPastQuotePdfClick"/>
@@ -978,14 +994,16 @@
                                         <Button Content="Copia"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnCopyPastQuoteClick"/>
-                                        <Button Content="Guadagno reale"
+                                        <Button Content="Costi e guadagno"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnCalculateRealProfitClick"/>
                                         <Button Content="Elimina"
                                                 Style="{StaticResource DetailDangerButtonStyle}"
                                                 Click="OnDeletePastQuoteClick"/>
-                                    </WrapPanel>
+                                    </UniformGrid>
 
+                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
                                     <Separator Margin="0,4,0,14"/>
 
                                     <Grid>
@@ -1130,6 +1148,7 @@
                                     </StackPanel>
                                 </StackPanel>
                             </ScrollViewer>
+                            </Grid>
                         </Border>
 
                         <Border x:Name="LoadingOverlay"

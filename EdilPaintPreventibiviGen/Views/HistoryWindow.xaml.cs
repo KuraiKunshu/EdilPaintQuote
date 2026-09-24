@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -354,7 +354,7 @@ public partial class HistoryWindow : Window
             var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
             if (fullEntry == null)
             {
-                MessageBox.Show("Preventivo non trovato nello storico.", "Guadagno reale",
+                MessageBox.Show("Preventivo non trovato nello storico.", "Costi e guadagno",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -383,7 +383,7 @@ public partial class HistoryWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Impossibile aprire il calcolo del guadagno.\n\n{ex.Message}",
-                "Guadagno reale", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Costi e guadagno", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -981,13 +981,17 @@ public partial class HistoryWindow : Window
         _isGeneratingWorkSheet = true;
         try
         {
+            var optionsWindow = new WorkSheetOptionsWindow(App.AppSettings.Employees, entry.QuoteNumber) { Owner = this };
+            if (optionsWindow.ShowDialog() != true)
+                return;
+
             Mouse.OverrideCursor = Cursors.Wait;
             var quote = await App.DataService.GetQuoteByNumberAsync(entry.QuoteNumber, includeAttachments: false)
                 ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
             var catalog = await App.DataService.GetLaborCatalogAsync();
             var customers = await App.DataService.GetCustomersAsync();
             var company = await App.DataService.GetCompanyAsync() ?? new Company();
-            var context = WorkSheetService.CreateContext(quote, catalog, customers);
+            var context = WorkSheetService.CreateContext(quote, catalog, customers, optionsWindow.Options);
             context.SelectedLogo = ResolveLogoForPdf(company);
             context.IsOfflineSnapshot = App.DataService is FallbackDataService { IsOfflineMode: true };
             if (context.IsOfflineSnapshot && MessageBox.Show(
@@ -1217,7 +1221,7 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
         menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
         menu.Items.Add(CreateMenuItem("Genera scheda lavoro", async () => await GenerateWorkSheetAsync(entry)));
-        menu.Items.Add(CreateMenuItem("Calcola guadagno reale", async () => await OpenRealProfitCalculatorAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Costi e guadagno", async () => await OpenRealProfitCalculatorAsync(entry)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));
 
