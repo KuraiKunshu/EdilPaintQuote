@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Npgsql;
+using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
 
@@ -17,6 +18,7 @@ public sealed class AppSettingsService
 	public PdfTemplateSettingsModel PdfTemplate { get; }
 	public DatabaseSettingsModel Database { get; }
 	public MailSettingsModel Mail { get; }
+	public List<EmployeeSettingsModel> Employees { get; set; } = [];
 	public string SettingsPath { get; }
 
 	public AppSettingsService(IConfiguration configuration)
@@ -30,10 +32,12 @@ public sealed class AppSettingsService
 		PdfTemplate.Normalize();
 		Database = LoadDatabaseSettings(configuration);
 		Mail = LoadMailSettings(configuration);
+		Employees = configuration.GetSection("Employees").Get<List<EmployeeSettingsModel>>() ?? [];
 	}
 
 	public void Save()
 	{
+		var employees = Employees.Select(employee => employee.CreateValidatedCopy()).ToList();
 		var root = File.Exists(SettingsPath)
 			? JsonNode.Parse(File.ReadAllText(SettingsPath)) as JsonObject ?? new JsonObject()
 			: new JsonObject();
@@ -51,6 +55,7 @@ public sealed class AppSettingsService
 			["Password"] = SecretProtectionService.Protect(Database.Password)
 		};
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
+		root["Employees"] = JsonSerializer.SerializeToNode(employees, jsonOptions);
 		root["RealProfit"] = JsonSerializer.SerializeToNode(RealProfit, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
 		root["PdfTemplate"] = JsonSerializer.SerializeToNode(PdfTemplate, jsonOptions);

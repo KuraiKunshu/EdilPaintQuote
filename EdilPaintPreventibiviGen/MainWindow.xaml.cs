@@ -107,6 +107,7 @@ public partial class MainWindow : Window
         scale = Math.Clamp(scale, 0.6, 1.3);
         MainWindowScaleTransform.ScaleX = scale;
         MainWindowScaleTransform.ScaleY = scale;
+        Helpers.WindowZoomBehavior.SetScale(scale);
         TxtMainWindowScale.Text = $"{scale:P0}";
     }
 

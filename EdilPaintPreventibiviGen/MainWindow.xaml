@@ -287,11 +287,7 @@
     </Window.Resources>
 
     <DockPanel x:Name="MainContentPanel" Margin="15">
-        <DockPanel.LayoutTransform>
-            <ScaleTransform x:Name="MainWindowScaleTransform" ScaleX="1" ScaleY="1"/>
-        </DockPanel.LayoutTransform>
-
-        <Border DockPanel.Dock="Top"
+        <Border x:Name="MainToolbar" DockPanel.Dock="Top"
                 Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource SubtleBorderBrush}"
                 BorderThickness="1"
@@ -373,6 +369,11 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <DockPanel x:Name="ZoomableContentPanel">
+            <DockPanel.LayoutTransform>
+                <ScaleTransform x:Name="MainWindowScaleTransform" ScaleX="1" ScaleY="1"/>
+            </DockPanel.LayoutTransform>
 
         <!-- ═══════════════════════════════════════ HEADER ═══════════════════════════════════════ -->
         <Border DockPanel.Dock="Top"
@@ -1293,5 +1294,6 @@
             </Grid>
         </Grid>
 
+        </DockPanel>
     </DockPanel>
 </Window>

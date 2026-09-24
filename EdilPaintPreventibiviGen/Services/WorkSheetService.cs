@@ -7,7 +7,8 @@ public static class WorkSheetService
     public static WorkSheetContext CreateContext(
         QuoteHistoryEntry quote,
         IEnumerable<Item> laborCatalog,
-        IEnumerable<Customer> customers)
+        IEnumerable<Customer> customers,
+        WorkSheetOptions? options = null)
     {
         var catalog = laborCatalog.ToList();
         var contacts = customers.ToList();
@@ -24,6 +25,10 @@ public static class WorkSheetService
             ContactPhone = FirstText(reference?.Phone, customer?.Phone),
             CustomerNotes = quote.CustomerNotes ?? string.Empty,
             Notes = quote.Notes ?? string.Empty,
+            EmployeeNames = options?.EmployeeNames.Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim()).ToArray() ?? [],
+            InterventionDate = options?.InterventionDate?.Date,
+            AdditionalNotes = options?.AdditionalNotes?.Trim() ?? string.Empty,
             MaterialsOrderedByCustomer = quote.MaterialsOrderedByCustomer,
             SupplierName = quote.MaterialsOrderedByCustomer ? quote.CustomerName : quote.SupplierName,
             MaterialStatus = string.IsNullOrWhiteSpace(quote.MaterialStatus) ? "NON INDICATO" : quote.MaterialStatus.Trim().ToUpperInvariant(),

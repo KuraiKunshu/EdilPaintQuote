@@ -66,6 +66,7 @@ public static class AppSettingsFileService
 
         var settings = new
         {
+            Employees = Array.Empty<EdilPaintPreventibiviGen.Models.EmployeeSettingsModel>(),
             Database = new
             {
                 Provider = DatabaseSettingsModel.SqlServerProvider,

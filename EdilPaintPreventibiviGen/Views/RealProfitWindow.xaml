@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="Calcolo guadagno reale"
+        Title="Costi e guadagno del lavoro"
         Width="1120"
         Height="800"
         MinWidth="980"
@@ -121,6 +121,7 @@
         </Style>
 
         <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
@@ -380,7 +381,7 @@
                     </Border>
 
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <TextBlock Text="Calcolo del guadagno reale"
+                        <TextBlock Text="Costi e guadagno del lavoro"
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource DefaultTextBrush}"/>
@@ -421,23 +422,25 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Parametri principali"
+                                    <TextBlock Text="Ricavo e stima"
                                                FontSize="15"
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource DefaultTextBrush}"/>
                                     <TextBlock Margin="0,4,0,0"
-                                               Text="Definiscono ricavo, costo dei materiali e margine prudenziale."
+                                               Text="Dal ricavo sottraiamo i costi inseriti e l'eventuale riduzione prudenziale."
                                                FontSize="11.5"
                                                Foreground="{StaticResource MutedTextBrush}"
                                                TextWrapping="Wrap"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Ricavo imponibile (€)"
+                                    <TextBlock Text="Ricavo del lavoro (€)"
                                                Style="{StaticResource FieldLabelStyle}"/>
                                     <TextBox x:Name="TxtRevenue"
                                              Style="{StaticResource ProfitTextBoxStyle}"
                                              TextAlignment="Right"/>
+                                    <TextBlock Text="Importo del preventivo, IVA esclusa."
+                                               Style="{StaticResource FieldHintStyle}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="4">
@@ -446,20 +449,24 @@
                                     <TextBox x:Name="TxtSupplierDiscount"
                                              Style="{StaticResource ProfitTextBoxStyle}"
                                              TextAlignment="Right"/>
+                                    <TextBlock Text="Riduce il costo di acquisto dei materiali."
+                                               Style="{StaticResource FieldHintStyle}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="6">
-                                    <TextBlock Text="Riduzione utile (%)"
+                                    <TextBlock Text="Riduzione prudenziale (%)"
                                                Style="{StaticResource FieldLabelStyle}"/>
                                     <TextBox x:Name="TxtProfitReduction"
                                              Style="{StaticResource ProfitTextBoxStyle}"
                                              TextAlignment="Right"/>
+                                    <TextBlock Text="Riduce solo il guadagno positivo. Con 0% non si applica."
+                                               Style="{StaticResource FieldHintStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
 
                         <TabControl Grid.Row="2" Style="{StaticResource ProfitTabControlStyle}">
-                            <TabItem x:Name="TabMaterials" Header="Materiali del preventivo">
+                            <TabItem x:Name="TabMaterials" Header="1. Materiali acquistati">
                                 <Grid Margin="16">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -478,7 +485,7 @@
                                                     CornerRadius="2"/>
                                             <TextBlock Grid.Column="2"
                                                        VerticalAlignment="Center"
-                                                       Text="Il costo d'acquisto parte dal prezzo del preventivo e applica automaticamente lo sconto fornitore."
+                                                       Text="Costo di acquisto stimato = prezzo unitario del preventivo × quantità, meno lo sconto fornitore. Lo sconto cliente riduce invece il ricavo sui materiali."
                                                        FontSize="11.5"
                                                        Foreground="{StaticResource MutedTextBrush}"
                                                        TextWrapping="Wrap"/>
@@ -495,12 +502,13 @@
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Materiale"
                                                                 Binding="{Binding Name}"
+                                                                MinWidth="220"
                                                                 Width="*"/>
                                             <DataGridTextColumn Header="Quantità"
                                                                 Binding="{Binding Quantity}"
                                                                 ElementStyle="{StaticResource NumericCellTextStyle}"
                                                                 Width="90"/>
-                                            <DataGridTextColumn Header="Prezzo cliente unit. €"
+                                            <DataGridTextColumn Header="Prezzo unitario base €"
                                                                 Binding="{Binding CustomerUnitPrice, StringFormat=N2}"
                                                                 ElementStyle="{StaticResource NumericCellTextStyle}"
                                                                 Width="165"/>
@@ -513,7 +521,7 @@
                                 </Grid>
                             </TabItem>
 
-                            <TabItem Header="Manodopera">
+                            <TabItem Header="2. Costo della squadra">
                                 <Grid Margin="16">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -532,7 +540,7 @@
                                                     CornerRadius="2"/>
                                             <TextBlock Grid.Column="2"
                                                        VerticalAlignment="Center"
-                                                       Text="Inserisci l'impiego reale della squadra per stimare il costo complessivo della manodopera."
+                                                       Text="Indica quante persone lavorano, per quanti giorni e a quale costo orario per persona. Il totale è il costo della squadra per questo lavoro."
                                                        FontSize="11.5"
                                                        Foreground="{StaticResource MutedTextBrush}"
                                                        TextWrapping="Wrap"/>
@@ -553,7 +561,7 @@
                                             </Grid.RowDefinitions>
 
                                             <StackPanel>
-                                                <TextBlock Text="Impiego della squadra"
+                                                <TextBlock Text="Persone, tempo e costo"
                                                            FontSize="14"
                                                            FontWeight="SemiBold"
                                                            Foreground="{StaticResource DefaultTextBrush}"/>
@@ -580,7 +588,7 @@
                                                         CornerRadius="7"
                                                         Padding="12">
                                                     <StackPanel>
-                                                        <TextBlock Text="Numero operai"
+                                                        <TextBlock Text="Persone in squadra"
                                                                    Style="{StaticResource FieldLabelStyle}"/>
                                                         <TextBox x:Name="TxtWorkers"
                                                                  Text="2"
@@ -598,7 +606,7 @@
                                                         CornerRadius="7"
                                                         Padding="12">
                                                     <StackPanel>
-                                                        <TextBlock Text="Giorni"
+                                                        <TextBlock Text="Giorni di lavoro"
                                                                    Style="{StaticResource FieldLabelStyle}"/>
                                                         <TextBox x:Name="TxtDays"
                                                                  Text="1"
@@ -622,7 +630,7 @@
                                                                  Text="10"
                                                                  Style="{StaticResource ProfitTextBoxStyle}"
                                                                  TextAlignment="Right"/>
-                                                        <TextBlock Text="Per ogni operaio"
+                                                        <TextBlock Text="Per ogni persona"
                                                                    Style="{StaticResource FieldHintStyle}"/>
                                                     </StackPanel>
                                                 </Border>
@@ -640,7 +648,7 @@
                                                                  Text="40"
                                                                  Style="{StaticResource ProfitTextBoxStyle}"
                                                                  TextAlignment="Right"/>
-                                                        <TextBlock Text="Per ogni operaio"
+                                                        <TextBlock Text="Per ogni persona"
                                                                    Style="{StaticResource FieldHintStyle}"/>
                                                     </StackPanel>
                                                 </Border>
@@ -652,7 +660,7 @@
                                                     BorderThickness="1"
                                                     CornerRadius="7"
                                                     Padding="12,9">
-                                                <TextBlock Text="Formula applicata: operai × giorni × ore giornaliere × costo orario."
+                                                <TextBlock Text="Costo della squadra = persone × giorni × ore al giorno × costo orario per persona."
                                                            HorizontalAlignment="Center"
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
@@ -664,7 +672,7 @@
                                 </Grid>
                             </TabItem>
 
-                            <TabItem x:Name="TabCompanyCosts" Header="Costi aziendali">
+                            <TabItem x:Name="TabCompanyCosts" Header="3. Altri costi del lavoro">
                                 <Grid Margin="16">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -688,7 +696,7 @@
                                                     CornerRadius="2"/>
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                 <TextBlock x:Name="TxtCompanyCostsHint"
-                                                           Text="Queste voci sono costi interni: non vengono aggiunte al catalogo né mostrate nel preventivo cliente."
+                                                           Text="Aggiungi materiali aziendali e altre spese di questo lavoro. Questi costi riducono il guadagno e non compaiono nel preventivo cliente."
                                                            FontSize="11.5"
                                                            Foreground="{StaticResource MutedTextBrush}"
                                                            TextWrapping="Wrap"/>
@@ -755,7 +763,7 @@
                                               CanUserAddRows="False"
                                               CanUserDeleteRows="False">
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Materiale / costo aziendale"
+                                            <DataGridTextColumn Header="Materiale o spesa"
                                                                 Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                                                 Width="280"/>
                                             <DataGridTextColumn Header="Origine"
@@ -821,7 +829,7 @@
                                     Style="{StaticResource MetricCardStyle}"
                                     BorderBrush="{StaticResource PrimaryBlueBrush}">
                                 <StackPanel>
-                                    <TextBlock Text="MARGINE MATERIALI"
+                                    <TextBlock Text="GUADAGNO SUI MATERIALI"
                                                FontSize="10"
                                                FontWeight="Bold"
                                                Foreground="{StaticResource MutedTextBrush}"/>
@@ -841,7 +849,7 @@
                                     Style="{StaticResource MetricCardStyle}"
                                     BorderBrush="{StaticResource CostsPartnerBrush}">
                                 <StackPanel>
-                                    <TextBlock Text="COSTO FORNITORE"
+                                    <TextBlock Text="ACQUISTO MATERIALI"
                                                FontSize="10"
                                                FontWeight="Bold"
                                                Foreground="{StaticResource MutedTextBrush}"/>
@@ -857,7 +865,7 @@
                                     Style="{StaticResource MetricCardStyle}"
                                     BorderBrush="{StaticResource CostsAdditionalBrush}">
                                 <StackPanel>
-                                    <TextBlock Text="MANODOPERA + AZIENDALI"
+                                    <TextBlock Text="SQUADRA + ALTRI COSTI"
                                                FontSize="10"
                                                FontWeight="Bold"
                                                Foreground="{StaticResource MutedTextBrush}"/>
@@ -888,13 +896,13 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="TxtProfitState"
-                                                   Text="UTILE STIMATO"
+                                                   Text="GUADAGNO STIMATO"
                                                    FontSize="10"
                                                    FontWeight="Bold"
                                                    Foreground="{StaticResource SuccessGreenBrush}"/>
                                         <TextBlock Grid.Column="1"
-                                                   Text="Guadagno reale"
-                                                   FontSize="12"
+                                                   Text="Sul ricavo"
+                                                   FontSize="10"
                                                    Foreground="{StaticResource MutedTextBrush}"/>
                                     </Grid>
                                     <TextBlock Grid.Row="1"
@@ -903,7 +911,7 @@
                                                HorizontalAlignment="Right"
                                                FontSize="10.5"
                                                Foreground="{StaticResource MutedTextBrush}"
-                                               TextAlignment="Right"/>
+                                               TextAlignment="Right" TextWrapping="Wrap"/>
                                     <TextBlock Grid.Row="2"
                                                x:Name="TxtProfit"
                                                Margin="0,3,0,0"
@@ -923,7 +931,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Ricalcola salva dati e guadagno nel preventivo."
+                                <TextBlock Text="Dopo le modifiche premi Ricalcola e salva per aggiornare gli importi e memorizzare il calcolo."
                                            FontSize="11"
                                            Foreground="{StaticResource MutedTextBrush}"
                                            TextWrapping="Wrap"/>
@@ -944,7 +952,7 @@
                                         Margin="10,0,0,0"
                                         MinWidth="126"
                                         Style="{StaticResource SecondaryActionButtonStyle}"
-                                        ToolTip="Crea il PDF riservato del guadagno reale"
+                                        ToolTip="Esporta il riepilogo di costi e guadagno per uso interno"
                                         Click="OnExportPdfClick"/>
                                 <Button x:Name="BtnCalculate"
                                         Content="Ricalcola e salva"

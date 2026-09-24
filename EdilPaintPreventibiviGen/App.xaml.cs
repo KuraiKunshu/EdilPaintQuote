@@ -45,6 +45,7 @@ public partial class App : Application
             var configuration = AppSettingsFileService.BuildConfiguration();
 
             AppSettings = new AppSettingsService(configuration);
+            Helpers.WindowZoomBehavior.Initialize(AppSettings.App.GetEffectiveMainWindowScale());
             IsSilentStartup = AppSettings.App.IsSilentStartup;
 
             StoragePathService.Initialize(AppSettings);
