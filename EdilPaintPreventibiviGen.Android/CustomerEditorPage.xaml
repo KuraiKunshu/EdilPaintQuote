@@ -87,6 +87,13 @@
                     </Border>
                 </VerticalStackLayout>
 
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="IVA preferita" FontAttributes="Bold" TextColor="#7B6661"/>
+                    <Picker x:Name="PreferredVatPicker" Title="IVA preferita" BackgroundColor="#FFFFFF"/>
+                    <Label Text="Proposta alla selezione del cliente e modificabile nel preventivo. Nessuna preferenza usa l’IVA predefinita."
+                           FontSize="12" TextColor="#7B6661"/>
+                </VerticalStackLayout>
+
                 <Border Stroke="#E6D6D2"
                         BackgroundColor="#FFFFFF"
                         Padding="14"

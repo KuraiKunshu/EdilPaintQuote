@@ -1,4 +1,5 @@
 using System.Globalization;
+using CustomerVatPreference = EdilPaintPreventibiviGen.Models.CustomerVatPreference;
 using System.Net.Mail;
 using EdilPaintPreventibiviGen.Android.Models;
 using EdilPaintPreventibiviGen.Android.Services;
@@ -23,6 +24,8 @@ public partial class CustomerEditorPage : ContentPage
         _connectionString = connectionString;
         _customer = customer?.Clone() ?? new CustomerRecord();
         _onSaved = onSaved;
+        PreferredVatPicker.ItemsSource = CustomerVatPreference.Options.ToList();
+        PreferredVatPicker.SelectedItem = CustomerVatPreference.Display(_customer.PreferredVatType);
 
         bool isEdit = _customer.Id > 0;
         HeaderTitleLabel.Text = isEdit ? "Modifica cliente" : "Nuovo cliente";
@@ -83,6 +86,7 @@ public partial class CustomerEditorPage : ContentPage
         _customer.Address = AddressEntry.Text?.Trim() ?? string.Empty;
         _customer.Phone = PhoneEntry.Text?.Trim() ?? string.Empty;
         _customer.Email = email;
+        _customer.PreferredVatType = CustomerVatPreference.Normalize(PreferredVatPicker.SelectedItem as string);
         _customer.MaterialDiscount = materialDiscount;
         _customer.LaborDiscount = laborDiscount;
 

@@ -339,6 +339,7 @@ public partial class MainViewModel
         left.MaterialDiscount.Equals(right.MaterialDiscount) &&
         left.LaborDiscount.Equals(right.LaborDiscount) &&
         left.SupplierDiscount.Equals(right.SupplierDiscount) &&
+        left.PreferredVatType == right.PreferredVatType &&
         left.IsSupplier == right.IsSupplier;
 
     private static bool ItemsHaveSameVisibleContent(Item left, Item right) =>
@@ -362,6 +363,7 @@ public partial class MainViewModel
         SetIfDifferent(target.Address, source.Address, value => target.Address = value, ref changed);
         SetIfDifferent(target.Email, source.Email, value => target.Email = value, ref changed);
         SetIfDifferent(target.Phone, source.Phone, value => target.Phone = value, ref changed);
+        SetIfDifferent(target.PreferredVatType, source.PreferredVatType, value => target.PreferredVatType = value, ref changed);
         SetIfDifferent(target.MaterialDiscount, source.MaterialDiscount, value => target.MaterialDiscount = value, ref changed);
         SetIfDifferent(target.LaborDiscount, source.LaborDiscount, value => target.LaborDiscount = value, ref changed);
         SetIfDifferent(target.SupplierDiscount, source.SupplierDiscount, value => target.SupplierDiscount = value, ref changed);
@@ -708,6 +710,7 @@ public partial class MainViewModel
         Address = source.Address,
         Email = source.Email,
         Phone = source.Phone,
+        PreferredVatType = source.PreferredVatType,
         MaterialDiscount = source.MaterialDiscount,
         LaborDiscount = source.LaborDiscount,
         SupplierDiscount = source.SupplierDiscount,
@@ -774,6 +777,7 @@ public partial class MainViewModel
         existing.Address = saved.Address;
         existing.Email = saved.Email;
         existing.Phone = saved.Phone;
+        existing.PreferredVatType = saved.PreferredVatType;
         existing.MaterialDiscount = saved.MaterialDiscount;
         existing.LaborDiscount = saved.LaborDiscount;
         existing.SupplierDiscount = saved.SupplierDiscount;

@@ -89,6 +89,7 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Customers", "Phone", "NVARCHAR(100) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "MaterialDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LaborDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
+        await EnsureColumnAsync(db, "Customers", "PreferredVatType", "NVARCHAR(50) NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "SupplierDiscount", "FLOAT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "IsSupplier", "BIT NOT NULL DEFAULT 0", cancellationToken);
         await EnsureColumnAsync(db, "Customers", "LastModifiedUtc",
@@ -228,6 +229,7 @@ public partial class SqlDataService
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialStatus" character varying(120) NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "RealProfitJson" text NOT NULL DEFAULT '';
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "IsSupplier" boolean NOT NULL DEFAULT FALSE;
+        ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "PreferredVatType" varchar(50) NOT NULL DEFAULT '';
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "SupplierDiscount" double precision NOT NULL DEFAULT 0;
         ALTER TABLE "PersonalMaterials" ADD COLUMN IF NOT EXISTS "IsCompanyMaterial" boolean NOT NULL DEFAULT FALSE;
         ALTER TABLE "LaborCatalog" ADD COLUMN IF NOT EXISTS "ExcludeFromWorkSheet" boolean NOT NULL DEFAULT FALSE;

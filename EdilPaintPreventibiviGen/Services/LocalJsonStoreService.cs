@@ -882,6 +882,7 @@ public class LocalJsonStoreService
         left.MaterialDiscount.Equals(right.MaterialDiscount) &&
         left.LaborDiscount.Equals(right.LaborDiscount) &&
         left.SupplierDiscount.Equals(right.SupplierDiscount) &&
+        left.PreferredVatType == right.PreferredVatType &&
         left.IsSupplier == right.IsSupplier &&
         left.LastModifiedUtc == right.LastModifiedUtc &&
         left.BaseVersionUtc == right.BaseVersionUtc &&

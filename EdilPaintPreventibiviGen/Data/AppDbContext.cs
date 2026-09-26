@@ -37,6 +37,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Address).HasMaxLength(500);
             entity.Property(x => x.Email).HasMaxLength(250);
             entity.Property(x => x.Phone).HasMaxLength(100);
+            entity.Property(x => x.PreferredVatType).HasMaxLength(50).HasDefaultValue("").IsRequired();
         });
 
         modelBuilder.Entity<CompanySettingsEntity>(entity =>

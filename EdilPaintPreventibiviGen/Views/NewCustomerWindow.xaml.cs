@@ -17,6 +17,8 @@ public partial class NewCustomerWindow : Window
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
 
         _existingCustomer = existingCustomer;
+        CmbPreferredVat.ItemsSource = CustomerVatPreference.Options;
+        CmbPreferredVat.SelectedItem = CustomerVatPreference.Display(existingCustomer?.PreferredVatType);
 
         if (_existingCustomer != null)
         {
@@ -85,6 +87,7 @@ public partial class NewCustomerWindow : Window
             _existingCustomer.Address = TxtAddress.Text;
             _existingCustomer.Email = TxtEmail.Text;
             _existingCustomer.Phone = TxtPhone.Text;
+            _existingCustomer.PreferredVatType = CustomerVatPreference.Normalize(CmbPreferredVat.SelectedItem as string);
             _existingCustomer.MaterialDiscount = materialDiscount;
             _existingCustomer.LaborDiscount = laborDiscount;
             _existingCustomer.SupplierDiscount = supplierDiscount;
@@ -100,6 +103,7 @@ public partial class NewCustomerWindow : Window
                 Address = TxtAddress.Text,
                 Email = TxtEmail.Text,
                 Phone = TxtPhone.Text,
+                PreferredVatType = CustomerVatPreference.Normalize(CmbPreferredVat.SelectedItem as string),
                 MaterialDiscount = materialDiscount,
                 LaborDiscount = laborDiscount,
                 SupplierDiscount = supplierDiscount,

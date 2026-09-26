@@ -9,6 +9,21 @@ namespace EdilPaintPreventibiviGen.Android.Tests;
 public class MobileOperationsTests
 {
     [Fact]
+    public void CustomerVatPreferenceSurvivesMobileEditingAndJson()
+    {
+        var customer = new CustomerRecord { BusinessName = "Cliente", PreferredVatType = "10%" };
+        var copy = customer.Clone();
+        Assert.Equal("10%", copy.PreferredVatType);
+        copy.PreferredVatType = "22%";
+        Assert.Equal("10%", customer.PreferredVatType);
+        var restored = JsonSerializer.Deserialize<CustomerRecord>(JsonSerializer.Serialize(copy))!;
+        Assert.Equal("22%", restored.PreferredVatType);
+        Assert.Equal("", JsonSerializer.Deserialize<CustomerRecord>("{}")!.PreferredVatType);
+        Assert.Equal("22%", EdilPaintPreventibiviGen.Models.CustomerVatPreference.Resolve(customer.PreferredVatType,
+            restored.PreferredVatType, true, "esclusa"));
+    }
+
+    [Fact]
     public void LargeQuantitiesKeepAllSupportedDecimalsInMobileDocuments()
     {
         Assert.True(QuantityValue.TryParse("10000,123456789", out decimal quantity));

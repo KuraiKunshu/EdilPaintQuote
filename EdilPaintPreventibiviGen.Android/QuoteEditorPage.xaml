@@ -119,7 +119,7 @@
                                 BackgroundColor="#FFFFFF"
                                 Padding="8,0"
                                 StrokeShape="RoundRectangle 8">
-                            <Picker x:Name="BillingCustomerPicker"
+                            <Picker x:Name="BillingCustomerPicker" SelectedIndexChanged="OnBillingCustomerChanged"
                                     Title="Nessun intestatario separato"/>
                         </Border>
                     </VerticalStackLayout>

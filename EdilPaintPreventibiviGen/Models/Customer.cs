@@ -10,6 +10,7 @@ public class Customer : INotifyPropertyChanged
 	private string _address = string.Empty;
 	private string _email = string.Empty;
 	private string _phone = string.Empty;
+	private string _preferredVatType = string.Empty;
 	private double _materialDiscount;
 	private double _laborDiscount;
 	private double _supplierDiscount;
@@ -29,6 +30,12 @@ public class Customer : INotifyPropertyChanged
 
 	[JsonPropertyName("Telefono")] 
 	public string Phone { get => _phone; set { _phone = value; OnPropertyChanged(); } }
+
+	[JsonPropertyName("preferredVatType")]
+	public string PreferredVatType { get => _preferredVatType; set { _preferredVatType = CustomerVatPreference.Normalize(value); OnPropertyChanged(); OnPropertyChanged(nameof(PreferredVatDisplay)); } }
+
+	[JsonIgnore]
+	public string PreferredVatDisplay => CustomerVatPreference.Display(PreferredVatType);
 
 	[JsonPropertyName("sconto_materiale")]
 	public double MaterialDiscount { get => _materialDiscount; set { _materialDiscount = value; OnPropertyChanged(); } }

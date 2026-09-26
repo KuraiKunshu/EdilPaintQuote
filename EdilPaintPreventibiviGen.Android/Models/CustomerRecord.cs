@@ -1,4 +1,5 @@
 using System.Globalization;
+using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Android.Models;
 
@@ -12,6 +13,8 @@ public sealed class CustomerRecord
     public string Address { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
+    private string _preferredVatType = string.Empty;
+    public string PreferredVatType { get => _preferredVatType; set => _preferredVatType = CustomerVatPreference.Normalize(value); }
     public double MaterialDiscount { get; set; }
     public double LaborDiscount { get; set; }
     public DateTime LastModifiedUtc { get; set; }
@@ -39,6 +42,7 @@ public sealed class CustomerRecord
         Address = Address,
         Email = Email,
         Phone = Phone,
+        PreferredVatType = PreferredVatType,
         MaterialDiscount = MaterialDiscount,
         LaborDiscount = LaborDiscount,
         LastModifiedUtc = LastModifiedUtc

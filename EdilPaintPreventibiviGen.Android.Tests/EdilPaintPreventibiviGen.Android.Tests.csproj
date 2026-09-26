@@ -18,5 +18,6 @@
     <Compile Include="../EdilPaintPreventibiviGen/Models/RealProfitCalculation.cs" Link="Shared/RealProfitCalculation.cs" />
     <Compile Include="../EdilPaintPreventibiviGen/Services/RealProfitCalculator.cs" Link="Shared/RealProfitCalculator.cs" />
   </ItemGroup>
-<ItemGroup><Compile Include="../EdilPaintPreventibiviGen/Models/QuantityValue.cs" Link="Shared/QuantityValue.cs" /></ItemGroup>
+<ItemGroup><Compile Include="../EdilPaintPreventibiviGen/Models/QuantityValue.cs" Link="Shared/QuantityValue.cs" />
+    <Compile Include="../EdilPaintPreventibiviGen/Models/CustomerVatPreference.cs" Link="Shared/CustomerVatPreference.cs" /></ItemGroup>
 </Project>

@@ -213,12 +213,17 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _isBillingCustomerEnabled;
         set
         {
+            if (_isBillingCustomerEnabled == value)
+                return;
+            bool hadBillingCustomer = _isBillingCustomerEnabled && SelectedBillingCustomer != null;
             _isBillingCustomerEnabled = value;
             if (!value)
             {
                 SelectedBillingCustomer = null;
                 _unresolvedBillingCustomerName = string.Empty;
             }
+            if (hadBillingCustomer || (value && SelectedBillingCustomer != null))
+                ApplyPreferredCustomerVat();
             OnPropertyChanged();
         }
     }
@@ -258,6 +263,8 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
                 CustomerBorderBrush = GetCustomerSelectionBrush(false);
             }
 
+            if (!IsBillingCustomerEnabled || SelectedBillingCustomer == null)
+                ApplyPreferredCustomerVat();
             OnPropertyChanged();
         }
     }
@@ -293,12 +300,22 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _selectedBillingCustomer;
         set
         {
+            if (_selectedBillingCustomer == value)
+                return;
             _selectedBillingCustomer = value;
             if (value != null)
                 _unresolvedBillingCustomerName = string.Empty;
+            if (IsBillingCustomerEnabled)
+                ApplyPreferredCustomerVat();
             OnPropertyChanged();
         }
     }
+
+    private void ApplyPreferredCustomerVat() =>
+        IvaType = CustomerVatPreference.Resolve(SelectedCustomer?.PreferredVatType,
+            SelectedBillingCustomer?.PreferredVatType,
+            IsBillingCustomerEnabled && SelectedBillingCustomer != null,
+            App.AppSettings?.App.GetEffectiveDefaultVatType() ?? "RC 10%+22%");
 
     public VeluxResult? SelectedCatalogMaterial
     {

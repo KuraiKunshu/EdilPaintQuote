@@ -87,6 +87,7 @@ public static class CustomerDuplicateFilter
                    left.MaterialDiscount.Equals(right.MaterialDiscount) &&
                    left.LaborDiscount.Equals(right.LaborDiscount) &&
                    left.SupplierDiscount.Equals(right.SupplierDiscount) &&
+                   left.PreferredVatType == right.PreferredVatType &&
                    left.IsSupplier == right.IsSupplier;
         }
 
@@ -100,6 +101,7 @@ public static class CustomerDuplicateFilter
             hash.Add(customer.MaterialDiscount);
             hash.Add(customer.LaborDiscount);
             hash.Add(customer.SupplierDiscount);
+            hash.Add(customer.PreferredVatType, StringComparer.Ordinal);
             hash.Add(customer.IsSupplier);
             return hash.ToHashCode();
         }

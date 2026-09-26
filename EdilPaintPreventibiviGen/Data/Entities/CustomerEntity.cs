@@ -8,6 +8,7 @@ public class CustomerEntity
 	public string Address { get; set; } = string.Empty;
 	public string Email { get; set; } = string.Empty;
 	public string Phone { get; set; } = string.Empty;
+	public string PreferredVatType { get; set; } = string.Empty;
 	public double MaterialDiscount { get; set; }
 	public double LaborDiscount { get; set; }
 	public double SupplierDiscount { get; set; }

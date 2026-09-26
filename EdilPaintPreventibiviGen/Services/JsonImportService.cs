@@ -82,6 +82,7 @@ public class JsonImportService
                 Address = GetJsonString(c, "Indirizzo", "indirizzo", "Address"),
                 Email = GetJsonString(c, "email", "Email", "EMAIL"),
                 Phone = GetJsonString(c, "Telefono", "telefono", "Phone", "tel"),
+                PreferredVatType = GetJsonString(c, "preferredVatType", "PreferredVatType"),
                 MaterialDiscount = GetJsonDouble(c, "sconto_materiale"),
                 LaborDiscount = GetJsonDouble(c, "sconto_lavori"),
                 SupplierDiscount = GetJsonDouble(c, "sconto_fornitore")

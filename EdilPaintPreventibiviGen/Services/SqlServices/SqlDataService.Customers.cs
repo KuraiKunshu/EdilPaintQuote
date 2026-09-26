@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json;
 using EdilPaintPreventibiviGen.Data;
 using EdilPaintPreventibiviGen.Data.Entities;
@@ -116,6 +116,7 @@ public partial class SqlDataService
             existing.Address = customer.Address;
             existing.Email = customer.Email;
             existing.Phone = customer.Phone;
+            existing.PreferredVatType = customer.PreferredVatType;
             existing.MaterialDiscount = customer.MaterialDiscount;
             existing.LaborDiscount = customer.LaborDiscount;
             existing.SupplierDiscount = customer.SupplierDiscount;
@@ -156,6 +157,7 @@ public partial class SqlDataService
             entity.Address = customer.Address;
             entity.Email = customer.Email;
             entity.Phone = customer.Phone;
+            entity.PreferredVatType = customer.PreferredVatType;
             entity.MaterialDiscount = customer.MaterialDiscount;
             entity.LaborDiscount = customer.LaborDiscount;
             entity.SupplierDiscount = customer.SupplierDiscount;

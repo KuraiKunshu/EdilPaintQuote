@@ -6,10 +6,10 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         RenderOptions.BitmapScalingMode="HighQuality"
-        Icon="pack://application:,,,/Assets/Windowsicon/contatti.png"
+        Icon="pack://application:,,,/EdilPaintPreventibiviGen;component/Assets/Windowsicon/contatti.png"
         Title="Anagrafica Cliente"
         Width="560"
-        Height="660"
+        Height="760"
         MinWidth="560"
         MinHeight="500"
         MaxWidth="760"
@@ -100,7 +100,7 @@
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource DefaultTextBrush}"/>
-                        <TextBlock Text="Compila l’anagrafica e gli eventuali sconti personalizzati"
+                        <TextBlock Text="Anagrafica, sconti e IVA preferita"
                                    Margin="0,2,0,0"
                                    FontSize="12"
                                    Foreground="{StaticResource MutedTextBrush}"/>
@@ -304,11 +304,15 @@
                             </Grid>
                         </Border>
 
-                        <!-- Nota -->
-                        <TextBlock Grid.Row="10"
-                                   Text="La ragione sociale è obbligatoria per il salvataggio."
-                                   FontSize="12"
-                                   Foreground="{StaticResource MutedTextBrush}"/>
+                        <StackPanel Grid.Row="10">
+                            <TextBlock Text="IVA preferita" Style="{StaticResource SectionLabelStyle}"/>
+                            <ComboBox x:Name="CmbPreferredVat" Margin="0,8,0,0" MinHeight="36"/>
+                            <TextBlock Text="Proposta quando selezioni il cliente, modificabile nel preventivo. Nessuna preferenza usa l’IVA predefinita."
+                                       TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12"
+                                       Foreground="{StaticResource MutedTextBrush}"/>
+                            <TextBlock Text="La ragione sociale è obbligatoria per il salvataggio."
+                                       Margin="0,14,0,0" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                        </StackPanel>
                     </Grid>
                 </ScrollViewer>
 
@@ -329,6 +333,7 @@
 
                     <Button x:Name="BtnSave"
                             Grid.Column="3"
+                            Width="150"
                             Style="{StaticResource FooterButtonStyle}"
                             Content="Salva cliente"
                             Click="OnSaveClick"

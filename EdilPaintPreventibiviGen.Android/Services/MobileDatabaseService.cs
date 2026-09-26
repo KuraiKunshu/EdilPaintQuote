@@ -260,7 +260,7 @@ public sealed partial class MobileDatabaseService
 
         command.CommandText = $"""
             select "Id", "SyncId", "BusinessName", "Address", "Email", "Phone",
-                   "MaterialDiscount", "LaborDiscount", "LastModifiedUtc"
+                   "MaterialDiscount", "LaborDiscount", "LastModifiedUtc", "PreferredVatType"
             from "Customers"
             where not "IsDeleted" and not "IsSupplier" {searchClause}
             order by "BusinessName"
@@ -281,7 +281,8 @@ public sealed partial class MobileDatabaseService
                 Phone = reader.GetString(5),
                 MaterialDiscount = reader.GetDouble(6),
                 LaborDiscount = reader.GetDouble(7),
-                LastModifiedUtc = reader.GetDateTime(8)
+                LastModifiedUtc = reader.GetDateTime(8),
+                PreferredVatType = reader.GetString(9)
             });
         }
 
@@ -306,11 +307,11 @@ public sealed partial class MobileDatabaseService
             command.CommandText = """
                 insert into "Customers"
                     ("SyncId", "BusinessName", "Address", "Email", "Phone",
-                     "MaterialDiscount", "LaborDiscount", "SupplierDiscount", "IsSupplier",
+                     "MaterialDiscount", "LaborDiscount", "PreferredVatType", "SupplierDiscount", "IsSupplier",
                      "LastModifiedUtc", "IsDeleted")
                 values
                     (@syncId, @businessName, @address, @email, @phone,
-                     @materialDiscount, @laborDiscount, 0, false, @savedAtUtc, false)
+                     @materialDiscount, @laborDiscount, @preferredVatType, 0, false, @savedAtUtc, false)
                 returning "Id", "LastModifiedUtc";
                 """;
         }
@@ -326,6 +327,7 @@ public sealed partial class MobileDatabaseService
                     "Phone" = @phone,
                     "MaterialDiscount" = @materialDiscount,
                     "LaborDiscount" = @laborDiscount,
+                    "PreferredVatType" = @preferredVatType,
                     "LastModifiedUtc" = @savedAtUtc
                 where "SyncId" = @syncId
                   and "LastModifiedUtc" = @expectedLastModifiedUtc
@@ -901,6 +903,7 @@ public sealed partial class MobileDatabaseService
         command.Parameters.AddWithValue("phone", customer.Phone);
         command.Parameters.AddWithValue("materialDiscount", customer.MaterialDiscount);
         command.Parameters.AddWithValue("laborDiscount", customer.LaborDiscount);
+        command.Parameters.AddWithValue("preferredVatType", customer.PreferredVatType);
         command.Parameters.AddWithValue("savedAtUtc", savedAtUtc);
     }
 

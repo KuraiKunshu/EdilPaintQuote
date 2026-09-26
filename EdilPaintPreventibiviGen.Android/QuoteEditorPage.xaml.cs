@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Globalization;
+using CustomerVatPreference = EdilPaintPreventibiviGen.Models.CustomerVatPreference;
 using EdilPaintPreventibiviGen.Android.Models;
 using EdilPaintPreventibiviGen.Android.Services;
 
@@ -187,6 +188,23 @@ public partial class QuoteEditorPage : ContentPage
             return;
         MaterialDiscountEntry.Text = customer.MaterialDiscount.ToString("0.##", ItalianCulture);
         LaborDiscountEntry.Text = customer.LaborDiscount.ToString("0.##", ItalianCulture);
+        if ((BillingCustomerPicker.SelectedItem as CustomerOption)?.Customer == null)
+            ApplyPreferredCustomerVat();
+        UpdateTotals();
+    }
+
+    private void OnBillingCustomerChanged(object? sender, EventArgs e)
+    {
+        if (!_initializingControls)
+            ApplyPreferredCustomerVat();
+    }
+
+    private void ApplyPreferredCustomerVat()
+    {
+        var customer = CustomerPicker.SelectedItem as CustomerRecord;
+        var billing = (BillingCustomerPicker.SelectedItem as CustomerOption)?.Customer;
+        IvaPicker.SelectedItem = DisplayIva(CustomerVatPreference.Resolve(customer?.PreferredVatType,
+            billing?.PreferredVatType, billing != null, new QuoteDraft().IvaType));
         UpdateTotals();
     }
 
@@ -231,6 +249,8 @@ public partial class QuoteEditorPage : ContentPage
         _initializingControls = false;
         MaterialDiscountEntry.Text = saved.MaterialDiscount.ToString("0.##", ItalianCulture);
         LaborDiscountEntry.Text = saved.LaborDiscount.ToString("0.##", ItalianCulture);
+        if (previousBillingCustomer == null)
+            ApplyPreferredCustomerVat();
         UpdateTotals();
     }
 

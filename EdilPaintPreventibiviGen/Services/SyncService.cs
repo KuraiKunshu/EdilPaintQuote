@@ -1195,6 +1195,7 @@ public class SyncService
         left.MaterialDiscount.Equals(right.MaterialDiscount) &&
         left.LaborDiscount.Equals(right.LaborDiscount) &&
         left.SupplierDiscount.Equals(right.SupplierDiscount) &&
+        left.PreferredVatType == right.PreferredVatType &&
         left.IsSupplier == right.IsSupplier;
 
     private static bool CustomersHaveSameSyncState(Customer database, Customer local) =>
