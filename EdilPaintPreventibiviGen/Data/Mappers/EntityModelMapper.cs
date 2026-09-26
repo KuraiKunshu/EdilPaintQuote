@@ -85,6 +85,7 @@ public static class EntityModelMapper
             Description = entity.Description,
             UnitPrice = entity.UnitPrice,
             Quantity = 1,
+            UnitOfMeasure = entity.UnitOfMeasure,
             IsSignificant = entity.IsSignificant,
             IsCompanyMaterial = entity.IsCompanyMaterial
         };
@@ -98,6 +99,7 @@ public static class EntityModelMapper
             Name = model.Name,
             Description = model.Description,
             UnitPrice = model.UnitPrice,
+            UnitOfMeasure = model.UnitOfMeasure,
             IsSignificant = model.IsSignificant,
             IsCompanyMaterial = model.IsCompanyMaterial
         };
@@ -112,6 +114,7 @@ public static class EntityModelMapper
             Description = entity.Description,
             UnitPrice = entity.UnitPrice,
             Quantity = 1,
+            UnitOfMeasure = entity.UnitOfMeasure,
             ExcludeFromWorkSheet = entity.ExcludeFromWorkSheet
         };
     }
@@ -124,6 +127,7 @@ public static class EntityModelMapper
             Name = model.Name,
             Description = model.Description,
             UnitPrice = model.UnitPrice,
+            UnitOfMeasure = model.UnitOfMeasure,
             ExcludeFromWorkSheet = model.ExcludeFromWorkSheet
         };
     }
@@ -207,6 +211,7 @@ public static class EntityModelMapper
                     Description = m.Description,
                     UnitPrice = m.UnitPrice,
                     Quantity = m.Quantity,
+                    UnitOfMeasure = m.UnitOfMeasure,
                     Discount = m.Discount,
                     IsSignificant = m.IsSignificant,
                     SortOrder = m.SortOrder
@@ -221,6 +226,7 @@ public static class EntityModelMapper
                     Description = l.Description,
                     UnitPrice = l.UnitPrice,
                     Quantity = l.Quantity,
+                    UnitOfMeasure = l.UnitOfMeasure,
                     Discount = l.Discount,
                     IsSignificant = l.IsSignificant,
                     SortOrder = l.SortOrder

@@ -43,6 +43,8 @@ public partial class HistoryWindow : Window
         "Non disponibile"
     ];
 
+    public Visibility CertificateVisibility => App.AppSettings.Business.EnableInstallationCertificate ? Visibility.Visible : Visibility.Collapsed;
+
     public ICollectionView HistoryView { get; private set; } = null!;
 
     public HistoryWindow(MainViewModel vm)
@@ -1033,7 +1035,7 @@ public partial class HistoryWindow : Window
 
     private async Task GenerateInstallationCertificateAsync(QuoteHistorySummary entry)
     {
-        if (_isGeneratingInstallationCertificate)
+        if (_isGeneratingInstallationCertificate || !App.AppSettings.Business.EnableInstallationCertificate)
             return;
 
         _isGeneratingInstallationCertificate = true;
@@ -1219,7 +1221,7 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateMenuItem("Copia in nuovo preventivo", async () => await CopyPastQuoteAsync(entry)));
         menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
-        menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
+        if (App.AppSettings.Business.EnableInstallationCertificate) menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
         menu.Items.Add(CreateMenuItem("Genera scheda lavoro", async () => await GenerateWorkSheetAsync(entry)));
         menu.Items.Add(CreateMenuItem("Costi e guadagno", async () => await OpenRealProfitCalculatorAsync(entry)));
         menu.Items.Add(new Separator());

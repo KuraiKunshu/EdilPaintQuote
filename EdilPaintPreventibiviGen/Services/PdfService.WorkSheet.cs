@@ -27,7 +27,7 @@ public partial class PdfService
     public void GenerateWorkSheet(WorkSheetContext context, Company company, string filePath)
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        string logoPath = Path.Combine(ResolveAssetsDirectory(), context.SelectedLogo);
+        string logoPath = CompanyBrandingService.ResolveLogo(company, context.SelectedLogo, ResolveAssetsDirectory());
 
         Document.Create(document => document.Page(page =>
         {
@@ -41,6 +41,9 @@ public partial class PdfService
                 {
                     if (File.Exists(logoPath)) left.Item().Width(110).Height(36).Image(logoPath).FitArea();
                     left.Item().Text(company.Nome).FontSize(12).Bold();
+                    if (!string.IsNullOrWhiteSpace(company.Indirizzo)) left.Item().Text(company.Indirizzo).FontSize(8);
+                    if (!string.IsNullOrWhiteSpace(company.Piva)) left.Item().Text($"P. IVA {company.Piva}").FontSize(8);
+                    if (!string.IsNullOrWhiteSpace(company.Email)) left.Item().Text(company.Email).FontSize(8);
                 });
                 row.RelativeItem().Column(right =>
                 {
@@ -231,18 +234,20 @@ public partial class PdfService
         bool checkboxes,
         string itemHeader)
     {
+        float quantityWidth = Math.Max(80, lines.Select(line => QuantityValue.Display(line.Quantity, line.UnitOfMeasure).Length)
+            .DefaultIfEmpty(0).Max() * 7.2f + 12);
         container.Table(table =>
         {
             table.ColumnsDefinition(columns =>
             {
                 if (checkboxes) columns.ConstantColumn(38);
-                columns.ConstantColumn(50);
+                columns.ConstantColumn(quantityWidth);
                 columns.RelativeColumn();
             });
             table.Header(header =>
             {
                 if (checkboxes) header.Cell().Element(Head).Text("Fatto");
-                header.Cell().Element(Head).Text("Q.ta");
+                header.Cell().Element(Head).Text("Q.tà / U.M.");
                 header.Cell().Element(Head).Text(itemHeader);
             });
             foreach (WorkSheetLine line in lines)
@@ -253,7 +258,7 @@ public partial class PdfService
                 {
                     if (checkboxes) row.ConstantItem(38).Padding(6).PaddingTop(2).Width(12).Height(12)
                         .Border(0.8f).BorderColor(WorkSheetPalette.GreyDarken2);
-                    row.ConstantItem(50).Padding(6).Text(line.Quantity.ToString()).FontSize(12).Bold();
+                    row.ConstantItem(quantityWidth).Padding(6).Text(QuantityValue.Display(line.Quantity, line.UnitOfMeasure)).FontSize(12).Bold();
                     row.RelativeItem().Padding(6).Column(description =>
                     {
                         description.Item().Text(line.Name).SemiBold();

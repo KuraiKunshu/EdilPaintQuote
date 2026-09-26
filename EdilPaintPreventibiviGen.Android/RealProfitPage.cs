@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using System.Globalization;
 using EdilPaintPreventibiviGen.Android.Controls;
 using EdilPaintPreventibiviGen.Android.Models;
@@ -18,7 +19,7 @@ public sealed class RealProfitPage : OperationPage
     private readonly Entry _hourly;
     private readonly Switch _exclude;
     private readonly List<ProfitMaterialCost> _materials;
-    private readonly List<(Entry Name, Entry Quantity, Entry Price, string Source)> _costRows = [];
+    private readonly List<(Entry Name, Entry Quantity, Entry Price, string Source, Picker Unit)> _costRows = [];
     private readonly VerticalStackLayout _costs = new() { Spacing = 12 };
     private readonly Label _result = Heading("");
     private readonly Label _saved = new() { FontSize = 12, TextColor = Color.FromArgb("#616166") };
@@ -40,7 +41,7 @@ public sealed class RealProfitPage : OperationPage
         _exclude = new Switch { IsToggled = saved?.ExcludeMaterials ?? quote.MaterialsOrderedByCustomer };
         _materials = saved?.Materials ?? quote.Materials.Select(line => new ProfitMaterialCost
         {
-            Name = line.Name, Quantity = line.Quantity, CustomerUnitPrice = line.UnitPrice,
+            Name = line.Name, Quantity = line.Quantity, UnitOfMeasure = line.UnitOfMeasure, CustomerUnitPrice = line.UnitPrice,
             CustomerDiscount = 100 - (1 - line.Discount / 100) * (1 - quote.MaterialDiscount / 100) * 100
         }).ToList();
         Form.Add(Heading(quote.CustomerName));
@@ -69,7 +70,7 @@ public sealed class RealProfitPage : OperationPage
         Form.Add(Action("Scegli materiale aziendale", async () =>
         {
             await Navigation.PushAsync(new CatalogPickerPage(ConnectionString, QuoteLineKind.Material, item => AddCost(new()
-            { Name = item.Name, Quantity = 1, UnitCost = item.UnitPrice, Source = "Catalogo" }), companyOnly: true));
+            { Name = item.Name, Quantity = 1, UnitCost = item.UnitPrice, UnitOfMeasure = item.UnitOfMeasure, Source = "Catalogo" }), companyOnly: true));
         }, true));
         Form.Add(Field("Riduzione prudenziale (%)", _reduction));
         Form.Add(_result);
@@ -95,15 +96,17 @@ public sealed class RealProfitPage : OperationPage
     private void AddCost(CompanyMaterialCost cost)
     {
         var name = Input(cost.Name);
-        var quantity = Input(Format(cost.Quantity), true);
+        var quantity = Input(QuantityValue.Format(cost.Quantity), true);
         var price = Input(Format(cost.UnitCost), true);
-        var row = (name, quantity, price, cost.Source);
+        var unit = new Picker { ItemsSource = QuantityValue.Units.ToList(), SelectedItem = cost.UnitOfMeasure };
+        var row = (name, quantity, price, cost.Source, unit);
         var layout = new VerticalStackLayout { Spacing = 4 };
         layout.Add(Field("Materiale / costo", name));
         var numbers = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 8 };
         numbers.Add(Field("Quantita", quantity), 0);
         numbers.Add(Field("Costo unitario", price), 1);
         layout.Add(numbers);
+        layout.Add(Field("Unità di misura", unit));
         layout.Add(Action("Rimuovi costo", () => { _costRows.Remove(row); _costs.Remove(layout); return Task.CompletedTask; }, true));
         _costRows.Add(row);
         _costs.Add(layout);
@@ -135,22 +138,22 @@ public sealed class RealProfitPage : OperationPage
         {
             WindowPrefixes = settings.WindowPrefixes,
             Rules = settings.MaterialRules,
-            WindowProducts = _quote.Materials.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticWindowProductLine(x.Name, x.Quantity)).ToArray(),
-            Labors = _quote.Labors.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticWindowLaborLine(x.CatalogItemId, x.Name, x.Quantity)).ToArray(),
-            MaterialCatalog = catalog.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticMaterialCatalogItem(x.Id, x.Name)).ToArray(),
-            ExistingQuoteMaterials = _quote.Materials.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticQuoteMaterialLine(x.CatalogItemId, x.Name, x.Quantity))
-                .Concat(currentCosts.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticQuoteMaterialLine(0, x.Name, x.Quantity))).ToArray()
+            WindowProducts = _quote.Materials.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticWindowProductLine(x.Name, x.Quantity, x.UnitOfMeasure)).ToArray(),
+            Labors = _quote.Labors.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticWindowLaborLine(x.CatalogItemId, x.Name, x.Quantity, x.UnitOfMeasure)).ToArray(),
+            MaterialCatalog = catalog.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticMaterialCatalogItem(x.Id, x.Name, x.UnitOfMeasure)).ToArray(),
+            ExistingQuoteMaterials = _quote.Materials.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticQuoteMaterialLine(x.CatalogItemId, x.Name, x.Quantity, x.UnitOfMeasure))
+                .Concat(currentCosts.Select(x => new EdilPaintPreventibiviGen.Models.AutomaticQuoteMaterialLine(0, x.Name, x.Quantity, x.UnitOfMeasure))).ToArray()
         };
         var result = EdilPaintPreventibiviGen.Services.AutomaticWindowMaterialCalculator.Calculate(input);
-        var additions = result.Materials.Where(x => x.QuantityToAdd > 0 && x.QuantityToAdd <= int.MaxValue && catalog.Any(c => c.Id == x.MaterialCatalogItemId)).ToList();
-        string preview = string.Join("\n", additions.Select(x => $"N.{x.QuantityToAdd} {x.MaterialName}"));
+        var additions = result.Materials.Where(x => QuantityValue.IsValid(x.QuantityToAdd) && catalog.Any(c => c.Id == x.MaterialCatalogItemId)).ToList();
+        string preview = string.Join("\n", additions.Select(x => $"{QuantityValue.Display(x.QuantityToAdd, catalog.First(c => c.Id == x.MaterialCatalogItemId).UnitOfMeasure)} {x.MaterialName}"));
         string issues = string.Join("\n", result.Issues.Select(x => x.Message));
         if (additions.Count == 0) { await DisplayAlertAsync("Materiali automatici", "Nessun materiale da aggiungere.\n" + issues, "OK"); return; }
         if (!await DisplayAlertAsync("Materiali automatici", preview + "\n\n" + issues, "Aggiungi", "Annulla")) return;
         foreach (var item in additions)
         {
             var product = catalog.First(x => x.Id == item.MaterialCatalogItemId);
-            AddCost(new CompanyMaterialCost { Name = product.Name, Quantity = (int)item.QuantityToAdd, UnitCost = product.UnitPrice, Source = "Automatico" });
+            AddCost(new CompanyMaterialCost { Name = product.Name, UnitOfMeasure = product.UnitOfMeasure, Quantity = item.QuantityToAdd, UnitCost = product.UnitPrice, Source = "Automatico" });
         }
         _saved.Text = "Costi modificati, da ricalcolare e salvare";
     }
@@ -165,7 +168,8 @@ public sealed class RealProfitPage : OperationPage
         CompanyMaterials = _costRows.Select(row => new CompanyMaterialCost
         {
             Name = string.IsNullOrWhiteSpace(row.Name.Text) ? throw new InvalidOperationException("Inserisci il nome dei costi aziendali.") : row.Name.Text.Trim(),
-            Quantity = WholeNumber(row.Quantity, "Quantita"), UnitCost = Number(row.Price, "Costo"), Source = row.Source
+            Quantity = QuantityValue.TryParse(row.Quantity.Text, out decimal quantity) ? quantity : throw new InvalidOperationException("Quantità positiva, massimo 9 decimali."),
+            UnitOfMeasure = row.Unit.SelectedItem as string ?? "pz", UnitCost = Number(row.Price, "Costo"), Source = row.Source
         }).ToList()
     };
 

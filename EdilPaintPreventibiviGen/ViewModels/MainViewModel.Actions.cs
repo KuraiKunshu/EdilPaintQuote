@@ -62,6 +62,7 @@ public partial class MainViewModel
 
     private async Task<bool> HandleVeluxLogin()
     {
+        if (!App.AppSettings.App.UseVeluxLogin) return false;
         return await Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var win = new VeluxLoginWindow { Owner = Application.Current.MainWindow };

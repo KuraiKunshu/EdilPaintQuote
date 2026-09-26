@@ -79,6 +79,7 @@
                                TextChanged="OnValueChanged"
                                BackgroundColor="#FFFFFF"
                                HorizontalTextAlignment="Center"/>
+                        <Picker x:Name="UnitPicker" Title="Unità di misura"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1"
                                          Spacing="6">

@@ -16,7 +16,7 @@ public static class RealProfitCalculator
             ? 0
             : input.Materials.Sum(material =>
                 Math.Max(0, material.CustomerUnitPrice) *
-                Math.Max(0, material.Quantity) *
+                (double)Math.Max(0, material.Quantity) *
                 (1 - supplierDiscount / 100));
         double laborCost =
             Math.Max(0, input.Workers) *

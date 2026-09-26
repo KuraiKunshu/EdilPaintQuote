@@ -20,6 +20,8 @@ public partial class SelectMaterialWindow : Window
     public SelectMaterialWindow(MainViewModel vm)
     {
         InitializeComponent();
+        CmbUnit.ItemsSource = QuantityValue.Units;
+        CmbUnit.SelectedItem = "pz";
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         _vm = vm;
         FilterList(string.Empty);
@@ -62,6 +64,7 @@ public partial class SelectMaterialWindow : Window
             BtnSaveMaterial.Content = "Salva modifiche";
 
             TxtName.Text = selected.Name;
+            CmbUnit.SelectedItem = selected.UnitOfMeasure;
             TxtDesc.Text = selected.Description;
             TxtPrice.Text = selected.UnitPrice.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
             ChkSignificant.IsChecked = selected.IsSignificant;
@@ -96,6 +99,7 @@ public partial class SelectMaterialWindow : Window
                 _editingMaterial.Name = TxtName.Text.Trim();
                 _editingMaterial.Description = TxtDesc.Text;
                 _editingMaterial.UnitPrice = price;
+                _editingMaterial.UnitOfMeasure = CmbUnit.SelectedItem as string ?? "pz";
                 _editingMaterial.IsSignificant = ChkSignificant.IsChecked ?? false;
                 _editingMaterial.IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false;
             }
@@ -106,6 +110,7 @@ public partial class SelectMaterialWindow : Window
                     Name = TxtName.Text.Trim(),
                     Description = TxtDesc.Text,
                     UnitPrice = price,
+                    UnitOfMeasure = CmbUnit.SelectedItem as string ?? "pz",
                     Quantity = 1,
                     IsSignificant = ChkSignificant.IsChecked ?? false,
                     IsCompanyMaterial = ChkCompanyMaterial.IsChecked ?? false
@@ -146,6 +151,7 @@ public partial class SelectMaterialWindow : Window
 
     private void ResetInputs()
     {
+        CmbUnit.SelectedItem = "pz";
         _editingMaterial = null;
         TxtFormTitle.Text = "Nuovo materiale";
         BtnSaveMaterial.Content = "Salva in anagrafica";

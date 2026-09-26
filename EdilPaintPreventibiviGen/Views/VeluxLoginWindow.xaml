@@ -15,7 +15,7 @@
                        Foreground="{StaticResource WhiteBrush}" FontWeight="Bold" TextAlignment="Center" FontSize="14"/>
         </Border>
 
-        <wv2:WebView2 x:Name="WebView" Grid.Row="1" Source="https://app.velux.it/cas/login"/>
+        <wv2:WebView2 x:Name="WebView" Grid.Row="1"/>
         
         <Border Grid.Row="2" Background="{StaticResource VeluxFooterBackgroundBrush}" Padding="15" BorderBrush="{StaticResource LegacyLightBorderBrush}" BorderThickness="0,1,0,0">
             <Button Content="CONFERMA LOGIN E PROCEDI" Height="50" Width="300" 

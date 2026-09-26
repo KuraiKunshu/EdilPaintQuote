@@ -1,4 +1,5 @@
 using System.Text.Json;
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using EdilPaintPreventibiviGen.Android.Models;
 using EdilPaintPreventibiviGen.Android.Services;
 using Xunit;
@@ -7,6 +8,60 @@ namespace EdilPaintPreventibiviGen.Android.Tests;
 
 public class MobileOperationsTests
 {
+    [Fact]
+    public void LargeQuantitiesKeepAllSupportedDecimalsInMobileDocuments()
+    {
+        Assert.True(QuantityValue.TryParse("10000,123456789", out decimal quantity));
+        var line = new QuoteLine { Name = "Materiale", Quantity = quantity, UnitOfMeasure = "m²" };
+        var restored = JsonSerializer.Deserialize<QuoteLine>(JsonSerializer.Serialize(line))!;
+        Assert.Equal(quantity, restored.Clone().Quantity);
+        Assert.Equal("10000,123456789 m²", restored.QuantityDisplay);
+        Assert.Contains("10000,123456789 m²", MobileMailService.BuildMaterialsList([restored]));
+        var quote = new QuoteDetail { Materials = [restored] };
+        Assert.Contains(MobileDocumentContent.Quote(quote, new CompanyContact("Azienda", "", "", "")), row => row.Text.Contains("10000,123456789 m²"));
+        Assert.False(QuantityValue.TryParse("1,0000000001", out _));
+    }
+
+    [Fact]
+    public void FractionalLinesKeepUnitsInClonesTotalsAndDocuments()
+    {
+        var line = new QuoteLine { Name = "Posa", Quantity = 1.125m, UnitOfMeasure = "h", UnitPrice = 40 };
+        var clone = line.Clone();
+        Assert.Equal(1.125m, clone.Quantity);
+        Assert.Equal("h", clone.UnitOfMeasure);
+        Assert.Equal(45, clone.Total);
+        Assert.Equal("1,125 h", clone.QuantityDisplay);
+        Assert.Contains("1,125 h", MobileMailService.BuildMaterialsList([clone]));
+        var quote = new QuoteDetail { Materials = [clone] };
+        Assert.Contains(MobileDocumentContent.Quote(quote, new CompanyContact("Azienda", "", "", "")), row => row.Text.Contains("1,125 h"));
+        var totals = QuoteTotalsCalculator.Calculate([clone], [], 0, 0, "22%");
+        Assert.Equal(54.9, totals.Total, 8);
+    }
+
+    [Fact]
+    public void FractionalTotalsMatchRoundedSummary()
+    {
+        var totals = QuoteTotalsCalculator.Calculate(
+            [new QuoteLine { Quantity = 2.5m, UnitPrice = 40 }],
+            [new QuoteLine { Quantity = 1.125m, UnitPrice = 50 }], 0, 0, "22%");
+        Assert.Equal(156.25, totals.Imponibile, 8);
+        Assert.Equal(34.38, totals.Iva, 8);
+        Assert.Equal(190.63, totals.Total, 8);
+    }
+
+    [Fact]
+    public void LegacyMobileLineDefaultsToPiecesAndDecimalJsonRoundTrips()
+    {
+        var old = JsonSerializer.Deserialize<QuoteLine>("""{"Quantity":2,"UnitPrice":10}""")!;
+        Assert.Equal("pz", old.UnitOfMeasure);
+        old.Quantity = 0.125m;
+        old.UnitOfMeasure = "kg";
+        var restored = JsonSerializer.Deserialize<QuoteLine>(JsonSerializer.Serialize(old))!;
+        Assert.Equal(0.125m, restored.Quantity);
+        Assert.Equal("kg", restored.UnitOfMeasure);
+        Assert.Equal("m²", new CatalogItem { UnitOfMeasure = "m²" }.Clone().UnitOfMeasure);
+    }
+
     [Theory]
     [InlineData("esclusa", 0)]
     [InlineData("10%", 28.2)]

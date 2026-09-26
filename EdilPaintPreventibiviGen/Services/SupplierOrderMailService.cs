@@ -156,7 +156,7 @@ public static class SupplierOrderMailService
         else
         {
             foreach (var material in materials)
-                body.AppendLine($"N.{material.Quantity} {material.Name.Trim()}");
+                body.AppendLine($"{QuantityValue.OrderDisplay(material.Quantity, material.UnitOfMeasure)} {material.Name.Trim()}");
         }
 
         return body.ToString().TrimEnd();

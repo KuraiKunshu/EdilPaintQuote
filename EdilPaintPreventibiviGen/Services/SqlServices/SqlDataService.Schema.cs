@@ -15,6 +15,8 @@ public partial class SqlDataService
         else if (db.Database.IsNpgsql())
             await EnsurePostgreSqlSchemaCompatibilityAsync(db, cancellationToken);
 
+        await EnsureQuantitySchemaAsync(db, cancellationToken);
+
         if (!await db.CompanySettings.AnyAsync(cancellationToken))
         {
             db.CompanySettings.Add(new CompanySettingsEntity
@@ -26,7 +28,7 @@ public partial class SqlDataService
                 SelectedLogo = string.Empty,
                 LogosJson = "[]",
                 LogoIndex = 0,
-                Counter = 1,
+                Counter = CompanyInstallationService.IsGenericInstallation ? 0 : 1,
                 PaymentTerms = string.Empty
             });
 

@@ -152,11 +152,11 @@ public sealed class PdfTemplatePreviewService
     {
         return new Company
         {
-            Nome = "EdilPaint",
+            Nome = "Azienda esempio",
             Indirizzo = "Sede demo",
             Piva = "00000000000",
             Email = "info@example.com",
-            Logo = ["Edilpaint.png"],
+            Logo = [],
             Logo_index = 0,
             Termini_pagamento = "Pagamento da concordare."
         };
@@ -165,10 +165,10 @@ public sealed class PdfTemplatePreviewService
     private static string ResolveSelectedLogo(Company company)
     {
         if (company.Logo.Count == 0)
-            return "Edilpaint.png";
+            return string.Empty;
 
         int index = Math.Clamp(company.Logo_index, 0, company.Logo.Count - 1);
         string logo = company.Logo[index];
-        return string.IsNullOrWhiteSpace(logo) ? "Edilpaint.png" : Path.GetFileName(logo);
+        return string.IsNullOrWhiteSpace(logo) ? string.Empty : Path.GetFileName(logo);
     }
 }

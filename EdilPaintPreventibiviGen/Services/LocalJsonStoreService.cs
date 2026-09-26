@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -128,6 +128,7 @@ public class LocalJsonStoreService
                     Description = GetJsonString(e, "descrizione", "Descrizione", "description", "Description"),
                     UnitPrice = GetJsonDouble(e, "valore", "Valore", "unitPrice", "UnitPrice"),
                     Quantity = 1,
+                    UnitOfMeasure = GetJsonString(e, "unitOfMeasure", "UnitOfMeasure"),
                     ExcludeFromWorkSheet = e.TryGetProperty("excludeFromWorkSheet", out var excluded) && excluded.ValueKind == JsonValueKind.True
                 });
             }
@@ -162,6 +163,7 @@ public class LocalJsonStoreService
                     nome = l.Name,
                     descrizione = l.Description,
                     valore = l.UnitPrice,
+                    unitOfMeasure = l.UnitOfMeasure,
                     excludeFromWorkSheet = l.ExcludeFromWorkSheet
                 }).ToList()
             };

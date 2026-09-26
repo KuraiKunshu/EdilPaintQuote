@@ -1,13 +1,14 @@
 <Window x:Class="EdilPaintPreventibiviGen.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:EdilPaintPreventibiviGen.Models"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:helpers="clr-namespace:EdilPaintPreventibiviGen.Helpers"
         mc:Ignorable="d"
         RenderOptions.BitmapScalingMode="HighQuality"
         Icon="pack://application:,,,/Assets/Windowsicon/main.ico"
-        Title="Gestione Preventivi - EdilPaint"
+        Title="Gestione Preventivi"
         Height="900"
         Width="1250"
         Background="{StaticResource ShellBackgroundBrush}"
@@ -303,7 +304,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="EdilPaint Preventivi"
+                <TextBlock Text="Gestione Preventivi"
                            FontSize="13"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource DefaultTextBrush}"
@@ -976,7 +977,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="180"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
@@ -1008,9 +1009,11 @@
                                  VerticalContentAlignment="Top"/>
                         <TextBlock Grid.Row="1" Grid.Column="2"
                                    Text="Quantità:" VerticalAlignment="Center" Margin="0,0,5,5"/>
-                        <TextBox Grid.Row="1" Grid.Column="3"
-                                 Margin="0,0,10,5" VerticalAlignment="Center"
-                                 Text="{Binding InputQuantity, UpdateSourceTrigger=PropertyChanged}"/>
+                        <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,5">
+                            <TextBox x:Name="TxtInputQuantity" Width="75" ToolTip="Quantità positiva, fino a 9 decimali. Esempio: 2,5"
+                                     Text="{Binding InputQuantity, Converter={StaticResource QuantityConverter}, UpdateSourceTrigger=LostFocus}"/>
+                            <ComboBox Width="80" Margin="6,0,0,0" ToolTip="Unità di misura" ItemsSource="{x:Static models:QuantityValue.Units}" SelectedItem="{Binding InputUnitOfMeasure}"/>
+                        </StackPanel>
                         <CheckBox Grid.Row="1" Grid.Column="4"
                                   Content="Bene significativo"
                                   VerticalAlignment="Center"
@@ -1106,7 +1109,8 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                <DataGridComboBoxColumn Header="U.M." SelectedItemBinding="{Binding UnitOfMeasure}" ItemsSource="{x:Static models:QuantityValue.Units}" Width="70"/>
+                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, Converter={StaticResource QuantityConverter}, UpdateSourceTrigger=LostFocus}" Width="70"/>
                                 <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
                                 <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, Converter={StaticResource FlexibleDoubleConverter}, UpdateSourceTrigger=LostFocus}" Width="100"/>
                                 <DataGridTextColumn Header="Totale" Binding="{Binding TotalPrice, StringFormat=N2}" IsReadOnly="True" Width="100"/>
@@ -1189,7 +1193,8 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                <DataGridComboBoxColumn Header="U.M." SelectedItemBinding="{Binding UnitOfMeasure}" ItemsSource="{x:Static models:QuantityValue.Units}" Width="70"/>
+                                <DataGridTextColumn Header="Q.tà" Binding="{Binding Quantity, Mode=TwoWay, Converter={StaticResource QuantityConverter}, UpdateSourceTrigger=LostFocus}" Width="70"/>
                                 <DataGridTextColumn Header="Sc. %" Binding="{Binding Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
                                 <DataGridTextColumn Header="Prezzo unit." Binding="{Binding UnitPrice, Mode=TwoWay, Converter={StaticResource FlexibleDoubleConverter}, UpdateSourceTrigger=LostFocus}" Width="100"/>
                                 <DataGridTextColumn Header="Totale" Binding="{Binding TotalPrice, StringFormat=N2}" IsReadOnly="True" Width="100"/>

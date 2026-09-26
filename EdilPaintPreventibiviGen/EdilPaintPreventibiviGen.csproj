@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
@@ -89,4 +89,11 @@
 
     </ItemGroup>
 
+    <!-- Company packages must be published into a new directory by Publish-Company.ps1. -->
+    <ItemGroup Condition="'$(GenericCompanyPackage)' == 'true'">
+        <AssemblyMetadata Include="GenericCompanyPackage" Value="true" />
+        <Content Update="Assets\*.json;Assets\*.png;Assets\Timbro*.*;..\tools\updater\Update-EdilPaint.ps1"
+                 CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+        <None Update="appsettings.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+    </ItemGroup>
 </Project>

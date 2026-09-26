@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using EdilPaintPreventibiviGen.Models;
@@ -46,6 +47,7 @@ public partial class RealProfitWindow : Window
             {
                 Name = material.Name,
                 Quantity = material.Quantity,
+                UnitOfMeasure = material.UnitOfMeasure,
                 CustomerUnitPrice = material.UnitPrice,
                 CustomerDiscount = 100 -
                     (1 - Math.Clamp(material.Discount, 0, 100) / 100) *
@@ -56,6 +58,7 @@ public partial class RealProfitWindow : Window
             {
                 Name = material.Name,
                 Quantity = material.Quantity,
+                UnitOfMeasure = material.UnitOfMeasure,
                 CustomerUnitPrice = material.CustomerUnitPrice,
                 CustomerDiscount = material.CustomerDiscount
             });
@@ -69,13 +72,14 @@ public partial class RealProfitWindow : Window
                 {
                     Name = material.Name,
                     Quantity = material.Quantity,
+                    UnitOfMeasure = material.UnitOfMeasure,
                     UnitCost = material.UnitCost,
                     Source = material.Source
                 });
             }
         }
 
-        if (!_excludeMaterials && savedInput == null)
+        if (!_excludeMaterials && savedInput == null && App.AppSettings?.Business.EnableWindowAutomations != false)
             AddAutomaticWindowMaterials(defaults);
 
         GridMaterialCosts.ItemsSource = _materials;
@@ -115,7 +119,13 @@ public partial class RealProfitWindow : Window
         }
     }
 
-    private RealProfitInput BuildInput() => new()
+    private RealProfitInput BuildInput()
+    {
+        if (!GridCompanyMaterials.CommitEdit(DataGridEditingUnit.Cell, true) || !GridCompanyMaterials.CommitEdit(DataGridEditingUnit.Row, true))
+            throw new InvalidOperationException("Correggi le quantità evidenziate: usa valori positivi con al massimo 9 decimali.");
+        if (_companyMaterials.Any(item => !QuantityValue.IsValid(item.Quantity)))
+            throw new InvalidOperationException("I costi aziendali richiedono quantità positive con al massimo 9 decimali.");
+        return new RealProfitInput
     {
         QuoteRevenue = ParseNonNegative(TxtRevenue.Text, "ricavo imponibile"),
         ProfitReductionPercentage = ParsePercentage(TxtProfitReduction.Text, "riduzione prudenziale"),
@@ -130,6 +140,7 @@ public partial class RealProfitWindow : Window
             .Where(item => item.Total != 0 || !string.IsNullOrWhiteSpace(item.Name))
             .ToList()
     };
+    }
 
     private async void OnCalculateClick(object sender, RoutedEventArgs e)
     {
@@ -211,8 +222,10 @@ public partial class RealProfitWindow : Window
             if (dialog.ShowDialog(this) != true)
                 return;
 
+            var company = await App.DataService.GetCompanyAsync();
             var context = new RealProfitPdfContext
             {
+                CompanyName = company?.Nome ?? string.Empty,
                 QuoteNumber = _quote.QuoteNumber,
                 QuoteDate = _quote.Date == default ? DateTime.Today : _quote.Date,
                 CustomerName = _quote.CustomerName,
@@ -274,6 +287,7 @@ public partial class RealProfitWindow : Window
         {
             Name = material.Name,
             Quantity = material.Quantity,
+            UnitOfMeasure = material.UnitOfMeasure,
             CustomerUnitPrice = material.CustomerUnitPrice,
             CustomerDiscount = material.CustomerDiscount
         }).ToList(),
@@ -281,6 +295,7 @@ public partial class RealProfitWindow : Window
         {
             Name = material.Name,
             Quantity = material.Quantity,
+            UnitOfMeasure = material.UnitOfMeasure,
             UnitCost = material.UnitCost,
             Source = material.Source
         }).ToList()
@@ -352,19 +367,19 @@ public partial class RealProfitWindow : Window
             AutomaticWindowMaterialCalculator.Calculate(new AutomaticWindowMaterialCalculationInput
             {
                 WindowProducts = _quote.Materials
-                    .Select(material => new AutomaticWindowProductLine(material.Name, material.Quantity))
+                    .Select(material => new AutomaticWindowProductLine(material.Name, material.Quantity, material.UnitOfMeasure))
                     .ToArray(),
                 Labors = _quote.Labors
                     .Select(labor => new AutomaticWindowLaborLine(
                         labor.PersistentId,
                         labor.Name,
-                        labor.Quantity))
+                        labor.Quantity, labor.UnitOfMeasure))
                     .ToArray(),
                 ExistingQuoteMaterials = _quote.Materials
                     .Select(material => new AutomaticQuoteMaterialLine(
                         material.PersistentId,
                         material.Name,
-                        material.Quantity))
+                        material.Quantity, material.UnitOfMeasure))
                     .ToArray(),
                 Rules = settings.WindowMaterialRules
                     .Select((rule, index) => new AutomaticWindowMaterialRule
@@ -384,7 +399,7 @@ public partial class RealProfitWindow : Window
                 MaterialCatalog = _availableCompanyMaterials
                     .Select(material => new AutomaticMaterialCatalogItem(
                         material.PersistentId,
-                        material.Name))
+                        material.Name, material.UnitOfMeasure))
                     .ToArray()
             });
 
@@ -395,7 +410,7 @@ public partial class RealProfitWindow : Window
         var notices = new List<string>();
         var localWarnings = new List<string>();
         AutomaticWindowMaterialPlanLine[] quantitiesTooLarge = calculation.Materials
-            .Where(material => material.QuantityToAdd > int.MaxValue)
+            .Where(material => material.QuantityToAdd > 0 && !QuantityValue.IsValid(material.QuantityToAdd))
             .ToArray();
         bool canApplyAllAutomaticMaterials = quantitiesTooLarge.Length == 0;
         if (!canApplyAllAutomaticMaterials)
@@ -414,7 +429,8 @@ public partial class RealProfitWindow : Window
                 _companyMaterials.Add(new CompanyMaterialCost
                 {
                     Name = catalogMaterial?.Name ?? materialPlan.MaterialName,
-                    Quantity = (int)materialPlan.QuantityToAdd,
+                    Quantity = materialPlan.QuantityToAdd,
+                    UnitOfMeasure = catalogMaterial?.UnitOfMeasure ?? "pz",
                     UnitCost = Math.Max(0, catalogMaterial?.UnitPrice ?? 0),
                     Source = "Automatico"
                 });
@@ -586,6 +602,7 @@ public partial class RealProfitWindow : Window
             {
                 Name = material.Name,
                 Quantity = 1,
+                UnitOfMeasure = material.UnitOfMeasure,
                 UnitCost = material.UnitPrice
             };
             _companyMaterials.Add(item);

@@ -48,6 +48,8 @@ public partial class SettingsWindow : Window
         TxtNoCompanyMaterials.Visibility = CompanyMaterialCatalog.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
+        CmbDefaultVat.ItemsSource = new[] { "22%", "10%", "RC 10%+22%", "esclusa" };
+        BtnCompanyProfile.IsEnabled = App.DataService != null;
         LoadSettings();
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
@@ -62,6 +64,9 @@ public partial class SettingsWindow : Window
                 LastName = employee.LastName
             });
         UpdateEmployeesEmptyState();
+        CmbDefaultVat.SelectedItem = App.AppSettings.App.GetEffectiveDefaultVatType();
+        ChkWindowAutomations.IsChecked = App.AppSettings.Business.EnableWindowAutomations;
+        ChkInstallationCertificate.IsChecked = App.AppSettings.Business.EnableInstallationCertificate;
         var app = App.AppSettings.App;
         var realProfit = App.AppSettings.RealProfit;
         var pdf = App.AppSettings.PdfStorage;
@@ -362,6 +367,9 @@ public partial class SettingsWindow : Window
                 _ = database.BuildConnectionString();
             if (mail.Enabled)
                 mail.ValidateForSend();
+            app.DefaultVatType = CmbDefaultVat.SelectedItem?.ToString() ?? "22%";
+            App.AppSettings.Business.EnableWindowAutomations = ChkWindowAutomations.IsChecked == true;
+            App.AppSettings.Business.EnableInstallationCertificate = ChkInstallationCertificate.IsChecked == true;
             app.GeneratePDF = ChkGeneratePdf.IsChecked == true;
             app.RestoreMissingPdfsOnStartup = ChkRestoreMissingPdfsOnStartup.IsChecked == true;
             app.DatabaseCostSavingMode = ChkDatabaseCostSavingMode.IsChecked == true;
@@ -772,8 +780,26 @@ public partial class SettingsWindow : Window
         return null;
     }
 
+    public void SelectDatabaseTab() => TabDatabaseSettings.IsSelected = true;
+
+    private async void OnCompanyProfileClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var company = await App.DataService.GetCompanyAsync() ?? new Company();
+            new CompanyProfileWindow(company) { Owner = this }.ShowDialog();
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Dati aziendali", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
     private void RefreshAutomaticUpdateStatus()
     {
+        if (CompanyInstallationService.IsGenericInstallation)
+        {
+            ChkAutomaticUpdates.IsEnabled = false;
+            TxtAutomaticUpdatesStatus.Text = "Aggiornamenti tramite pacchetto della propria azienda.";
+            return;
+        }
         _updatingAutomaticUpdatesControl = true;
         try
         {

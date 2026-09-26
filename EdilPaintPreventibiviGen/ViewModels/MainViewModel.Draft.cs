@@ -691,6 +691,7 @@ public partial class MainViewModel
                !string.IsNullOrWhiteSpace(InputDescription) ||
                InputValue != 0 ||
                InputQuantity != 1 ||
+               InputUnitOfMeasure != "pz" ||
                MaterialDiscount != 0 ||
                LaborDiscount != 0 ||
                IsJointVenture;
@@ -705,6 +706,7 @@ public partial class MainViewModel
             Description = item.Description,
             UnitPrice = item.UnitPrice,
             Quantity = item.Quantity,
+            UnitOfMeasure = item.UnitOfMeasure,
             Discount = item.Discount,
             IsSignificant = item.IsSignificant,
             SortOrder = item.SortOrder

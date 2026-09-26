@@ -82,4 +82,5 @@
 		<MauiAsset Include="..\EdilPaintPreventibiviGen\Assets\Edilpaint.png" LogicalName="edilpaint.png" />
 	</ItemGroup>
 
+<ItemGroup><Compile Include="../EdilPaintPreventibiviGen/Models/QuantityValue.cs" Link="Shared/QuantityValue.cs" /></ItemGroup>
 </Project>

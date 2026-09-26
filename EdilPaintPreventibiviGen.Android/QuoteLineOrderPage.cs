@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using System.Collections.ObjectModel;
 using EdilPaintPreventibiviGen.Android.Controls;
 using EdilPaintPreventibiviGen.Android.Models;
@@ -24,7 +25,7 @@ public sealed class QuoteLineOrderPage : OperationPage
             foreach (var item in items)
             {
                 var row = new Grid { ColumnDefinitions = { new(GridLength.Star), new(48), new(48) }, ColumnSpacing = 6 };
-                row.Add(new Label { Text = $"N.{item.Quantity} {item.Name}", VerticalOptions = LayoutOptions.Center });
+                row.Add(new Label { Text = $"{QuantityValue.OrderDisplay(item.Quantity, item.UnitOfMeasure)} {item.Name}", VerticalOptions = LayoutOptions.Center });
                 var up = Action("\u2191", () => { Move(-1); return Task.CompletedTask; }, true);
                 var down = Action("\u2193", () => { Move(1); return Task.CompletedTask; }, true);
                 SemanticProperties.SetDescription(up, "Sposta su " + item.Name);

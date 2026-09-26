@@ -23,12 +23,12 @@ internal static class QuoteSyncHashService
         var materialsHash = string.Join("|", entry.Materials
             .OrderBy(m => m.SortOrder)
             .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(m => $"{(includeCatalogIdentity ? $"{m.PersistentId}:" : string.Empty)}{m.SortOrder}:{m.Name}:{m.Description}:{Number(m.UnitPrice)}:{m.Quantity}:{Number(m.Discount)}:{m.IsSignificant}"));
+            .Select(m => $"{(includeCatalogIdentity ? $"{m.PersistentId}:" : string.Empty)}{m.SortOrder}:{m.Name}:{m.Description}:{Number(m.UnitPrice)}:{m.Quantity.ToString(QuantityValue.NumberFormat, CultureInfo.InvariantCulture)}{(m.UnitOfMeasure == "pz" ? "" : ":u=" + m.UnitOfMeasure)}:{Number(m.Discount)}:{m.IsSignificant}"));
 
         var laborsHash = string.Join("|", entry.Labors
             .OrderBy(l => l.SortOrder)
             .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(l => $"{(includeCatalogIdentity ? $"{l.PersistentId}:" : string.Empty)}{l.SortOrder}:{l.Name}:{l.Description}:{Number(l.UnitPrice)}:{l.Quantity}:{Number(l.Discount)}:{l.IsSignificant}"));
+            .Select(l => $"{(includeCatalogIdentity ? $"{l.PersistentId}:" : string.Empty)}{l.SortOrder}:{l.Name}:{l.Description}:{Number(l.UnitPrice)}:{l.Quantity.ToString(QuantityValue.NumberFormat, CultureInfo.InvariantCulture)}{(l.UnitOfMeasure == "pz" ? "" : ":u=" + l.UnitOfMeasure)}:{Number(l.Discount)}:{l.IsSignificant}"));
 
         var costsHash =
             string.Join("|", entry.OurCosts.Select(c => $"{c.Description}:{Number(c.Amount)}:{c.Notes}")) + "|" +

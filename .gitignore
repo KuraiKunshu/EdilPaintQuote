@@ -122,3 +122,6 @@ mono_crash.mem.*
 tools/updater/updater-settings.json
 .idea/
 *.sln.DotSettings.user
+
+# Local company distribution checks
+output/company-package*/

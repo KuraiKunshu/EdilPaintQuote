@@ -9,9 +9,7 @@ public static class VeluxSessionStorage
 
     public static string GetStoragePath()
     {
-        string folder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "EdilPaintPreventivi");
+        string folder = CompanyInstallationService.RootDirectory;
 
         Directory.CreateDirectory(folder);
         return Path.Combine(folder, "velux_storage.json");

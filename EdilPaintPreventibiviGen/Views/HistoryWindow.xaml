@@ -982,7 +982,7 @@
                                         <Button Content="Invia"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnSendQuoteClick"/>
-                                        <Button Content="Certificato posa"
+                                        <Button Content="Certificato posa" Visibility="{Binding CertificateVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnGenerateInstallationCertificateClick"/>
                                         <Button Content="Scheda lavoro"

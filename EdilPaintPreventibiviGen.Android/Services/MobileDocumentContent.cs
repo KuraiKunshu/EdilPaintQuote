@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using System.Globalization;
 using EdilPaintPreventibiviGen.Android.Models;
 
@@ -46,7 +47,7 @@ public static class MobileDocumentContent
         output.Add(new(title.ToUpperInvariant(), true));
         foreach (var line in lines.OrderBy(line => line.SortOrder))
         {
-            output.Add(new($"N.{line.Quantity}  {line.Name}", true));
+            output.Add(new($"{QuantityValue.OrderDisplay(line.Quantity, line.UnitOfMeasure)}  {line.Name}", true));
             if (!string.IsNullOrWhiteSpace(line.Description)) output.Add(new(line.Description));
             output.Add(new($"Prezzo unit. {Money(line.UnitPrice)}   Sconto {line.Discount:0.##}%   Totale {Money(line.Total)}"));
         }
@@ -64,7 +65,7 @@ public static class MobileDocumentContent
             new("COSTI AZIENDALI", true)
         };
         foreach (var cost in input.CompanyMaterials)
-            lines.Add(new($"N.{cost.Quantity} {cost.Name} - {Money(cost.UnitCost)} / cad. - {Money(cost.Total)}"));
+            lines.Add(new($"{QuantityValue.OrderDisplay(cost.Quantity, cost.UnitOfMeasure)} {cost.Name} - {Money(cost.UnitCost)} / {cost.UnitOfMeasure} - {Money(cost.Total)}"));
         lines.AddRange(new[]
         {
             new DocumentLine($"Costo fornitore: {Money(result.SupplierMaterialCost)}"),
@@ -102,7 +103,7 @@ public static class MobileDocumentContent
         };
         foreach (var material in quote.Materials.OrderBy(x => x.SortOrder))
         {
-            lines.Add(new($"N.{material.Quantity} {material.Name}", true));
+            lines.Add(new($"{QuantityValue.OrderDisplay(material.Quantity, material.UnitOfMeasure)} {material.Name}", true));
             if (!string.IsNullOrWhiteSpace(material.Description)) lines.Add(new(material.Description));
         }
         lines.Add(new("Timbro e firma dell'impresa: __________________________"));

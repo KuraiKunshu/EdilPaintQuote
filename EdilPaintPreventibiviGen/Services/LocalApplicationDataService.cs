@@ -7,10 +7,7 @@ public static class LocalApplicationDataService
 {
     public static string GetDataDirectoryPath()
     {
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "EdilPaintPreventivi",
-            "Data");
+        return Path.Combine(CompanyInstallationService.RootDirectory, "Data");
     }
 
     private static readonly string[] LegacyDataFiles =
@@ -23,11 +20,16 @@ public static class LocalApplicationDataService
         "materiali_personali.json"
     ];
 
-    public static string EnsureDataDirectory(string legacyAssetsPath)
-    {
-        string dataPath = GetDataDirectoryPath();
+    public static string EnsureDataDirectory(string legacyAssetsPath, bool importLegacyData = true)
+        => InitializeDataDirectory(legacyAssetsPath, GetDataDirectoryPath(),
+            importLegacyData && !CompanyInstallationService.IsGenericInstallation);
 
+    internal static string InitializeDataDirectory(string legacyAssetsPath, string dataPath, bool importLegacyData)
+    {
         Directory.CreateDirectory(dataPath);
+
+        if (!importLegacyData)
+            return dataPath;
 
         foreach (string fileName in LegacyDataFiles)
         {

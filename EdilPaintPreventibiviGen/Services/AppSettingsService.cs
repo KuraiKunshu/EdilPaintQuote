@@ -18,6 +18,7 @@ public sealed class AppSettingsService
 	public PdfTemplateSettingsModel PdfTemplate { get; }
 	public DatabaseSettingsModel Database { get; }
 	public MailSettingsModel Mail { get; }
+	public BusinessSettingsModel Business { get; }
 	public List<EmployeeSettingsModel> Employees { get; set; } = [];
 	public string SettingsPath { get; }
 
@@ -32,6 +33,7 @@ public sealed class AppSettingsService
 		PdfTemplate.Normalize();
 		Database = LoadDatabaseSettings(configuration);
 		Mail = LoadMailSettings(configuration);
+		Business = configuration.GetSection("Business").Get<BusinessSettingsModel>() ?? new();
 		Employees = configuration.GetSection("Employees").Get<List<EmployeeSettingsModel>>() ?? [];
 	}
 
@@ -55,6 +57,7 @@ public sealed class AppSettingsService
 			["Password"] = SecretProtectionService.Protect(Database.Password)
 		};
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
+		root["Business"] = JsonSerializer.SerializeToNode(Business, jsonOptions);
 		root["Employees"] = JsonSerializer.SerializeToNode(employees, jsonOptions);
 		root["RealProfit"] = JsonSerializer.SerializeToNode(RealProfit, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
@@ -258,6 +261,9 @@ public sealed class AppSettingsService
 
 public sealed class AppSettingsServiceModel
 {
+	public bool ImportLegacyData { get; set; } = true;
+	public string DefaultVatType { get; set; } = "RC 10%+22%";
+    public string GetEffectiveDefaultVatType() => DefaultVatType is "22%" or "10%" or "RC 10%+22%" or "esclusa" ? DefaultVatType : "22%";
 	public bool FirstStartup { get; set; } = true;
 	public bool GeneratePDF { get; set; } = true;
 	public bool RestoreMissingPdfsOnStartup { get; set; }
@@ -314,7 +320,9 @@ public sealed class AppSettingsServiceModel
 			}
 		}
 
-		string fallback = Path.Combine(Path.GetTempPath(), "EdilPaintPreventivi");
+		string fallback = CompanyInstallationService.IsGenericInstallation
+			? Path.Combine(CompanyInstallationService.RootDirectory, "Temp")
+			: Path.Combine(Path.GetTempPath(), "EdilPaintPreventivi");
 		Directory.CreateDirectory(fallback);
 		return fallback;
 	}

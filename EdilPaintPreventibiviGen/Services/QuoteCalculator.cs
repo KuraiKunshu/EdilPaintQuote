@@ -72,6 +72,16 @@ public sealed class QuoteCalculator
             break;
     }
 
+    // Calculate the payable amount from the same cents shown in the summary.
+    // Fractional quantities can produce half cents: never sum unrounded VAT.
+    imponibile10 = Math.Round(imponibile10, 2, MidpointRounding.AwayFromZero);
+    imponibile22 = Math.Round(imponibile22, 2, MidpointRounding.AwayFromZero);
+    if (NormalizeIvaType(ivaType) != "esclusa")
+    {
+        iva10 = Math.Round(imponibile10 * 0.10, 2, MidpointRounding.AwayFromZero);
+        iva22 = Math.Round(imponibile22 * 0.22, 2, MidpointRounding.AwayFromZero);
+    }
+
     return new QuoteTotals
     {
         Imponibile10 = imponibile10,

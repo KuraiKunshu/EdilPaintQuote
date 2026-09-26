@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json;
 using EdilPaintPreventibiviGen.Data;
 using EdilPaintPreventibiviGen.Data.Entities;
@@ -135,6 +135,7 @@ public partial class SqlDataService
                         Description = m.Description,
                         UnitPrice = m.UnitPrice,
                         Quantity = m.Quantity,
+                        UnitOfMeasure = m.UnitOfMeasure,
                         Discount = m.Discount,
                         IsSignificant = m.IsSignificant,
                         SortOrder = m.SortOrder
@@ -149,6 +150,7 @@ public partial class SqlDataService
                         Description = l.Description,
                         UnitPrice = l.UnitPrice,
                         Quantity = l.Quantity,
+                        UnitOfMeasure = l.UnitOfMeasure,
                         Discount = l.Discount,
                         IsSignificant = l.IsSignificant,
                         SortOrder = l.SortOrder
@@ -339,6 +341,7 @@ public partial class SqlDataService
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
                 Quantity = m.Quantity,
+                UnitOfMeasure = m.UnitOfMeasure,
                 Discount = m.Discount,
                 IsSignificant = m.IsSignificant,
                 SortOrder = m.SortOrder
@@ -350,6 +353,7 @@ public partial class SqlDataService
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,
                 Quantity = l.Quantity,
+                UnitOfMeasure = l.UnitOfMeasure,
                 Discount = l.Discount,
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
@@ -441,6 +445,7 @@ public partial class SqlDataService
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
                 Quantity = m.Quantity,
+                UnitOfMeasure = m.UnitOfMeasure,
                 Discount = m.Discount,
                 IsSignificant = m.IsSignificant,
                 SortOrder = m.SortOrder
@@ -452,6 +457,7 @@ public partial class SqlDataService
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,
                 Quantity = l.Quantity,
+                UnitOfMeasure = l.UnitOfMeasure,
                 Discount = l.Discount,
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
@@ -527,6 +533,7 @@ public partial class SqlDataService
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
                 Quantity = m.Quantity,
+                UnitOfMeasure = m.UnitOfMeasure,
                 Discount = m.Discount,
                 IsSignificant = m.IsSignificant,
                 SortOrder = m.SortOrder
@@ -538,6 +545,7 @@ public partial class SqlDataService
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,
                 Quantity = l.Quantity,
+                UnitOfMeasure = l.UnitOfMeasure,
                 Discount = l.Discount,
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
@@ -938,14 +946,16 @@ public partial class SqlDataService
             {
                 PersistentId = m.CatalogItemId,
                 Name = m.Name, Description = m.Description, UnitPrice = m.UnitPrice,
-                Quantity = m.Quantity, Discount = m.Discount, IsSignificant = m.IsSignificant,
+                Quantity = m.Quantity,
+                UnitOfMeasure = m.UnitOfMeasure, Discount = m.Discount, IsSignificant = m.IsSignificant,
                 SortOrder = m.SortOrder
             }).ToList(),
             Labors = q.Labors.OrderBy(l => l.SortOrder).Select(l => new Item
             {
                 PersistentId = l.CatalogItemId,
                 Name = l.Name, Description = l.Description, UnitPrice = l.UnitPrice,
-                Quantity = l.Quantity, Discount = l.Discount, IsSignificant = l.IsSignificant,
+                Quantity = l.Quantity,
+                UnitOfMeasure = l.UnitOfMeasure, Discount = l.Discount, IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder
             }).ToList(),
             PdfFile = null,
@@ -1345,6 +1355,7 @@ public partial class SqlDataService
                         Description = m.Description,
                         UnitPrice = m.UnitPrice,
                         Quantity = m.Quantity,
+                        UnitOfMeasure = m.UnitOfMeasure,
                         Discount = m.Discount,
                         IsSignificant = m.IsSignificant,
                         SortOrder = m.SortOrder
@@ -1357,6 +1368,7 @@ public partial class SqlDataService
                         Description = l.Description,
                         UnitPrice = l.UnitPrice,
                         Quantity = l.Quantity,
+                        UnitOfMeasure = l.UnitOfMeasure,
                         Discount = l.Discount,
                         IsSignificant = l.IsSignificant,
                         SortOrder = l.SortOrder
@@ -1430,6 +1442,7 @@ public partial class SqlDataService
                             Description = m.Description,
                             UnitPrice = m.UnitPrice,
                             Quantity = m.Quantity,
+                            UnitOfMeasure = m.UnitOfMeasure,
                             Discount = m.Discount,
                             IsSignificant = m.IsSignificant,
                             SortOrder = m.SortOrder
@@ -1441,6 +1454,7 @@ public partial class SqlDataService
                             Description = l.Description,
                             UnitPrice = l.UnitPrice,
                             Quantity = l.Quantity,
+                            UnitOfMeasure = l.UnitOfMeasure,
                             Discount = l.Discount,
                             IsSignificant = l.IsSignificant,
                             SortOrder = l.SortOrder

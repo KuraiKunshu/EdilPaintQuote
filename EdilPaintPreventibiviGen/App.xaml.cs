@@ -46,7 +46,17 @@ public partial class App : Application
 
             AppSettings = new AppSettingsService(configuration);
             Helpers.WindowZoomBehavior.Initialize(AppSettings.App.GetEffectiveMainWindowScale());
-            IsSilentStartup = AppSettings.App.IsSilentStartup;
+            IsSilentStartup = !CompanyInstallationService.IsGenericInstallation && AppSettings.App.IsSilentStartup;
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (CompanyInstallationService.IsGenericInstallation)
+            {
+                while (!AppSettings.Database.IsConfigured)
+                {
+                    var setup = new Views.SettingsWindow { Title = "Prima configurazione — database aziendale" };
+                    setup.SelectDatabaseTab();
+                    if (setup.ShowDialog() != true) { Shutdown(); return; }
+                }
+            }
 
             StoragePathService.Initialize(AppSettings);
 
@@ -61,7 +71,7 @@ public partial class App : Application
                 Path.Combine(baseDir, "..", "..", "..", "assets")
             ];
             string assetsPath = candidates.FirstOrDefault(Directory.Exists) ?? candidates[0];
-            string localDataPath = LocalApplicationDataService.EnsureDataDirectory(assetsPath);
+            string localDataPath = LocalApplicationDataService.EnsureDataDirectory(assetsPath, importLegacyData: AppSettings.App.ImportLegacyData);
             var localStore = new LocalJsonStoreService(localDataPath);
             var quotePatchOutbox = new LocalQuotePatchOutboxService(localDataPath);
             var deletionOutbox = new LocalDeletionOutboxService(localDataPath);
@@ -94,7 +104,7 @@ public partial class App : Application
                         loadingWindow,
                         "2/5 - Database non raggiungibile: avvio offline...");
                 }
-                else if (AppSettings.App.FirstStartup)
+                else if (AppSettings.App.FirstStartup && AppSettings.App.ImportLegacyData && !CompanyInstallationService.IsGenericInstallation)
                 {
                     await SetLoadingStatusAsync(loadingWindow, "2/5 - Import dati legacy...");
                     var importer = new JsonImportService(sqlService);
@@ -118,6 +128,24 @@ public partial class App : Application
                 }
 
                 await SetLoadingStatusAsync(loadingWindow, "4/5 - Caricamento dati applicazione...");
+                if (CompanyInstallationService.IsGenericInstallation)
+                {
+                    var company = await DataService.GetCompanyAsync();
+                    if (company == null || string.IsNullOrWhiteSpace(company.Nome))
+                    {
+                        if (IsOfflineMode)
+                        {
+                            MessageBox.Show("Per configurare la nuova azienda serve una connessione al suo database. Verifica la connessione e riavvia.", "Prima configurazione");
+                            var setup = new Views.SettingsWindow();
+                            setup.SelectDatabaseTab();
+                            setup.ShowDialog();
+                            Shutdown();
+                            return;
+                        }
+                        var profile = new Views.CompanyProfileWindow(company ?? new Models.Company());
+                        if (profile.ShowDialog() != true) { Shutdown(); return; }
+                    }
+                }
                 MainVm = new MainViewModel();
                 await MainVm.InitializeAsync();
 
@@ -126,8 +154,9 @@ public partial class App : Application
 
                 var mainWindow = new MainWindow(MainVm);
                 if (IsOfflineMode)
-                    mainWindow.Title = "Gestione Preventivi - EdilPaint (OFFLINE)";
+                    mainWindow.Title = "Gestione Preventivi (OFFLINE)";
                 MainWindow = mainWindow;
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
                 mainWindow.Show();
 
                 StartPeriodicSyncIfEnabled();
@@ -247,7 +276,7 @@ public partial class App : Application
             if (Current.MainWindow is Window mainWindow)
             {
                 _ = mainWindow.Dispatcher.InvokeAsync(() =>
-                    mainWindow.Title = "Gestione Preventivi - EdilPaint");
+                    mainWindow.Title = "Gestione Preventivi");
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -295,7 +295,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CommitPendingGridEdits()
+    private bool CommitPendingGridEdits()
     {
         try
         {
@@ -303,15 +303,20 @@ public partial class MainWindow : Window
 
             foreach (var grid in GetEditableDataGrids())
             {
-                grid.CommitEdit(DataGridEditingUnit.Cell, true);
-                grid.CommitEdit(DataGridEditingUnit.Row, true);
+                if (!grid.CommitEdit(DataGridEditingUnit.Cell, true) || !grid.CommitEdit(DataGridEditingUnit.Row, true))
+                {
+                    MessageBox.Show(this, "Correggi i valori evidenziati nella tabella prima di continuare.", "Dati non validi");
+                    return false;
+                }
             }
 
             (DataContext as MainViewModel)?.CalculateTotals();
+            return true;
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[CommitPendingGridEdits] Commit modifiche griglia non riuscito: {ex.Message}");
+            return false;
         }
     }
 
@@ -533,13 +538,13 @@ public partial class MainWindow : Window
     }
     private void OnGeneratePdfClick(object sender, RoutedEventArgs e)
     {
-        CommitPendingGridEdits();
+        if (!CommitPendingGridEdits()) return;
         (DataContext as MainViewModel)?.GeneratePdf();
     }
 
     private void OnGenerateCostsPdfClick(object sender, RoutedEventArgs e)
     {
-        CommitPendingGridEdits();
+        if (!CommitPendingGridEdits()) return;
         (DataContext as MainViewModel)?.GenerateCostsPdf();
     }
     private void OnOpenHistoryClick(object sender, RoutedEventArgs e)
@@ -590,8 +595,9 @@ public partial class MainWindow : Window
             win.ShowDialog();
         }
     }
-    private void OnOpenSettingsClick(object sender, RoutedEventArgs e)
+    private async void OnOpenSettingsClick(object sender, RoutedEventArgs e)
     {
+        string previousDatabase = App.AppSettings.Database.GetCatalogIdentity();
         var win = DataContext is MainViewModel vm
             ? new SettingsWindow(
                 vm.AllCatalogLabors,
@@ -599,6 +605,12 @@ public partial class MainWindow : Window
             : new SettingsWindow();
         win.Owner = this;
         win.ShowDialog();
+        if (DataContext is MainViewModel currentVm && string.Equals(previousDatabase,
+                App.AppSettings.Database.GetCatalogIdentity(), StringComparison.OrdinalIgnoreCase))
+        {
+            try { await currentVm.RefreshCompanyProfileAsync(); }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Aggiornamento dati aziendali"); }
+        }
     }
     private void OnOpenDashboardClick(object sender, RoutedEventArgs e)
     {
@@ -684,8 +696,7 @@ public partial class MainWindow : Window
     private void OnOpenReferenceFolderClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.OpenReferenceFolder();
     private async void OnAddMaterialClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainViewModel vm)
-            return;
+        if (DataContext is not MainViewModel vm || !ValidateInputQuantity()) return;
 
         Button? button = sender as Button;
         if (button != null)
@@ -700,7 +711,21 @@ public partial class MainWindow : Window
                 button.IsEnabled = true;
         }
     }
-    private void OnAddLaborClick(object sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.AddLabor();
+    private bool ValidateInputQuantity()
+    {
+        if (!QuantityValue.TryParse(TxtInputQuantity.Text, out decimal quantity))
+        {
+            MessageBox.Show(this, "Inserisci una quantità positiva, con al massimo 9 decimali (es. 2,5).", "Quantità non valida");
+            TxtInputQuantity.Focus();
+            return false;
+        }
+        if (DataContext is MainViewModel vm) vm.InputQuantity = quantity;
+        return true;
+    }
+    private void OnAddLaborClick(object sender, RoutedEventArgs e)
+    {
+        if (ValidateInputQuantity()) (DataContext as MainViewModel)?.AddLabor();
+    }
     private void OnComboDropDownOpened(object sender, EventArgs e)
     {
         if (sender is ComboBox cb)

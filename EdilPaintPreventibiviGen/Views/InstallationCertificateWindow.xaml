@@ -141,7 +141,7 @@
                                                        Foreground="{StaticResource DefaultTextBrush}"
                                                        VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="1" Margin="12,0,0,0"
-                                                       Text="{Binding Material.Quantity, StringFormat='Q.tà: {0}'}"
+                                                       Text="{Binding Material.QuantityDisplay, StringFormat='Q.tà: {0}'}"
                                                        Foreground="{StaticResource MutedTextBrush}"
                                                        VerticalAlignment="Center"/>
                                         </Grid>

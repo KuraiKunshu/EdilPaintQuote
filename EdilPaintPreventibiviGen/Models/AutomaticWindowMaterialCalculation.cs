@@ -8,21 +8,21 @@ public static class AutomaticWindowMaterialModes
 
 public sealed record AutomaticWindowProductLine(
     string Name,
-    int Quantity);
+    decimal Quantity, string UnitOfMeasure = "pz");
 
 public sealed record AutomaticWindowLaborLine(
     int CatalogItemId,
     string Name,
-    int Quantity = 1);
+    decimal Quantity = 1, string UnitOfMeasure = "pz");
 
 public sealed record AutomaticQuoteMaterialLine(
     int CatalogItemId,
     string Name,
-    int Quantity);
+    decimal Quantity, string UnitOfMeasure = "pz");
 
 public sealed record AutomaticMaterialCatalogItem(
     int CatalogItemId,
-    string Name);
+    string Name, string UnitOfMeasure = "pz");
 
 public sealed class AutomaticWindowMaterialRule
 {
@@ -154,7 +154,7 @@ public sealed record AutomaticWindowMaterialRuleCalculation(
     int LaborCatalogItemId,
     string LaborName,
     bool IsWindowAutomation,
-    long LaborQuantity,
+    decimal LaborQuantity,
     AutomaticMaterialKey MaterialKey,
     int MaterialCatalogItemId,
     string MaterialName,
@@ -170,8 +170,8 @@ public sealed record AutomaticWindowMaterialPlanLine(
     string MaterialName,
     AutomaticMaterialResolutionStatus MaterialResolution,
     long GrossRequiredQuantity,
-    long AlreadyQuotedQuantity,
-    long QuantityToAdd,
+    decimal AlreadyQuotedQuantity,
+    decimal QuantityToAdd,
     IReadOnlyList<string> ContributingRuleIds,
     IReadOnlyList<AutomaticWindowRuleSizeCalculation> Details);
 

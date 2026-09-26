@@ -9,7 +9,7 @@ public class Item : INotifyPropertyChanged
     private string _name = string.Empty;
     private string _description = string.Empty;
     private double _unitPrice;
-    private int _quantity = 1;
+    private decimal _quantity = 1;
     private double _discount;
     private bool _isSignificant;
     private bool _isCompanyMaterial;
@@ -19,14 +19,18 @@ public class Item : INotifyPropertyChanged
     public string Name { get => _name; set { _name = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalPrice)); } }
     public string Description { get => _description; set { _description = value; OnPropertyChanged(); } }
     public double UnitPrice { get => _unitPrice; set { _unitPrice = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalPrice)); } }
-    public int Quantity { get => _quantity; set { _quantity = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalPrice)); } }
+    public decimal Quantity { get => _quantity; set { _quantity = value; OnPropertyChanged(); OnPropertyChanged(nameof(QuantityDisplay)); OnPropertyChanged(nameof(TotalPrice)); } }
+    private string _unitOfMeasure = "pz";
+    public string UnitOfMeasure { get => _unitOfMeasure; set { _unitOfMeasure = QuantityValue.NormalizeUnit(value); OnPropertyChanged(); OnPropertyChanged(nameof(QuantityDisplay)); } }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string QuantityDisplay => QuantityValue.Display(Quantity, UnitOfMeasure);
     public double Discount { get => _discount; set { _discount = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalPrice)); } }
     public bool IsSignificant { get => _isSignificant; set { _isSignificant = value; OnPropertyChanged(); } }
     public bool IsCompanyMaterial { get => _isCompanyMaterial; set { _isCompanyMaterial = value; OnPropertyChanged(); } }
     public bool ExcludeFromWorkSheet { get => _excludeFromWorkSheet; set { _excludeFromWorkSheet = value; OnPropertyChanged(); } }
     public int SortOrder { get => _sortOrder; set { _sortOrder = value; OnPropertyChanged(); } }
 
-    public double TotalPrice => (UnitPrice * Quantity) * (1 - Math.Clamp(Discount, 0, 100) / 100);
+    public double TotalPrice => (UnitPrice * (double)Quantity) * (1 - Math.Clamp(Discount, 0, 100) / 100);
     
     
     

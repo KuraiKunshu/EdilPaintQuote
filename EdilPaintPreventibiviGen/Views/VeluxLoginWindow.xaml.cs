@@ -14,6 +14,25 @@ public partial class VeluxLoginWindow : Window
     public VeluxLoginWindow()
     {
         InitializeComponent();
+        Loaded += OnBrowserLoaded;
+    }
+
+    private async void OnBrowserLoaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // Preserve the existing browser profile for legacy installations.
+            string? userDataFolder = CompanyInstallationService.IsGenericInstallation
+                ? Path.Combine(CompanyInstallationService.RootDirectory, "Browser") : null;
+            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
+            if (!IsVisible) return;
+            await WebView.EnsureCoreWebView2Async(environment);
+            if (IsVisible) WebView.Source = new Uri("https://app.velux.it/cas/login");
+        }
+        catch (Exception ex)
+        {
+            if (IsVisible) MessageBox.Show(this, ex.Message, "Accesso Velux", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     protected override void OnClosed(EventArgs e)
