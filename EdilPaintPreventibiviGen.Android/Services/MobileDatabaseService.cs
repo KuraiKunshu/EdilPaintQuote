@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using System.Data;
 using System.Text.Json;
 using EdilPaintPreventibiviGen.Android.Models;
@@ -372,13 +373,13 @@ public sealed partial class MobileDatabaseService
 
         command.CommandText = kind == QuoteLineKind.Material
             ? $"""
-                select "Id", "Name", "Description", "UnitPrice", "IsSignificant", "IsCompanyMaterial"
+                select "Id", "Name", "Description", "UnitPrice", "IsSignificant", "IsCompanyMaterial", "UnitOfMeasure"
                 from "PersonalMaterials" {searchClause}
                 order by "Name"
                 ;
                 """
             : $"""
-                select "Id", "Name", "Description", "UnitPrice", false, false
+                select "Id", "Name", "Description", "UnitPrice", false, false, "UnitOfMeasure"
                 from "LaborCatalog" {searchClause}
                 order by "Name"
                 ;
@@ -395,7 +396,8 @@ public sealed partial class MobileDatabaseService
                 Description = reader.GetString(2),
                 UnitPrice = reader.GetDouble(3),
                 IsSignificant = reader.GetBoolean(4),
-                IsCompanyMaterial = reader.GetBoolean(5)
+                IsCompanyMaterial = reader.GetBoolean(5),
+                UnitOfMeasure = reader.GetString(6)
             });
         }
 
@@ -706,10 +708,10 @@ public sealed partial class MobileDatabaseService
             insertCommand.CommandText = $"""
                 insert into "{tableName}"
                     ("QuoteId", "CatalogItemId", "Name", "Description", "UnitPrice",
-                     "Quantity", "Discount", "IsSignificant", "SortOrder")
+                     "Quantity", "Discount", "IsSignificant", "SortOrder", "UnitOfMeasure")
                 values
                     (@quoteId, @catalogItemId, @name, @description, @unitPrice,
-                     @quantity, @discount, @isSignificant, @sortOrder);
+                     @quantity, @discount, @isSignificant, @sortOrder, @unit);
                 """;
             insertCommand.Parameters.AddWithValue("quoteId", quoteId);
             insertCommand.Parameters.AddWithValue("catalogItemId", Math.Max(0, line.CatalogItemId));
@@ -717,6 +719,7 @@ public sealed partial class MobileDatabaseService
             insertCommand.Parameters.AddWithValue("description", line.Description);
             insertCommand.Parameters.AddWithValue("unitPrice", line.UnitPrice);
             insertCommand.Parameters.AddWithValue("quantity", line.Quantity);
+            insertCommand.Parameters.AddWithValue("unit", line.UnitOfMeasure);
             insertCommand.Parameters.AddWithValue("discount", line.Discount);
             insertCommand.Parameters.AddWithValue("isSignificant", line.IsSignificant);
             insertCommand.Parameters.AddWithValue("sortOrder", sortOrder++);
@@ -815,7 +818,7 @@ public sealed partial class MobileDatabaseService
         command.Transaction = transaction;
         command.CommandText = $"""
             select "CatalogItemId", "Name", "Description", "UnitPrice", "Quantity",
-                   "Discount", "IsSignificant", "SortOrder"
+                   "Discount", "IsSignificant", "SortOrder", "UnitOfMeasure"
             from "{tableName}"
             where "QuoteId" = @quoteId
             order by "SortOrder", "Id";
@@ -832,7 +835,8 @@ public sealed partial class MobileDatabaseService
                 Name = reader.GetString(1),
                 Description = reader.GetString(2),
                 UnitPrice = reader.GetDouble(3),
-                Quantity = reader.GetInt32(4),
+                Quantity = Convert.ToDecimal(reader.GetValue(4)),
+                UnitOfMeasure = reader.GetString(8),
                 Discount = reader.GetDouble(5),
                 IsSignificant = reader.GetBoolean(6),
                 SortOrder = reader.GetInt32(7)
@@ -876,10 +880,12 @@ public sealed partial class MobileDatabaseService
         {
             line.Name = (line.Name ?? string.Empty).Trim();
             line.Description = (line.Description ?? string.Empty).Trim();
+            line.UnitOfMeasure = QuantityValue.NormalizeUnit(line.UnitOfMeasure);
+            if (line.UnitOfMeasure.Length > 16) throw new InvalidOperationException("Unità di misura: massimo 16 caratteri.");
             line.Discount = Math.Clamp(line.Discount, 0, 100);
             if (string.IsNullOrWhiteSpace(line.Name))
                 throw new InvalidOperationException("Ogni riga deve avere un nome.");
-            if (line.Quantity <= 0)
+            if (!QuantityValue.IsValid(line.Quantity))
                 throw new InvalidOperationException($"La quantità di '{line.Name}' deve essere maggiore di zero.");
             if (!double.IsFinite(line.UnitPrice) || !double.IsFinite(line.Discount) || !double.IsFinite(line.Total) || line.UnitPrice < 0)
                 throw new InvalidOperationException($"Il prezzo di '{line.Name}' non può essere negativo.");

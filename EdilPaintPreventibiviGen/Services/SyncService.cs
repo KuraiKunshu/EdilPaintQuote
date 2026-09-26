@@ -658,6 +658,7 @@ public class SyncService
         item.Description,
         item.UnitPrice,
         item.Quantity,
+        item.UnitOfMeasure,
         item.Discount,
         item.IsSignificant);
 
@@ -666,7 +667,8 @@ public class SyncService
         string Name,
         string Description,
         double UnitPrice,
-        int Quantity,
+        decimal Quantity,
+        string UnitOfMeasure,
         double Discount,
         bool IsSignificant);
 

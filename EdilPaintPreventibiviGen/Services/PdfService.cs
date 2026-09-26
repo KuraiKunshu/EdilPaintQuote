@@ -141,6 +141,7 @@ public partial class PdfService
     {
         QuestPDF.Settings.License = LicenseType.Community;
         NormalizePdfTemplate(ctx);
+        string companyStamp = CompanyBrandingService.ResolveConfiguredStamp();
         var templateStyle = PdfTemplateStyle.Resolve(ctx.PdfTemplateName);
 
         var customer = ctx.AllCustomers.FirstOrDefault(c => c.BusinessName == ctx.CustomerName);
@@ -174,7 +175,7 @@ public partial class PdfService
                         if (!Directory.Exists(assetsPath)) assetsPath = Path.Combine(baseDir, "assets");
                         if (!Directory.Exists(assetsPath)) assetsPath = Path.Combine(baseDir, "..", "..", "..", "Assets");
 
-                        string logoPath = Path.Combine(assetsPath, ctx.SelectedLogo);
+                        string logoPath = CompanyBrandingService.ResolveLogo(company, ctx.SelectedLogo, assetsPath);
                         if (!string.IsNullOrEmpty(ctx.SelectedLogo) && File.Exists(logoPath))
                             col.Item().Height(60).Image(Image.FromFile(logoPath)).FitHeight();
                         else
@@ -278,13 +279,14 @@ public partial class PdfService
                         {
                             table.ColumnsDefinition(columns =>
                             {
-                                columns.RelativeColumn(3); columns.ConstantColumn(40);
+                                columns.RelativeColumn(3);
+                                columns.ConstantColumn(Math.Max(70, ctx.Materials.Max(item => item.QuantityDisplay.Length) * templateStyle.BodyFontSize * 0.6f + 12));
                                 columns.ConstantColumn(80); columns.ConstantColumn(80);
                             });
                             table.Header(header =>
                             {
                                 header.Cell().Element(TableHeaderStyle).Text("Descrizione").SemiBold();
-                                header.Cell().Element(TableHeaderStyle).AlignCenter().Text("Q.ta'").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignCenter().Text("Q.tà / U.M.").SemiBold();
                                 header.Cell().Element(TableHeaderStyle).AlignRight().Text("Prezzo unit.").SemiBold();
                                 header.Cell().Element(TableHeaderStyle).AlignRight().Text("Totale").SemiBold();
 
@@ -306,7 +308,7 @@ public partial class PdfService
                                     if (!string.IsNullOrWhiteSpace(item.Description))
                                         c.Item().Text(item.Description).FontSize(8).FontColor(PdfPalette.GreyDarken1);
                                 });
-                                table.Cell().Element(RowStyle).AlignCenter().Text(item.Quantity.ToString());
+                                table.Cell().Element(RowStyle).AlignCenter().Text(item.QuantityDisplay);
                                 table.Cell().Element(RowStyle).AlignRight().Text(text =>
                                 {
                                     text.Line($"{item.UnitPrice:N2} €");
@@ -334,13 +336,14 @@ public partial class PdfService
                         {
                             table.ColumnsDefinition(columns =>
                             {
-                                columns.RelativeColumn(3); columns.ConstantColumn(40);
+                                columns.RelativeColumn(3);
+                                columns.ConstantColumn(Math.Max(70, ctx.Labors.Max(item => item.QuantityDisplay.Length) * templateStyle.BodyFontSize * 0.6f + 12));
                                 columns.ConstantColumn(80); columns.ConstantColumn(80);
                             });
                             table.Header(header =>
                             {
                                 header.Cell().Element(TableHeaderStyle).Text("Descrizione").SemiBold();
-                                header.Cell().Element(TableHeaderStyle).AlignCenter().Text("Q.ta'").SemiBold();
+                                header.Cell().Element(TableHeaderStyle).AlignCenter().Text("Q.tà / U.M.").SemiBold();
                                 header.Cell().Element(TableHeaderStyle).AlignRight().Text("Prezzo unit.").SemiBold();
                                 header.Cell().Element(TableHeaderStyle).AlignRight().Text("Totale").SemiBold();
 
@@ -362,7 +365,7 @@ public partial class PdfService
                                     if (!string.IsNullOrWhiteSpace(item.Description))
                                         c.Item().Text(item.Description).FontSize(8).FontColor(PdfPalette.GreyDarken1);
                                 });
-                                table.Cell().Element(RowStyle).AlignCenter().Text(item.Quantity.ToString());
+                                table.Cell().Element(RowStyle).AlignCenter().Text(item.QuantityDisplay);
                                 table.Cell().Element(RowStyle).AlignRight().Text(text =>
                                 {
                                     double totalDiscount = item.Discount + ctx.LaborDiscount;
@@ -414,6 +417,11 @@ public partial class PdfService
                                 });
                                 noteCol.Item().PaddingTop(2).Text("Luogo e data")
                                     .FontSize(8).FontColor(PdfPalette.GreyMedium);
+                                if (File.Exists(companyStamp))
+                                {
+                                    noteCol.Item().PaddingTop(12).Text(company.Nome).FontSize(8);
+                                    noteCol.Item().Height(48).Image(companyStamp).FitArea();
+                                }
                             });
 
                             row.ConstantItem(230).BorderLeft(3).BorderColor(templateStyle.AccentColor)
@@ -503,9 +511,7 @@ public partial class PdfService
         var customer = ctx.AllCustomers.FirstOrDefault(c =>
             string.Equals(c.BusinessName, ctx.CustomerName, StringComparison.OrdinalIgnoreCase));
         string assetsPath = ResolveAssetsDirectory();
-        string logoPath = string.IsNullOrWhiteSpace(ctx.SelectedLogo)
-            ? string.Empty
-            : Path.Combine(assetsPath, ctx.SelectedLogo);
+        string logoPath = CompanyBrandingService.ResolveLogo(company, ctx.SelectedLogo, assetsPath);
         string stampPath = ResolveStampPath(assetsPath);
 
         Document.Create(container =>
@@ -659,7 +665,7 @@ public partial class PdfService
                                         .FontSize(8).FontColor(PdfPalette.GreyDarken1);
                             });
                             table.Cell().Element(MaterialRow).AlignCenter().AlignMiddle()
-                                .Text(material.Quantity.ToString());
+                                .Text(material.QuantityDisplay);
                         }
 
                         static IContainer MaterialRow(IContainer container) =>
@@ -712,6 +718,10 @@ public partial class PdfService
 
     private static string ResolveStampPath(string assetsPath)
     {
+        string configured = CompanyBrandingService.ResolveConfiguredStamp();
+        if (!string.IsNullOrWhiteSpace(configured)) return File.Exists(configured) ? configured : string.Empty;
+        if (CompanyInstallationService.IsGenericInstallation || App.AppSettings?.Business.UseLegacyStamp == false)
+            return string.Empty;
         if (!Directory.Exists(assetsPath))
             return string.Empty;
 
@@ -820,7 +830,7 @@ public partial class PdfService
                         });
                     }
 
-                    RenderSection("🏢 Nostri Costi (EdilPaint)", ctx.OurCosts, ourTotal);
+                    RenderSection("🏢 Costi della nostra azienda", ctx.OurCosts, ourTotal);
                     RenderSection($"🤝 Costi Ditta Partner ({(string.IsNullOrWhiteSpace(ctx.PartnerCompanyName) ? "—" : ctx.PartnerCompanyName)})", ctx.PartnerCosts, partnerTotal);
                     RenderSection("➕ Costi Aggiuntivi / Condivisi", ctx.AdditionalCosts, additionalTotal);
 
@@ -911,7 +921,7 @@ public partial class PdfService
                         row.RelativeItem().Column(left =>
                         {
                             left.Item().Text(string.IsNullOrWhiteSpace(ctx.CompanyName)
-                                    ? "Edil Paint Srl"
+                                    ? "Riepilogo aziendale"
                                     : ctx.CompanyName.Trim())
                                 .FontSize(13).Bold().FontColor(red);
                             left.Item().Text("COSTI E GUADAGNO DEL LAVORO")
@@ -998,7 +1008,7 @@ public partial class PdfService
                             table.ColumnsDefinition(columns =>
                             {
                                 columns.RelativeColumn(4);
-                                columns.ConstantColumn(42);
+                                columns.ConstantColumn(65);
                                 columns.ConstantColumn(76);
                                 columns.ConstantColumn(60);
                                 columns.ConstantColumn(84);
@@ -1028,10 +1038,10 @@ public partial class PdfService
                                 foreach (ProfitMaterialCost material in materials)
                                 {
                                     double purchaseCost = Math.Max(0, material.CustomerUnitPrice) *
-                                                          Math.Max(0, material.Quantity) *
+                                                          (double)Math.Max(0, material.Quantity) *
                                                           (1 - Math.Clamp(input.SupplierDiscount, 0, 100) / 100);
                                     table.Cell().Element(Cell).Text(material.Name);
-                                    table.Cell().Element(Cell).AlignRight().Text(Math.Max(0, material.Quantity).ToString(culture));
+                                    table.Cell().Element(Cell).AlignRight().Text(QuantityValue.Display(Math.Max(0, material.Quantity), material.UnitOfMeasure));
                                     table.Cell().Element(Cell).AlignRight().Text(Money(Math.Max(0, material.CustomerUnitPrice)));
                                     table.Cell().Element(Cell).AlignRight().Text(Percentage(Math.Clamp(material.CustomerDiscount, 0, 100)));
                                     table.Cell().Element(Cell).AlignRight().Text(Money(material.CustomerTotal));
@@ -1085,7 +1095,7 @@ public partial class PdfService
                             {
                                 table.Cell().Element(Cell).Text(material.Name);
                                 table.Cell().Element(Cell).Text(material.Source).FontSize(8.5f).FontColor(muted);
-                                table.Cell().Element(Cell).AlignRight().Text(Math.Max(0, material.Quantity).ToString(culture));
+                                table.Cell().Element(Cell).AlignRight().Text(QuantityValue.Display(Math.Max(0, material.Quantity), material.UnitOfMeasure));
                                 table.Cell().Element(Cell).AlignRight().Text(Money(Math.Max(0, material.UnitCost)));
                                 table.Cell().Element(Cell).AlignRight().Text(Money(material.Total));
                             }

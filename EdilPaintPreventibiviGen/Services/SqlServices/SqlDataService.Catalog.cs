@@ -41,6 +41,7 @@ public partial class SqlDataService
             entity.Name = labor.Name.Trim();
             entity.Description = labor.Description?.Trim() ?? string.Empty;
             entity.UnitPrice = labor.UnitPrice;
+            entity.UnitOfMeasure = labor.UnitOfMeasure;
             entity.ExcludeFromWorkSheet = labor.ExcludeFromWorkSheet;
             labor.PersistentId = entity.Id;
         }
@@ -97,6 +98,7 @@ public partial class SqlDataService
             entity.Name = material.Name.Trim();
             entity.Description = material.Description?.Trim() ?? string.Empty;
             entity.UnitPrice = material.UnitPrice;
+            entity.UnitOfMeasure = material.UnitOfMeasure;
             entity.IsSignificant = material.IsSignificant;
             entity.IsCompanyMaterial = material.IsCompanyMaterial;
             material.PersistentId = entity.Id;

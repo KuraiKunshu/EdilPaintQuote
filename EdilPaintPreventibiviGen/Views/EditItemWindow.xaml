@@ -16,7 +16,7 @@
         ResizeMode="CanResize"
         AllowsTransparency="True"
         Background="{StaticResource TransparentBrush}"
-        Icon="pack://application:,,,/Assets/Windowsicon/main.png"
+        Icon="pack://application:,,,/EdilPaintPreventibiviGen;component/Assets/Windowsicon/main.png"
         RenderOptions.BitmapScalingMode="HighQuality">
 
     <shell:WindowChrome.WindowChrome>
@@ -169,7 +169,7 @@
                     <!-- Prezzo + Quantità -->
                     <Grid Grid.Row="4">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="0.7*"/>
                             <ColumnDefinition Width="16"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
@@ -202,8 +202,14 @@
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource DefaultTextBrush}"/>
 
-                            <TextBox x:Name="TxtQty"
-                                     Grid.Row="2"/>
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtQty" ToolTip="Quantità positiva, fino a 9 decimali"/>
+                                <ComboBox x:Name="CmbUnit" Grid.Column="1" Margin="8,0,0,0" ToolTip="Unità di misura"/>
+                            </Grid>
                         </Grid>
                     </Grid>
 

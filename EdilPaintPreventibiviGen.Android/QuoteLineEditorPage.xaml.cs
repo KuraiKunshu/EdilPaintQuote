@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using System.Globalization;
 using EdilPaintPreventibiviGen.Android.Models;
 
@@ -33,7 +34,9 @@ public partial class QuoteLineEditorPage : ContentPage
         NameEntry.Text = _line.Name;
         DescriptionEditor.Text = _line.Description;
         UnitPriceEntry.Text = _line.UnitPrice.ToString("0.##", ItalianCulture);
-        QuantityEntry.Text = _line.Quantity.ToString(ItalianCulture);
+        QuantityEntry.Text = QuantityValue.Format(_line.Quantity);
+        UnitPicker.ItemsSource = QuantityValue.Units.ToList();
+        UnitPicker.SelectedItem = _line.UnitOfMeasure;
         DiscountEntry.Text = _line.Discount.ToString("0.##", ItalianCulture);
         SignificantCheckBox.IsChecked = _line.IsSignificant;
         UpdateTotalPreview();
@@ -51,6 +54,7 @@ public partial class QuoteLineEditorPage : ContentPage
     {
         _line.CatalogItemId = item.Id;
         NameEntry.Text = item.Name;
+        UnitPicker.SelectedItem = item.UnitOfMeasure;
         DescriptionEditor.Text = item.Description;
         UnitPriceEntry.Text = item.UnitPrice.ToString("0.##", ItalianCulture);
         SignificantCheckBox.IsChecked = item.IsSignificant;
@@ -70,12 +74,12 @@ public partial class QuoteLineEditorPage : ContentPage
         }
 
         if (!TryParseNumber(UnitPriceEntry.Text, out double unitPrice) || unitPrice < 0 ||
-            !int.TryParse(QuantityEntry.Text, NumberStyles.Integer, ItalianCulture, out int quantity) || quantity <= 0 ||
+            !QuantityValue.TryParse(QuantityEntry.Text, out decimal quantity) ||
             !TryParseNumber(DiscountEntry.Text, out double discount) || discount is < 0 or > 100)
         {
             await DisplayAlertAsync(
                 "Voce",
-                "Controlla prezzo, quantità e sconto. La quantità deve essere maggiore di zero e lo sconto compreso tra 0 e 100.",
+                "Controlla prezzo, quantità e sconto. La quantità deve essere positiva, con al massimo 9 decimali e lo sconto compreso tra 0 e 100.",
                 "OK");
             return;
         }
@@ -84,6 +88,7 @@ public partial class QuoteLineEditorPage : ContentPage
         _line.Description = DescriptionEditor.Text?.Trim() ?? string.Empty;
         _line.UnitPrice = unitPrice;
         _line.Quantity = quantity;
+        _line.UnitOfMeasure = UnitPicker.SelectedItem as string ?? "pz";
         _line.Discount = discount;
         _line.IsSignificant = SignificantCheckBox.IsChecked;
         _onSaved(_line.Clone());
@@ -93,11 +98,11 @@ public partial class QuoteLineEditorPage : ContentPage
     private void UpdateTotalPreview()
     {
         double unitPrice = TryParseNumber(UnitPriceEntry.Text, out double parsedPrice) ? parsedPrice : 0;
-        int quantity = int.TryParse(QuantityEntry.Text, NumberStyles.Integer, ItalianCulture, out int parsedQuantity)
+        decimal quantity = QuantityValue.TryParse(QuantityEntry.Text, out decimal parsedQuantity)
             ? parsedQuantity
             : 0;
         double discount = TryParseNumber(DiscountEntry.Text, out double parsedDiscount) ? parsedDiscount : 0;
-        double total = Math.Max(0, unitPrice) * Math.Max(0, quantity) * (1 - Math.Clamp(discount, 0, 100) / 100);
+        double total = Math.Max(0, unitPrice) * (double)Math.Max(0, quantity) * (1 - Math.Clamp(discount, 0, 100) / 100);
         TotalLabel.Text = total.ToString("C", ItalianCulture);
     }
 

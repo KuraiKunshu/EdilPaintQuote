@@ -15,6 +15,13 @@ public static class AppSettingsFileService
         if (_settingsPath != null)
             return _settingsPath;
 
+        if (CompanyInstallationService.IsGenericInstallation)
+        {
+            string profilePath = Path.Combine(CompanyInstallationService.RootDirectory, FileName);
+            if (!File.Exists(profilePath)) WriteDefaultSettings(profilePath, generic: true);
+            return _settingsPath = profilePath;
+        }
+
         string applicationPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, FileName);
         if (File.Exists(applicationPath))
             return _settingsPath = applicationPath;
@@ -53,7 +60,7 @@ public static class AppSettingsFileService
             .Build();
     }
 
-    private static void WriteDefaultSettings(string path)
+    internal static void WriteDefaultSettings(string path, bool generic = false)
     {
         string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -63,9 +70,18 @@ public static class AppSettingsFileService
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "EdilPaintPreventivi",
             "Preventivi");
+        if (generic)
+            pdfRootPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "PreventiviAzienda", CompanyInstallationService.ProfileId ?? "NuovaAzienda");
 
         var settings = new
         {
+            Business = new BusinessSettingsModel
+            {
+                EnableWindowAutomations = !generic,
+                EnableInstallationCertificate = !generic,
+                UseLegacyStamp = !generic
+            },
             Employees = Array.Empty<EdilPaintPreventibiviGen.Models.EmployeeSettingsModel>(),
             Database = new
             {
@@ -84,6 +100,8 @@ public static class AppSettingsFileService
                 DatabaseCostSavingMode = true,
                 IsSilentStartup = false,
                 UseVeluxLogin = false,
+                ImportLegacyData = !generic,
+                DefaultVatType = generic ? "22%" : "RC 10%+22%",
                 NumberOfQuote = 200,
                 TempPath = string.Empty,
                 DeviceName = Environment.MachineName
@@ -98,7 +116,7 @@ public static class AppSettingsFileService
                 WindowProductPrefixes = RealProfitSettingsModel.CreateDefaultWindowProductPrefixes(),
                 WindowMaterialCatalogIdentity = string.Empty,
                 WindowMaterialRulesSchemaVersion = RealProfitSettingsModel.CurrentWindowMaterialRulesSchemaVersion,
-                WindowMaterialRules = RealProfitSettingsModel.CreateDefaultWindowMaterialRules(),
+                WindowMaterialRules = generic ? [] : RealProfitSettingsModel.CreateDefaultWindowMaterialRules(),
                 InternalFinishLaborKeyword = RealProfitSettingsModel.DefaultInternalFinishLaborKeyword,
                 InternalFinishMaterialName = RealProfitSettingsModel.DefaultInternalFinishMaterialName
             },
@@ -120,13 +138,13 @@ public static class AppSettingsFileService
             Mail = new
             {
                 Enabled = false,
-                SmtpServer = "smtp.libero.it",
+                SmtpServer = generic ? string.Empty : "smtp.libero.it",
                 Port = 465,
                 UseSsl = true,
                 Username = string.Empty,
                 Password = string.Empty,
                 SenderEmail = string.Empty,
-                SenderName = "EdilPaint",
+                SenderName = generic ? "Preventivi" : "EdilPaint",
                 DefaultSubject = "Preventivo {QuoteNumber}",
                 DefaultBody = "Buongiorno,\n\nin allegato inviamo il preventivo n. {QuoteNumber}.\n\nCordiali saluti",
                 SupplierOrderSubjectTemplate = MailSettingsModel.DefaultSupplierOrderSubjectTemplate,

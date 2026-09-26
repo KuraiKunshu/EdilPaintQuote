@@ -10,6 +10,7 @@
                 <ResourceDictionary Source="Helpers/Colors.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <converters:FlexibleDoubleConverter x:Key="FlexibleDoubleConverter"/>
+            <converters:QuantityConverter x:Key="QuantityConverter" />
             <Style TargetType="TextBox">
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
                 <Setter Property="Padding" Value="5,2"/>

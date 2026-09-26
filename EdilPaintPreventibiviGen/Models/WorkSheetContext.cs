@@ -1,6 +1,6 @@
 namespace EdilPaintPreventibiviGen.Models;
 
-public sealed record WorkSheetLine(string Name, string Description, int Quantity);
+public sealed record WorkSheetLine(string Name, string Description, decimal Quantity, string UnitOfMeasure = "pz");
 
 public sealed class WorkSheetContext
 {

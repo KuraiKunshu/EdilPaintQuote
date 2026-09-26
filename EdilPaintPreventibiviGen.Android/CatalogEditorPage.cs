@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using EdilPaintPreventibiviGen.Android.Controls;
 using EdilPaintPreventibiviGen.Android.Models;
 
@@ -12,12 +13,14 @@ public sealed class CatalogEditorPage : OperationPage
         var name = Input(item.Name);
         var description = new Editor { Text = item.Description, AutoSize = EditorAutoSizeOption.TextChanges, MinimumHeightRequest = 100 };
         var price = Input(Format(item.UnitPrice), true);
+        var unit = new Picker { ItemsSource = QuantityValue.Units.ToList(), SelectedItem = item.UnitOfMeasure };
         var significant = new Switch { IsToggled = item.IsSignificant };
         var company = new Switch { IsToggled = item.IsCompanyMaterial };
         Form.Add(Heading(item.Id == 0 ? "Nuova voce" : item.Name));
         Form.Add(Field("Nome", name));
         Form.Add(Field("Descrizione", description));
         Form.Add(Field("Prezzo unitario", price));
+        Form.Add(Field("Unità di misura", unit));
         if (kind == QuoteLineKind.Material)
         {
             Form.Add(Toggle("Bene significativo", significant));
@@ -28,6 +31,7 @@ public sealed class CatalogEditorPage : OperationPage
             item.Name = name.Text ?? "";
             item.Description = description.Text ?? "";
             item.UnitPrice = Number(price, "Prezzo");
+            item.UnitOfMeasure = unit.SelectedItem as string ?? "pz";
             item.IsSignificant = significant.IsToggled;
             item.IsCompanyMaterial = company.IsToggled;
             await Database.SaveCatalogItemAsync(ConnectionString, kind, item, original: original);

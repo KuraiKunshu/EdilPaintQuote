@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using System.Globalization;
 
 namespace EdilPaintPreventibiviGen.Android.Models;
@@ -9,16 +10,17 @@ public sealed class QuoteLine
     public int CatalogItemId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string UnitOfMeasure { get; set; } = "pz";
     public double UnitPrice { get; set; }
-    public int Quantity { get; set; } = 1;
+    public decimal Quantity { get; set; } = 1;
     public double Discount { get; set; }
     public bool IsSignificant { get; set; }
     public int SortOrder { get; set; }
 
-    public double Total => UnitPrice * Quantity * (1 - Math.Clamp(Discount, 0, 100) / 100);
+    public double Total => UnitPrice * (double)Quantity * (1 - Math.Clamp(Discount, 0, 100) / 100);
 
     public string TotalDisplay => Total.ToString("C", ItalianCulture);
-    public string QuantityDisplay => Quantity.ToString("N0", ItalianCulture);
+    public string QuantityDisplay => QuantityValue.Display(Quantity, UnitOfMeasure);
     public string UnitPriceDisplay => UnitPrice.ToString("C", ItalianCulture);
     public string DiscountDisplay => Discount > 0 ? $"{Discount:0.#}%" : "Nessuno";
     public bool HasDiscount => Discount > 0;
@@ -30,7 +32,7 @@ public sealed class QuoteLine
         {
             string price = UnitPrice.ToString("C", ItalianCulture);
             string discount = Discount > 0 ? $" - sc. {Discount:0.#}%" : string.Empty;
-            return $"{Quantity} x {price}{discount}";
+            return $"{QuantityDisplay} x {price}{discount}";
         }
     }
 
@@ -40,6 +42,7 @@ public sealed class QuoteLine
         Name = Name,
         Description = Description,
         UnitPrice = UnitPrice,
+        UnitOfMeasure = UnitOfMeasure,
         Quantity = Quantity,
         Discount = Discount,
         IsSignificant = IsSignificant,

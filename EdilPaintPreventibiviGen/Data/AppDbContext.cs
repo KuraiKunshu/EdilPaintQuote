@@ -1,4 +1,5 @@
 using EdilPaintPreventibiviGen.Data.Entities;
+using EdilPaintPreventibiviGen.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EdilPaintPreventibiviGen.Data;
@@ -54,6 +55,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<LaborCatalogEntity>(entity =>
         {
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(16).HasDefaultValue("pz").IsRequired();
             entity.ToTable("LaborCatalog");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.ExcludeFromWorkSheet).HasDefaultValue(false);
@@ -64,6 +66,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<PersonalMaterialEntity>(entity =>
         {
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(16).HasDefaultValue("pz").IsRequired();
             entity.ToTable("PersonalMaterials");
             entity.HasKey(x => x.Id);
 
@@ -115,6 +118,8 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<QuoteMaterialEntity>(entity =>
         {
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(16).HasDefaultValue("pz").IsRequired();
+            entity.Property(x => x.Quantity).HasPrecision(QuantityValue.Precision, QuantityValue.Scale);
             entity.ToTable("QuoteMaterials");
             entity.HasKey(x => x.Id);
 
@@ -130,6 +135,8 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<QuoteLaborEntity>(entity =>
         {
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(16).HasDefaultValue("pz").IsRequired();
+            entity.Property(x => x.Quantity).HasPrecision(QuantityValue.Precision, QuantityValue.Scale);
             entity.ToTable("QuoteLabors");
             entity.HasKey(x => x.Id);
 

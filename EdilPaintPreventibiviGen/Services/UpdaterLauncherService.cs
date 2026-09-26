@@ -12,6 +12,7 @@ public static class UpdaterLauncherService
 
     public static string? ResolveUpdaterScriptPath(string? baseDirectory = null)
     {
+        if (CompanyInstallationService.IsGenericInstallation) return null;
         baseDirectory = string.IsNullOrWhiteSpace(baseDirectory)
             ? AppContext.BaseDirectory
             : Path.GetFullPath(baseDirectory);

@@ -11,10 +11,7 @@ public static class DiagnosticsService
 {
     public static DiagnosticsSnapshot CreateSnapshot()
     {
-        string localDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "EdilPaintPreventivi",
-            "Data");
+        string localDataPath = LocalApplicationDataService.GetDataDirectoryPath();
 
         var updater = ReadUpdaterState();
         var assembly = Assembly.GetExecutingAssembly();
@@ -98,6 +95,8 @@ public static class DiagnosticsService
 
     private static (string status, string path) ReadUpdaterState()
     {
+        if (CompanyInstallationService.IsGenericInstallation)
+            return ("Pacchetto aziendale: aggiornamento manuale", string.Empty);
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         string[] candidates =
         [

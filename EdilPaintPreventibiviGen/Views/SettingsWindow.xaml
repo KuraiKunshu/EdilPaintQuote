@@ -13,7 +13,7 @@
         ResizeMode="CanResize"
         AllowsTransparency="True"
         Background="{StaticResource TransparentBrush}"
-        Icon="pack://application:,,,/Assets/Windowsicon/main.png">
+        Icon="pack://application:,,,/EdilPaintPreventibiviGen;component/Assets/Windowsicon/main.png">
 
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0"
@@ -377,6 +377,28 @@
                                 Margin="20,16"
                                 SelectedIndex="0"
                                 Style="{StaticResource SettingsTabControlStyle}">
+                        <TabItem Header="Azienda" x:Name="TabCompany" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalContentAlignment="Top">
+                                <StackPanel Margin="24" VerticalAlignment="Top">
+                                    <StackPanel.Resources>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
+                                            <Setter Property="FontWeight" Value="Normal"/>
+                                        </Style>
+                                    </StackPanel.Resources>
+                                    <TextBlock Text="Dati e funzioni aziendali" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Ragione sociale, indirizzo, partita IVA, email, loghi, timbro e numerazione dei preventivi." TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                    <Button x:Name="BtnCompanyProfile" Content="Modifica dati aziendali…" Click="OnCompanyProfileClick" HorizontalAlignment="Left" Style="{StaticResource SecondaryActionButtonStyle}"/>
+                                    <TextBlock Text="I dati aziendali si salvano nella finestra dedicata. Le opzioni sotto si applicano con Salva." TextWrapping="Wrap" Margin="0,12,0,22"/>
+                                    <TextBlock Text="IVA predefinita per i nuovi preventivi" FontWeight="SemiBold"/>
+                                    <ComboBox x:Name="CmbDefaultVat" Width="200" HorizontalAlignment="Left" Margin="0,8,0,22"/>
+                                    <TextBlock Text="Funzioni per serramenti" FontWeight="SemiBold"/>
+                                    <CheckBox x:Name="ChkWindowAutomations" Margin="0,12,0,12"><TextBlock Text="Aggiungi automaticamente i materiali per finestra nel calcolo del guadagno" TextWrapping="Wrap"/></CheckBox>
+                                    <CheckBox x:Name="ChkInstallationCertificate" Content="Mostra il certificato di corretta posa nello storico" Margin="0,0,0,12"/>
+                                    <TextBlock Text="L'accesso al catalogo Velux si abilita separatamente nella scheda Generali. Con l'accesso disattivato puoi usare i tuoi materiali e le tue lavorazioni." TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
                         <TabItem x:Name="TabGeneralSettings" Header="_Generali">
                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled"

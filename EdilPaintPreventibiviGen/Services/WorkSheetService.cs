@@ -57,7 +57,7 @@ public static class WorkSheetService
         .Select(item => new WorkSheetLine(
             item.Name,
             includeDescriptions ? item.Description ?? string.Empty : string.Empty,
-            item.Quantity));
+            item.Quantity, item.UnitOfMeasure));
 
     private static bool SameName(string? left, string? right) =>
         string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);

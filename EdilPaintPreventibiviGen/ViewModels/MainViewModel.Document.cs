@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -56,7 +56,7 @@ public partial class MainViewModel
 
         _materialDiscount = 0;
         _laborDiscount = 0;
-        _ivaType = "RC 10%+22%";
+        _ivaType = App.AppSettings?.App.GetEffectiveDefaultVatType() ?? "RC 10%+22%";
 
         PaymentTerms = _companyData.Termini_pagamento;
         CustomerNotes = string.Empty;
@@ -492,6 +492,7 @@ public partial class MainViewModel
                 Description = m.Description,
                 UnitPrice = m.UnitPrice,
                 Quantity = m.Quantity,
+                UnitOfMeasure = m.UnitOfMeasure,
                 Discount = m.Discount,
                 IsSignificant = m.IsSignificant,
                 SortOrder = m.SortOrder
@@ -507,6 +508,7 @@ public partial class MainViewModel
                 Description = l.Description,
                 UnitPrice = l.UnitPrice,
                 Quantity = l.Quantity,
+                UnitOfMeasure = l.UnitOfMeasure,
                 Discount = l.Discount,
                 IsSignificant = l.IsSignificant,
                 SortOrder = l.SortOrder

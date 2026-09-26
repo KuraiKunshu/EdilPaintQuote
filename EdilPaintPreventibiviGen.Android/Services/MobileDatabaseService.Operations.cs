@@ -377,6 +377,7 @@ public sealed partial class MobileDatabaseService
         command.Parameters.AddWithValue("name", item.Name);
         command.Parameters.AddWithValue("description", item.Description);
         command.Parameters.AddWithValue("unitPrice", item.UnitPrice);
+        command.Parameters.AddWithValue("unit", item.UnitOfMeasure);
 
         if (kind == QuoteLineKind.Material)
         {
@@ -384,13 +385,13 @@ public sealed partial class MobileDatabaseService
             command.Parameters.AddWithValue("isCompanyMaterial", item.IsCompanyMaterial);
             command.CommandText = item.Id == 0
                 ? """
-                  insert into "PersonalMaterials" ("Name", "Description", "UnitPrice", "IsSignificant", "IsCompanyMaterial")
-                  values (@name, @description, @unitPrice, @isSignificant, @isCompanyMaterial)
+                  insert into "PersonalMaterials" ("Name", "Description", "UnitPrice", "IsSignificant", "IsCompanyMaterial", "UnitOfMeasure")
+                  values (@name, @description, @unitPrice, @isSignificant, @isCompanyMaterial, @unit)
                   returning "Id";
                   """
                 : """
                   update "PersonalMaterials"
-                  set "Name" = @name, "Description" = @description, "UnitPrice" = @unitPrice,
+                  set "Name" = @name, "Description" = @description, "UnitOfMeasure" = @unit, "UnitPrice" = @unitPrice,
                       "IsSignificant" = @isSignificant, "IsCompanyMaterial" = @isCompanyMaterial
                   where "Id" = @id
                   returning "Id";
@@ -400,13 +401,13 @@ public sealed partial class MobileDatabaseService
         {
             command.CommandText = item.Id == 0
                 ? """
-                  insert into "LaborCatalog" ("Name", "Description", "UnitPrice")
-                  values (@name, @description, @unitPrice)
+                  insert into "LaborCatalog" ("Name", "Description", "UnitPrice", "UnitOfMeasure")
+                  values (@name, @description, @unitPrice, @unit)
                   returning "Id";
                   """
                 : """
                   update "LaborCatalog"
-                  set "Name" = @name, "Description" = @description, "UnitPrice" = @unitPrice
+                  set "Name" = @name, "Description" = @description, "UnitOfMeasure" = @unit, "UnitPrice" = @unitPrice
                   where "Id" = @id
                   returning "Id";
                   """;
@@ -450,6 +451,8 @@ public sealed partial class MobileDatabaseService
         command.Parameters.AddWithValue("oldName", original.Name);
         command.Parameters.AddWithValue("oldDescription", original.Description);
         command.Parameters.AddWithValue("oldPrice", original.UnitPrice);
+        condition += " and \"UnitOfMeasure\" = @oldUnit";
+        command.Parameters.AddWithValue("oldUnit", original.UnitOfMeasure);
         if (kind == QuoteLineKind.Material)
         {
             condition += " and \"IsSignificant\" = @oldSignificant and \"IsCompanyMaterial\" = @oldCompany";

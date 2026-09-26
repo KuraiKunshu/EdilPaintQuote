@@ -69,6 +69,7 @@ public static class AutomaticWindowMaterialCalculator
             calculations,
             activeRules,
             existingMaterials,
+            catalog,
             issues);
 
         return new AutomaticWindowMaterialCalculationResult
@@ -141,10 +142,18 @@ public static class AutomaticWindowMaterialCalculator
                 continue;
             }
 
-            long laborQuantity = GetMatchingLaborQuantity(rule, laborSnapshot, labors);
+            decimal laborQuantity = GetMatchingLaborQuantity(rule, laborSnapshot, labors);
             if (laborQuantity <= 0)
                 continue;
 
+            if (rule.IsWindowAutomation && (decimal.Truncate(laborQuantity) != laborQuantity ||
+                labors.Any(l => l.Quantity > 0 && ((rule.LaborCatalogItemId > 0 && l.CatalogItemId == rule.LaborCatalogItemId) ||
+                    NormalizeName(l.Name) == NormalizeName(laborSnapshot)) && (l.UnitOfMeasure != "pz" || decimal.Truncate(l.Quantity) != l.Quantity))))
+            {
+                issues.Add(new AutomaticWindowMaterialIssue(AutomaticWindowMaterialIssueCode.InvalidRule,
+                    $"La regola finestre per {laborSnapshot} richiede quantità intere in pz.", ruleId));
+                continue;
+            }
             ResolvedMaterial material = ResolveMaterial(rule, catalog);
             if (!material.IsValid)
             {
@@ -186,12 +195,12 @@ public static class AutomaticWindowMaterialCalculator
         return preparedRules;
     }
 
-    private static long GetMatchingLaborQuantity(
+    private static decimal GetMatchingLaborQuantity(
         AutomaticWindowMaterialRule rule,
         string laborSnapshot,
         IEnumerable<AutomaticWindowLaborLine> labors)
     {
-        long totalQuantity = 0;
+        decimal totalQuantity = 0;
         string normalizedSnapshot = NormalizeName(laborSnapshot);
         foreach (AutomaticWindowLaborLine labor in labors)
         {
@@ -232,8 +241,14 @@ public static class AutomaticWindowMaterialCalculator
 
         foreach (AutomaticWindowProductLine product in products)
         {
-            if (product.Quantity <= 0)
+            if (product.Quantity <= 0) continue;
+            if (decimal.Truncate(product.Quantity) != product.Quantity || product.Quantity > int.MaxValue || product.UnitOfMeasure != "pz")
+            {
+                if (normalizedPrefixes.Any(prefix => (product.Name ?? "").StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+                    issues.Add(new AutomaticWindowMaterialIssue(AutomaticWindowMaterialIssueCode.InvalidRule,
+                        $"La finestra {product.Name} richiede una quantità intera in pz; automatismo ignorato."));
                 continue;
+            }
 
             string productName = product.Name?.TrimStart() ?? string.Empty;
             if (!StartsWithPrefix(productName, normalizedPrefixes))
@@ -250,7 +265,7 @@ public static class AutomaticWindowMaterialCalculator
 
             try
             {
-                quantitiesBySize[size] = checked(quantitiesBySize.GetValueOrDefault(size) + product.Quantity);
+                quantitiesBySize[size] = checked(quantitiesBySize.GetValueOrDefault(size) + (int)product.Quantity);
             }
             catch (OverflowException)
             {
@@ -293,7 +308,7 @@ public static class AutomaticWindowMaterialCalculator
             }
             else
             {
-                long remainingLaborQuantity = rule.LaborQuantity;
+                decimal remainingLaborQuantity = rule.LaborQuantity;
                 foreach (AutomaticRecognizedWindowGroup window in windows)
                 {
                     if (remainingLaborQuantity <= 0)
@@ -363,6 +378,7 @@ public static class AutomaticWindowMaterialCalculator
         IEnumerable<AutomaticWindowMaterialRuleCalculation> calculations,
         IReadOnlyCollection<PreparedRule> preparedRules,
         IEnumerable<AutomaticQuoteMaterialLine> existingMaterials,
+        IReadOnlyCollection<AutomaticMaterialCatalogItem> catalog,
         ICollection<AutomaticWindowMaterialIssue> issues)
     {
         IReadOnlyDictionary<string, PreparedRule> preparedById = preparedRules
@@ -452,8 +468,15 @@ public static class AutomaticWindowMaterialCalculator
                     AddAmbiguousExistingIssue(existing, normalizedName, warnedAmbiguousNames, issues);
             }
 
-            if (match == null)
+            if (match == null) continue;
+            var matchedCatalog = catalog.FirstOrDefault(c => c.CatalogItemId > 0 && c.CatalogItemId == match.MaterialCatalogItemId)
+                ?? catalog.FirstOrDefault(c => NormalizeName(c.Name) == NormalizeName(match.MaterialName));
+            if ((matchedCatalog?.UnitOfMeasure ?? "pz") != existing.UnitOfMeasure)
+            {
+                issues.Add(new AutomaticWindowMaterialIssue(AutomaticWindowMaterialIssueCode.InvalidRule,
+                    $"Unità diverse per {existing.Name}: il materiale già a preventivo non viene sottratto."));
                 continue;
+            }
 
             try
             {
@@ -697,7 +720,7 @@ public static class AutomaticWindowMaterialCalculator
         int LaborCatalogItemId,
         string LaborName,
         bool IsWindowAutomation,
-        long LaborQuantity,
+        decimal LaborQuantity,
         string Mode,
         decimal Parameter,
         ResolvedMaterial Material);
@@ -758,7 +781,7 @@ public static class AutomaticWindowMaterialCalculator
         public bool AllowLegacyNameMatch { get; set; }
         public bool HasOverflow { get; set; }
         public long GrossRequiredQuantity { get; set; }
-        public long AlreadyQuotedQuantity { get; set; }
+        public decimal AlreadyQuotedQuantity { get; set; }
         public List<string> RuleIds { get; } = [];
         public List<AutomaticWindowRuleSizeCalculation> Details { get; } = [];
         public HashSet<string> Aliases { get; } = new(StringComparer.Ordinal);

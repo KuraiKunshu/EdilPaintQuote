@@ -45,10 +45,13 @@ public static class QuoteTotalsCalculator
                 break;
         }
 
+        taxable10 = Math.Round(taxable10, 2, MidpointRounding.AwayFromZero);
+        taxable22 = Math.Round(taxable22, 2, MidpointRounding.AwayFromZero);
         double taxable = taxable10 + taxable22;
         double vat = NormalizeIvaType(ivaType) == "esclusa"
             ? 0
-            : taxable10 * 0.10 + taxable22 * 0.22;
+            : Math.Round(taxable10 * 0.10, 2, MidpointRounding.AwayFromZero)
+                + Math.Round(taxable22 * 0.22, 2, MidpointRounding.AwayFromZero);
         return new QuoteTotals(taxable, vat, taxable + vat);
     }
 

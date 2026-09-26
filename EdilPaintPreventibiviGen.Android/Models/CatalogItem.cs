@@ -1,3 +1,4 @@
+using QuantityValue = EdilPaintPreventibiviGen.Models.QuantityValue;
 using System.Globalization;
 
 namespace EdilPaintPreventibiviGen.Android.Models;
@@ -15,6 +16,7 @@ public sealed class CatalogItem
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string UnitOfMeasure { get; set; } = "pz";
     public double UnitPrice { get; set; }
     public bool IsSignificant { get; set; }
     public bool IsCompanyMaterial { get; set; }
@@ -29,6 +31,7 @@ public sealed class CatalogItem
         Name = Name,
         Description = Description,
         UnitPrice = UnitPrice,
+        UnitOfMeasure = UnitOfMeasure,
         IsSignificant = IsSignificant,
         IsCompanyMaterial = IsCompanyMaterial
     };

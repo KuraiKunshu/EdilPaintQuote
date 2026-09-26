@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -19,7 +19,17 @@ using EdilPaintPreventibiviGen.Views;
 namespace EdilPaintPreventibiviGen.ViewModels;
 public partial class MainViewModel
 {
-    private const string DefaultLogoFileName = "Edilpaint.png";
+    public async Task RefreshCompanyProfileAsync()
+    {
+        var company = await _dataService.GetCompanyAsync();
+        if (company == null) return;
+        bool usesDefaultPayment = PaymentTerms == _companyData.Termini_pagamento;
+        _companyData = company;
+        if (usesDefaultPayment) PaymentTerms = company.Termini_pagamento;
+        Logos.Clear();
+        foreach (string logo in company.Logo) Logos.Add(Path.GetFileName(logo));
+        SelectDefaultLogo();
+    }
 
     #region Data Loading & Saving
     public Task InitializeAsync() => LoadDataAsync();
@@ -336,6 +346,7 @@ public partial class MainViewModel
         string.Equals(left.Description, right.Description, StringComparison.Ordinal) &&
         left.UnitPrice.Equals(right.UnitPrice) &&
         left.Quantity == right.Quantity &&
+        left.UnitOfMeasure == right.UnitOfMeasure &&
         left.Discount.Equals(right.Discount) &&
         left.IsSignificant == right.IsSignificant &&
         left.IsCompanyMaterial == right.IsCompanyMaterial &&
@@ -369,6 +380,7 @@ public partial class MainViewModel
         SetIfDifferent(target.Name, source.Name, value => target.Name = value, ref changed);
         SetIfDifferent(target.Description, source.Description, value => target.Description = value, ref changed);
         SetIfDifferent(target.UnitPrice, source.UnitPrice, value => target.UnitPrice = value, ref changed);
+        SetIfDifferent(target.UnitOfMeasure, source.UnitOfMeasure, value => target.UnitOfMeasure = value, ref changed);
         SetIfDifferent(target.Quantity, source.Quantity, value => target.Quantity = value, ref changed);
         SetIfDifferent(target.Discount, source.Discount, value => target.Discount = value, ref changed);
         SetIfDifferent(target.IsSignificant, source.IsSignificant, value => target.IsSignificant = value, ref changed);
@@ -423,7 +435,7 @@ public partial class MainViewModel
         try
         {
             string assetsPath = GetAssetsPath();
-            LoadSignificantMaterialsConfig(assetsPath);
+            if (!CompanyInstallationService.IsGenericInstallation) LoadSignificantMaterialsConfig(assetsPath);
 
             var company = await _dataService.GetCompanyAsync();
             var customers = await _dataService.GetCustomersAsync();
@@ -504,10 +516,8 @@ public partial class MainViewModel
 
     private void SelectDefaultLogo()
     {
-        string defaultLogo = Logos.FirstOrDefault(logo => string.Equals(logo, DefaultLogoFileName, StringComparison.OrdinalIgnoreCase))
-            ?? Logos.FirstOrDefault(logo => logo.Contains("edilpaint", StringComparison.OrdinalIgnoreCase))
-            ?? Logos.FirstOrDefault()
-            ?? string.Empty;
+        string defaultLogo = Logos.Count > 0
+            ? Logos[Math.Clamp(_companyData.Logo_index, 0, Logos.Count - 1)] : string.Empty;
 
         if (_selectedLogo == defaultLogo)
             return;
@@ -714,6 +724,7 @@ public partial class MainViewModel
         Description = source.Description,
         UnitPrice = source.UnitPrice,
         Quantity = source.Quantity,
+        UnitOfMeasure = source.UnitOfMeasure,
         Discount = source.Discount,
         IsSignificant = source.IsSignificant,
         IsCompanyMaterial = source.IsCompanyMaterial,

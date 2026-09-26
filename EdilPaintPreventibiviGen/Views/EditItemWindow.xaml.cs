@@ -22,7 +22,9 @@ public partial class EditItemWindow : Window
         TxtName.Text = _item.Name;
         TxtDescription.Text = _item.Description;
         TxtPrice.Text = _item.UnitPrice.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
-        TxtQty.Text = _item.Quantity.ToString();
+        TxtQty.Text = QuantityValue.Format(_item.Quantity);
+        CmbUnit.ItemsSource = QuantityValue.Units;
+        CmbUnit.SelectedItem = _item.UnitOfMeasure;
         ChkSignificant.IsChecked = _item.IsSignificant;
     }
 
@@ -40,7 +42,7 @@ public partial class EditItemWindow : Window
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
         if (FlexibleDoubleConverter.TryParse(TxtPrice.Text, out double price) &&
-            int.TryParse(TxtQty.Text, out int qty))
+            QuantityValue.TryParse(TxtQty.Text, out decimal qty))
         {
             string newName = TxtName.Text.Trim();
             if (!string.Equals(_originalName, newName, StringComparison.OrdinalIgnoreCase))
@@ -50,6 +52,7 @@ public partial class EditItemWindow : Window
             _item.Description = TxtDescription.Text;
             _item.UnitPrice = price;
             _item.Quantity = qty;
+            _item.UnitOfMeasure = CmbUnit.SelectedItem as string ?? "pz";
             _item.IsSignificant = ChkSignificant.IsChecked ?? false;
             
             Success = true;
@@ -58,7 +61,7 @@ public partial class EditItemWindow : Window
         }
         else
         {
-            MessageBox.Show("Inserisci valori numerici validi.", "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("Inserisci un prezzo valido e una quantità positiva con al massimo 9 decimali.", "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

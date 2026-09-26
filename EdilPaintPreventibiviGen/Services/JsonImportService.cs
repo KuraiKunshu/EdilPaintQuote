@@ -118,7 +118,8 @@ public class JsonImportService
                 Name = GetJsonString(e, "nome", "Nome", "name"),
                 Description = GetJsonString(e, "descrizione", "Descrizione", "description"),
                 UnitPrice = GetJsonDouble(e, "valore", "Valore", "unitPrice"),
-                Quantity = 1
+                Quantity = 1,
+                UnitOfMeasure = GetJsonString(e, "unitOfMeasure", "UnitOfMeasure")
             });
         }
 

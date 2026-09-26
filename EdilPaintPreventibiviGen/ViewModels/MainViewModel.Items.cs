@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -96,6 +96,7 @@ public partial class MainViewModel
             Description = InputDescription,
             UnitPrice = InputValue,
             Quantity = InputQuantity,
+            UnitOfMeasure = InputUnitOfMeasure,
             IsSignificant = IsSignificant,
             SortOrder = Materials.Count
         };
@@ -125,6 +126,7 @@ public partial class MainViewModel
                 Description = newItem.Description,
                 UnitPrice = newItem.UnitPrice,
                 Quantity = 1,
+                UnitOfMeasure = newItem.UnitOfMeasure,
                 IsSignificant = newItem.IsSignificant,
                 SortOrder = _personalMaterials.Count
             };
@@ -181,6 +183,7 @@ public partial class MainViewModel
             Description = InputDescription,
             UnitPrice = InputValue,
             Quantity = InputQuantity,
+            UnitOfMeasure = InputUnitOfMeasure,
             IsSignificant = IsSignificant,
             SortOrder = Labors.Count
         });
@@ -194,6 +197,8 @@ public partial class MainViewModel
         InputName = "";
         InputDescription = "";
         InputValue = 0;
+        InputQuantity = 1;
+        InputUnitOfMeasure = "pz";
         SelectedCatalogLabor = null;
         SelectedCatalogMaterial = null;
         OnPropertyChanged(string.Empty);
@@ -219,6 +224,7 @@ public partial class MainViewModel
                 InputName = localItem.Name;
                 InputDescription = localItem.Description;
                 InputValue = localItem.UnitPrice;
+                InputUnitOfMeasure = localItem.UnitOfMeasure;
                 IsSignificant = localItem.IsSignificant;
 
                 OnPropertyChanged(nameof(InputName));
@@ -254,6 +260,7 @@ public partial class MainViewModel
             InputName = details.Name;
             InputDescription = details.Description;
             InputValue = details.UnitPrice;
+            InputUnitOfMeasure = "pz";
             IsSignificant = IsMaterialSignificant(details.Name);
 
             OnPropertyChanged(nameof(InputName));

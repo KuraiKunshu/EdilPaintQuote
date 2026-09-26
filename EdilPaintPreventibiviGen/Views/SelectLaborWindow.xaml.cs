@@ -20,6 +20,8 @@ public partial class SelectLaborWindow : Window
     public SelectLaborWindow(MainViewModel vm)
     {
         InitializeComponent();
+        CmbUnit.ItemsSource = QuantityValue.Units;
+        CmbUnit.SelectedItem = "pz";
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         _vm = vm;
         FilterList(string.Empty);
@@ -66,6 +68,7 @@ public partial class SelectLaborWindow : Window
             BtnSaveLabor.Content = "Salva modifiche";
 
             TxtName.Text = selected.Name;
+            CmbUnit.SelectedItem = selected.UnitOfMeasure;
             TxtDesc.Text = selected.Description;
             TxtPrice.Text = selected.UnitPrice.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
             ChkExcludeFromWorkSheet.IsChecked = selected.ExcludeFromWorkSheet;
@@ -99,6 +102,7 @@ public partial class SelectLaborWindow : Window
                 _editingLabor.Name = TxtName.Text.Trim();
                 _editingLabor.Description = TxtDesc.Text;
                 _editingLabor.UnitPrice = price;
+                _editingLabor.UnitOfMeasure = CmbUnit.SelectedItem as string ?? "pz";
                 _editingLabor.ExcludeFromWorkSheet = ChkExcludeFromWorkSheet.IsChecked == true;
             }
             else
@@ -108,6 +112,7 @@ public partial class SelectLaborWindow : Window
                     Name = TxtName.Text.Trim(),
                     Description = TxtDesc.Text,
                     UnitPrice = price,
+                    UnitOfMeasure = CmbUnit.SelectedItem as string ?? "pz",
                     Quantity = 1,
                     ExcludeFromWorkSheet = ChkExcludeFromWorkSheet.IsChecked == true
                 });
@@ -150,6 +155,7 @@ public partial class SelectLaborWindow : Window
 
     private void ResetInputs()
     {
+        CmbUnit.SelectedItem = "pz";
         _editingLabor = null;
         TxtFormTitle.Text = "Nuova lavorazione";
         BtnSaveLabor.Content = "Salva in anagrafica";

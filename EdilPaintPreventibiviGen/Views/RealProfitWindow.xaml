@@ -1,6 +1,7 @@
 <Window x:Class="EdilPaintPreventibiviGen.Views.RealProfitWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:EdilPaintPreventibiviGen.Models"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Costi e guadagno del lavoro"
         Width="1120"
@@ -504,8 +505,9 @@
                                                                 Binding="{Binding Name}"
                                                                 MinWidth="220"
                                                                 Width="*"/>
+                                            <DataGridComboBoxColumn Header="U.M." SelectedItemBinding="{Binding UnitOfMeasure}" ItemsSource="{x:Static models:QuantityValue.Units}" Width="70"/>
                                             <DataGridTextColumn Header="Quantità"
-                                                                Binding="{Binding Quantity}"
+                                                                Binding="{Binding Quantity, Converter={StaticResource QuantityConverter}}"
                                                                 ElementStyle="{StaticResource NumericCellTextStyle}"
                                                                 Width="90"/>
                                             <DataGridTextColumn Header="Prezzo unitario base €"
@@ -770,8 +772,9 @@
                                                                 Binding="{Binding Source}"
                                                                 IsReadOnly="True"
                                                                 Width="110"/>
+                                            <DataGridComboBoxColumn Header="U.M." SelectedItemBinding="{Binding UnitOfMeasure}" ItemsSource="{x:Static models:QuantityValue.Units}" Width="70"/>
                                             <DataGridTextColumn Header="Quantità"
-                                                                Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
+                                                                Binding="{Binding Quantity, Converter={StaticResource QuantityConverter}, UpdateSourceTrigger=LostFocus}"
                                                                 ElementStyle="{StaticResource NumericCellTextStyle}"
                                                                 EditingElementStyle="{StaticResource NumericEditingTextStyle}"
                                                                 Width="90"/>

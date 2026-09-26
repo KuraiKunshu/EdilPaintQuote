@@ -5,30 +5,32 @@ namespace EdilPaintPreventibiviGen.Models;
 
 public sealed class ProfitMaterialCost
 {
+    public string UnitOfMeasure { get; set; } = "pz";
     public string Name { get; set; } = string.Empty;
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public double CustomerUnitPrice { get; set; }
     public double CustomerDiscount { get; set; }
 
     public double CustomerTotal =>
-        CustomerUnitPrice * Quantity * (1 - Math.Clamp(CustomerDiscount, 0, 100) / 100);
+        CustomerUnitPrice * (double)Quantity * (1 - Math.Clamp(CustomerDiscount, 0, 100) / 100);
 }
 
 public sealed class CompanyMaterialCost : INotifyPropertyChanged
 {
     private string _name = string.Empty;
-    private int _quantity = 1;
+    private decimal _quantity = 1;
     private double _unitCost;
 
     public string Source { get; set; } = "Manuale";
 
+    public string UnitOfMeasure { get; set; } = "pz";
     public string Name
     {
         get => _name;
         set { _name = value; OnPropertyChanged(); }
     }
 
-    public int Quantity
+    public decimal Quantity
     {
         get => _quantity;
         set
@@ -50,7 +52,7 @@ public sealed class CompanyMaterialCost : INotifyPropertyChanged
         }
     }
 
-    public double Total => Math.Max(0, Quantity) * Math.Max(0, UnitCost);
+    public double Total => (double)Math.Max(0, Quantity) * Math.Max(0, UnitCost);
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
@@ -96,7 +98,7 @@ public sealed class RealProfitSnapshot
 
 public sealed class RealProfitPdfContext
 {
-    public string CompanyName { get; init; } = "Edil Paint Srl";
+    public string CompanyName { get; init; } = string.Empty;
     public string QuoteNumber { get; init; } = string.Empty;
     public DateTime QuoteDate { get; init; }
     public string CustomerName { get; init; } = string.Empty;

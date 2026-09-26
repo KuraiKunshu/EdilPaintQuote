@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -93,7 +93,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _inputName = string.Empty;
     private string _inputDescription = string.Empty;
     private double _inputValue;
-    private int _inputQuantity = 1;
+    private decimal _inputQuantity = 1;
     private bool _isSignificant;
     #endregion
 
@@ -153,6 +153,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     #region Constructor
     public MainViewModel()
     {
+        _ivaType = App.AppSettings?.App.GetEffectiveDefaultVatType() ?? "RC 10%+22%";
         _dataService = App.DataService;
         _quoteHistoryService = new QuoteHistoryService(_dataService, _storagePathService);
 
@@ -331,6 +332,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
                 InputName = value.Name;
                 InputDescription = value.Description;
                 InputValue = value.UnitPrice;
+                InputUnitOfMeasure = value.UnitOfMeasure;
 
                 OnPropertyChanged(nameof(InputName));
                 OnPropertyChanged(nameof(InputDescription));
@@ -362,7 +364,10 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public string InputName { get => _inputName; set { _inputName = value; OnPropertyChanged(); } }
     public string InputDescription { get => _inputDescription; set { _inputDescription = value; OnPropertyChanged(); } }
     public double InputValue { get => _inputValue; set { _inputValue = value; OnPropertyChanged(); } }
-    public int InputQuantity { get => _inputQuantity; set { _inputQuantity = value; OnPropertyChanged(); } }
+    public decimal InputQuantity { get => _inputQuantity; set { _inputQuantity = value; OnPropertyChanged(); } }
+    private string _inputUnitOfMeasure = "pz";
+    public IReadOnlyList<string> QuantityUnits => QuantityValue.Units;
+    public string InputUnitOfMeasure { get => _inputUnitOfMeasure; set { _inputUnitOfMeasure = QuantityValue.NormalizeUnit(value); OnPropertyChanged(); } }
     public bool IsSignificant { get => _isSignificant; set { _isSignificant = value; OnPropertyChanged(); } }
 
     public string PartnerCompanyName
