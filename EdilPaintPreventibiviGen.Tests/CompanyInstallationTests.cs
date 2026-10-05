@@ -25,7 +25,6 @@ public sealed class CompanyInstallationTests : IDisposable
         Assert.False(business.EnableInstallationCertificate);
         Assert.False(business.UseLegacyStamp);
         Assert.Empty(business.StampFileName);
-        Assert.False(app.UseVeluxLogin);
         Assert.False(app.ImportLegacyData);
         Assert.False(app.FirstStartup);
         Assert.Equal("22%", app.GetEffectiveDefaultVatType());

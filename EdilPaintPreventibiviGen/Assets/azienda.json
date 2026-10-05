@@ -5,8 +5,7 @@
   "Email": "edilpaint2015@libero.it",
   "Logo": [
     "Assets/Edilpaint.png",
-    "Assets/roto.png",
-    "Assets/velux.png"
+    "Assets/roto.png"
   ],
   "Logo_index": 0,
   "Counter": 180000,

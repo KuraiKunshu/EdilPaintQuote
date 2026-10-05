@@ -17,7 +17,7 @@
     },
     {
       "nome": "Memorizzazione Telecomando",
-      "descrizione": "Memorizzazione di un singolo prodotto su un radiocomando VELUX",
+      "descrizione": "Memorizzazione di un singolo prodotto su un radiocomando",
       "valore": 15
     },
     {
@@ -166,7 +166,7 @@
       "valore": 385
     },
     {
-      "nome": "Installazione kit motorizzazione VELUX",
+      "nome": "Installazione kit motorizzazione",
       "descrizione": "",
       "valore": 60
     },
@@ -221,13 +221,13 @@
       "valore": 60
     },
     {
-      "nome": "Installazione finestra Velux",
-      "descrizione": "Fissaggio del serramento al solaio; Isolamento termico del telaio tramite cornice isolante VELUX BDX o equivalenti; Posa del tessuto impermeabilizzante VELUX BFX o equivalenti; Installazione del raccordo sagomato; Collaudo eventuali funzioni elettriche, se presenti sulla finestra",
+      "nome": "Installazione finestra",
+      "descrizione": "Fissaggio del serramento al solaio; Isolamento termico del telaio tramite cornice isolante compatibile; Posa del tessuto impermeabilizzante compatibile; Installazione del raccordo sagomato; Collaudo eventuali funzioni elettriche, se presenti sulla finestra",
       "valore": 290
     },
     {
       "nome": "Installazione finestra per tetti piani",
-      "descrizione": "posa rialzo VELUX dove previsto, posa finestra per tetti piani, impermeabilizzazione, installazione profili bloccaguaina, installazione cupola, eventuale cablaggio e configurazione",
+      "descrizione": "posa rialzo dove previsto, posa finestra per tetti piani, impermeabilizzazione, installazione profili bloccaguaina, installazione cupola, eventuale cablaggio e configurazione",
       "valore": 290
     },
     {

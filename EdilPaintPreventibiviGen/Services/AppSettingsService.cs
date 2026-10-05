@@ -269,7 +269,6 @@ public sealed class AppSettingsServiceModel
 	public bool RestoreMissingPdfsOnStartup { get; set; }
 	public bool DatabaseCostSavingMode { get; set; } = true;
 	public bool IsSilentStartup { get; set; } = true;
-	public bool UseVeluxLogin { get; set; }
 	public int NumberOfQuote { get; set; } = 100;
 	public double MainWindowScale { get; set; } = 1.0;
 	public string TempPath { get; set; } = string.Empty;
@@ -354,7 +353,7 @@ public sealed class RealProfitSettingsModel
 	public string InternalFinishMaterialName { get; set; } = DefaultInternalFinishMaterialName;
 
 	public static List<string> CreateDefaultWindowProductPrefixes() =>
-		["GGL", "GGU", "GPL", "GPU", "Q4", "R8"];
+		["FINESTRA"];
 
 	public static List<WindowMaterialRuleSettingsModel> CreateDefaultWindowMaterialRules() =>
 	[

@@ -73,7 +73,7 @@ public partial class MainViewModel
         string materialName = InputName.Trim();
         Item? selectedLocalCatalogMaterial = SelectedCatalogMaterial == null
             ? null
-            : FindLocalCatalogMaterial(SelectedCatalogMaterial.Id);
+            : FindCatalogMaterial(SelectedCatalogMaterial);
         var existingCatalogMaterial = selectedLocalCatalogMaterial ?? _personalMaterials.FirstOrDefault(m =>
             m.Name.Equals(materialName, StringComparison.OrdinalIgnoreCase));
         bool selectedCatalogMaterialStillMatches =
@@ -103,17 +103,7 @@ public partial class MainViewModel
 
         Materials.Add(newItem);
 
-        bool isVeluxMaterial = SelectedCatalogMaterial != null &&
-            !SelectedCatalogMaterial.Id.StartsWith("LOCAL_", StringComparison.OrdinalIgnoreCase);
-
-        if (existingCatalogMaterial != null)
-        {
-            await UpdateExistingLocalMaterialFromVeluxAsync(
-                existingCatalogMaterial,
-                newItem,
-                isVeluxMaterial);
-        }
-        else if (
+        if (existingCatalogMaterial == null &&
             MessageBox.Show(
                 $"Il materiale '{newItem.Name}' non è ancora presente nell'anagrafica.\n\nVuoi aggiungerlo ai materiali locali?",
                 "Nuovo materiale",
@@ -139,26 +129,6 @@ public partial class MainViewModel
 
         ResetInputs();
         await SaveDraftAsync();
-    }
-
-    private async Task UpdateExistingLocalMaterialFromVeluxAsync(
-        Item existingCatalogMaterial,
-        Item veluxMaterial,
-        bool isVeluxMaterial)
-    {
-        if (!isVeluxMaterial)
-            return;
-
-        if (Math.Abs(existingCatalogMaterial.UnitPrice - veluxMaterial.UnitPrice) < 0.001)
-            return;
-
-        Debug.WriteLine(
-            $"[Velux] Aggiorno prezzo materiale locale '{existingCatalogMaterial.Name}': {existingCatalogMaterial.UnitPrice:N2} -> {veluxMaterial.UnitPrice:N2}");
-
-        existingCatalogMaterial.Description = veluxMaterial.Description;
-        existingCatalogMaterial.UnitPrice = veluxMaterial.UnitPrice;
-        existingCatalogMaterial.IsSignificant = veluxMaterial.IsSignificant;
-        await SavePersonalMaterialsAsync();
     }
 
     public void AddLabor()
@@ -204,105 +174,23 @@ public partial class MainViewModel
         OnPropertyChanged(string.Empty);
     }
 
-    public async Task FetchVeluxDetails(string uuid, CancellationToken cancellationToken = default)
+    private void ApplyCatalogMaterial(CatalogMaterialOption selection)
     {
-        if (string.IsNullOrEmpty(uuid))
+        Item? item = FindCatalogMaterial(selection);
+        if (item == null)
             return;
-
-        if (cancellationToken.IsCancellationRequested)
-            return;
-
-        if (uuid.StartsWith("LOCAL_", StringComparison.OrdinalIgnoreCase))
-        {
-            Item? localItem = FindLocalCatalogMaterial(uuid);
-
-            if (localItem != null)
-            {
-                if (SelectedCatalogMaterial?.Id != uuid)
-                    return;
-
-                InputName = localItem.Name;
-                InputDescription = localItem.Description;
-                InputValue = localItem.UnitPrice;
-                InputUnitOfMeasure = localItem.UnitOfMeasure;
-                IsSignificant = localItem.IsSignificant;
-
-                OnPropertyChanged(nameof(InputName));
-                OnPropertyChanged(nameof(InputDescription));
-                OnPropertyChanged(nameof(InputValue));
-                OnPropertyChanged(nameof(IsSignificant));
-            }
-
-            return;
-        }
-
-        if (!App.AppSettings.App.UseVeluxLogin)
-            return;
-
-        Item? details;
-        try
-        {
-            details = await _veluxService.GetProductDetailsAsync(uuid, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-
-        if (details != null)
-        {
-            if (cancellationToken.IsCancellationRequested)
-                return;
-
-            if (SelectedCatalogMaterial?.Id != uuid)
-                return;
-
-            InputName = details.Name;
-            InputDescription = details.Description;
-            InputValue = details.UnitPrice;
-            InputUnitOfMeasure = "pz";
-            IsSignificant = IsMaterialSignificant(details.Name);
-
-            OnPropertyChanged(nameof(InputName));
-            OnPropertyChanged(nameof(InputDescription));
-            OnPropertyChanged(nameof(InputValue));
-            OnPropertyChanged(nameof(IsSignificant));
-        }
+        InputName = item.Name;
+        InputDescription = item.Description;
+        InputValue = item.UnitPrice;
+        InputUnitOfMeasure = item.UnitOfMeasure;
+        IsSignificant = item.IsSignificant;
     }
 
-    private Item? FindLocalCatalogMaterial(string selectionId)
+    private Item? FindCatalogMaterial(CatalogMaterialOption selection)
     {
-        const string idPrefix = "LOCAL_ID_";
-        const string namePrefix = "LOCAL_NAME_";
-        const string legacyPrefix = "LOCAL_";
-
-        if (selectionId.StartsWith(idPrefix, StringComparison.OrdinalIgnoreCase) &&
-            int.TryParse(
-                selectionId[idPrefix.Length..],
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out int persistentId) &&
-            persistentId > 0)
-        {
-            return _personalMaterials.FirstOrDefault(item => item.PersistentId == persistentId);
-        }
-
-        string? materialName = selectionId.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase)
-            ? selectionId[namePrefix.Length..]
-            : selectionId.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase)
-                ? selectionId[legacyPrefix.Length..]
-                : null;
-        if (string.IsNullOrWhiteSpace(materialName))
-            return null;
-
-        Item[] exactMatches = _personalMaterials
-            .Where(item => string.Equals(
-                item.Name.Trim(),
-                materialName.Trim(),
-                StringComparison.OrdinalIgnoreCase))
-            .Take(2)
-            .ToArray();
-        return exactMatches.Length == 1 ? exactMatches[0] : null;
+        if (selection.Item.PersistentId > 0)
+            return _personalMaterials.FirstOrDefault(item => item.PersistentId == selection.Item.PersistentId);
+        return _personalMaterials.FirstOrDefault(item => ReferenceEquals(item, selection.Item));
     }
     #endregion
 }

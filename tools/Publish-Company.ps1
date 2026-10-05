@@ -17,7 +17,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Pubblicazione non riuscita. Non distribuire la
 $forbidden = Get-ChildItem -LiteralPath $destination -File -Recurse | Where-Object {
     $_.Name -eq 'appsettings.json' -or
     $_.Name -match '^(azienda|clienti|history|dati_lavori|materiali_personali|config_fatture)\.json$' -or
-    $_.Name -match '^(Edilpaint|Timbro|velux|roto).*\.(png|jpe?g)$' -or
+    $_.Name -match '^(Edilpaint|Timbro|roto).*\.(png|jpe?g)$' -or
     $_.Name -eq 'Update-EdilPaint.ps1'
 }
 if ($forbidden) { throw 'Il pacchetto contiene dati riservati o risorse aziendali. Non distribuirlo.' }

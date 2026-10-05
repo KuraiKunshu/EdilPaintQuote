@@ -25,13 +25,13 @@ L'aggiornatore EdilPaint è disabilitato nei pacchetti aziendali. Aggiornare dis
 1. Configurare la connessione al database dedicato, già predisposto e raggiungibile. L'applicazione crea/aggiorna lo schema come nell'installazione esistente.
 2. Inserire i dati aziendali. Solo la ragione sociale è obbligatoria. Per iniziare dal preventivo 1 lasciare a 0 l'ultimo numero utilizzato.
 3. In **Impostazioni → Azienda** scegliere IVA predefinita e funzioni opzionali. Verificare inoltre cartella PDF, testi del documento, dipendenti, costi di lavoro ed eventuale invio email.
-4. Inserire materiali e lavorazioni propri tramite le funzioni del catalogo. Il pacchetto parte senza cataloghi o storico EdilPaint. Velux, automatismi per finestre e certificato di posa sono inizialmente disattivati.
+4. Inserire materiali e lavorazioni propri tramite le funzioni del catalogo. Il pacchetto parte senza cataloghi o storico EdilPaint. Gli automatismi per finestre e il certificato di posa sono inizialmente disattivati. La ricerca materiali usa soltanto il catalogo aziendale.
 
 Non è prevista una modalità completamente senza database: il primo avvio e il salvataggio di dati aziendali/cataloghi richiedono la connessione. Se la connessione fallisce al primo avvio, correggerla nelle impostazioni proposte e riavviare.
 
 ## Dove sono conservati i dati
 
-- Configurazione, dipendenti, cache, bozze, sessione Velux e immagini locali: `%LOCALAPPDATA%/PreventiviAzienda/<identificativo>/`.
+- Configurazione, dipendenti, cache, bozze e immagini locali: `%LOCALAPPDATA%/PreventiviAzienda/<identificativo>/`.
 - PDF predefiniti: `Documenti/PreventiviAzienda/<identificativo>/`; il percorso può essere cambiato nelle impostazioni.
 - Clienti, cataloghi, storico, anagrafica azienda e numerazione: database configurato. La numerazione già utilizzata non viene ridotta.
 - Logo e timbro vengono copiati nella cartella locale `Data/Branding`. Nelle altre postazioni copiare questa cartella dalla prima postazione e configurare il timbro; le password vanno reinserite perché protette per utente Windows.

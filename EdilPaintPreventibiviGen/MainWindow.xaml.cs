@@ -653,8 +653,11 @@ public partial class MainWindow : Window
             return;
 
         // Evita loop quando viene selezionato un elemento
-        if (cb.SelectedItem is VeluxResult selected && selected.Label == cb.Text)
+        if (cb.SelectedItem is CatalogMaterialOption selected && selected.Label == cb.Text)
+        {
+            _materialSearchCts?.Cancel();
             return;
+        }
 
         string text = cb.Text;
 

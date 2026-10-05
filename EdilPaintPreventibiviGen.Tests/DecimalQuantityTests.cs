@@ -212,7 +212,7 @@ public sealed class DecimalQuantityTests
     {
         var result = AutomaticWindowMaterialCalculator.Calculate(new AutomaticWindowMaterialCalculationInput
         {
-            WindowProducts = [new("GGL MK04 78x98", 1.5m)], WindowPrefixes = ["GGL"],
+            WindowProducts = [new("FINESTRA (78x98) 78x98", 1.5m)], WindowPrefixes = ["FINESTRA"],
             Labors = [new(1, "Posa", 1.5m)], MaterialCatalog = [new(2, "Nastro")],
             Rules = [new() { Enabled = true, IsWindowAutomation = true, LaborCatalogItemId = 1, MaterialCatalogItemId = 2, Parameter = 1, RuleId = "r", Mode = AutomaticWindowMaterialModes.Perimeter }]
         });

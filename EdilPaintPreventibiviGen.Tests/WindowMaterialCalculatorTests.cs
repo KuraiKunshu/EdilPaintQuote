@@ -11,15 +11,15 @@ public sealed class WindowMaterialCalculatorTests
     {
         WindowMaterialProductLine[] products =
         [
-            new("GGL MK04 2070(78x98)", "", 7),
-            new("GGL MK04 207021A(78x98)", "", 5),
-            new("EDW MK04 2000S(78x98)", "", 12),
-            new("DKL MK04 1025SG", "", 5),
-            new("GGL MK08 2070(78x140)", "", 2),
-            new("EDW MK08 2000S(78x140)", "", 2),
-            new("DKL MK08 1025SG", "", 2),
-            new("GGL PK04 2070(94x98)", "", 1),
-            new("EDW PK04 2000S(94x98)", "", 1)
+            new("FINESTRA (78x98) 2070 (78x98)", "", 7),
+            new("FINESTRA (78x98) 207021A (78x98)", "", 5),
+            new("EDW (78x98) 2000S(78x98)", "", 12),
+            new("DKL (78x98) 1025SG", "", 5),
+            new("FINESTRA (78x140) 2070 (78x140)", "", 2),
+            new("EDW (78x140) 2000S(78x140)", "", 2),
+            new("DKL (78x140) 1025SG", "", 2),
+            new("FINESTRA (94x98) 2070 (94x98)", "", 1),
+            new("EDW (94x98) 2000S(94x98)", "", 1)
         ];
 
         WindowMaterialCalculationResult result = WindowMaterialCalculator.Calculate(
@@ -27,7 +27,7 @@ public sealed class WindowMaterialCalculatorTests
             [new WindowMaterialLaborLine("Finitura interna", "")],
             new WindowMaterialCalculationOptions
             {
-                WindowPrefixes = ["GGL", "GGU", "Q4", "R8"],
+                WindowPrefixes = ["FINESTRA", "SERRAMENTO", "Q4", "R8"],
                 RequiredLaborKeyword = "finitura interna"
             });
 
@@ -61,50 +61,19 @@ public sealed class WindowMaterialCalculatorTests
     }
 
     [Theory]
-    [InlineData("BK", 47)]
-    [InlineData("CK", 55)]
-    [InlineData("FK", 66)]
-    [InlineData("MK", 78)]
-    [InlineData("PK", 94)]
-    [InlineData("SK", 114)]
-    [InlineData("UK", 134)]
-    public void TryGetWindowSizeMapsEveryVeluxWidth(string code, int expectedWidth)
+    [InlineData("FINESTRA CODICE-A04")]
+    [InlineData("FINESTRA 1234")]
+    public void CatalogCodesWithoutExplicitDimensionsAreNotGuessed(string name)
     {
-        bool recognized = WindowMaterialCalculator.TryGetWindowSize(
-            $"GGL {code}04 2070",
-            ["ggl"],
-            out WindowSize size);
-
-        Assert.True(recognized);
-        Assert.Equal(new WindowSize(expectedWidth, 98), size);
-    }
-
-    [Theory]
-    [InlineData("25", 55)]
-    [InlineData("01", 70)]
-    [InlineData("02", 78)]
-    [InlineData("04", 98)]
-    [InlineData("06", 118)]
-    [InlineData("08", 140)]
-    [InlineData("10", 160)]
-    [InlineData("12", 180)]
-    public void TryGetWindowSizeMapsEveryVeluxHeight(string code, int expectedHeight)
-    {
-        bool recognized = WindowMaterialCalculator.TryGetWindowSize(
-            $"GGU MK{code} 006621",
-            ["GGU"],
-            out WindowSize size);
-
-        Assert.True(recognized);
-        Assert.Equal(new WindowSize(78, expectedHeight), size);
+        Assert.False(WindowMaterialCalculator.TryGetWindowSize(name, ["FINESTRA"], out _));
     }
 
     [Theory]
     [InlineData("Q42C 078/118 K200", "q4", 78, 118)]
     [InlineData("R89P 114/140 K2EF", "R8", 114, 140)]
-    [InlineData("GGL prodotto speciale (94X98)", "GGL", 94, 98)]
-    [InlineData("GGU prodotto speciale (55×98)", "ggu", 55, 98)]
-    public void TryGetWindowSizeSupportsRotoAndExplicitMeasures(
+    [InlineData("FINESTRA prodotto speciale (94X98)", "FINESTRA", 94, 98)]
+    [InlineData("SERRAMENTO prodotto speciale (55×98)", "serramento", 55, 98)]
+    public void TryGetWindowSizeSupportsSlashAndExplicitMeasures(
         string productName,
         string prefix,
         int expectedWidth,
@@ -120,14 +89,14 @@ public sealed class WindowMaterialCalculatorTests
     }
 
     [Theory]
-    [InlineData("EDW MK04 2000S(78x98)")]
-    [InlineData("DKL MK04 1025SG")]
-    [InlineData("Accessorio GGL MK04 (78x98)")]
+    [InlineData("EDW (78x98) 2000S(78x98)")]
+    [InlineData("DKL (78x98) 1025SG")]
+    [InlineData("Accessorio FINESTRA (78x98) (78x98)")]
     public void TryGetWindowSizeRejectsProductsThatDoNotStartWithAllowedPrefix(string productName)
     {
         bool recognized = WindowMaterialCalculator.TryGetWindowSize(
             productName,
-            ["GGL", "GGU"],
+            ["FINESTRA", "SERRAMENTO"],
             out _);
 
         Assert.False(recognized);
@@ -139,11 +108,11 @@ public sealed class WindowMaterialCalculatorTests
     public void RequiredLaborNameMatchesIgnoringCaseAndOuterSpaces(string name)
     {
         WindowMaterialCalculationResult result = WindowMaterialCalculator.Calculate(
-            [new WindowMaterialProductLine("GGL CK04 2070", "", 2)],
+            [new WindowMaterialProductLine("FINESTRA (55x98) 2070", "", 2)],
             [new WindowMaterialLaborLine(name, "")],
             new WindowMaterialCalculationOptions
             {
-                WindowPrefixes = ["GGL"],
+                WindowPrefixes = ["FINESTRA"],
                 RequiredLaborKeyword = "finitura interna"
             });
 
@@ -166,11 +135,11 @@ public sealed class WindowMaterialCalculatorTests
     public void MissingRequiredLaborDoesNotGenerateMaterial()
     {
         WindowMaterialCalculationResult result = WindowMaterialCalculator.Calculate(
-            [new WindowMaterialProductLine("GGL MK04 2070", "", 3)],
+            [new WindowMaterialProductLine("FINESTRA (78x98) 2070", "", 3)],
             [new WindowMaterialLaborLine("Installazione finestra", "")],
             new WindowMaterialCalculationOptions
             {
-                WindowPrefixes = ["GGL"],
+                WindowPrefixes = ["FINESTRA"],
                 RequiredLaborKeyword = "finitura interna"
             });
 
@@ -199,29 +168,29 @@ public sealed class WindowMaterialCalculatorTests
     public void ValidPrefixWithMissingMeasureIsReportedInsteadOfSilentlyIgnored()
     {
         WindowMaterialCalculationResult result = WindowMaterialCalculator.Calculate(
-            [new WindowMaterialProductLine("GGL prodotto senza misura", "", 2)],
+            [new WindowMaterialProductLine("FINESTRA prodotto senza misura", "", 2)],
             [new WindowMaterialLaborLine("Finitura interna", "")],
             new WindowMaterialCalculationOptions
             {
-                WindowPrefixes = ["GGL"],
+                WindowPrefixes = ["FINESTRA"],
                 RequiredLaborKeyword = "Finitura interna"
             });
 
         Assert.Equal(0, result.TotalLinearMeters);
         UnrecognizedWindowProduct product = Assert.Single(result.UnrecognizedProducts);
-        Assert.Equal("GGL prodotto senza misura", product.Name);
+        Assert.Equal("FINESTRA prodotto senza misura", product.Name);
         Assert.Equal(2, product.Quantity);
     }
 
     [Fact]
-    public void ConflictingExplicitAndVeluxMeasuresAreReportedAsUnrecognized()
+    public void ConflictingExplicitMeasuresAreReportedAsUnrecognized()
     {
         WindowMaterialCalculationResult result = WindowMaterialCalculator.Calculate(
-            [new WindowMaterialProductLine("GGL MK04 2070(94x98)", "", 1)],
+            [new WindowMaterialProductLine("FINESTRA (78x98) 2070 (94x98)", "", 1)],
             [new WindowMaterialLaborLine("Finitura interna", "")],
             new WindowMaterialCalculationOptions
             {
-                WindowPrefixes = ["GGL"],
+                WindowPrefixes = ["FINESTRA"],
                 RequiredLaborKeyword = "Finitura interna"
             });
 
@@ -235,11 +204,11 @@ public sealed class WindowMaterialCalculatorTests
     public void NonPositiveProductQuantityIsIgnoredWithoutWarning(int quantity)
     {
         WindowMaterialCalculationResult result = WindowMaterialCalculator.Calculate(
-            [new WindowMaterialProductLine("GGL MK04 2070", "", quantity)],
+            [new WindowMaterialProductLine("FINESTRA (78x98) 2070", "", quantity)],
             [new WindowMaterialLaborLine("Finitura interna", "")],
             new WindowMaterialCalculationOptions
             {
-                WindowPrefixes = ["GGL"],
+                WindowPrefixes = ["FINESTRA"],
                 RequiredLaborKeyword = "Finitura interna"
             });
 

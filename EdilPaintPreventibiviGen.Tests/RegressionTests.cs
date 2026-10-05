@@ -1046,26 +1046,15 @@ public sealed class RegressionTests
     }
 
     [Fact]
-    public void DpapiEncryptsAndDecryptsVeluxSession()
+    public void DpapiEncryptsAndDecryptsProtectedPayload()
     {
         const string json = """{"cookies":[{"name":"session","value":"secret"}]}""";
 
-        string protectedValue = SecretProtectionService.Protect(json, "VeluxSession.v1");
+        string protectedValue = SecretProtectionService.Protect(json, "ProtectedPayload.v1");
 
         Assert.StartsWith("dpapi:", protectedValue, StringComparison.Ordinal);
         Assert.NotEqual(json, protectedValue);
-        Assert.Equal(json, SecretProtectionService.Unprotect(protectedValue, "VeluxSession.v1"));
-    }
-
-    [Fact]
-    public async Task VeluxSearchRespectsCancellation()
-    {
-        using var service = new VeluxService();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await service.SearchProductsAsync("test", cts.Token));
+        Assert.Equal(json, SecretProtectionService.Unprotect(protectedValue, "ProtectedPayload.v1"));
     }
 
     [Fact]

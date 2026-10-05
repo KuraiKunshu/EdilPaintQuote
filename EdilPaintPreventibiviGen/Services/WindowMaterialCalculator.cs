@@ -6,31 +6,6 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public static partial class WindowMaterialCalculator
 {
-    private static readonly IReadOnlyDictionary<string, int> VeluxWidths =
-        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["BK"] = 47,
-            ["CK"] = 55,
-            ["FK"] = 66,
-            ["MK"] = 78,
-            ["PK"] = 94,
-            ["SK"] = 114,
-            ["UK"] = 134
-        };
-
-    private static readonly IReadOnlyDictionary<string, int> VeluxHeights =
-        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["25"] = 55,
-            ["01"] = 70,
-            ["02"] = 78,
-            ["04"] = 98,
-            ["06"] = 118,
-            ["08"] = 140,
-            ["10"] = 160,
-            ["12"] = 180
-        };
-
     public static WindowMaterialCalculationResult Calculate(
         IEnumerable<WindowMaterialProductLine> products,
         IEnumerable<WindowMaterialLaborLine> labors,
@@ -123,18 +98,16 @@ public static partial class WindowMaterialCalculator
             return false;
         }
 
-        var detectedSizes = new List<WindowSize>(3);
-        if (TryParseExplicitSize(name, out WindowSize explicitSize))
-            detectedSizes.Add(explicitSize);
-        if (TryParseRotoSize(name, out WindowSize rotoSize))
-            detectedSizes.Add(rotoSize);
-        if (TryParseVeluxSize(name, out WindowSize veluxSize))
-            detectedSizes.Add(veluxSize);
-
-        if (detectedSizes.Count == 0 || detectedSizes.Any(candidate => candidate != detectedSizes[0]))
+        WindowSize? detected = null;
+        foreach (Match match in ExplicitSizeRegex().Matches(name))
+        {
+            if (!TryCreateSize(match, out WindowSize candidate) || (detected.HasValue && candidate != detected.Value))
+                return false;
+            detected = candidate;
+        }
+        if (!detected.HasValue)
             return false;
-
-        size = detectedSizes[0];
+        size = detected.Value;
         return true;
     }
 
@@ -163,27 +136,6 @@ public static partial class WindowMaterialCalculator
         return false;
     }
 
-    private static bool TryParseExplicitSize(string productName, out WindowSize size) =>
-        TryCreateSize(ExplicitSizeRegex().Match(productName), out size);
-
-    private static bool TryParseRotoSize(string productName, out WindowSize size) =>
-        TryCreateSize(RotoSizeRegex().Match(productName), out size);
-
-    private static bool TryParseVeluxSize(string productName, out WindowSize size)
-    {
-        size = default;
-        Match match = VeluxSizeRegex().Match(productName);
-        if (!match.Success ||
-            !VeluxWidths.TryGetValue(match.Groups["width"].Value, out int width) ||
-            !VeluxHeights.TryGetValue(match.Groups["height"].Value, out int height))
-        {
-            return false;
-        }
-
-        size = new WindowSize(width, height);
-        return true;
-    }
-
     private static bool TryCreateSize(Match match, out WindowSize size)
     {
         size = default;
@@ -200,12 +152,6 @@ public static partial class WindowMaterialCalculator
         return true;
     }
 
-    [GeneratedRegex(@"\(\s*(?<width>\d{2,3})\s*(?:[xX]|\u00D7)\s*(?<height>\d{2,3})\s*\)", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?<![\d.,])(?<width>\d{2,3})\s*(?:[xX/]|\u00D7)\s*(?<height>\d{2,3})(?![\d.,])", RegexOptions.CultureInvariant)]
     private static partial Regex ExplicitSizeRegex();
-
-    [GeneratedRegex(@"(?<!\d)(?<width>\d{3})\s*/\s*(?<height>\d{3})(?!\d)", RegexOptions.CultureInvariant)]
-    private static partial Regex RotoSizeRegex();
-
-    [GeneratedRegex(@"(?<![A-Z0-9])(?<width>BK|CK|FK|MK|PK|SK|UK)(?<height>25|01|02|04|06|08|10|12)(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex VeluxSizeRegex();
 }

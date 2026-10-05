@@ -395,7 +395,7 @@
                                     <TextBlock Text="Funzioni per serramenti" FontWeight="SemiBold"/>
                                     <CheckBox x:Name="ChkWindowAutomations" Margin="0,12,0,12"><TextBlock Text="Aggiungi automaticamente i materiali per finestra nel calcolo del guadagno" TextWrapping="Wrap"/></CheckBox>
                                     <CheckBox x:Name="ChkInstallationCertificate" Content="Mostra il certificato di corretta posa nello storico" Margin="0,0,0,12"/>
-                                    <TextBlock Text="L'accesso al catalogo Velux si abilita separatamente nella scheda Generali. Con l'accesso disattivato puoi usare i tuoi materiali e le tue lavorazioni." TextWrapping="Wrap"/>
+                                    <TextBlock Text="Materiali e lavorazioni provengono dal catalogo aziendale. Gli automatismi per serramenti richiedono misure esplicite, ad esempio 78x98 cm nel nome del prodotto." TextWrapping="Wrap"/>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>
@@ -594,7 +594,7 @@
                                                              VerticalContentAlignment="Top"
                                                              VerticalScrollBarVisibility="Auto"/>
                                                     <TextBlock Style="{StaticResource HintStyle}"
-                                                               Text="Uno per riga. Il nome prodotto deve iniziare con uno di questi codici, ad esempio GGL, Q4 o R8. Se la lista è vuota vengono ripristinati i valori predefiniti."/>
+                                                               Text="Uno per riga. Il nome prodotto deve iniziare con uno di questi codici, ad esempio FINESTRA. Se la lista è vuota vengono ripristinati i valori predefiniti."/>
                                                 </StackPanel>
                                             </Border>
 
@@ -836,16 +836,16 @@
                             </ScrollViewer>
                         </TabItem>
 
-                        <TabItem x:Name="TabDatabaseSettings" Header="_Database e integrazioni">
+                        <TabItem x:Name="TabDatabaseSettings" Header="_Database">
                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled"
                                           HorizontalContentAlignment="Stretch"
                                           Focusable="False">
                                 <StackPanel Margin="18,16,18,6" HorizontalAlignment="Stretch">
                                     <StackPanel Margin="2,0,0,14">
-                                        <TextBlock Text="Database e integrazioni"
+                                        <TextBlock Text="Database aziendale"
                                                    Style="{StaticResource PageTitleStyle}"/>
-                                        <TextBlock Text="Connessione ai dati condivisi e servizi esterni utilizzati dall'app."
+                                        <TextBlock Text="Connessione all’archivio condiviso dell’azienda."
                                                    Style="{StaticResource PageSubtitleStyle}"/>
                                     </StackPanel>
 
@@ -907,28 +907,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <Border Style="{StaticResource SectionStyle}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Text="Integrazione Velux"
-                                                           Style="{StaticResource SectionTitleStyle}"/>
-                                                <CheckBox x:Name="ChkUseVeluxLogin"
-                                                          Content="Cerca anche nel catalogo Velux durante la ricerca materiali"/>
-                                                <TextBlock Style="{StaticResource HintStyle}"
-                                                           Text="Il login avviene nel browser integrato e la sessione resta salvata solo su questo PC."/>
-                                            </StackPanel>
-                                            <Button Grid.Column="1"
-                                                    Content="Rimuovi sessione"
-                                                    Margin="16,0,0,0"
-                                                    VerticalAlignment="Center"
-                                                    Style="{StaticResource DangerCompactButtonStyle}"
-                                                    Click="OnClearVeluxSessionClick"/>
-                                        </Grid>
-                                    </Border>
+
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>

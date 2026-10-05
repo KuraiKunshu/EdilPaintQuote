@@ -99,7 +99,6 @@ public static class AppSettingsFileService
                 RestoreMissingPdfsOnStartup = false,
                 DatabaseCostSavingMode = true,
                 IsSilentStartup = false,
-                UseVeluxLogin = false,
                 ImportLegacyData = !generic,
                 DefaultVatType = generic ? "22%" : "RC 10%+22%",
                 NumberOfQuote = 200,

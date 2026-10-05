@@ -291,7 +291,7 @@ public sealed class WorkSheetTests
         Notes = "Telefonare al referente prima dell'arrivo.\nPortare i teli e la scala per l'accesso al piano superiore.",
         SupplierName = "Fornitore di prova", MaterialStatus = "In magazzino",
         MaterialOrderDate = new DateTime(2026, 9, 1), ExpectedDeliveryDate = new DateTime(2026, 9, 15),
-        Materials = [new() { Name = "Finestra GGL MK04", Description = "Finitura bianca, vetrocamera isolante", Quantity = 12 }],
+        Materials = [new() { Name = "Finestra FINESTRA (78x98)", Description = "Finitura bianca, vetrocamera isolante", Quantity = 12 }],
         Labors = [new() { Name = "Posa finestra", Quantity = 12 }]
     };
 }

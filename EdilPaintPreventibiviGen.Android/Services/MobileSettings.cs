@@ -19,7 +19,7 @@ public sealed class MobileSettings
     public double HoursPerDay { get; set; } = 10;
     public double HourlyCost { get; set; } = 40;
     public double ProfitReductionPercentage { get; set; }
-    public List<string> WindowPrefixes { get; set; } = ["GGL", "GGU", "GPL", "GPU", "Q4", "R8"];
+    public List<string> WindowPrefixes { get; set; } = ["FINESTRA"];
     public List<EdilPaintPreventibiviGen.Models.AutomaticWindowMaterialRule> MaterialRules { get; set; } =
     [new() { RuleId = "internal-finish", LaborNameSnapshot = "Finitura interna", MaterialNameSnapshot = "Perline" }];
 

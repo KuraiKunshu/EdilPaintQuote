@@ -23,7 +23,6 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     #region Services
     private readonly IDataService _dataService;
-    private readonly VeluxService _veluxService = new();
     private readonly PdfService _pdfService = new();
     private readonly StoragePathService _storagePathService = StoragePathService.Instance;
     private readonly QuoteCalculator _quoteCalculator = new();
@@ -39,7 +38,6 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private List<Customer> _allCustomers = new();
     private List<Item> _allCatalogLabors = new();
     private List<Item> _personalMaterials = new();
-    private readonly HashSet<string> _significantMaterialPrefixes = new(StringComparer.OrdinalIgnoreCase);
     #endregion
 
     #region Selection State
@@ -49,9 +47,8 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _unresolvedCustomerName = string.Empty;
     private string _unresolvedReferenceCustomerName = string.Empty;
     private string _unresolvedBillingCustomerName = string.Empty;
-    private VeluxResult? _selectedCatalogMaterial;
+    private CatalogMaterialOption? _selectedCatalogMaterial;
     private Item? _selectedCatalogLabor;
-    private CancellationTokenSource? _veluxDetailsCts;
     #endregion
 
     #region UI State - Search
@@ -128,7 +125,7 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     #region Collections & Views
     public ObservableCollection<Customer> AllCustomers { get; } = new();
     public ObservableCollection<Item> AllCatalogLabors { get; } = new();
-    public ObservableCollection<VeluxResult> AllCatalogMaterials { get; } = new();
+    public ObservableCollection<CatalogMaterialOption> AllCatalogMaterials { get; } = new();
     public ObservableCollection<Customer> FilteredCustomers { get; } = new();
     public ObservableCollection<Customer> FilteredSecondCustomers { get; } = new();
     public ObservableCollection<Item> FilteredLabors { get; } = new();
@@ -157,7 +154,6 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
         _dataService = App.DataService;
         _quoteHistoryService = new QuoteHistoryService(_dataService, _storagePathService);
 
-        _veluxService.OnLoginRequired += HandleVeluxLogin;
 
         Materials.CollectionChanged += OnItemsCollectionChanged;
         Labors.CollectionChanged += OnItemsCollectionChanged;
@@ -167,11 +163,6 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         Materials.CollectionChanged -= OnItemsCollectionChanged;
         Labors.CollectionChanged -= OnItemsCollectionChanged;
-        _veluxDetailsCts?.Cancel();
-        _veluxDetailsCts?.Dispose();
-        _veluxDetailsCts = null;
-        _veluxService.OnLoginRequired -= HandleVeluxLogin;
-        _veluxService.Dispose();
         _draftSaveLock.Dispose();
         _sharedDataRefreshLock.Dispose();
     }
@@ -317,20 +308,16 @@ public partial class MainViewModel : INotifyPropertyChanged, IDisposable
             IsBillingCustomerEnabled && SelectedBillingCustomer != null,
             App.AppSettings?.App.GetEffectiveDefaultVatType() ?? "RC 10%+22%");
 
-    public VeluxResult? SelectedCatalogMaterial
+    public CatalogMaterialOption? SelectedCatalogMaterial
     {
         get => _selectedCatalogMaterial;
         set
         {
             _selectedCatalogMaterial = value;
-            _veluxDetailsCts?.Cancel();
-            _veluxDetailsCts?.Dispose();
-            _veluxDetailsCts = null;
 
             if (value != null)
             {
-                _veluxDetailsCts = AppShutdownManager.CreateLinkedTokenSource();
-                _ = FetchVeluxDetails(value.Id, _veluxDetailsCts.Token);
+                ApplyCatalogMaterial(value);
             }
 
             OnPropertyChanged();

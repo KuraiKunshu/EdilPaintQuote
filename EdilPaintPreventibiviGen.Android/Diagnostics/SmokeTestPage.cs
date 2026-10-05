@@ -18,7 +18,7 @@ public sealed class SmokeTestPage : OperationPage
             MaterialStatus = "ORDINATO", MaterialOrderDate = DateTime.Today,
             CustomerNotes = "Nota pubblica di prova", Notes = "Nota interna riservata",
             PaymentTerms = "Acconto 30%, saldo a fine lavori", IvaType = "22%", Imponibile = 1850, Total = 2257,
-            Materials = [new() { Name = "GGL MK04 finestra per tetti", Description = "Dimensioni 78 x 98 cm. Finitura bianca.", Quantity = 3, UnitPrice = 500 }],
+            Materials = [new() { Name = "FINESTRA (78x98) finestra per tetti", Description = "Dimensioni 78 x 98 cm. Finitura bianca.", Quantity = 3, UnitPrice = 500 }],
             Labors = [new() { Name = "Posa in opera e finitura interna", Quantity = 2, UnitPrice = 175 }],
             Events = [new() { Description = "Preventivo creato per test", CreatedAtUtc = DateTime.UtcNow }]
         };

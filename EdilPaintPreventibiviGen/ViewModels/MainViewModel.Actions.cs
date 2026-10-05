@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -60,15 +60,6 @@ public partial class MainViewModel
         }
     }
 
-    private async Task<bool> HandleVeluxLogin()
-    {
-        if (!App.AppSettings.App.UseVeluxLogin) return false;
-        return await Application.Current.Dispatcher.InvokeAsync(() =>
-        {
-            var win = new VeluxLoginWindow { Owner = Application.Current.MainWindow };
-            return win.ShowDialog() == true;
-        });
-    }
     #endregion
 }
 

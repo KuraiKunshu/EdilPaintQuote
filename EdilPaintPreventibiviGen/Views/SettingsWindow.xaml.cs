@@ -98,7 +98,6 @@ public partial class SettingsWindow : Window
         ChkRestoreMissingPdfsOnStartup.IsChecked = app.RestoreMissingPdfsOnStartup;
         ChkDatabaseCostSavingMode.IsChecked = app.DatabaseCostSavingMode;
         ChkSilentStartup.IsChecked = app.IsSilentStartup;
-        ChkUseVeluxLogin.IsChecked = app.UseVeluxLogin;
         TxtHistoryResultLimit.Text = app.NumberOfQuote.ToString(CultureInfo.InvariantCulture);
         TxtTempPath.Text = app.TempPath;
         TxtDeviceName.Text = app.GetEffectiveDeviceName();
@@ -374,7 +373,6 @@ public partial class SettingsWindow : Window
             app.RestoreMissingPdfsOnStartup = ChkRestoreMissingPdfsOnStartup.IsChecked == true;
             app.DatabaseCostSavingMode = ChkDatabaseCostSavingMode.IsChecked == true;
             app.IsSilentStartup = ChkSilentStartup.IsChecked == true;
-            app.UseVeluxLogin = ChkUseVeluxLogin.IsChecked == true;
             app.NumberOfQuote = historyResultLimit;
             app.TempPath = TxtTempPath.Text.Trim();
             app.DeviceName = string.IsNullOrWhiteSpace(TxtDeviceName.Text)
@@ -637,27 +635,6 @@ public partial class SettingsWindow : Window
 
         if (dialog.ShowDialog() == true)
             target.Text = dialog.FolderName;
-    }
-
-    private void OnClearVeluxSessionClick(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            VeluxSessionStorage.Clear();
-            MessageBox.Show(
-                "Sessione Velux rimossa. Il login verra richiesto alla prossima ricerca dopo il riavvio dell'app.",
-                "Sessione Velux",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"Impossibile rimuovere la sessione Velux.\n\n{ex.Message}",
-                "Errore sessione Velux",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-        }
     }
 
     private void OnRunUpdaterClick(object sender, RoutedEventArgs e)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -84,58 +84,14 @@ public partial class MainViewModel
 
     public async Task ApplyMaterialFilterAsync(string text, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(text) || text.Length < 3)
-        {
-            await Application.Current.Dispatcher.InvokeAsync(() => AllCatalogMaterials.Clear());
-            return;
-        }
-
-        try
+        var matches = MaterialCatalogSearch.Find(_personalMaterials, text, cancellationToken);
+        await Application.Current.Dispatcher.InvokeAsync(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            var personalMatches = _personalMaterials
-                .Where(m =>
-                    !m.IsCompanyMaterial &&
-                    m.Name.Contains(text, StringComparison.OrdinalIgnoreCase))
-                .Select(p => new VeluxResult
-                {
-                    Id = p.PersistentId > 0
-                        ? $"LOCAL_ID_{p.PersistentId}"
-                        : "LOCAL_NAME_" + p.Name,
-                    Label = $"[Locale] {p.Name} - EUR {p.UnitPrice:N2}",
-                    Value = p.Name
-                })
-                .ToList();
-
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                AllCatalogMaterials.Clear();
-                foreach (var p in personalMatches)
-                    AllCatalogMaterials.Add(p);
-            });
-
-            if (!App.AppSettings.App.UseVeluxLogin)
-                return;
-
-            var veluxResults = await _veluxService.SearchProductsAsync(text, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            Debug.WriteLine($"[SEARCH] Velux: {veluxResults.Count} | Locali: {personalMatches.Count}");
-
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                for (int i = 0; i < veluxResults.Count; i++)
-                    AllCatalogMaterials.Insert(i, veluxResults[i]);
-            });
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[ApplyMaterialFilter] Errore: {ex.Message}");
-        }
+            AllCatalogMaterials.Clear();
+            foreach (var match in matches)
+                AllCatalogMaterials.Add(match);
+        });
     }
     #endregion
 }

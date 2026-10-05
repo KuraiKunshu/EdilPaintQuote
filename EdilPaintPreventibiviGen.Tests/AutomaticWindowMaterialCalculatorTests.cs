@@ -12,11 +12,11 @@ public sealed class AutomaticWindowMaterialCalculatorTests
         AutomaticWindowMaterialCalculationResult result = Calculate(
             products:
             [
-                new("GGL MK04 2070(78x98)", 7),
-                new("GGL MK04 207021A(78x98)", 5),
-                new("EDW MK04 2000S(78x98)", 12),
-                new("GGL MK08 2070(78x140)", 2),
-                new("GGL PK04 2070(94x98)", 1)
+                new("FINESTRA (78x98) 2070 (78x98)", 7),
+                new("FINESTRA (78x98) 207021A (78x98)", 5),
+                new("EDW (78x98) 2000S(78x98)", 12),
+                new("FINESTRA (78x140) 2070 (78x140)", 2),
+                new("FINESTRA (94x98) 2070 (94x98)", 1)
             ],
             labors: [new(20, "Finitura interna", 15)],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
@@ -38,10 +38,10 @@ public sealed class AutomaticWindowMaterialCalculatorTests
         AutomaticWindowMaterialCalculationResult result = Calculate(
             products:
             [
-                new("GGL MK04 2070(78x98)", 7),
-                new("GGL MK04 207021A(78x98)", 5),
-                new("GGL MK08 2070(78x140)", 2),
-                new("GGL PK04 2070(94x98)", 1)
+                new("FINESTRA (78x98) 2070 (78x98)", 7),
+                new("FINESTRA (78x98) 207021A (78x98)", 5),
+                new("FINESTRA (78x140) 2070 (78x140)", 2),
+                new("FINESTRA (94x98) 2070 (94x98)", 1)
             ],
             labors:
             [
@@ -80,9 +80,9 @@ public sealed class AutomaticWindowMaterialCalculatorTests
         AutomaticWindowMaterialCalculationResult result = Calculate(
             products:
             [
-                new("GGL MK08", 2),
-                new("GGL MK04", 1),
-                new("GGL MK04", int.MaxValue)
+                new("FINESTRA (78x140)", 2),
+                new("FINESTRA (78x98)", 1),
+                new("FINESTRA (78x98)", int.MaxValue)
             ],
             labors: [new(20, "Finitura interna")],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
@@ -100,7 +100,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void RuleOverflowDiscardsCalculationsFromOtherwiseValidRules()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors:
             [
                 new(20, "Finitura interna"),
@@ -139,7 +139,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void AggregateOverflowDiscardsEveryMaterialPlan()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors:
             [
                 new(20, "Lavoro A"),
@@ -189,7 +189,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void GeneratedRuleIdIsReservedAgainstLaterExplicitCollision()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             rules:
             [
@@ -230,8 +230,8 @@ public sealed class AutomaticWindowMaterialCalculatorTests
         AutomaticWindowMaterialCalculationResult result = Calculate(
             products:
             [
-                new("GGL MK04", int.MaxValue),
-                new("GGL MK08", 1)
+                new("FINESTRA (78x98)", int.MaxValue),
+                new("FINESTRA (78x140)", 1)
             ],
             labors:
             [
@@ -264,8 +264,8 @@ public sealed class AutomaticWindowMaterialCalculatorTests
         AutomaticWindowMaterialCalculationResult result = Calculate(
             products:
             [
-                new("GGL MK04 2070", 2),
-                new("GGL MK08 2070", 1)
+                new("FINESTRA (78x98) 2070", 2),
+                new("FINESTRA (78x140) 2070", 1)
             ],
             labors: [new(30, "Supporto corretta quota", 3)],
             rules:
@@ -290,7 +290,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void ModernLaborIdsDoNotFallBackToEqualNames()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(99, "Finitura interna")],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
             catalog: [new(100, "Perline")]);
@@ -304,7 +304,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void LegacyLaborLineFallsBackToExactSnapshotName()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(0, "  FINITURA INTERNA  ")],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
             catalog: [new(100, "Perline")]);
@@ -316,7 +316,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void LegacyMaterialRuleUsesUniqueCatalogNameAndSubtractsByResolvedId()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 2)],
+            products: [new("FINESTRA (78x98)", 2)],
             labors: [new(20, "Finitura interna", 2)],
             existing: [new(100, "Nome non rilevante", 3)],
             rules: [Rule("finish", 20, "Finitura interna", 0, " perline ")],
@@ -335,7 +335,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void TwoRulesForSameMaterialAreAggregatedBeforeExistingQuantityIsSubtracted()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors:
             [
                 new(20, "Finitura interna"),
@@ -367,7 +367,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void MaterialsWithSameNameAndDifferentIdsRemainSeparate()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors:
             [
                 new(20, "Lavoro A"),
@@ -400,7 +400,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void AmbiguousLegacyMaterialDoesNotChooseCatalogItemOrSubtractLegacyQuantity()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             existing: [new(0, "Perline", 2)],
             rules: [Rule("finish", 20, "Finitura interna", 0, "Perline")],
@@ -425,7 +425,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void MissingCatalogItemKeepsConfiguredIdAndCanSubtractSameId()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             existing: [new(999, "Vecchie perline", 1)],
             rules: [Rule("finish", 20, "Finitura interna", 999, "Perline eliminate")]);
@@ -443,7 +443,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void CatalogRenameRetainsSnapshotAsAliasForLegacyQuoteLine()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             existing: [new(0, "Vecchie perline", 1)],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Vecchie perline")],
@@ -459,7 +459,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void DuplicateRuleIsIgnoredInsteadOfDoublingRequirement()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             rules:
             [
@@ -479,7 +479,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void ExistingMaterialWithDifferentModernIdDoesNotMatchByName()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             existing: [new(101, "Perline", 4)],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
@@ -498,13 +498,13 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void ExactAndExcessExistingQuantitiesNeverProduceNegativeAddition()
     {
         AutomaticWindowMaterialCalculationResult exact = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             existing: [new(100, "Perline", 4)],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
             catalog: [new(100, "Perline")]);
         AutomaticWindowMaterialCalculationResult excess = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             existing: [new(100, "Perline", 10)],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
@@ -535,7 +535,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
             0m);
 
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 1)],
+            products: [new("FINESTRA (78x98)", 1)],
             labors: [new(20, "Finitura interna")],
             rules: [badMode, badParameter],
             catalog: [new(100, "Perline")]);
@@ -553,8 +553,8 @@ public sealed class AutomaticWindowMaterialCalculatorTests
         AutomaticWindowMaterialCalculationResult result = Calculate(
             products:
             [
-                new("GGL prodotto senza misura", 2),
-                new("EDW MK04", 10)
+                new("FINESTRA prodotto senza misura", 2),
+                new("EDW (78x98)", 10)
             ],
             labors: [new(20, "Finitura interna")],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
@@ -571,7 +571,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void WindowRuleUsesLaborQuantityInsteadOfEveryRecognizedWindow()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 3)],
+            products: [new("FINESTRA (78x98)", 3)],
             labors: [new(20, "Finitura interna", 2)],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
             catalog: [new(100, "Perline")]);
@@ -617,7 +617,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
     public void WindowRuleWarnsWhenLaborQuantityExceedsRecognizedWindows()
     {
         AutomaticWindowMaterialCalculationResult result = Calculate(
-            products: [new("GGL MK04", 2)],
+            products: [new("FINESTRA (78x98)", 2)],
             labors: [new(20, "Finitura interna", 3)],
             rules: [Rule("finish", 20, "Finitura interna", 100, "Perline")],
             catalog: [new(100, "Perline")]);
@@ -639,7 +639,7 @@ public sealed class AutomaticWindowMaterialCalculatorTests
             Labors = labors,
             ExistingQuoteMaterials = existing ?? Array.Empty<AutomaticQuoteMaterialLine>(),
             Rules = rules ?? Array.Empty<AutomaticWindowMaterialRule>(),
-            WindowPrefixes = ["GGL", "GGU", "Q4", "R8"],
+            WindowPrefixes = ["FINESTRA", "SERRAMENTO", "Q4", "R8"],
             MaterialCatalog = catalog ?? Array.Empty<AutomaticMaterialCatalogItem>()
         });
 

@@ -117,8 +117,6 @@
     <Color x:Key="LoadingMessageColor">#6B7280</Color>
     <Color x:Key="LoadingProgressBackgroundColor">#F3F4F6</Color>
     <Color x:Key="LoadingDetailColor">#9CA3AF</Color>
-    <Color x:Key="VeluxFooterBackgroundColor">#F8F9FA</Color>
-    <Color x:Key="VeluxLoginButtonColor">#1ABC9C</Color>
 
     <!-- PDF palette -->
     <Color x:Key="PdfWhiteColor">#FFFFFF</Color>
@@ -267,8 +265,6 @@
     <SolidColorBrush x:Key="LoadingMessageBrush" Color="{StaticResource LoadingMessageColor}"/>
     <SolidColorBrush x:Key="LoadingProgressBackgroundBrush" Color="{StaticResource LoadingProgressBackgroundColor}"/>
     <SolidColorBrush x:Key="LoadingDetailBrush" Color="{StaticResource LoadingDetailColor}"/>
-    <SolidColorBrush x:Key="VeluxFooterBackgroundBrush" Color="{StaticResource VeluxFooterBackgroundColor}"/>
-    <SolidColorBrush x:Key="VeluxLoginButtonBrush" Color="{StaticResource VeluxLoginButtonColor}"/>
 
     <!-- Effects -->
     <DropShadowEffect x:Key="ShadowEffect"

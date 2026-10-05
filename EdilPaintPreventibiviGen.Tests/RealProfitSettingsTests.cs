@@ -16,7 +16,7 @@ public sealed class RealProfitSettingsTests
         settings.Normalize();
 
         Assert.Equal(0, settings.ProfitReductionPercentage);
-        Assert.Equal(["GGL", "GGU", "GPL", "GPU", "Q4", "R8"], settings.WindowProductPrefixes);
+        Assert.Equal(["FINESTRA"], settings.WindowProductPrefixes);
         Assert.Equal("Finitura interna", settings.InternalFinishLaborKeyword);
         Assert.Equal("Perline", settings.InternalFinishMaterialName);
         Assert.Equal(RealProfitSettingsModel.CurrentWindowMaterialRulesSchemaVersion, settings.WindowMaterialRulesSchemaVersion);
@@ -37,7 +37,7 @@ public sealed class RealProfitSettingsTests
         var settings = new RealProfitSettingsModel
         {
             ProfitReductionPercentage = 140,
-            WindowProductPrefixes = [" ggl ", "GGL", " q4", "", "R8 "],
+            WindowProductPrefixes = [" finestra ", "FINESTRA", " q4", "", "R8 "],
             InternalFinishLaborKeyword = "  finitura interna  ",
             InternalFinishMaterialName = "  Perline abete  "
         };
@@ -45,7 +45,7 @@ public sealed class RealProfitSettingsTests
         settings.Normalize();
 
         Assert.Equal(100, settings.ProfitReductionPercentage);
-        Assert.Equal(["GGL", "Q4", "R8"], settings.WindowProductPrefixes);
+        Assert.Equal(["FINESTRA", "Q4", "R8"], settings.WindowProductPrefixes);
         Assert.Equal("finitura interna", settings.InternalFinishLaborKeyword);
         Assert.Equal("Perline abete", settings.InternalFinishMaterialName);
         WindowMaterialRuleSettingsModel rule = Assert.Single(settings.WindowMaterialRules);

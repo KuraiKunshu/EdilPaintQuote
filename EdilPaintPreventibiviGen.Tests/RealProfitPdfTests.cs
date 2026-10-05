@@ -32,16 +32,16 @@ public sealed class RealProfitPdfTests
                 HourlyCost = 40,
                 Materials =
                 [
-                    Material("GGL MK04 2070(78x98)", 7, 474),
-                    Material("GGL MK04 207021A(78x98)", 5, 973),
-                    Material("EDW MK04 2000S(78x98)", 12, 154),
-                    Material("DKL MK04 1025SG", 7, 103),
-                    Material("GGL MK08 2070(78x140)", 2, 551),
-                    Material("EDW MK08 2000S(78x140)", 2, 172),
-                    Material("DKL MK08 1025SG", 2, 119),
-                    Material("GGL PK04 2070(94x98)", 1, 541),
-                    Material("EDW PK04 2000S(94x98)", 1, 173),
-                    Material("DKL PK04 1025S", 1, 118)
+                    Material("FINESTRA (78x98) 2070 (78x98)", 7, 474),
+                    Material("FINESTRA (78x98) 207021A (78x98)", 5, 973),
+                    Material("EDW (78x98) 2000S(78x98)", 12, 154),
+                    Material("DKL (78x98) 1025SG", 7, 103),
+                    Material("FINESTRA (78x140) 2070 (78x140)", 2, 551),
+                    Material("EDW (78x140) 2000S(78x140)", 2, 172),
+                    Material("DKL (78x140) 1025SG", 2, 119),
+                    Material("FINESTRA (94x98) 2070 (94x98)", 1, 541),
+                    Material("EDW (94x98) 2000S(94x98)", 1, 173),
+                    Material("DKL (94x98) 1025S", 1, 118)
                 ],
                 CompanyMaterials =
                 [

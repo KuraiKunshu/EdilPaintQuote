@@ -31,7 +31,7 @@ I report di guadagno/collaborazione sono riservati e non vengono allegati automa
 
 ## Limiti attuali e verifiche rimanenti
 
-- Non ancora equivalenti al PC: integrazione/login Velux, importazioni specifiche del desktop, gestione completa impostazioni aziendali/loghi/template, aggiornamento automatico APK e bozze offline.
+- Non ancora equivalenti al PC: importazioni specifiche del desktop, gestione completa impostazioni aziendali/loghi/template, aggiornamento automatico APK e bozze offline.
 - PDF Android con impaginazione propria; non riproduce tutti i template desktop e non incorpora automaticamente le immagini allegate.
 - Le impostazioni SMTP e le regole personalizzate non sono sincronizzate con appsettings del PC: vanno configurate sul telefono.
 - Il guadagno automatico propone i materiali dopo il comando esplicito; occorre confermarli e premere Ricalcola e salva.

@@ -437,7 +437,6 @@ public partial class MainViewModel
         try
         {
             string assetsPath = GetAssetsPath();
-            if (!CompanyInstallationService.IsGenericInstallation) LoadSignificantMaterialsConfig(assetsPath);
 
             var company = await _dataService.GetCompanyAsync();
             var customers = await _dataService.GetCustomersAsync();
