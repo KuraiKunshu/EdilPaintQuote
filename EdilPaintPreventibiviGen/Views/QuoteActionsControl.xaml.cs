@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -11,7 +12,9 @@ public partial class QuoteActionsControl : UserControl
     public static readonly DependencyProperty QuoteNumberProperty = DependencyProperty.Register(
         nameof(QuoteNumber), typeof(string), typeof(QuoteActionsControl), new PropertyMetadata(string.Empty, OnQuoteChanged));
     public static readonly DependencyProperty ScheduleEntryProperty = DependencyProperty.Register(
-        nameof(ScheduleEntry), typeof(WorkScheduleEntry), typeof(QuoteActionsControl), new PropertyMetadata(null));
+        nameof(ScheduleEntry), typeof(WorkScheduleEntry), typeof(QuoteActionsControl), new PropertyMetadata(null, OnQuoteChanged));
+    public static readonly DependencyProperty CanCompleteProperty = DependencyProperty.Register(
+        nameof(CanComplete), typeof(bool), typeof(QuoteActionsControl), new PropertyMetadata(true, OnQuoteChanged));
     public static readonly DependencyProperty ShowDetailsProperty = DependencyProperty.Register(
         nameof(ShowDetails), typeof(bool), typeof(QuoteActionsControl), new PropertyMetadata(true));
     private static readonly DependencyPropertyKey IsBusyPropertyKey = DependencyProperty.RegisterReadOnly(
@@ -24,8 +27,11 @@ public partial class QuoteActionsControl : UserControl
     public string QuoteNumber { get => (string)GetValue(QuoteNumberProperty); set => SetValue(QuoteNumberProperty, value); }
     public WorkScheduleEntry? ScheduleEntry { get => (WorkScheduleEntry?)GetValue(ScheduleEntryProperty); set => SetValue(ScheduleEntryProperty, value); }
     public bool ShowDetails { get => (bool)GetValue(ShowDetailsProperty); set => SetValue(ShowDetailsProperty, value); }
+    public bool CanComplete { get => (bool)GetValue(CanCompleteProperty); set => SetValue(CanCompleteProperty, value); }
     public bool IsBusy => (bool)GetValue(IsBusyProperty);
     public bool IsMenuOpen => (bool)GetValue(IsMenuOpenProperty);
+    public event EventHandler<CancelEventArgs>? CompletionRequested;
+    public event EventHandler<WorkScheduleCompletedEventArgs>? WorkCompleted;
 
     public QuoteActionsControl()
     {
@@ -38,8 +44,31 @@ public partial class QuoteActionsControl : UserControl
 
     private void UpdateButtons()
     {
-        if (BtnPdf == null || BtnActions == null) return;
+        if (BtnPdf == null || BtnActions == null || BtnComplete == null) return;
         BtnPdf.IsEnabled = BtnActions.IsEnabled = !IsBusy && !string.IsNullOrWhiteSpace(QuoteNumber);
+        bool savedJob = ScheduleEntry is { Kind: WorkScheduleEntryKind.Job, Revision: > 0 };
+        BtnComplete.Visibility = savedJob ? Visibility.Visible : Visibility.Collapsed;
+        BtnComplete.IsEnabled = savedJob && CanComplete && !IsBusy;
+        BtnComplete.Content = ScheduleEntry?.Status == WorkScheduleEntryStatus.Completed ? "PDF costi" : "Finito e costi";
+    }
+
+    private async void OnCompleteClick(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (ScheduleEntry is not { Kind: WorkScheduleEntryKind.Job, Revision: > 0 } entry || !CanComplete) return;
+        await ExecuteAsync((owner, token) => CompleteAsync(entry.CreateValidatedCopy(), owner, token));
+    }
+
+    private async Task CompleteAsync(WorkScheduleEntry entry, Window owner, CancellationToken token)
+    {
+        if (!CanComplete) return;
+        var request = new CancelEventArgs();
+        CompletionRequested?.Invoke(this, request);
+        if (request.Cancel) return;
+        var completed = await WorkScheduleActions.CompleteAndGenerateCostsAsync(entry, owner, token);
+        if (completed == null) return;
+        ScheduleEntry = completed;
+        WorkCompleted?.Invoke(this, new WorkScheduleCompletedEventArgs(completed));
     }
 
     private async void OnPdfClick(object sender, RoutedEventArgs e)
@@ -74,6 +103,12 @@ public partial class QuoteActionsControl : UserControl
             ? QuoteDocumentActions.GenerateWorkSheetAsync(number, owner, token)
             : WorkScheduleActions.GenerateWorkSheetAsync(intervention, owner, token));
         Add("Cartella cliente", (owner, token) => QuoteDocumentActions.OpenCustomerFolderAsync(number, owner, token));
+        if (intervention is { Kind: WorkScheduleEntryKind.Job, Revision: > 0 })
+        {
+            var finish = Add(intervention.Status == WorkScheduleEntryStatus.Completed ? "Rigenera PDF costi" : "Finito e PDF costi",
+                (owner, token) => CompleteAsync(intervention, owner, token));
+            finish.IsEnabled = CanComplete;
+        }
         if (ShowDetails)
             Add("Dettaglio nello storico", (owner, _) =>
             {
@@ -82,11 +117,12 @@ public partial class QuoteActionsControl : UserControl
             });
         return menu;
 
-        void Add(string label, Func<Window, CancellationToken, Task> action)
+        MenuItem Add(string label, Func<Window, CancellationToken, Task> action)
         {
             var item = new MenuItem { Header = label };
             item.Click += async (_, e) => { e.Handled = true; await ExecuteAsync(action, capturedOwner); };
             menu.Items.Add(item);
+            return item;
         }
     }
 
@@ -116,4 +152,9 @@ public partial class QuoteActionsControl : UserControl
             UpdateButtons();
         }
     }
+}
+
+public sealed class WorkScheduleCompletedEventArgs(WorkScheduleEntry entry) : EventArgs
+{
+    public WorkScheduleEntry Entry { get; } = entry;
 }

@@ -190,6 +190,28 @@ public sealed class WorkScheduleService
         }, token, prepareEmployees: true);
     }
 
+    public Task<WorkScheduleEntry> CompleteEntryAsync(Guid id, long revision, CancellationToken token = default)
+    {
+        if (id == Guid.Empty || revision <= 0) throw WorkScheduleRules.Conflict();
+        return RunDatabaseAsync(async operationToken =>
+        {
+            var completed = await _repository.CompleteWorkScheduleEntryAsync(id, revision, operationToken)
+                .ConfigureAwait(false);
+            lock (_cacheLock)
+            {
+                foreach (var page in _cache.Pages.Values)
+                {
+                    page.Entries.RemoveAll(entry => entry.Id == completed.Id);
+                    if (completed.Date >= page.From && completed.Date < page.To)
+                        page.Entries.Add(completed.CreateValidatedCopy());
+                    page.IsCurrent = false;
+                }
+            }
+            PersistCache();
+            return completed;
+        }, token);
+    }
+
     public Task DeleteEntryAsync(Guid id, long revision, CancellationToken token = default) =>
         RunDatabaseAsync(async operationToken =>
         {

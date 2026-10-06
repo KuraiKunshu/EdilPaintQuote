@@ -232,7 +232,7 @@
                                                                            Visibility="{Binding MaterialWarningVisibility}"/>
                                                             </StackPanel>
                                                         </Button>
-                                                        <views:QuoteActionsControl QuoteNumber="{Binding Entry.QuoteNumber}" ScheduleEntry="{Binding Entry}"
+                                                        <views:QuoteActionsControl QuoteNumber="{Binding Entry.QuoteNumber}" ScheduleEntry="{Binding Entry}" CanComplete="{Binding CanComplete}"
                                                                                   Visibility="{Binding DocumentActionsVisibility}"
                                                                                   Loaded="OnQuoteActionsLoaded" Unloaded="OnQuoteActionsUnloaded"/>
                                                         </StackPanel>

@@ -14,6 +14,8 @@ namespace EdilPaintPreventibiviGen.Views;
 
 public partial class RealProfitWindow : Window
 {
+    public bool CloseAfterSaved { get; set; }
+    private bool _isSaving;
     private readonly QuoteHistoryEntry _quote;
     private readonly ObservableCollection<ProfitMaterialCost> _materials;
     private readonly ObservableCollection<CompanyMaterialCost> _companyMaterials = [];
@@ -31,6 +33,7 @@ public partial class RealProfitWindow : Window
         RealProfitSettingsModel? defaults = null)
     {
         InitializeComponent();
+        Closing += (_, args) => { if (CloseAfterSaved && _isSaving) args.Cancel = true; };
         defaults ??= new RealProfitSettingsModel();
         defaults.Normalize();
         _quote = quote;
@@ -144,6 +147,7 @@ public partial class RealProfitWindow : Window
 
     private async void OnCalculateClick(object sender, RoutedEventArgs e)
     {
+        if (_isSaving) return;
         RealProfitInput currentInput;
         RealProfitResult currentResult;
         try
@@ -159,6 +163,8 @@ public partial class RealProfitWindow : Window
         }
 
         BtnCalculate.IsEnabled = false;
+        _isSaving = true;
+        if (CloseAfterSaved) IsEnabled = false;
         TxtSaveStatus.Text = "Salvataggio del calcolo in corso...";
         TxtSaveStatus.Foreground = (Brush)FindResource("PrimaryBlueBrush");
         try
@@ -174,6 +180,8 @@ public partial class RealProfitWindow : Window
             await _saveCalculation(snapshot);
             _quote.RealProfit = snapshot;
             ShowSavedStatus(snapshot);
+            _isSaving = false;
+            if (CloseAfterSaved) { IsEnabled = true; Close(); }
         }
         catch (Exception ex)
         {
@@ -187,6 +195,8 @@ public partial class RealProfitWindow : Window
         }
         finally
         {
+            _isSaving = false;
+            if (CloseAfterSaved) IsEnabled = true;
             BtnCalculate.IsEnabled = true;
         }
     }

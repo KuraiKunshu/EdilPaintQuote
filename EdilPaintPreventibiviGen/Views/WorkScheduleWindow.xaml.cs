@@ -126,10 +126,11 @@ public partial class WorkScheduleWindow : Window
         {
             var date = _weekStart.AddDays(offset);
             var entries = snapshot.Entries.Where(entry => entry.Date.Date == date &&
-                    (entry.Kind == WorkScheduleEntryKind.Absence || entry.IsActiveOrder || ChkShowInactive.IsChecked == true))
+                    (entry.Kind == WorkScheduleEntryKind.Absence || entry.Status == WorkScheduleEntryStatus.Completed ||
+                     entry.IsActiveOrder || ChkShowInactive.IsChecked == true))
                 .OrderBy(entry => entry.StartMinutes).ThenBy(entry => entry.Title, StringComparer.CurrentCultureIgnoreCase)
                 .Select(entry => new WorkScheduleCard(entry, snapshot.Settings.UseEmployeeAbbreviations, this,
-                    conflictsByEntry.GetValueOrDefault(entry.Id, string.Empty))).ToList();
+                    conflictsByEntry.GetValueOrDefault(entry.Id, string.Empty), snapshot.IsCurrent)).ToList();
             return new WorkScheduleDay
             {
                 Date = date,
@@ -353,8 +354,10 @@ public partial class WorkScheduleWindow : Window
         public string OrderWarning => OrderWarningText(Entry);
         public Visibility OrderWarningVisibility => Entry.HasOrderWarning ? Visibility.Visible : Visibility.Collapsed;
         public Visibility DocumentActionsVisibility => Entry.Kind == WorkScheduleEntryKind.Job ? Visibility.Visible : Visibility.Collapsed;
-        public WorkScheduleCard(WorkScheduleEntry entry, bool abbreviations, FrameworkElement resources, string conflictText = "")
+        public bool CanComplete { get; }
+        public WorkScheduleCard(WorkScheduleEntry entry, bool abbreviations, FrameworkElement resources, string conflictText = "", bool canComplete = true)
         {
+            CanComplete = canComplete;
             Entry = entry;
             ConflictText = conflictText;
             BorderBrush = (Brush)resources.FindResource(string.IsNullOrWhiteSpace(conflictText) ? "SubtleBorderBrush" : "DangerSoftTextBrush");
@@ -363,7 +366,7 @@ public partial class WorkScheduleWindow : Window
             Crew = entry.Employees.Count == 0 ? "Squadra da assegnare" : string.Join(" · ", entry.Employees.Select(employee =>
                 abbreviations && !string.IsNullOrWhiteSpace(employee.Abbreviation) ? employee.Abbreviation :
                     $"{employee.FirstName} {employee.LastName}".Trim()));
-            Status = entry.Kind == WorkScheduleEntryKind.Absence ? "Assenza" : entry.Status == WorkScheduleEntryStatus.Completed ? "Intervento completato" : "Programmato";
+            Status = entry.Kind == WorkScheduleEntryKind.Absence ? "Assenza" : entry.Status == WorkScheduleEntryStatus.Completed ? "Intervento finito" : "Programmato";
             Background = (Brush)resources.FindResource(entry.Kind == WorkScheduleEntryKind.Absence ? "DangerSoftBackgroundBrush" :
                 entry.Status == WorkScheduleEntryStatus.Completed ? "StatusConfermatoBrush" : "WhiteBrush");
             MaterialWarning = entry.ExpectedDeliveryDate?.Date > entry.Date.Date

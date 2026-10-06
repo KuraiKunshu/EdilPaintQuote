@@ -180,7 +180,7 @@
                         <StackPanel x:Name="StatusPanel">
                             <TextBlock Text="Stato dell’intervento" Style="{StaticResource FieldTitle}"/>
                             <ComboBox x:Name="CmbStatus" FontSize="14" Padding="7" SelectedIndex="0">
-                                <ComboBoxItem Content="Programmato"/><ComboBoxItem Content="Completato"/>
+                                <ComboBoxItem Content="Programmato"/><ComboBoxItem Content="Finito"/>
                             </ComboBox>
                             <TextBlock Text="Completare un intervento non chiude l’ordine: potrebbero esserci altri lavori da fare."
                                        Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" FontSize="12" Margin="0,7,0,0"/>

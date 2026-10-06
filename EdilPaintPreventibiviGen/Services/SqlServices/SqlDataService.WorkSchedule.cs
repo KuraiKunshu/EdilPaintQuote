@@ -195,6 +195,31 @@ public partial class SqlDataService
         catch (DbUpdateConcurrencyException ex) { throw WorkScheduleRules.Conflict(ex); }
     }
 
+    public async Task<WorkScheduleEntry> CompleteWorkScheduleEntryAsync(Guid id, long revision,
+        CancellationToken token = default)
+    {
+        if (id == Guid.Empty || revision <= 0) throw WorkScheduleRules.Conflict();
+        try
+        {
+            return await ExecuteWorkScheduleTransactionAsync(async (db, ct) =>
+            {
+                var stored = await ScheduleEntriesQuery(db).SingleOrDefaultAsync(entry => entry.Id == id, ct)
+                    .ConfigureAwait(false);
+                var completed = WorkScheduleRules.CreateCompletedCopy(
+                    stored == null ? null : ScheduleEntryToModel(stored), id, revision, stored?.IsDeleted == true);
+                if (stored!.Status != completed.Status)
+                {
+                    // Only the visit status changes; keep the original dates, crew and order.
+                    stored.Status = completed.Status;
+                    stored.Revision = completed.Revision;
+                    await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                }
+                return ScheduleEntryToModel(stored);
+            }, token).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex) { throw WorkScheduleRules.Conflict(ex); }
+    }
+
     public async Task DeleteWorkScheduleEntryAsync(Guid id, long revision, CancellationToken token = default)
     {
         if (id == Guid.Empty || revision <= 0) throw WorkScheduleRules.Conflict();

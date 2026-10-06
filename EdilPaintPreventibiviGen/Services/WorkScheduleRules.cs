@@ -7,6 +7,25 @@ internal static class WorkScheduleRules
     internal static InvalidOperationException Conflict(Exception? inner = null) => new(
         "L'intervento è stato modificato o eliminato da un altro PC. Ricarica il calendario prima di modificarlo.", inner);
 
+    internal static WorkScheduleEntry CreateCompletedCopy(WorkScheduleEntry? stored, Guid id, long revision,
+        bool isDeleted = false)
+    {
+        if (id == Guid.Empty || revision <= 0 || stored == null || isDeleted || stored.Id != id ||
+            stored.Revision != revision)
+            throw Conflict();
+        if (stored.Kind != WorkScheduleEntryKind.Job)
+            throw new InvalidOperationException("Puoi completare soltanto un intervento di lavoro già salvato.");
+        var completed = stored.CreateValidatedCopy();
+        // Completion records what happened without changing the saved planning.
+        // Existing overlap warnings do not prevent recording the completed visit.
+        if (completed.Status != WorkScheduleEntryStatus.Completed)
+        {
+            completed.Status = WorkScheduleEntryStatus.Completed;
+            completed.Revision = checked(completed.Revision + 1);
+        }
+        return completed;
+    }
+
     internal static void ValidateRevision(WorkScheduleEntry requested, WorkScheduleEntry? stored)
     {
         if (stored == null ? requested.Revision != 0 : requested.Revision != stored.Revision)

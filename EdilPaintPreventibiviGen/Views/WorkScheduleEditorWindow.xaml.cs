@@ -14,7 +14,7 @@ public partial class WorkScheduleEditorWindow : Window
 {
     private readonly CancellationTokenSource _lifetime = AppShutdownManager.CreateLinkedTokenSource();
     private readonly WorkScheduleSettings _settings;
-    private readonly WorkScheduleEntry? _original;
+    private WorkScheduleEntry? _original;
     private readonly bool _absence;
     private readonly bool _canEdit;
     private readonly List<WorkScheduleEmployeeChoice> _employees = [];
@@ -49,13 +49,16 @@ public partial class WorkScheduleEditorWindow : Window
         _availabilityCurrent = snapshot.IsCurrent;
         InitializeComponent();
         _documentBusyDescriptor.AddValueChanged(CommonQuoteActions, OnDocumentBusyChanged);
+        CommonQuoteActions.CompletionRequested += OnCompletionRequested;
+        CommonQuoteActions.WorkCompleted += OnWorkCompleted;
+        CommonQuoteActions.CanComplete = _canEdit;
         Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         Closing += OnClosing;
         Closed += OnClosed;
         PreviewKeyDown += OnPreviewKeyDown;
 
         TxtTitle.Text = _absence ? (entry == null ? "Segna assenza" : "Assenza squadra") :
-            entry == null ? "Programma intervento" : "Intervento programmato";
+            entry == null ? "Programma intervento" : entry.Status == WorkScheduleEntryStatus.Completed ? "Intervento finito" : "Intervento programmato";
         Title = TxtTitle.Text;
         OrderPanel.Visibility = _absence ? Visibility.Collapsed : Visibility.Visible;
         AbsencePanel.Visibility = _absence ? Visibility.Visible : Visibility.Collapsed;
@@ -384,6 +387,30 @@ public partial class WorkScheduleEditorWindow : Window
         if (!_closed) SetBusy(_busy, TxtBusy.Text);
     }
 
+    private void OnCompletionRequested(object? sender, CancelEventArgs e)
+    {
+        if (_original == null || !_canEdit) { e.Cancel = true; return; }
+        try
+        {
+            var draft = BuildEntries().Single();
+            if (draft.Date != _original.Date || draft.SlotKind != _original.SlotKind ||
+                draft.StartMinutes != _original.StartMinutes || draft.EndMinutes != _original.EndMinutes ||
+                draft.Notes != _original.Notes || !draft.EmployeeIds.ToHashSet().SetEquals(_original.EmployeeIds) ||
+                _original.Status == WorkScheduleEntryStatus.Completed && draft.Status != _original.Status)
+                throw new InvalidOperationException("Salva le modifiche prima di segnare l’intervento come finito o generare il PDF dei costi.");
+        }
+        catch (Exception ex) { e.Cancel = true; ShowError(ex.Message); }
+    }
+
+    private void OnWorkCompleted(object? sender, WorkScheduleCompletedEventArgs e)
+    {
+        _original = e.Entry.CreateValidatedCopy();
+        HasChangesSaved = true;
+        CmbStatus.SelectedIndex = 1;
+        TxtTitle.Text = Title = "Intervento finito";
+        ErrorPanel.Visibility = Visibility.Collapsed;
+    }
+
     private void ShowError(string message)
     {
         if (_closed) return;
@@ -440,6 +467,8 @@ public partial class WorkScheduleEditorWindow : Window
     {
         _closed = true;
         _documentBusyDescriptor.RemoveValueChanged(CommonQuoteActions, OnDocumentBusyChanged);
+        CommonQuoteActions.CompletionRequested -= OnCompletionRequested;
+        CommonQuoteActions.WorkCompleted -= OnWorkCompleted;
         _lifetime.Cancel();
         _lifetime.Dispose();
     }

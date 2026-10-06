@@ -192,6 +192,99 @@ public sealed class WorkScheduleServiceTests : IDisposable
         Assert.Equal(1, cached.Revision);
     }
 
+    [Fact]
+    public async Task CompletionPreservesTheVisitAcrossSharedDatabaseAndCachedWeeks()
+    {
+        var first = Pc("first");
+        var second = Pc("second");
+        var entry = Entry(_monday);
+        entry.Notes = "Accesso dal cancello laterale";
+        entry.SettingsRevision = 3;
+        entry.Employees = [new() { FirstName = "Mario", LastName = "Rossi", Abbreviation = "MR" }];
+        entry.EmployeeIds = entry.Employees.Select(employee => employee.Id).ToList();
+        var saved = Assert.Single(await first.SaveEntriesAsync([entry]));
+        await first.GetLatestAsync(_monday, _monday.AddDays(7));
+        await first.GetLatestAsync(_monday.AddDays(-1), _monday.AddDays(1));
+        var completed = await first.CompleteEntryAsync(saved.Id, saved.Revision);
+
+        Assert.Equal(saved.Id, completed.Id);
+        Assert.Equal(saved.Revision + 1, completed.Revision);
+        Assert.Equal(WorkScheduleEntryStatus.Completed, completed.Status);
+        Assert.Equal(1, _database.CompleteCalls);
+        Assert.Equal(1, _database.SaveCalls);
+        Assert.Equal(0, _database.DeleteCalls);
+        foreach (var from in new[] { _monday, _monday.AddDays(-1) })
+        {
+            var to = from == _monday ? _monday.AddDays(7) : _monday.AddDays(1);
+            var cached = first.CachedSnapshot(from, to);
+            Assert.False(cached.IsCurrent);
+            var visit = Assert.Single(cached.Entries);
+            Assert.Equal(completed.Id, visit.Id);
+            Assert.Equal(completed.Status, visit.Status);
+            Assert.Equal(completed.Revision, visit.Revision);
+            Assert.Equal(saved.Date, visit.Date);
+            Assert.Equal(saved.StartMinutes, visit.StartMinutes);
+            Assert.Equal(saved.EndMinutes, visit.EndMinutes);
+            Assert.Equal(saved.SettingsRevision, visit.SettingsRevision);
+            Assert.Equal(saved.Notes, visit.Notes);
+            Assert.Equal(saved.EmployeeIds, visit.EmployeeIds);
+        }
+        var shared = Assert.Single((await second.GetLatestAsync(_monday, _monday.AddDays(7))).Entries);
+        Assert.Equal(completed.Status, shared.Status);
+        Assert.Equal(completed.Id, shared.Id);
+        var restarted = Assert.Single(Pc("first").CachedSnapshot(_monday, _monday.AddDays(7)).Entries);
+        Assert.Equal(completed.Status, restarted.Status);
+        Assert.Equal(saved.Notes, restarted.Notes);
+    }
+
+    [Fact]
+    public async Task OfflineCompletionDoesNotChangeTheKnownVisit()
+    {
+        var service = Pc("first");
+        var saved = Assert.Single(await service.SaveEntriesAsync([Entry(_monday)]));
+        await service.GetLatestAsync(_monday, _monday.AddDays(7));
+        _database.Unavailable = true;
+        await Assert.ThrowsAsync<IOException>(() => service.CompleteEntryAsync(saved.Id, saved.Revision));
+        var known = Assert.Single(service.CachedSnapshot(_monday, _monday.AddDays(7)).Entries);
+        Assert.Equal(WorkScheduleEntryStatus.Planned, known.Status);
+        Assert.Equal(saved.Revision, known.Revision);
+        Assert.Equal(0, _database.DeleteCalls);
+        Assert.Equal(1, _database.SaveCalls);
+    }
+
+    [Fact]
+    public async Task CompletionRejectsConcurrentChangesAndAllowsCurrentRevisionPdfRetries()
+    {
+        var first = Pc("first");
+        var second = Pc("second");
+        var saved = Assert.Single(await first.SaveEntriesAsync([Entry(_monday)]));
+        await second.GetLatestAsync(_monday, _monday.AddDays(7));
+        var completed = await first.CompleteEntryAsync(saved.Id, saved.Revision);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => second.CompleteEntryAsync(saved.Id, saved.Revision));
+        Assert.Equal(WorkScheduleEntryStatus.Planned,
+            Assert.Single(second.CachedSnapshot(_monday, _monday.AddDays(7)).Entries).Status);
+        var retried = await first.CompleteEntryAsync(completed.Id, completed.Revision);
+        Assert.Equal(completed.Revision, retried.Revision);
+        Assert.Equal(WorkScheduleEntryStatus.Completed, retried.Status);
+        Assert.Equal(0, _database.DeleteCalls);
+        Assert.Equal(1, _database.SaveCalls);
+    }
+
+    [Fact]
+    public async Task CancelledCompletionDoesNotChangeTheKnownVisit()
+    {
+        var service = Pc("first");
+        var saved = Assert.Single(await service.SaveEntriesAsync([Entry(_monday)]));
+        await service.GetLatestAsync(_monday, _monday.AddDays(7));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.CompleteEntryAsync(saved.Id, saved.Revision, cts.Token));
+        Assert.Equal(WorkScheduleEntryStatus.Planned,
+            Assert.Single(service.CachedSnapshot(_monday, _monday.AddDays(7)).Entries).Status);
+        Assert.Equal(0, _database.CompleteCalls);
+    }
+
     private static WorkScheduleEntry Entry(DateTime date) => new()
     {
         Date = date, QuoteNumber = "2026/001", CustomerName = "Cliente Rossi", SiteName = "Via Roma"
@@ -204,6 +297,9 @@ public sealed class WorkScheduleServiceTests : IDisposable
         private WorkScheduleSettings _settings = new();
         private readonly List<WorkScheduleEntry> _entries = [];
         public bool Unavailable;
+        public int SaveCalls;
+        public int CompleteCalls;
+        public int DeleteCalls;
 
         public Task<WorkScheduleSnapshot> LoadWorkScheduleAsync(DateTime from, DateTime to, CancellationToken token = default)
         {
@@ -221,12 +317,22 @@ public sealed class WorkScheduleServiceTests : IDisposable
         public Task<List<WorkScheduleEntry>> SaveWorkScheduleEntriesAsync(IReadOnlyList<WorkScheduleEntry> entries, CancellationToken token = default)
         {
             Check(token);
+            SaveCalls++;
             var saved = entries.Select(x => x.CreateValidatedCopy()).ToList();
             foreach (var entry in saved) { entry.Revision++; _entries.RemoveAll(x => x.Id == entry.Id); _entries.Add(entry); }
             return Task.FromResult(saved.Select(x => x.CreateValidatedCopy()).ToList());
         }
+        public Task<WorkScheduleEntry> CompleteWorkScheduleEntryAsync(Guid id, long revision, CancellationToken token = default)
+        {
+            Check(token);
+            CompleteCalls++;
+            var completed = WorkScheduleRules.CreateCompletedCopy(_entries.SingleOrDefault(entry => entry.Id == id), id, revision);
+            _entries.RemoveAll(entry => entry.Id == id);
+            _entries.Add(completed);
+            return Task.FromResult(completed.CreateValidatedCopy());
+        }
         public Task DeleteWorkScheduleEntryAsync(Guid id, long revision, CancellationToken token = default)
-        { Check(token); _entries.RemoveAll(x => x.Id == id); return Task.CompletedTask; }
+        { Check(token); DeleteCalls++; _entries.RemoveAll(x => x.Id == id); return Task.CompletedTask; }
         private void Check(CancellationToken token) { token.ThrowIfCancellationRequested(); if (Unavailable) throw new IOException("Offline"); }
     }
 }

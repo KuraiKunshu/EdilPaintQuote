@@ -23,5 +23,6 @@ public interface IWorkScheduleRepository
     Task<WorkScheduleSettings> GetWorkScheduleSettingsAsync(CancellationToken token = default);
     Task<WorkScheduleSettings> SaveWorkScheduleSettingsAsync(WorkScheduleSettings settings, CancellationToken token = default);
     Task<List<WorkScheduleEntry>> SaveWorkScheduleEntriesAsync(IReadOnlyList<WorkScheduleEntry> entries, CancellationToken token = default);
+    Task<WorkScheduleEntry> CompleteWorkScheduleEntryAsync(Guid id, long revision, CancellationToken token = default);
     Task DeleteWorkScheduleEntryAsync(Guid id, long revision, CancellationToken token = default);
 }

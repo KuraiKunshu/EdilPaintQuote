@@ -18,5 +18,8 @@
                 ToolTip="Apri il PDF del preventivo" AutomationProperties.Name="Apri PDF del preventivo"/>
         <Button x:Name="BtnActions" Content="Azioni ▾" MinWidth="64" Margin="0,0,0,4" Click="OnActionsClick"
                 ToolTip="Azioni comuni del preventivo" AutomationProperties.Name="Azioni del preventivo"/>
+        <Button x:Name="BtnComplete" Content="Finito e costi" MinWidth="92" Margin="4,0,0,4" Visibility="Collapsed"
+                Click="OnCompleteClick" Background="{StaticResource ModalPrimaryActionBrush}" Foreground="{StaticResource WhiteBrush}"
+                ToolTip="Conserva l’intervento e salva il PDF dei costi nella cartella CostiLavori"/>
     </WrapPanel>
 </UserControl>
