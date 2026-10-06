@@ -30,25 +30,19 @@ public partial class SqlDataService
         CancellationToken token = default)
     {
         if (employees.Count == 0) return;
-        for (int attempt = 0; ; attempt++)
+        await using var strategyDb = AppDbContextFactory.Create();
+        await EnsureEmployeeSchemaAsync(strategyDb, token).ConfigureAwait(false);
+        await strategyDb.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             await using var db = AppDbContextFactory.Create();
-            await EnsureEmployeeSchemaAsync(db, token).ConfigureAwait(false);
+            await using var transaction = await db.Database.BeginTransactionAsync(token).ConfigureAwait(false);
+            await WorkScheduleDatabaseLock.AcquireAsync(db, token).ConfigureAwait(false);
             var stored = await db.Employees.AsNoTracking().ToListAsync(token).ConfigureAwait(false);
             var imports = EmployeeChanges.LegacyImports(employees, stored);
-            if (imports.Count == 0) return;
             db.Employees.AddRange(imports);
-            try
-            {
-                await db.SaveChangesAsync(token).ConfigureAwait(false);
-                return;
-            }
-            catch (DbUpdateException) when (attempt < 2)
-            {
-                // Another PC may have imported these same stable IDs in the meantime.
-                // Re-read using a fresh context; never overwrite existing entries.
-            }
-        }
+            await db.SaveChangesAsync(token).ConfigureAwait(false);
+            await transaction.CommitAsync(token).ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 
     public async Task SaveEmployeesAsync(IReadOnlyList<EmployeeSettingsModel> original,
@@ -56,17 +50,30 @@ public partial class SqlDataService
     {
         var changes = EmployeeChanges.Between(original, edited);
         if (changes.Count == 0) return;
-        await using var db = AppDbContextFactory.Create();
-        await EnsureEmployeeSchemaAsync(db, token).ConfigureAwait(false);
-        var ids = changes.Select(x => x.Id).ToArray();
-        var stored = await db.Employees.Where(x => ids.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, token).ConfigureAwait(false);
-        db.Employees.AddRange(EmployeeChanges.Apply(changes, stored));
+        await using var strategyDb = AppDbContextFactory.Create();
+        await EnsureEmployeeSchemaAsync(strategyDb, token).ConfigureAwait(false);
         try
         {
-            // EF saves this batch atomically and checks the original revision of
-            // every updated/deleted row, including changes made after the read.
-            await db.SaveChangesAsync(token).ConfigureAwait(false);
+            await strategyDb.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var db = AppDbContextFactory.Create();
+                await using var transaction = await db.Database.BeginTransactionAsync(token).ConfigureAwait(false);
+                await WorkScheduleDatabaseLock.AcquireAsync(db, token).ConfigureAwait(false);
+                // Read every active row so aliases added by another PC are checked,
+                // while the change set still writes only rows edited on this PC.
+                var stored = await db.Employees.ToDictionaryAsync(x => x.Id, token).ConfigureAwait(false);
+                db.Employees.AddRange(EmployeeChanges.Apply(changes, stored));
+                // Release all edited aliases together before assigning their final
+                // values, allowing two employees to exchange aliases atomically.
+                var aliases = changes.Where(x => x.Updated != null).ToDictionary(x => x.Id, x => x.Updated!.Abbreviation);
+                foreach (var id in aliases.Keys)
+                    db.Employees.Local.Single(x => x.Id == id).Abbreviation = string.Empty;
+                await db.SaveChangesAsync(token).ConfigureAwait(false);
+                foreach (var (id, alias) in aliases)
+                    db.Employees.Local.Single(x => x.Id == id).Abbreviation = alias;
+                await db.SaveChangesAsync(token).ConfigureAwait(false);
+                await transaction.CommitAsync(token).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
         catch (DbUpdateConcurrencyException ex)
         {
@@ -81,9 +88,13 @@ public partial class SqlDataService
             "Id" uuid NOT NULL PRIMARY KEY,
             "FirstName" varchar(250) NOT NULL,
             "LastName" varchar(250) NOT NULL,
+            "Abbreviation" varchar(24) NOT NULL DEFAULT '',
             "Revision" bigint NOT NULL,
             "IsDeleted" boolean NOT NULL
         );
+        ALTER TABLE "Employees" ADD COLUMN IF NOT EXISTS "Abbreviation" varchar(24) NOT NULL DEFAULT '';
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_Employees_Abbreviation" ON "Employees" ("Abbreviation")
+            WHERE "IsDeleted" = false AND "Abbreviation" <> '';
         COMMIT;
         """ : """
         SET XACT_ABORT ON;
@@ -101,9 +112,17 @@ public partial class SqlDataService
                 [Id] uniqueidentifier NOT NULL PRIMARY KEY,
                 [FirstName] nvarchar(250) NOT NULL,
                 [LastName] nvarchar(250) NOT NULL,
+                [Abbreviation] nvarchar(24) NOT NULL DEFAULT N'',
                 [Revision] bigint NOT NULL,
                 [IsDeleted] bit NOT NULL
             );
+        IF COL_LENGTH(N'dbo.Employees', N'Abbreviation') IS NULL
+            ALTER TABLE [dbo].[Employees] ADD [Abbreviation] nvarchar(24) NOT NULL
+                CONSTRAINT [DF_Employees_Abbreviation] DEFAULT N'';
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Employees_Abbreviation'
+            AND object_id = OBJECT_ID(N'[dbo].[Employees]'))
+            EXEC(N'CREATE UNIQUE INDEX [IX_Employees_Abbreviation] ON [dbo].[Employees] ([Abbreviation])
+                WHERE [IsDeleted] = 0 AND [Abbreviation] <> N''''');
         COMMIT TRANSACTION;
         """;
 }

@@ -17,6 +17,7 @@ public partial class App : Application
     public static AppSettingsService AppSettings { get; private set; } = null!;
     public static SyncService SyncService { get; private set; } = null!;
     public static EmployeeDirectoryService? EmployeeDirectory { get; private set; }
+    public static WorkScheduleService? WorkSchedule { get; private set; }
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
     public static bool IsOfflineMode { get; private set; }
@@ -93,8 +94,13 @@ public partial class App : Application
                 AppSettings.EmployeesDatabaseIdentity == employeeDatabaseIdentity ? AppSettings.Employees : [],
                 token => DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(DataService, "aggiornamento dipendenti", token),
                 () => AppSettings.Database.GetCatalogIdentity());
+            WorkSchedule = new WorkScheduleService(sqlService, Path.Combine(localDataPath, "calendario-lavori.json"),
+                employeeDatabaseIdentity,
+                token => DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(DataService, "calendario lavori", token),
+                () => AppSettings.Database.GetCatalogIdentity(),
+                async token => { await EmployeeDirectory.RefreshAsync(token); });
             SyncService = new SyncService(
-                DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox, EmployeeDirectory);
+                DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox, EmployeeDirectory, WorkSchedule);
             SyncService.SyncCompleted += OnSyncCompleted;
 
             var loadingWindow = new LoadingWindow

@@ -17,6 +17,7 @@ internal static class EmployeeChanges
     {
         var before = original.ToDictionary(x => x.Id);
         var after = edited.Select(x => x.CreateValidatedCopy()).ToDictionary(x => x.Id);
+        ValidateUniqueAbbreviations(after.Values);
         if (before.ContainsKey(Guid.Empty) || after.ContainsKey(Guid.Empty))
             throw new InvalidOperationException("Identificativo dipendente non valido.");
 
@@ -27,7 +28,8 @@ internal static class EmployeeChanges
             return new EmployeeChange(previous, current);
         }).Where(change => change.Original == null || change.Updated == null ||
             change.Original.FirstName != change.Updated.FirstName ||
-            change.Original.LastName != change.Updated.LastName).ToList();
+            change.Original.LastName != change.Updated.LastName ||
+            change.Original.Abbreviation != change.Updated.Abbreviation).ToList();
     }
 
     // Validate the entire batch before mutating tracked entities. Untouched rows
@@ -43,6 +45,10 @@ internal static class EmployeeChanges
             if (!matches)
                 throw Conflict();
         }
+
+        var changedIds = changes.Select(x => x.Id).ToHashSet();
+        ValidateUniqueAbbreviations(stored.Values.Where(x => !x.IsDeleted && !changedIds.Contains(x.Id))
+            .Select(ToModel).Concat(changes.Where(x => x.Updated != null).Select(x => x.Updated!)));
 
         var added = new List<EmployeeEntity>();
         foreach (var change in changes)
@@ -60,6 +66,7 @@ internal static class EmployeeChanges
             {
                 entity.FirstName = change.Updated.FirstName;
                 entity.LastName = change.Updated.LastName;
+                entity.Abbreviation = change.Updated.Abbreviation;
             }
         }
         return added;
@@ -71,7 +78,8 @@ internal static class EmployeeChanges
 
     internal static EmployeeSettingsModel ToModel(EmployeeEntity entity) => new()
     {
-        Id = entity.Id, FirstName = entity.FirstName, LastName = entity.LastName, Revision = entity.Revision
+        Id = entity.Id, FirstName = entity.FirstName, LastName = entity.LastName,
+        Abbreviation = entity.Abbreviation, Revision = entity.Revision
     };
 
     internal static List<EmployeeEntity> LegacyImports(IEnumerable<EmployeeSettingsModel> legacy,
@@ -92,6 +100,8 @@ internal static class EmployeeChanges
             imports.Add(new EmployeeEntity
             {
                 Id = id, FirstName = employee.FirstName, LastName = employee.LastName,
+                Abbreviation = employee.Abbreviation.Length > 0 && stored.Concat(imports).Any(x =>
+                    !x.IsDeleted && x.Abbreviation == employee.Abbreviation) ? string.Empty : employee.Abbreviation,
                 // A tombstone also records imports matched to another ID, preventing
                 // old local settings from bringing a renamed/deleted employee back.
                 IsDeleted = alreadyPresent
@@ -102,6 +112,15 @@ internal static class EmployeeChanges
 
     private static string NameKey(EmployeeSettingsModel employee) =>
         Normalize(employee.FirstName) + "\n" + Normalize(employee.LastName);
+
+    internal static void ValidateUniqueAbbreviations(IEnumerable<EmployeeSettingsModel> employees)
+    {
+        var duplicate = employees.Where(x => !string.IsNullOrWhiteSpace(x.Abbreviation))
+            .GroupBy(x => x.Abbreviation.Trim(), StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(x => x.Count() > 1);
+        if (duplicate != null)
+            throw new InvalidOperationException($"La sigla '{duplicate.Key}' è già usata da un altro dipendente. Scegli sigle diverse oppure lascia il campo vuoto.");
+    }
 
     private static string Normalize(string name) => string.Join(' ',
         name.Normalize(NormalizationForm.FormKC).Split((char[]?)null,

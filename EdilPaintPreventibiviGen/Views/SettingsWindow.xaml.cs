@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 using Microsoft.Win32;
@@ -21,6 +22,13 @@ public partial class SettingsWindow : Window
     private List<EmployeeSettingsModel> _originalEmployees = [];
     private readonly CancellationTokenSource _employeeLoadCts = AppShutdownManager.CreateLinkedTokenSource();
     private bool _employeeListCurrent;
+    private WorkScheduleSettings _originalScheduleSettings = new();
+    private bool _scheduleSettingsCurrent;
+    private bool _scheduleSettingsLoaded;
+    private bool _isRefreshingShared;
+    private CancellationTokenSource? _sharedRefreshCts;
+    private Task _sharedRefreshTask = Task.CompletedTask;
+    private readonly DispatcherTimer _sharedSettingsTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private bool _isSaving;
     private readonly string _displayedCatalogIdentity;
     private bool _catalogIdsCompatible;
@@ -55,9 +63,15 @@ public partial class SettingsWindow : Window
         CmbDefaultVat.ItemsSource = new[] { "22%", "10%", "RC 10%+22%", "esclusa" };
         BtnCompanyProfile.IsEnabled = App.DataService != null;
         LoadSettings();
-        Loaded += async (_, _) => await RefreshEmployeesAsync();
+        Loaded += async (_, _) =>
+        {
+            await RefreshSelectedSharedSettingsAsync();
+            if (!_employeeLoadCts.IsCancellationRequested) _sharedSettingsTimer.Start();
+        };
+        _sharedSettingsTimer.Tick += async (_, _) => await RefreshSelectedSharedSettingsAsync(automatic: true);
+        SettingsTabs.SelectionChanged += OnSettingsTabSelectionChanged;
         Closing += (_, args) => { if (_isSaving) args.Cancel = true; };
-        Closed += (_, _) => _employeeLoadCts.Cancel();
+        Closed += (_, _) => { _sharedSettingsTimer.Stop(); _employeeLoadCts.Cancel(); };
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
 
@@ -66,6 +80,8 @@ public partial class SettingsWindow : Window
         try { SetEmployeeSnapshot(App.EmployeeDirectory?.CachedSnapshot ?? new EmployeeDirectorySnapshot([], false)); }
         catch (InvalidOperationException) { SetEmployeeSnapshot(new EmployeeDirectorySnapshot([], false)); }
         SetEmployeeEditingEnabled(false);
+        SetScheduleSettingsSnapshot(new WorkScheduleSettingsSnapshot(new(), false, null));
+        _scheduleSettingsLoaded = false;
         CmbDefaultVat.SelectedItem = App.AppSettings.App.GetEffectiveDefaultVatType();
         ChkWindowAutomations.IsChecked = App.AppSettings.Business.EnableWindowAutomations;
         ChkInstallationCertificate.IsChecked = App.AppSettings.Business.EnableInstallationCertificate;
@@ -166,7 +182,7 @@ public partial class SettingsWindow : Window
 
     private async void OnSaveClick(object sender, RoutedEventArgs e)
     {
-        if (_isSaving) return;
+        if (_isSaving || _isRefreshingShared) return;
         var invalidEmployee = _employees.FirstOrDefault(employee => string.IsNullOrWhiteSpace(employee.FirstName));
         if (invalidEmployee != null)
         {
@@ -177,7 +193,26 @@ public partial class SettingsWindow : Window
                 "Dipendenti", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        var employees = _employees.Select(employee => employee.CreateValidatedCopy()).ToList();
+        List<EmployeeSettingsModel> employees;
+        WorkScheduleSettings scheduleSettings;
+        try
+        {
+            employees = _employees.Select(employee => employee.CreateValidatedCopy()).ToList();
+            EmployeeChanges.ValidateUniqueAbbreviations(employees);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TabEmployees.IsSelected = true;
+            MessageBox.Show(this, ex.Message, "Dipendenti", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        try { scheduleSettings = ReadScheduleSettings(); }
+        catch (InvalidOperationException ex)
+        {
+            ShowValidationError(TabCalendarSettings, TxtFullDayStart, ex.Message);
+            return;
+        }
+        bool scheduleChanged = !ScheduleSettingsEqual(_originalScheduleSettings, scheduleSettings);
 
         if (string.IsNullOrWhiteSpace(TxtPdfRootPath.Text))
         {
@@ -335,6 +370,7 @@ public partial class SettingsWindow : Window
         }
 
         bool employeesSaved = false;
+        bool calendarSaved = false;
         try
         {
             var employeeChanges = EmployeeChanges.Between(_originalEmployees, employees);
@@ -344,15 +380,17 @@ public partial class SettingsWindow : Window
                 Port = databasePort, Database = databaseName, Username = databaseUsername, Password = databasePassword
             };
             if (requestedDatabase.IsConfigured) _ = requestedDatabase.BuildConnectionString();
-            if (employeeChanges.Count > 0 && !string.Equals(_displayedCatalogIdentity,
+            if ((employeeChanges.Count > 0 || scheduleChanged) && !string.Equals(_displayedCatalogIdentity,
                     requestedDatabase.GetCatalogIdentity(), StringComparison.Ordinal))
             {
                 ShowValidationError(TabDatabaseSettings, TxtDatabaseName,
-                    "Salva prima le modifiche ai dipendenti. Poi puoi cambiare la connessione al database e riavviare l'applicazione.");
+                    "Salva prima le modifiche condivise a dipendenti e calendario. Poi puoi cambiare la connessione al database e riavviare l'applicazione.");
                 return;
             }
             _isSaving = true;
             IsEnabled = false;
+            if (scheduleChanged && (!_scheduleSettingsCurrent || App.WorkSchedule == null))
+                throw new InvalidOperationException("Ricarica gli orari dal database prima di modificarli.");
             if (employeeChanges.Count > 0)
             {
                 if (!_employeeListCurrent || App.EmployeeDirectory == null)
@@ -361,6 +399,12 @@ public partial class SettingsWindow : Window
                 employeesSaved = true;
                 SetEmployeeSnapshot(saved);
                 SetEmployeeEditingEnabled(saved.IsCurrent);
+            }
+            if (scheduleChanged)
+            {
+                var saved = await App.WorkSchedule!.SaveSettingsAsync(scheduleSettings, _employeeLoadCts.Token);
+                calendarSaved = true;
+                SetScheduleSettingsSnapshot(saved);
             }
 
             var app = App.AppSettings.App;
@@ -448,8 +492,8 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(
-                (employeesSaved
-                    ? "I dipendenti sono stati salvati nel database, ma non è stato possibile salvare le impostazioni locali."
+                (employeesSaved || calendarSaved
+                    ? $"Salvati nel database: {string.Join(" e ", new[] { employeesSaved ? "dipendenti" : null, calendarSaved ? "orari del calendario" : null }.Where(x => x != null))}. Non è stato possibile completare le altre modifiche."
                     : "Impossibile salvare le impostazioni.") + $"\n\n{ex.Message}",
                 "Errore salvataggio",
                 MessageBoxButton.OK,
@@ -477,11 +521,78 @@ public partial class SettingsWindow : Window
         ItemsEmployees.IsEnabled = enabled;
     }
 
-    private async Task RefreshEmployeesAsync()
+    private Task RefreshSelectedSharedSettingsAsync(bool automatic = true)
     {
-        SetEmployeeEditingEnabled(false);
+        var tab = SettingsTabs.SelectedItem as TabItem;
+        return tab == TabEmployees || tab == TabCalendarSettings
+            ? StartSharedTabRefreshAsync(tab, automatic) : Task.CompletedTask;
+    }
+
+    private async void OnSettingsTabSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.Source != SettingsTabs || !IsLoaded || _isSaving) return;
+        if (_isRefreshingShared)
+        {
+            _sharedRefreshCts?.Cancel();
+            await _sharedRefreshTask;
+        }
+        if (!_employeeLoadCts.IsCancellationRequested) await RefreshSelectedSharedSettingsAsync();
+    }
+
+    private Task StartSharedTabRefreshAsync(TabItem tab, bool automatic)
+    {
+        if (_isRefreshingShared || _isSaving || _employeeLoadCts.IsCancellationRequested) return Task.CompletedTask;
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_employeeLoadCts.Token);
+        _sharedRefreshCts = cancellation;
+        _sharedRefreshTask = RefreshSharedTabCoreAsync(tab, automatic, cancellation);
+        return _sharedRefreshTask;
+    }
+
+    private async Task RefreshSharedTabCoreAsync(TabItem tab, bool automatic, CancellationTokenSource cancellation)
+    {
+        _isRefreshingShared = true;
+        BtnSaveSettings.IsEnabled = false;
         BtnRefreshEmployees.IsEnabled = false;
-        TxtEmployeeSyncStatus.Text = "Caricamento dei dipendenti dal database...";
+        BtnRefreshCalendarSettings.IsEnabled = false;
+        try
+        {
+            if (tab == TabEmployees) await RefreshEmployeesAsync(automatic, cancellation.Token);
+            else await RefreshScheduleSettingsAsync(automatic, cancellation.Token);
+        }
+        finally
+        {
+            _isRefreshingShared = false;
+            BtnSaveSettings.IsEnabled = true;
+            BtnRefreshEmployees.IsEnabled = App.EmployeeDirectory != null;
+            BtnRefreshCalendarSettings.IsEnabled = App.WorkSchedule != null;
+            _sharedRefreshCts = null;
+            cancellation.Dispose();
+        }
+    }
+
+    private static bool EmployeeListsEqual(IEnumerable<EmployeeSettingsModel> first,
+        IEnumerable<EmployeeSettingsModel> second, bool includeRevision = false)
+    {
+        static string Text(string? value) => value?.Trim() ?? string.Empty;
+        var left = first.OrderBy(x => x.Id).ToArray();
+        var right = second.OrderBy(x => x.Id).ToArray();
+        return left.Length == right.Length && left.Zip(right).All(pair => pair.First.Id == pair.Second.Id &&
+            Text(pair.First.FirstName) == Text(pair.Second.FirstName) &&
+            Text(pair.First.LastName) == Text(pair.Second.LastName) &&
+            Text(pair.First.Abbreviation).ToUpperInvariant() == Text(pair.Second.Abbreviation).ToUpperInvariant() &&
+            (!includeRevision || pair.First.Revision == pair.Second.Revision));
+    }
+
+    private async Task RefreshEmployeesAsync(bool automatic, CancellationToken token)
+    {
+        bool modified = !EmployeeListsEqual(_originalEmployees, _employees);
+        if (string.IsNullOrWhiteSpace(TxtEmployeeSyncStatus.Text))
+            TxtEmployeeSyncStatus.Text = "Caricamento dei dipendenti dal database...";
+        if (!automatic)
+        {
+            SetEmployeeEditingEnabled(false);
+            TxtEmployeeSyncStatus.Text = "Caricamento dei dipendenti dal database...";
+        }
         try
         {
             var directory = App.EmployeeDirectory;
@@ -490,33 +601,144 @@ public partial class SettingsWindow : Window
                 TxtEmployeeSyncStatus.Text = "Configura il database e riavvia l'applicazione per gestire i dipendenti condivisi.";
                 return;
             }
-            var snapshot = await directory.GetLatestAsync(_employeeLoadCts.Token);
-            if (_employeeLoadCts.IsCancellationRequested) return;
-            SetEmployeeSnapshot(snapshot);
+            var snapshot = await directory.GetLatestAsync(token);
+            if (token.IsCancellationRequested) return;
+            modified = !EmployeeListsEqual(_originalEmployees, _employees);
+            if (!automatic || !modified)
+            {
+                if (!automatic || !EmployeeListsEqual(_originalEmployees, snapshot.Employees, includeRevision: true))
+                    SetEmployeeSnapshot(snapshot);
+            }
+            _employeeListCurrent = snapshot.IsCurrent;
             SetEmployeeEditingEnabled(snapshot.IsCurrent);
             TxtEmployeeSyncStatus.Text = snapshot.IsCurrent
-                ? "Elenco aggiornato dal database. Le modifiche salvate saranno disponibili su tutti i PC."
+                ? automatic && modified && !EmployeeListsEqual(_originalEmployees, snapshot.Employees, includeRevision: true)
+                    ? "L'elenco è cambiato su un altro PC. Le tue modifiche non salvate sono conservate; ricarica l'elenco per vedere gli aggiornamenti."
+                    : modified && automatic
+                        ? "Modifiche non ancora salvate. L'elenco condiviso viene controllato automaticamente."
+                        : "Elenco aggiornato dal database. Le modifiche salvate saranno disponibili su tutti i PC."
                 : "Database non disponibile: visualizzi l'ultimo elenco scaricato. Per modificarlo, riconnettiti e premi Ricarica elenco.";
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
+            _employeeListCurrent = false;
+            SetEmployeeEditingEnabled(false);
             TxtEmployeeSyncStatus.Text = ex.Message;
-        }
-        finally
-        {
-            BtnRefreshEmployees.IsEnabled = App.EmployeeDirectory != null;
         }
     }
 
     private async void OnRefreshEmployeesClick(object sender, RoutedEventArgs e)
     {
         // Reload is explicit: never replace unsaved edits during background sync.
-        bool modified = _employees.Any(x => string.IsNullOrWhiteSpace(x.FirstName)) ||
-            EmployeeChanges.Between(_originalEmployees, _employees.ToList()).Count > 0;
+        if (_isRefreshingShared || _isSaving) return;
+        bool modified = !EmployeeListsEqual(_originalEmployees, _employees);
         if (modified && MessageBox.Show(this, "Ricaricare l'elenco e scartare le modifiche ai dipendenti non ancora salvate?",
                 "Ricarica dipendenti", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        await RefreshEmployeesAsync();
+        if (_isRefreshingShared || _isSaving || _employeeLoadCts.IsCancellationRequested) return;
+        await StartSharedTabRefreshAsync(TabEmployees, automatic: false);
+    }
+
+    private WorkScheduleSettings ReadScheduleSettings()
+    {
+        static int Parse(TextBox input)
+        {
+            if (!WorkScheduleSettings.TryParseTime(input.Text, out int minutes))
+                throw new InvalidOperationException("Inserisci gli orari del calendario nel formato HH:mm, per esempio 08:00.");
+            return minutes;
+        }
+        return new WorkScheduleSettings
+        {
+            Revision = _originalScheduleSettings.Revision,
+            FullDayStartMinutes = Parse(TxtFullDayStart), FullDayEndMinutes = Parse(TxtFullDayEnd),
+            MorningStartMinutes = Parse(TxtMorningStart), MorningEndMinutes = Parse(TxtMorningEnd),
+            AfternoonStartMinutes = Parse(TxtAfternoonStart), AfternoonEndMinutes = Parse(TxtAfternoonEnd),
+            UseEmployeeAbbreviations = ChkCalendarUseAbbreviations.IsChecked == true
+        }.CreateValidatedCopy();
+    }
+
+    private static bool ScheduleSettingsEqual(WorkScheduleSettings first, WorkScheduleSettings second) =>
+        first.FullDayStartMinutes == second.FullDayStartMinutes && first.FullDayEndMinutes == second.FullDayEndMinutes &&
+        first.MorningStartMinutes == second.MorningStartMinutes && first.MorningEndMinutes == second.MorningEndMinutes &&
+        first.AfternoonStartMinutes == second.AfternoonStartMinutes && first.AfternoonEndMinutes == second.AfternoonEndMinutes &&
+        first.UseEmployeeAbbreviations == second.UseEmployeeAbbreviations;
+
+    private bool HasScheduleSettingsChanges()
+    {
+        if (!_scheduleSettingsLoaded) return false;
+        try { return !ScheduleSettingsEqual(_originalScheduleSettings, ReadScheduleSettings()); }
+        catch (InvalidOperationException) { return true; }
+    }
+
+    private void SetScheduleSettingsSnapshot(WorkScheduleSettingsSnapshot snapshot)
+    {
+        _originalScheduleSettings = snapshot.Settings.CreateValidatedCopy();
+        _scheduleSettingsCurrent = snapshot.IsCurrent;
+        _scheduleSettingsLoaded = true;
+        TxtFullDayStart.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.FullDayStartMinutes);
+        TxtFullDayEnd.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.FullDayEndMinutes);
+        TxtMorningStart.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.MorningStartMinutes);
+        TxtMorningEnd.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.MorningEndMinutes);
+        TxtAfternoonStart.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.AfternoonStartMinutes);
+        TxtAfternoonEnd.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.AfternoonEndMinutes);
+        ChkCalendarUseAbbreviations.IsChecked = snapshot.Settings.UseEmployeeAbbreviations;
+        CalendarSettingsEditor.IsEnabled = snapshot.IsCurrent;
+    }
+
+    private async Task RefreshScheduleSettingsAsync(bool automatic, CancellationToken token)
+    {
+        bool modified = HasScheduleSettingsChanges();
+        if (string.IsNullOrWhiteSpace(TxtCalendarSyncStatus.Text))
+            TxtCalendarSyncStatus.Text = "Caricamento degli orari dal database...";
+        if (!automatic)
+        {
+            CalendarSettingsEditor.IsEnabled = false;
+            TxtCalendarSyncStatus.Text = "Caricamento degli orari dal database...";
+        }
+        try
+        {
+            if (App.WorkSchedule == null)
+            {
+                TxtCalendarSyncStatus.Text = "Configura il database e riavvia l'applicazione per gestire il calendario condiviso.";
+                return;
+            }
+            var snapshot = await App.WorkSchedule.GetSettingsAsync(token);
+            if (token.IsCancellationRequested) return;
+            modified = HasScheduleSettingsChanges();
+            bool remoteChanged = snapshot.Settings.Revision != _originalScheduleSettings.Revision;
+            if (!automatic || !modified)
+            {
+                if (!automatic || !_scheduleSettingsLoaded || remoteChanged || !ScheduleSettingsEqual(_originalScheduleSettings, snapshot.Settings))
+                    SetScheduleSettingsSnapshot(snapshot);
+            }
+            _scheduleSettingsCurrent = snapshot.IsCurrent;
+            CalendarSettingsEditor.IsEnabled = snapshot.IsCurrent;
+            TxtCalendarSyncStatus.Text = !snapshot.IsCurrent
+                ? "Database non disponibile: gli ultimi orari scaricati sono consultabili. Le modifiche richiedono la connessione."
+                : modified && automatic && remoteChanged
+                    ? "Gli orari sono cambiati su un altro PC. Le tue modifiche non salvate sono conservate; ricarica per vedere gli aggiornamenti."
+                    : modified && automatic
+                        ? "Modifiche non ancora salvate. Gli orari condivisi vengono controllati automaticamente."
+                        : $"Orari aggiornati dal database{(snapshot.UpdatedAtUtc is { } updated ? $" alle {updated.ToLocalTime():HH:mm:ss}" : string.Empty)}. Aggiornamento automatico ogni 10 secondi.";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _scheduleSettingsCurrent = false;
+            CalendarSettingsEditor.IsEnabled = false;
+            TxtCalendarSyncStatus.Text = ex.Message;
+        }
+    }
+
+    private async void OnRefreshCalendarSettingsClick(object sender, RoutedEventArgs e)
+    {
+        if (_isRefreshingShared || _isSaving) return;
+        if (HasScheduleSettingsChanges() && MessageBox.Show(this,
+                "Ricaricare gli orari e scartare le modifiche al calendario non ancora salvate?",
+                "Ricarica orari", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (_isRefreshingShared || _isSaving || _employeeLoadCts.IsCancellationRequested) return;
+        // Explicit reload of one tab must preserve unsaved edits in the other tab.
+        await StartSharedTabRefreshAsync(TabCalendarSettings, automatic: false);
     }
 
     private void OnBrowsePdfRootClick(object sender, RoutedEventArgs e)

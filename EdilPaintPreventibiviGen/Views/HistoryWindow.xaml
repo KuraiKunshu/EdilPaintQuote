@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:EdilPaintPreventibiviGen.Views"
         xmlns:models="clr-namespace:EdilPaintPreventibiviGen.Models"
         xmlns:converters="clr-namespace:EdilPaintPreventibiviGen.Converters"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
@@ -970,9 +971,8 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </UniformGrid.Style>
-                                        <Button Content="Apri PDF"
-                                                Style="{StaticResource DetailActionButtonStyle}"
-                                                Click="OnOpenPastQuotePdfClick"/>
+                                        <views:QuoteActionsControl QuoteNumber="{Binding QuoteNumber}"
+                                                                   ShowDetails="False" Margin="0,0,8,8"/>
                                         <Button Content="Modifica"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnEditPastQuoteClick"/>
@@ -985,12 +985,6 @@
                                         <Button Content="Certificato posa" Visibility="{Binding CertificateVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnGenerateInstallationCertificateClick"/>
-                                        <Button Content="Scheda lavoro"
-                                                Style="{StaticResource DetailActionButtonStyle}"
-                                                Click="OnGenerateWorkSheetClick"/>
-                                        <Button Content="Cartella"
-                                                Style="{StaticResource DetailActionButtonStyle}"
-                                                Click="OnOpenCustomerFolderClick"/>
                                         <Button Content="Copia"
                                                 Style="{StaticResource DetailActionButtonStyle}"
                                                 Click="OnCopyPastQuoteClick"/>

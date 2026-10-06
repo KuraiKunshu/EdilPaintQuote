@@ -82,10 +82,9 @@ public partial class SuppliersWindow : Window
             CmbStatusFilter.IsEnabled = false;
             CmbSortOrder.IsEnabled = false;
 
-            int take = Math.Clamp(App.AppSettings.App.NumberOfQuote <= 0 ? 100 : App.AppSettings.App.NumberOfQuote, 1, 250);
             var summaries = await _historyService.LoadSupplierOrderSummariesAsync(
                 searchText,
-                take,
+                int.MaxValue,
                 token);
 
             token.ThrowIfCancellationRequested();

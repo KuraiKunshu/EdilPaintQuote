@@ -17,6 +17,7 @@ public partial class SqlDataService
 
         await EnsureQuantitySchemaAsync(db, cancellationToken);
         await EnsureEmployeeSchemaAsync(db, cancellationToken);
+        await EnsureWorkScheduleSchemaAsync(db, cancellationToken);
 
         if (!await db.CompanySettings.AnyAsync(cancellationToken))
         {

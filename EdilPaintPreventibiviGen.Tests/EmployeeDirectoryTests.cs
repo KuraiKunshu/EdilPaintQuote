@@ -233,6 +233,8 @@ public sealed class EmployeeDirectoryTests : IDisposable
         Assert.Equal("Employees", entity.GetTableName());
         Assert.True(entity.FindProperty(nameof(EmployeeEntity.Revision))!.IsConcurrencyToken);
         Assert.Equal(250, entity.FindProperty(nameof(EmployeeEntity.FirstName))!.GetMaxLength());
+        Assert.Equal(24, entity.FindProperty(nameof(EmployeeEntity.Abbreviation))!.GetMaxLength());
+        Assert.Contains(entity.GetIndexes(), index => index.IsUnique && index.Properties.Single().Name == nameof(EmployeeEntity.Abbreviation));
         string schema = SqlDataService.BuildEmployeeSchemaSql(postgres);
         Assert.Contains(postgres ? "CREATE TABLE IF NOT EXISTS" : "IF OBJECT_ID", schema);
         Assert.Contains("Revision", schema);
