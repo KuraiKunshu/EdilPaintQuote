@@ -2,7 +2,9 @@ namespace EdilPaintPreventibiviGen.Models;
 
 public sealed class EmployeeSettingsModel
 {
+    public const int MaxNameLength = 250;
     public Guid Id { get; set; } = Guid.NewGuid();
+    public long Revision { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
 
@@ -11,9 +13,13 @@ public sealed class EmployeeSettingsModel
         if (string.IsNullOrWhiteSpace(FirstName))
             throw new InvalidOperationException("Inserisci il nome di ogni dipendente. Il cognome è facoltativo.");
 
+        if (FirstName.Trim().Length > MaxNameLength || (LastName?.Trim().Length ?? 0) > MaxNameLength)
+            throw new InvalidOperationException($"Nome e cognome possono contenere al massimo {MaxNameLength} caratteri ciascuno.");
+
         return new EmployeeSettingsModel
         {
             Id = Id,
+            Revision = Revision,
             FirstName = FirstName.Trim(),
             LastName = LastName?.Trim() ?? string.Empty
         };

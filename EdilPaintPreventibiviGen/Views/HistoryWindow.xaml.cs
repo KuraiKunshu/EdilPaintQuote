@@ -983,7 +983,12 @@ public partial class HistoryWindow : Window
         _isGeneratingWorkSheet = true;
         try
         {
-            var optionsWindow = new WorkSheetOptionsWindow(App.AppSettings.Employees, entry.QuoteNumber) { Owner = this };
+            Mouse.OverrideCursor = Cursors.Wait;
+            var employees = App.EmployeeDirectory != null
+                ? await App.EmployeeDirectory.GetLatestAsync(AppShutdownManager.ShutdownToken)
+                : new EmployeeDirectorySnapshot([], false);
+            Mouse.OverrideCursor = null;
+            var optionsWindow = new WorkSheetOptionsWindow(employees.Employees, entry.QuoteNumber, employees.IsCurrent) { Owner = this };
             if (optionsWindow.ShowDialog() != true)
                 return;
 

@@ -18,6 +18,10 @@ public partial class SettingsWindow : Window
 {
     private readonly ObservableCollection<WindowMaterialRuleEditor> _windowMaterialRuleEditors = [];
     private readonly ObservableCollection<EmployeeSettingsModel> _employees = [];
+    private List<EmployeeSettingsModel> _originalEmployees = [];
+    private readonly CancellationTokenSource _employeeLoadCts = AppShutdownManager.CreateLinkedTokenSource();
+    private bool _employeeListCurrent;
+    private bool _isSaving;
     private readonly string _displayedCatalogIdentity;
     private bool _catalogIdsCompatible;
     private bool _updatingAutomaticUpdatesControl;
@@ -51,19 +55,17 @@ public partial class SettingsWindow : Window
         CmbDefaultVat.ItemsSource = new[] { "22%", "10%", "RC 10%+22%", "esclusa" };
         BtnCompanyProfile.IsEnabled = App.DataService != null;
         LoadSettings();
+        Loaded += async (_, _) => await RefreshEmployeesAsync();
+        Closing += (_, args) => { if (_isSaving) args.Cancel = true; };
+        Closed += (_, _) => _employeeLoadCts.Cancel();
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
 
     private void LoadSettings()
     {
-        foreach (var employee in App.AppSettings.Employees)
-            _employees.Add(new EmployeeSettingsModel
-            {
-                Id = employee.Id,
-                FirstName = employee.FirstName,
-                LastName = employee.LastName
-            });
-        UpdateEmployeesEmptyState();
+        try { SetEmployeeSnapshot(App.EmployeeDirectory?.CachedSnapshot ?? new EmployeeDirectorySnapshot([], false)); }
+        catch (InvalidOperationException) { SetEmployeeSnapshot(new EmployeeDirectorySnapshot([], false)); }
+        SetEmployeeEditingEnabled(false);
         CmbDefaultVat.SelectedItem = App.AppSettings.App.GetEffectiveDefaultVatType();
         ChkWindowAutomations.IsChecked = App.AppSettings.Business.EnableWindowAutomations;
         ChkInstallationCertificate.IsChecked = App.AppSettings.Business.EnableInstallationCertificate;
@@ -162,8 +164,9 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnSaveClick(object sender, RoutedEventArgs e)
+    private async void OnSaveClick(object sender, RoutedEventArgs e)
     {
+        if (_isSaving) return;
         var invalidEmployee = _employees.FirstOrDefault(employee => string.IsNullOrWhiteSpace(employee.FirstName));
         if (invalidEmployee != null)
         {
@@ -331,8 +334,35 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        bool employeesSaved = false;
         try
         {
+            var employeeChanges = EmployeeChanges.Between(_originalEmployees, employees);
+            var requestedDatabase = new DatabaseSettingsModel
+            {
+                Provider = DatabaseSettingsModel.NormalizeProvider(databaseProvider), Server = databaseServer,
+                Port = databasePort, Database = databaseName, Username = databaseUsername, Password = databasePassword
+            };
+            if (requestedDatabase.IsConfigured) _ = requestedDatabase.BuildConnectionString();
+            if (employeeChanges.Count > 0 && !string.Equals(_displayedCatalogIdentity,
+                    requestedDatabase.GetCatalogIdentity(), StringComparison.Ordinal))
+            {
+                ShowValidationError(TabDatabaseSettings, TxtDatabaseName,
+                    "Salva prima le modifiche ai dipendenti. Poi puoi cambiare la connessione al database e riavviare l'applicazione.");
+                return;
+            }
+            _isSaving = true;
+            IsEnabled = false;
+            if (employeeChanges.Count > 0)
+            {
+                if (!_employeeListCurrent || App.EmployeeDirectory == null)
+                    throw new InvalidOperationException("Ricarica l'elenco dal database prima di modificare i dipendenti.");
+                var saved = await App.EmployeeDirectory.SaveAsync(_originalEmployees, employees, _employeeLoadCts.Token);
+                employeesSaved = true;
+                SetEmployeeSnapshot(saved);
+                SetEmployeeEditingEnabled(saved.IsCurrent);
+            }
+
             var app = App.AppSettings.App;
             var realProfit = App.AppSettings.RealProfit;
             var pdf = App.AppSettings.PdfStorage;
@@ -403,17 +433,7 @@ public partial class SettingsWindow : Window
             template.ShowTemplateName = ChkPdfShowTemplateName.IsChecked == true;
             template.Normalize();
 
-            var previousEmployees = App.AppSettings.Employees;
-            App.AppSettings.Employees = employees;
-            try
-            {
-                App.AppSettings.Save();
-            }
-            catch
-            {
-                App.AppSettings.Employees = previousEmployees;
-                throw;
-            }
+            App.AppSettings.Save();
 
             MessageBox.Show(
                 "Impostazioni salvate. Riavvia l'applicazione se hai modificato la connessione al database.",
@@ -421,17 +441,82 @@ public partial class SettingsWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
 
+            _isSaving = false;
             DialogResult = true;
             Close();
         }
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Impossibile salvare le impostazioni.\n\n{ex.Message}",
+                (employeesSaved
+                    ? "I dipendenti sono stati salvati nel database, ma non è stato possibile salvare le impostazioni locali."
+                    : "Impossibile salvare le impostazioni.") + $"\n\n{ex.Message}",
                 "Errore salvataggio",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+        finally
+        {
+            _isSaving = false;
+            IsEnabled = true;
+        }
+    }
+
+    private void SetEmployeeSnapshot(EmployeeDirectorySnapshot snapshot)
+    {
+        _employees.Clear();
+        foreach (var employee in snapshot.Employees) _employees.Add(employee.CreateValidatedCopy());
+        _originalEmployees = snapshot.Employees.Select(x => x.CreateValidatedCopy()).ToList();
+        _employeeListCurrent = snapshot.IsCurrent;
+        UpdateEmployeesEmptyState();
+    }
+
+    private void SetEmployeeEditingEnabled(bool enabled)
+    {
+        BtnAddEmployee.IsEnabled = enabled;
+        ItemsEmployees.IsEnabled = enabled;
+    }
+
+    private async Task RefreshEmployeesAsync()
+    {
+        SetEmployeeEditingEnabled(false);
+        BtnRefreshEmployees.IsEnabled = false;
+        TxtEmployeeSyncStatus.Text = "Caricamento dei dipendenti dal database...";
+        try
+        {
+            var directory = App.EmployeeDirectory;
+            if (directory == null)
+            {
+                TxtEmployeeSyncStatus.Text = "Configura il database e riavvia l'applicazione per gestire i dipendenti condivisi.";
+                return;
+            }
+            var snapshot = await directory.GetLatestAsync(_employeeLoadCts.Token);
+            if (_employeeLoadCts.IsCancellationRequested) return;
+            SetEmployeeSnapshot(snapshot);
+            SetEmployeeEditingEnabled(snapshot.IsCurrent);
+            TxtEmployeeSyncStatus.Text = snapshot.IsCurrent
+                ? "Elenco aggiornato dal database. Le modifiche salvate saranno disponibili su tutti i PC."
+                : "Database non disponibile: visualizzi l'ultimo elenco scaricato. Per modificarlo, riconnettiti e premi Ricarica elenco.";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            TxtEmployeeSyncStatus.Text = ex.Message;
+        }
+        finally
+        {
+            BtnRefreshEmployees.IsEnabled = App.EmployeeDirectory != null;
+        }
+    }
+
+    private async void OnRefreshEmployeesClick(object sender, RoutedEventArgs e)
+    {
+        // Reload is explicit: never replace unsaved edits during background sync.
+        bool modified = _employees.Any(x => string.IsNullOrWhiteSpace(x.FirstName)) ||
+            EmployeeChanges.Between(_originalEmployees, _employees.ToList()).Count > 0;
+        if (modified && MessageBox.Show(this, "Ricaricare l'elenco e scartare le modifiche ai dipendenti non ancora salvate?",
+                "Ricarica dipendenti", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        await RefreshEmployeesAsync();
     }
 
     private void OnBrowsePdfRootClick(object sender, RoutedEventArgs e)

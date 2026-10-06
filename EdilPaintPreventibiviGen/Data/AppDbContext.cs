@@ -7,6 +7,7 @@ namespace EdilPaintPreventibiviGen.Data;
 public class AppDbContext : DbContext
 {
     public DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
+    public DbSet<EmployeeEntity> Employees => Set<EmployeeEntity>();
     public DbSet<CompanySettingsEntity> CompanySettings => Set<CompanySettingsEntity>();
     public DbSet<LaborCatalogEntity> LaborCatalog => Set<LaborCatalogEntity>();
     public DbSet<PersonalMaterialEntity> PersonalMaterials => Set<PersonalMaterialEntity>();
@@ -23,6 +24,16 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<EmployeeEntity>(entity =>
+        {
+            entity.ToTable("Employees");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.FirstName).HasMaxLength(EmployeeSettingsModel.MaxNameLength).IsRequired();
+            entity.Property(x => x.LastName).HasMaxLength(EmployeeSettingsModel.MaxNameLength).IsRequired();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+        });
 
         modelBuilder.Entity<CustomerEntity>(entity =>
         {

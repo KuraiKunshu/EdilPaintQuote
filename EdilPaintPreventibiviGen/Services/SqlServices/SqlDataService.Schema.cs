@@ -16,6 +16,7 @@ public partial class SqlDataService
             await EnsurePostgreSqlSchemaCompatibilityAsync(db, cancellationToken);
 
         await EnsureQuantitySchemaAsync(db, cancellationToken);
+        await EnsureEmployeeSchemaAsync(db, cancellationToken);
 
         if (!await db.CompanySettings.AnyAsync(cancellationToken))
         {
