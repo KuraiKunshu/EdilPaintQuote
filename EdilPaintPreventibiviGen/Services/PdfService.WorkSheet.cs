@@ -66,6 +66,8 @@ public partial class PdfService
                                 dateColumn.Item().PaddingTop(7).Text($"{date:dd/MM/yyyy}").FontSize(22).Bold();
                             else
                                 dateColumn.Item().Height(32).AlignBottom().LineHorizontal(1).LineColor(WorkSheetPalette.GreyDarken2);
+                            if (!string.IsNullOrWhiteSpace(context.InterventionTime))
+                                dateColumn.Item().PaddingTop(5).Text(context.InterventionTime).FontSize(14).Bold();
                         });
                         row.ConstantItem(18);
                         row.RelativeItem().Column(team =>

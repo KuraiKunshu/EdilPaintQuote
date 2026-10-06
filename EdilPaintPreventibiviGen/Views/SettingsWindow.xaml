@@ -797,10 +797,16 @@
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
                                 <StackPanel Margin="18,16,18,6">
                                     <TextBlock Text="Dipendenti" Style="{StaticResource PageTitleStyle}"/>
-                                    <TextBlock Text="Gestisci i dipendenti. Il nome è obbligatorio, il cognome è facoltativo. Conferma le modifiche con Salva."
+                                    <TextBlock Text="Elenco condiviso tra tutti i PC collegati allo stesso database. Solo il nome è obbligatorio. La sigla facoltativa identifica la persona nel calendario e deve essere diversa per ciascun dipendente."
                                                Style="{StaticResource PageSubtitleStyle}" TextWrapping="Wrap"/>
-                                    <Button Content="Aggiungi dipendente" HorizontalAlignment="Left" Margin="0,16,0,12"
-                                            Style="{StaticResource PrimaryActionButtonStyle}" Click="OnAddEmployeeClick"/>
+                                    <TextBlock x:Name="TxtEmployeeSyncStatus" TextWrapping="Wrap" Margin="0,12,0,0"
+                                               Foreground="{StaticResource MutedTextBrush}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,16,0,12">
+                                        <Button x:Name="BtnAddEmployee" Content="Aggiungi dipendente"
+                                                Style="{StaticResource PrimaryActionButtonStyle}" Click="OnAddEmployeeClick"/>
+                                        <Button x:Name="BtnRefreshEmployees" Content="Ricarica elenco" Margin="12,0,0,0"
+                                                Style="{StaticResource SecondaryActionButtonStyle}" Click="OnRefreshEmployeesClick"/>
+                                    </StackPanel>
                                     <TextBlock x:Name="TxtNoEmployees" Text="Nessun dipendente inserito. Usa Aggiungi dipendente per iniziare."
                                                Foreground="{StaticResource MutedTextBrush}" Margin="0,8" TextWrapping="Wrap"/>
                                     <ItemsControl x:Name="ItemsEmployees">
@@ -813,25 +819,81 @@
                                                             <ColumnDefinition Width="16"/>
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="16"/>
+                                                            <ColumnDefinition Width="120"/>
+                                                            <ColumnDefinition Width="16"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <StackPanel>
-                                                            <TextBlock Text="Nome (obbligatorio)" Margin="0,0,0,6"/>
+                                                            <TextBlock Text="Nome (obbligatorio)" Style="{StaticResource LabelStyle}" Margin="0,0,0,6"/>
                                                             <TextBox x:Name="TxtEmployeeFirstName" Text="{Binding FirstName, UpdateSourceTrigger=PropertyChanged}"
+                                                                     MaxLength="250"
                                                                      AutomationProperties.Name="Nome dipendente (obbligatorio)"/>
                                                         </StackPanel>
                                                         <StackPanel Grid.Column="2">
-                                                            <TextBlock Text="Cognome (facoltativo)" Margin="0,0,0,6"/>
+                                                            <TextBlock Text="Cognome (facoltativo)" Style="{StaticResource LabelStyle}" Margin="0,0,0,6"/>
                                                             <TextBox Text="{Binding LastName, UpdateSourceTrigger=PropertyChanged}"
+                                                                     MaxLength="250"
                                                                      AutomationProperties.Name="Cognome dipendente (facoltativo)"/>
                                                         </StackPanel>
-                                                        <Button Grid.Column="4" Content="Rimuovi" VerticalAlignment="Bottom"
+                                                        <StackPanel Grid.Column="4">
+                                                            <TextBlock Text="Sigla (facoltativa)" Style="{StaticResource LabelStyle}" Margin="0,0,0,6"/>
+                                                            <TextBox Text="{Binding Abbreviation, UpdateSourceTrigger=PropertyChanged}"
+                                                                     MaxLength="24" CharacterCasing="Upper"
+                                                                     AutomationProperties.Name="Sigla dipendente (facoltativa)"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="6" Content="Rimuovi" VerticalAlignment="Bottom"
                                                                 Style="{StaticResource SecondaryActionButtonStyle}" Click="OnRemoveEmployeeClick"/>
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem x:Name="TabCalendarSettings" Header="_Calendario">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                                <StackPanel Margin="18,16,18,6">
+                                    <TextBlock Text="Orari del calendario" Style="{StaticResource PageTitleStyle}"/>
+                                    <TextBlock Text="Orari e visualizzazione della squadra sono condivisi tra tutti i PC. Usa il formato 08:00."
+                                               Style="{StaticResource PageSubtitleStyle}" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="TxtCalendarSyncStatus" TextWrapping="Wrap" Margin="0,12,0,12"
+                                               Foreground="{StaticResource MutedTextBrush}"/>
+                                    <Button x:Name="BtnRefreshCalendarSettings" Content="Ricarica orari" HorizontalAlignment="Left"
+                                            Margin="0,0,0,16" Style="{StaticResource SecondaryActionButtonStyle}" Click="OnRefreshCalendarSettingsClick"/>
+                                    <Border Style="{StaticResource SectionStyle}">
+                                        <StackPanel x:Name="CalendarSettingsEditor">
+                                            <TextBlock Text="Orari standard" Style="{StaticResource SectionTitleStyle}"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/><ColumnDefinition Width="120"/>
+                                                    <ColumnDefinition Width="16"/><ColumnDefinition Width="120"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <TextBlock Grid.Column="1" Text="Dalle" Style="{StaticResource LabelStyle}"/>
+                                                <TextBlock Grid.Column="3" Text="Alle" Style="{StaticResource LabelStyle}"/>
+                                                <TextBlock Grid.Row="1" Text="Giornata intera" Style="{StaticResource LabelStyle}" Margin="0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                                <TextBox x:Name="TxtFullDayStart" Grid.Row="1" Grid.Column="1" Margin="0,6" MaxLength="5" AutomationProperties.Name="Inizio giornata intera"/>
+                                                <TextBox x:Name="TxtFullDayEnd" Grid.Row="1" Grid.Column="3" Margin="0,6" MaxLength="5" AutomationProperties.Name="Fine giornata intera"/>
+                                                <TextBlock Grid.Row="2" Text="Mezza giornata · mattina" Style="{StaticResource LabelStyle}" Margin="0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                                <TextBox x:Name="TxtMorningStart" Grid.Row="2" Grid.Column="1" Margin="0,6" MaxLength="5" AutomationProperties.Name="Inizio mattina"/>
+                                                <TextBox x:Name="TxtMorningEnd" Grid.Row="2" Grid.Column="3" Margin="0,6" MaxLength="5" AutomationProperties.Name="Fine mattina"/>
+                                                <TextBlock Grid.Row="3" Text="Mezza giornata · pomeriggio" Style="{StaticResource LabelStyle}" Margin="0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                                <TextBox x:Name="TxtAfternoonStart" Grid.Row="3" Grid.Column="1" Margin="0,6" MaxLength="5" AutomationProperties.Name="Inizio pomeriggio"/>
+                                                <TextBox x:Name="TxtAfternoonEnd" Grid.Row="3" Grid.Column="3" Margin="0,6" MaxLength="5" AutomationProperties.Name="Fine pomeriggio"/>
+                                            </Grid>
+                                            <CheckBox x:Name="ChkCalendarUseAbbreviations" Content="Mostra le sigle dei dipendenti nel calendario" Margin="0,16,0,8"/>
+                                            <TextBlock Text="Se una persona non ha una sigla, viene mostrato il suo nome." TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SectionStyle}" Margin="0,16,0,0">
+                                        <TextBlock Text="Modificando gli orari standard aggiorni anche gli interventi futuri già programmati come giornata intera, mattina o pomeriggio. Gli orari personalizzati e gli interventi conclusi o passati mantengono gli orari concordati. Il salvataggio controlla le sovrapposizioni della squadra."
+                                                   TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                    </Border>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>
@@ -1201,7 +1263,7 @@
                                     Width="110"
                                     Style="{StaticResource SecondaryActionButtonStyle}"
                                     Click="OnCancelClick"/>
-                            <Button Content="Salva"
+                            <Button x:Name="BtnSaveSettings" Content="Salva"
                                     Width="118"
                                     Margin="10,0,0,0"
                                     IsDefault="True"

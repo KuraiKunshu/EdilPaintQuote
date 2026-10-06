@@ -16,11 +16,12 @@ public partial class WorkSheetOptionsWindow : Window
     private string? _invalidDateText;
     public WorkSheetOptions Options { get; private set; } = new();
 
-    public WorkSheetOptionsWindow(IEnumerable<EmployeeSettingsModel> employees, string quoteNumber)
+    public WorkSheetOptionsWindow(IEnumerable<EmployeeSettingsModel> employees, string quoteNumber, bool employeeListCurrent = true)
     {
         InitializeComponent();
         Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         TxtQuote.Text = $"Preventivo {quoteNumber}";
+        TxtEmployeeCacheNotice.Visibility = employeeListCurrent ? Visibility.Collapsed : Visibility.Visible;
         _employees.AddRange(employees.Select(employee => new WorkSheetEmployeeSelection
         {
             DisplayName = $"{employee.FirstName} {employee.LastName}".Trim()

@@ -16,6 +16,8 @@ public partial class App : Application
     public static IDataService DataService { get; private set; } = null!;
     public static AppSettingsService AppSettings { get; private set; } = null!;
     public static SyncService SyncService { get; private set; } = null!;
+    public static EmployeeDirectoryService? EmployeeDirectory { get; private set; }
+    public static WorkScheduleService? WorkSchedule { get; private set; }
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
     public static bool IsOfflineMode { get; private set; }
@@ -79,8 +81,26 @@ public partial class App : Application
             var fallbackDataService = new FallbackDataService(
                 sqlService, localStore, quotePatchOutbox, deletionOutbox);
             DataService = fallbackDataService;
+            string employeeDatabaseIdentity = AppSettings.Database.GetCatalogIdentity();
+            if (AppSettings.Employees.Count > 0 && string.IsNullOrEmpty(AppSettings.EmployeesDatabaseIdentity))
+            {
+                // Bind legacy data before import, so changing company/database cannot
+                // accidentally import this company's local staff into another database.
+                AppSettings.EmployeesDatabaseIdentity = employeeDatabaseIdentity;
+                AppSettings.Save();
+            }
+            EmployeeDirectory = new EmployeeDirectoryService(sqlService,
+                Path.Combine(localDataPath, "dipendenti.json"), employeeDatabaseIdentity,
+                AppSettings.EmployeesDatabaseIdentity == employeeDatabaseIdentity ? AppSettings.Employees : [],
+                token => DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(DataService, "aggiornamento dipendenti", token),
+                () => AppSettings.Database.GetCatalogIdentity());
+            WorkSchedule = new WorkScheduleService(sqlService, Path.Combine(localDataPath, "calendario-lavori.json"),
+                employeeDatabaseIdentity,
+                token => DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(DataService, "calendario lavori", token),
+                () => AppSettings.Database.GetCatalogIdentity(),
+                async token => { await EmployeeDirectory.RefreshAsync(token); });
             SyncService = new SyncService(
-                DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox);
+                DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox, EmployeeDirectory, WorkSchedule);
             SyncService.SyncCompleted += OnSyncCompleted;
 
             var loadingWindow = new LoadingWindow

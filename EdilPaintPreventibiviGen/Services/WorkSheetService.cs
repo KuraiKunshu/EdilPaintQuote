@@ -28,6 +28,7 @@ public static class WorkSheetService
             EmployeeNames = options?.EmployeeNames.Where(name => !string.IsNullOrWhiteSpace(name))
                 .Select(name => name.Trim()).ToArray() ?? [],
             InterventionDate = options?.InterventionDate?.Date,
+            InterventionTime = options?.InterventionTime?.Trim() ?? string.Empty,
             AdditionalNotes = options?.AdditionalNotes?.Trim() ?? string.Empty,
             MaterialsOrderedByCustomer = quote.MaterialsOrderedByCustomer,
             SupplierName = quote.MaterialsOrderedByCustomer ? quote.CustomerName : quote.SupplierName,

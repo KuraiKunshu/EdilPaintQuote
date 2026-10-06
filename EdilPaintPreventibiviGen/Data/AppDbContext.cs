@@ -7,6 +7,10 @@ namespace EdilPaintPreventibiviGen.Data;
 public class AppDbContext : DbContext
 {
     public DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
+    public DbSet<EmployeeEntity> Employees => Set<EmployeeEntity>();
+    public DbSet<WorkScheduleSettingsEntity> WorkScheduleSettings => Set<WorkScheduleSettingsEntity>();
+    public DbSet<WorkScheduleEntryEntity> WorkScheduleEntries => Set<WorkScheduleEntryEntity>();
+    public DbSet<WorkScheduleAssignmentEntity> WorkScheduleAssignments => Set<WorkScheduleAssignmentEntity>();
     public DbSet<CompanySettingsEntity> CompanySettings => Set<CompanySettingsEntity>();
     public DbSet<LaborCatalogEntity> LaborCatalog => Set<LaborCatalogEntity>();
     public DbSet<PersonalMaterialEntity> PersonalMaterials => Set<PersonalMaterialEntity>();
@@ -23,6 +27,54 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<WorkScheduleSettingsEntity>(entity =>
+        {
+            entity.ToTable("WorkScheduleSettings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<WorkScheduleEntryEntity>(entity =>
+        {
+            entity.ToTable("WorkScheduleEntries");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Date).HasColumnType("date");
+            entity.Property(x => x.AbsenceReason).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Notes).IsRequired();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasIndex(x => x.Date);
+            entity.HasIndex(x => x.QuoteId);
+            entity.HasOne(x => x.Quote).WithMany().HasForeignKey(x => x.QuoteId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkScheduleAssignmentEntity>(entity =>
+        {
+            entity.ToTable("WorkScheduleAssignments");
+            entity.HasKey(x => new { x.EntryId, x.EmployeeId });
+            entity.HasIndex(x => x.EmployeeId);
+            entity.HasOne(x => x.Entry).WithMany(x => x.Assignments).HasForeignKey(x => x.EntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<EmployeeEntity>(entity =>
+        {
+            entity.ToTable("Employees");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.FirstName).HasMaxLength(EmployeeSettingsModel.MaxNameLength).IsRequired();
+            entity.Property(x => x.LastName).HasMaxLength(EmployeeSettingsModel.MaxNameLength).IsRequired();
+            entity.Property(x => x.Abbreviation).HasMaxLength(EmployeeSettingsModel.MaxAbbreviationLength).HasDefaultValue("").IsRequired();
+            entity.HasIndex(x => x.Abbreviation).IsUnique().HasFilter(Database.IsNpgsql()
+                ? "\"IsDeleted\" = false AND \"Abbreviation\" <> ''"
+                : "[IsDeleted] = 0 AND [Abbreviation] <> N''");
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+        });
 
         modelBuilder.Entity<CustomerEntity>(entity =>
         {
