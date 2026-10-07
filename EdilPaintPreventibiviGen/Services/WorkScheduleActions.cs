@@ -13,7 +13,9 @@ public static class WorkScheduleActions
         Window owner, CancellationToken token = default)
     {
         var schedule = App.WorkSchedule ?? throw new InvalidOperationException("Il calendario non è disponibile.");
-        var completion = new WorkScheduleCompletionService(schedule, App.DataService, StoragePathService.Instance);
+        var completion = new WorkScheduleCompletionService(schedule, App.DataService, StoragePathService.Instance,
+            automaticMaterials: App.AutomaticMaterials,
+            enableWindowAutomations: App.AppSettings?.Business.EnableWindowAutomations != false);
         try
         {
             WorkScheduleCompletionResult result;

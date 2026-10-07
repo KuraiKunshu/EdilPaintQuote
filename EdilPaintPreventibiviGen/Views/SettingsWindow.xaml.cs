@@ -32,6 +32,10 @@ public partial class SettingsWindow : Window
     private bool _isSaving;
     private readonly string _displayedCatalogIdentity;
     private bool _catalogIdsCompatible;
+    private AutomaticMaterialSettings _originalAutomaticSettings = new();
+    private AutomaticMaterialSettings _automaticFormBaseline = new();
+    private bool _automaticSettingsCurrent;
+    private bool _automaticSettingsLoaded;
     private bool _updatingAutomaticUpdatesControl;
 
     public IReadOnlyList<Item> LaborCatalog { get; }
@@ -147,6 +151,8 @@ public partial class SettingsWindow : Window
                 useCatalogIds: _catalogIdsCompatible));
         }
         UpdateWindowMaterialRulesEmptyState();
+        _originalAutomaticSettings = AutomaticMaterialSettings.FromLocal(realProfit);
+        _automaticFormBaseline = ReadAutomaticMaterialDraft();
 
         TxtPdfRootPath.Text = pdf.RootPath;
         TxtHistorySubFolder.Text = pdf.HistorySubFolder ?? string.Empty;
@@ -333,10 +339,12 @@ public partial class SettingsWindow : Window
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (!TryBuildWindowMaterialRules(
-                out List<WindowMaterialRuleSettingsModel> windowMaterialRules,
-                out WindowMaterialRuleEditor? invalidRule,
-                out string windowMaterialRuleError))
+        bool automaticMaterialsChanged = HasAutomaticMaterialChanges();
+        List<WindowMaterialRuleSettingsModel> windowMaterialRules;
+        if (!automaticMaterialsChanged)
+            windowMaterialRules = _automaticFormBaseline.CreateValidatedCopy().WindowMaterialRules;
+        else if (!TryBuildWindowMaterialRules(out windowMaterialRules,
+                out WindowMaterialRuleEditor? invalidRule, out string windowMaterialRuleError))
         {
             ShowWindowMaterialRuleValidationError(invalidRule, windowMaterialRuleError);
             return;
@@ -371,6 +379,7 @@ public partial class SettingsWindow : Window
 
         bool employeesSaved = false;
         bool calendarSaved = false;
+        bool automaticMaterialsSaved = false;
         try
         {
             var employeeChanges = EmployeeChanges.Between(_originalEmployees, employees);
@@ -380,7 +389,7 @@ public partial class SettingsWindow : Window
                 Port = databasePort, Database = databaseName, Username = databaseUsername, Password = databasePassword
             };
             if (requestedDatabase.IsConfigured) _ = requestedDatabase.BuildConnectionString();
-            if ((employeeChanges.Count > 0 || scheduleChanged) && !string.Equals(_displayedCatalogIdentity,
+            if ((employeeChanges.Count > 0 || scheduleChanged || automaticMaterialsChanged) && !string.Equals(_displayedCatalogIdentity,
                     requestedDatabase.GetCatalogIdentity(), StringComparison.Ordinal))
             {
                 ShowValidationError(TabDatabaseSettings, TxtDatabaseName,
@@ -391,6 +400,8 @@ public partial class SettingsWindow : Window
             IsEnabled = false;
             if (scheduleChanged && (!_scheduleSettingsCurrent || App.WorkSchedule == null))
                 throw new InvalidOperationException("Ricarica gli orari dal database prima di modificarli.");
+            if (automaticMaterialsChanged && (!_automaticSettingsCurrent || App.AutomaticMaterials == null))
+                throw new InvalidOperationException("Ricarica le regole dei materiali dal database prima di modificarle.");
             if (employeeChanges.Count > 0)
             {
                 if (!_employeeListCurrent || App.EmployeeDirectory == null)
@@ -405,6 +416,17 @@ public partial class SettingsWindow : Window
                 var saved = await App.WorkSchedule!.SaveSettingsAsync(scheduleSettings, _employeeLoadCts.Token);
                 calendarSaved = true;
                 SetScheduleSettingsSnapshot(saved);
+            }
+            if (automaticMaterialsChanged)
+            {
+                var requested = new AutomaticMaterialSettings
+                {
+                    Revision = _originalAutomaticSettings.Revision, WindowProductPrefixes = windowProductPrefixes,
+                    WindowMaterialRules = windowMaterialRules
+                };
+                var saved = await App.AutomaticMaterials!.SaveAsync(requested, _employeeLoadCts.Token);
+                automaticMaterialsSaved = true;
+                SetAutomaticMaterialSnapshot(saved);
             }
 
             var app = App.AppSettings.App;
@@ -492,8 +514,8 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(
-                (employeesSaved || calendarSaved
-                    ? $"Salvati nel database: {string.Join(" e ", new[] { employeesSaved ? "dipendenti" : null, calendarSaved ? "orari del calendario" : null }.Where(x => x != null))}. Non è stato possibile completare le altre modifiche."
+                (employeesSaved || calendarSaved || automaticMaterialsSaved
+                    ? $"Salvati nel database: {string.Join(" e ", new[] { employeesSaved ? "dipendenti" : null, calendarSaved ? "orari del calendario" : null, automaticMaterialsSaved ? "regole materiali automatici" : null }.Where(x => x != null))}. Non è stato possibile completare le altre modifiche."
                     : "Impossibile salvare le impostazioni.") + $"\n\n{ex.Message}",
                 "Errore salvataggio",
                 MessageBoxButton.OK,
@@ -524,7 +546,7 @@ public partial class SettingsWindow : Window
     private Task RefreshSelectedSharedSettingsAsync(bool automatic = true)
     {
         var tab = SettingsTabs.SelectedItem as TabItem;
-        return tab == TabEmployees || tab == TabCalendarSettings
+        return tab == TabEmployees || tab == TabCalendarSettings || tab == TabGeneralSettings
             ? StartSharedTabRefreshAsync(tab, automatic) : Task.CompletedTask;
     }
 
@@ -554,9 +576,11 @@ public partial class SettingsWindow : Window
         BtnSaveSettings.IsEnabled = false;
         BtnRefreshEmployees.IsEnabled = false;
         BtnRefreshCalendarSettings.IsEnabled = false;
+        BtnRefreshAutomaticMaterials.IsEnabled = false;
         try
         {
             if (tab == TabEmployees) await RefreshEmployeesAsync(automatic, cancellation.Token);
+            else if (tab == TabGeneralSettings) await RefreshAutomaticMaterialsAsync(automatic, cancellation.Token);
             else await RefreshScheduleSettingsAsync(automatic, cancellation.Token);
         }
         finally
@@ -565,9 +589,90 @@ public partial class SettingsWindow : Window
             BtnSaveSettings.IsEnabled = true;
             BtnRefreshEmployees.IsEnabled = App.EmployeeDirectory != null;
             BtnRefreshCalendarSettings.IsEnabled = App.WorkSchedule != null;
+            BtnRefreshAutomaticMaterials.IsEnabled = App.AutomaticMaterials != null;
             _sharedRefreshCts = null;
             cancellation.Dispose();
         }
+    }
+
+    private AutomaticMaterialSettings ReadAutomaticMaterialDraft() => new()
+    {
+        Revision = _originalAutomaticSettings.Revision,
+        CatalogIdentity = _displayedCatalogIdentity,
+        WindowProductPrefixes = TxtWindowProductPrefixes.Text
+            .Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.ToUpperInvariant()).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+        WindowMaterialRules = _windowMaterialRuleEditors.Select(editor => editor.CreateSettingsRule(
+            TryParseSettingsDecimal(editor.QuantityParameterText, out var value) ? value : -1m)).ToList()
+    };
+
+    private bool HasAutomaticMaterialChanges() =>
+        !AutomaticMaterialSettings.SameContent(_automaticFormBaseline, ReadAutomaticMaterialDraft());
+
+    private void SetAutomaticMaterialSnapshot(AutomaticMaterialSettingsSnapshot snapshot)
+    {
+        _originalAutomaticSettings = snapshot.Settings.CreateValidatedCopy();
+        _automaticSettingsCurrent = snapshot.IsCurrent; _automaticSettingsLoaded = true;
+        bool compatible = string.IsNullOrWhiteSpace(snapshot.Settings.CatalogIdentity) ||
+            snapshot.Settings.CatalogIdentity == _displayedCatalogIdentity;
+        var rebound = RealProfitAutomaticMaterialBuilder.RebindSettings(snapshot.Settings,
+            LaborCatalog, CompanyMaterialCatalog, compatible);
+        _catalogIdsCompatible = true;
+        TxtWindowProductPrefixes.Text = string.Join(Environment.NewLine, rebound.WindowProductPrefixes);
+        _windowMaterialRuleEditors.Clear();
+        foreach (var rule in rebound.WindowMaterialRules)
+            _windowMaterialRuleEditors.Add(WindowMaterialRuleEditor.FromSettings(rule, LaborCatalog,
+                CompanyMaterialCatalog, useCatalogIds: true));
+        _automaticFormBaseline = ReadAutomaticMaterialDraft();
+        BorderWindowMaterialCatalogIdentityWarning.Visibility = snapshot.Settings.ResolutionWarnings.Count > 0
+            ? Visibility.Visible : Visibility.Collapsed;
+        TxtWindowMaterialCatalogIdentityWarning.Text = string.Join(Environment.NewLine, snapshot.Settings.ResolutionWarnings);
+        UpdateWindowMaterialRulesEmptyState();
+        AutomaticMaterialSettingsEditor.IsEnabled = snapshot.IsCurrent;
+        rebound.CatalogIdentity = _displayedCatalogIdentity;
+        if (snapshot.IsCurrent) rebound.ApplyTo(App.AppSettings.RealProfit);
+    }
+
+    private async Task RefreshAutomaticMaterialsAsync(bool automatic, CancellationToken token)
+    {
+        try
+        {
+            if (App.AutomaticMaterials == null)
+            {
+                AutomaticMaterialSettingsEditor.IsEnabled = false;
+                TxtAutomaticMaterialSyncStatus.Text = "Configura il database e riavvia per modificare le regole condivise.";
+                return;
+            }
+            var snapshot = await App.AutomaticMaterials.GetLatestAsync(token);
+            if (token.IsCancellationRequested) return;
+            bool modified = HasAutomaticMaterialChanges();
+            bool remoteChanged = snapshot.Settings.Revision != _originalAutomaticSettings.Revision;
+            if (!automatic || (!modified && (!_automaticSettingsLoaded || remoteChanged)))
+                SetAutomaticMaterialSnapshot(snapshot);
+            _automaticSettingsCurrent = snapshot.IsCurrent;
+            AutomaticMaterialSettingsEditor.IsEnabled = snapshot.IsCurrent;
+            TxtAutomaticMaterialSyncStatus.Text = !snapshot.IsCurrent
+                ? "Database non disponibile. Le regole scaricate sono consultabili; le modifiche richiedono la connessione."
+                : modified && remoteChanged
+                    ? "Regole cambiate su un altro PC. Le tue modifiche sono conservate; ricarica prima di salvare."
+                    : modified ? "Modifiche non salvate. Controllo aggiornamenti ogni 10 secondi."
+                    : "Regole aggiornate dal database. Controllo automatico ogni 10 secondi.";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _automaticSettingsCurrent = false; AutomaticMaterialSettingsEditor.IsEnabled = false;
+            TxtAutomaticMaterialSyncStatus.Text = ex.Message;
+        }
+    }
+
+    private async void OnRefreshAutomaticMaterialsClick(object sender, RoutedEventArgs e)
+    {
+        if (_isRefreshingShared || _isSaving) return;
+        if (HasAutomaticMaterialChanges() && MessageBox.Show(this,
+            "Ricaricare le regole e scartare le modifiche ai materiali automatici non ancora salvate?",
+            "Ricarica regole", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        await StartSharedTabRefreshAsync(TabGeneralSettings, automatic: false);
     }
 
     private static bool EmployeeListsEqual(IEnumerable<EmployeeSettingsModel> first,
@@ -1437,7 +1542,7 @@ public sealed class WindowMaterialRuleEditor : INotifyPropertyChanged
         string? snapshotName)
     {
         if (catalogId > 0)
-            return catalog.FirstOrDefault(item => item.PersistentId == catalogId.Value);
+            return RealProfitAutomaticMaterialBuilder.ResolveCatalogItem(catalog, catalogId, snapshotName);
 
         string name = snapshotName?.Trim() ?? string.Empty;
         if (name.Length == 0)

@@ -18,6 +18,7 @@ public partial class App : Application
     public static SyncService SyncService { get; private set; } = null!;
     public static EmployeeDirectoryService? EmployeeDirectory { get; private set; }
     public static WorkScheduleService? WorkSchedule { get; private set; }
+    public static AutomaticMaterialSettingsService? AutomaticMaterials { get; private set; }
     public static MainViewModel? MainVm { get; private set; }
     public static bool IsSilentStartup { get; private set; }
     public static bool IsOfflineMode { get; private set; }
@@ -99,6 +100,10 @@ public partial class App : Application
                 token => DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(DataService, "calendario lavori", token),
                 () => AppSettings.Database.GetCatalogIdentity(),
                 async token => { await EmployeeDirectory.RefreshAsync(token); });
+            AutomaticMaterials = new AutomaticMaterialSettingsService(sqlService,
+                Path.Combine(localDataPath, "materiali-automatici.json"), employeeDatabaseIdentity, AppSettings.RealProfit,
+                token => DatabaseOperationCoordinator.EnsureInteractiveDatabaseReadyAsync(DataService, "materiali automatici", token),
+                () => AppSettings.Database.GetCatalogIdentity());
             SyncService = new SyncService(
                 DataService, sqlService, localStore, quotePatchOutbox, deletionOutbox, EmployeeDirectory, WorkSchedule);
             SyncService.SyncCompleted += OnSyncCompleted;

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
@@ -37,20 +38,27 @@ public sealed class WorkScheduleCompletionService
     private readonly StoragePathService _storage;
     private readonly Action<RealProfitPdfContext, string> _writePdf;
     private readonly Func<DateTime> _clock;
+    private readonly AutomaticMaterialSettingsService? _automaticMaterials;
+    private readonly bool _enableWindowAutomations;
 
-    public WorkScheduleCompletionService(WorkScheduleService schedule, IDataService data, StoragePathService storage)
-        : this(schedule, data, storage, (context, path) => new PdfService().GenerateRealProfitPdf(context, path))
+    public WorkScheduleCompletionService(WorkScheduleService schedule, IDataService data, StoragePathService storage,
+        AutomaticMaterialSettingsService? automaticMaterials = null, bool enableWindowAutomations = true)
+        : this(schedule, data, storage, (context, path) => new PdfService().GenerateRealProfitPdf(context, path),
+            null, automaticMaterials, enableWindowAutomations)
     {
     }
 
     internal WorkScheduleCompletionService(WorkScheduleService schedule, IDataService data,
-        StoragePathService storage, Action<RealProfitPdfContext, string> writePdf, Func<DateTime>? clock = null)
+        StoragePathService storage, Action<RealProfitPdfContext, string> writePdf, Func<DateTime>? clock = null,
+        AutomaticMaterialSettingsService? automaticMaterials = null, bool enableWindowAutomations = true)
     {
         _schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
         _data = data ?? throw new ArgumentNullException(nameof(data));
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _writePdf = writePdf ?? throw new ArgumentNullException(nameof(writePdf));
         _clock = clock ?? (() => DateTime.Now);
+        _automaticMaterials = automaticMaterials;
+        _enableWindowAutomations = enableWindowAutomations;
     }
 
     public Task<WorkScheduleCompletionResult> CompleteAsync(WorkScheduleEntry selected,
@@ -77,7 +85,40 @@ public sealed class WorkScheduleCompletionService
         var company = await _data.GetCompanyAsync().WaitAsync(token).ConfigureAwait(false) ?? new Company();
         token.ThrowIfCancellationRequested();
         EnsureCurrentData();
-        var context = CreatePdfContext(quote, company, _clock());
+        var labor = await _schedule.GetQuoteLaborAsync(current.QuoteNumber, token).ConfigureAwait(false);
+        if (!labor.IsCurrent)
+            throw new InvalidOperationException("La squadra del calendario non è aggiornata dal database. " +
+                "Ripristina la connessione prima di archiviare il PDF dei costi.");
+        var context = CreatePdfContext(quote, company, _clock(), labor.Labor);
+        if (context.Input.CalendarLabor != null)
+            foreach (var row in context.Input.CalendarLabor.Rows.Where(row => row.EntryId == current.Id))
+                row.IsCompleted = true;
+        if (_automaticMaterials != null && !context.Input.ExcludeMaterials)
+        {
+            var automatic = await _automaticMaterials.GetLatestAsync(token).ConfigureAwait(false);
+            if (!automatic.IsCurrent)
+                throw new InvalidOperationException("Le regole dei costi automatici non sono aggiornate dal database. " +
+                    "Ripristina la connessione prima di archiviare il PDF dei costi.");
+            var laborCatalogTask = _data.GetLaborCatalogAsync();
+            var materialsTask = _data.GetPersonalMaterialsAsync();
+            await Task.WhenAll(laborCatalogTask, materialsTask).WaitAsync(token).ConfigureAwait(false);
+            EnsureCurrentData();
+            var automaticCosts = RealProfitAutomaticMaterialBuilder.Build(quote, automatic.Settings,
+                await laborCatalogTask.ConfigureAwait(false), await materialsTask.ConfigureAwait(false),
+                trustCatalogIds: true, enableWindowAutomations: _enableWindowAutomations);
+            if (automaticCosts.HasWarnings)
+                throw new InvalidOperationException("Verifica i costi automatici nelle impostazioni prima di generare il PDF. " +
+                    string.Join(" ", automaticCosts.Notices));
+            context.Input.CompanyMaterials.RemoveAll(cost => string.Equals(cost.Source?.Trim(), "Automatico", StringComparison.OrdinalIgnoreCase));
+            context.Input.CompanyMaterials.AddRange(automaticCosts.Materials.Select(cost => new CompanyMaterialCost
+            { Name = cost.Name, UnitOfMeasure = cost.UnitOfMeasure, Quantity = cost.Quantity, UnitCost = cost.UnitCost, Source = cost.Source }));
+            context = new RealProfitPdfContext
+            {
+                CompanyName = context.CompanyName, QuoteNumber = context.QuoteNumber, QuoteDate = context.QuoteDate,
+                CustomerName = context.CustomerName, CustomerIsSupplier = context.CustomerIsSupplier,
+                GeneratedAt = context.GeneratedAt, Input = context.Input, Result = RealProfitCalculator.Calculate(context.Input)
+            };
+        }
 
         string finalPath = _storage.BuildWorkScheduleCostsPdfPath(current.QuoteNumber, current.Date, current.Id);
         string folder = Path.GetDirectoryName(finalPath)!;
@@ -94,6 +135,13 @@ public sealed class WorkScheduleCompletionService
                     throw new IOException("Il PDF dei costi non è stato generato.");
             }, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
+
+            var latestLabor = await _schedule.GetQuoteLaborAsync(current.QuoteNumber, token).ConfigureAwait(false);
+            if (!latestLabor.IsCurrent)
+                throw new InvalidOperationException("La squadra del calendario non è aggiornata dal database. Riprova dopo aver ripristinato la connessione.");
+            if (JsonSerializer.Serialize(labor.Labor) != JsonSerializer.Serialize(latestLabor.Labor))
+                throw new InvalidOperationException("La squadra o gli orari di questo ordine sono cambiati durante la generazione del PDF. " +
+                    "Ricarica l'intervento e riprova.");
 
             // The document must be ready before changing the shared state. Even a retry
             // checks the revision again: completion is idempotent for an unchanged finished
@@ -142,7 +190,11 @@ public sealed class WorkScheduleCompletionService
                 "Ripristina la connessione prima di archiviare il PDF dei costi.");
     }
 
-    internal static RealProfitPdfContext CreatePdfContext(QuoteHistoryEntry quote, Company company, DateTime generatedAt)
+    internal static RealProfitPdfContext CreatePdfContext(QuoteHistoryEntry quote, Company company, DateTime generatedAt) =>
+        CreatePdfContext(quote, company, generatedAt, quote.RealProfit?.Input?.CalendarLabor);
+
+    internal static RealProfitPdfContext CreatePdfContext(QuoteHistoryEntry quote, Company company, DateTime generatedAt,
+        CalendarLaborSnapshot? calendarLabor)
     {
         var saved = quote.RealProfit?.Input;
         if (saved == null || saved.Materials == null || saved.CompanyMaterials == null ||
@@ -158,6 +210,7 @@ public sealed class WorkScheduleCompletionService
             Days = saved.Days,
             HoursPerDay = saved.HoursPerDay,
             HourlyCost = saved.HourlyCost,
+            CalendarLabor = calendarLabor?.CreateCopy(),
             Materials = saved.Materials.Select(material => new ProfitMaterialCost
             {
                 Name = material.Name,

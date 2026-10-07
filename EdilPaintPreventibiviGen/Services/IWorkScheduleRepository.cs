@@ -16,10 +16,13 @@ public sealed class WorkScheduleSnapshot
 }
 
 public sealed record WorkScheduleSettingsSnapshot(WorkScheduleSettings Settings, bool IsCurrent, DateTime? UpdatedAtUtc);
+public sealed record WorkScheduleLaborSnapshot(CalendarLaborSnapshot? Labor, bool IsCurrent,
+    bool HasCachedData, DateTime? UpdatedAtUtc);
 
 public interface IWorkScheduleRepository
 {
     Task<WorkScheduleSnapshot> LoadWorkScheduleAsync(DateTime from, DateTime to, CancellationToken token = default);
+    Task<WorkScheduleSnapshot> LoadWorkScheduleForQuoteAsync(string quoteNumber, CancellationToken token = default);
     Task<WorkScheduleSettings> GetWorkScheduleSettingsAsync(CancellationToken token = default);
     Task<WorkScheduleSettings> SaveWorkScheduleSettingsAsync(WorkScheduleSettings settings, CancellationToken token = default);
     Task<List<WorkScheduleEntry>> SaveWorkScheduleEntriesAsync(IReadOnlyList<WorkScheduleEntry> entries, CancellationToken token = default);

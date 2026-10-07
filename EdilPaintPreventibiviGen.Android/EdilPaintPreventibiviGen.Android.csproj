@@ -74,6 +74,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<Compile Include="..\EdilPaintPreventibiviGen\Models\RealProfitCalculation.cs" Link="Shared\RealProfitCalculation.cs" />
+		<Compile Include="..\EdilPaintPreventibiviGen\Models\CalendarLaborSnapshot.cs" Link="Shared\CalendarLaborSnapshot.cs" />
 		<Compile Include="..\EdilPaintPreventibiviGen\Services\RealProfitCalculator.cs" Link="Shared\RealProfitCalculator.cs" />
 		<Compile Include="..\EdilPaintPreventibiviGen\Models\AutomaticWindowMaterialCalculation.cs" Link="Shared\AutomaticWindowMaterialCalculation.cs" />
 		<Compile Include="..\EdilPaintPreventibiviGen\Models\WindowMaterialCalculation.cs" Link="Shared\WindowMaterialCalculation.cs" />

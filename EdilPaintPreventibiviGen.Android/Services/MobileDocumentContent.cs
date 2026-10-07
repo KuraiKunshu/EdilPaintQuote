@@ -61,9 +61,14 @@ public static class MobileDocumentContent
             new("GUADAGNO REALE - RISERVATO", true), new($"Preventivo {quote.QuoteNumber} - {quote.CustomerName}"),
             new($"Ricavo: {Money(input.QuoteRevenue)}"), new($"Materiali esclusi: {(input.ExcludeMaterials ? "Si" : "No")}"),
             new($"Sconto fornitore: {input.SupplierDiscount:0.##}%"),
-            new($"Operai {input.Workers} x giorni {input.Days} x ore {input.HoursPerDay} x {Money(input.HourlyCost)}"),
-            new("COSTI AZIENDALI", true)
+            new(input.CalendarLabor is { } calendar
+                ? $"Squadra da calendario: {calendar.TotalPersonHours:0.##} ore/persona x {Money(input.HourlyCost)} per ora/persona"
+                : $"Operai {input.Workers} x giorni {input.Days} x ore {input.HoursPerDay} x {Money(input.HourlyCost)}")
         };
+        if (input.CalendarLabor is { } labor)
+            foreach (var visit in labor.Rows)
+                lines.Add(new($"{visit.Date:dd/MM/yyyy} {visit.TimeDisplay} - {string.Join(", ", visit.Employees.Select(employee => employee.Name))} - {visit.PersonHours:0.##} ore/persona"));
+        lines.Add(new("COSTI AZIENDALI", true));
         foreach (var cost in input.CompanyMaterials)
             lines.Add(new($"{QuantityValue.OrderDisplay(cost.Quantity, cost.UnitOfMeasure)} {cost.Name} - {Money(cost.UnitCost)} / {cost.UnitOfMeasure} - {Money(cost.Total)}"));
         lines.AddRange(new[]

@@ -8,6 +8,25 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public partial class SqlDataService
 {
+    public Task<WorkScheduleSnapshot> LoadWorkScheduleForQuoteAsync(string quoteNumber, CancellationToken token = default)
+    {
+        if (string.IsNullOrWhiteSpace(quoteNumber)) throw new ArgumentException("Indica il numero del preventivo.", nameof(quoteNumber));
+        quoteNumber = quoteNumber.Trim();
+        return ExecuteWorkScheduleTransactionAsync(async (db, ct) =>
+        {
+            var settings = await db.WorkScheduleSettings.AsNoTracking().SingleAsync(x => x.Id == 1, ct).ConfigureAwait(false);
+            var entries = await ScheduleEntriesQuery(db).AsNoTracking()
+                .Where(x => !x.IsDeleted && x.Kind == WorkScheduleEntryKind.Job && x.Quote != null &&
+                    x.Quote.QuoteNumber == quoteNumber)
+                .OrderBy(x => x.Date).ThenBy(x => x.StartMinutes).ToListAsync(ct).ConfigureAwait(false);
+            return new WorkScheduleSnapshot
+            {
+                Settings = ScheduleSettingsToModel(settings), Entries = entries.Select(ScheduleEntryToModel).ToList(),
+                IsCurrent = true, HasCachedData = true, UpdatedAtUtc = DateTime.UtcNow
+            };
+        }, token);
+    }
+
     public Task<WorkScheduleSnapshot> LoadWorkScheduleAsync(DateTime from, DateTime to, CancellationToken token = default)
     {
         from = DateTime.SpecifyKind(from.Date, DateTimeKind.Unspecified);

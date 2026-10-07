@@ -559,6 +559,14 @@
                                         <StackPanel>
                                             <TextBlock Text="Materiali automatici"
                                                        Style="{StaticResource SectionTitleStyle}"/>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Button x:Name="BtnRefreshAutomaticMaterials" DockPanel.Dock="Right"
+                                                        Content="Ricarica regole" Style="{StaticResource CompactActionButtonStyle}"
+                                                        Click="OnRefreshAutomaticMaterialsClick"/>
+                                                <TextBlock x:Name="TxtAutomaticMaterialSyncStatus" Style="{StaticResource HintStyle}"
+                                                           Text="Regole condivise nel database aziendale." Margin="0,0,12,0"/>
+                                            </DockPanel>
+                                            <StackPanel x:Name="AutomaticMaterialSettingsEditor" IsEnabled="False">
                                             <TextBlock Style="{StaticResource HintStyle}"
                                                        Margin="0,0,0,12"
                                                        Text="Quando una lavorazione configurata è presente, la scheda Costi e guadagno aggiunge i materiali selezionati agli altri costi del lavoro. Ogni regola può usare le misure delle finestre oppure la sola quantità della lavorazione."/>
@@ -787,6 +795,7 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

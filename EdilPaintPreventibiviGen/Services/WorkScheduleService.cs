@@ -37,15 +37,17 @@ public sealed class WorkScheduleService
                 var cache = JsonSerializer.Deserialize<ScheduleCache>(File.ReadAllText(cachePath));
                 if (cache?.DatabaseIdentity == databaseIdentity && cache.Version == CurrentCacheVersion)
                 {
-                    if (cache.Settings == null || cache.Pages == null || cache.Pages.Values.Any(page =>
-                            page == null || page.Entries == null || page.Employees == null || page.Orders == null ||
+                    if (cache.Settings == null || cache.Pages == null || cache.QuotePages == null ||
+                        cache.Pages.Values.Concat(cache.QuotePages.Values).Any(page =>
+                            page == null || page.Settings == null || page.Entries == null || page.Employees == null || page.Orders == null ||
                             page.Entries.Any(entry => entry == null || entry.EmployeeIds == null ||
                                 entry.Employees == null || entry.Employees.Any(employee => employee == null)) ||
                             page.Employees.Any(employee => employee == null) || page.Orders.Any(order => order == null)))
                         throw new InvalidOperationException("La copia locale del calendario non è valida.");
                     cache.Settings.CreateValidatedCopy();
-                    foreach (var page in cache.Pages.Values)
+                    foreach (var page in cache.Pages.Values.Concat(cache.QuotePages.Values))
                     {
+                        page.Settings.CreateValidatedCopy();
                         foreach (var entry in page.Entries) entry.CreateValidatedCopy();
                         foreach (var employee in page.Employees) employee.CreateValidatedCopy();
                     }
@@ -136,6 +138,50 @@ public sealed class WorkScheduleService
         }
     }
 
+    public WorkScheduleLaborSnapshot CachedQuoteLabor(string quoteNumber)
+    {
+        EnsureIdentity();
+        quoteNumber = ValidateQuoteNumber(quoteNumber);
+        lock (_cacheLock)
+        {
+            _cache.QuotePages.TryGetValue(quoteNumber, out var page);
+            return new(page == null ? null : CalendarLaborCalculator.Build(quoteNumber, page.Entries, page.Settings),
+                false, page != null, page?.UpdatedAtUtc);
+        }
+    }
+
+    public async Task<WorkScheduleLaborSnapshot> GetQuoteLaborAsync(string quoteNumber, CancellationToken token = default)
+    {
+        quoteNumber = ValidateQuoteNumber(quoteNumber);
+        try
+        {
+            return await RunDatabaseAsync(async operationToken =>
+            {
+                var page = await _repository.LoadWorkScheduleForQuoteAsync(quoteNumber, operationToken).ConfigureAwait(false);
+                var labor = CalendarLaborCalculator.Build(quoteNumber, page.Entries, page.Settings);
+                page.IsCurrent = true;
+                page.HasCachedData = true;
+                page.UpdatedAtUtc = DateTime.UtcNow;
+                lock (_cacheLock)
+                {
+                    _cache.Settings = page.Settings.CreateValidatedCopy();
+                    _cache.SettingsUpdatedAtUtc = page.UpdatedAtUtc;
+                    _cache.QuotePages[quoteNumber] = Clone(page);
+                    foreach (var key in _cache.QuotePages.OrderByDescending(x => x.Value.UpdatedAtUtc)
+                                 .Skip(100).Select(x => x.Key).ToArray()) _cache.QuotePages.Remove(key);
+                }
+                PersistCache();
+                return new WorkScheduleLaborSnapshot(labor, true, true, page.UpdatedAtUtc);
+            }, token, prepareEmployees: true).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Schedule] Quote labor read failed: {ex.GetType().Name}");
+            return CachedQuoteLabor(quoteNumber);
+        }
+    }
+
     public Task<WorkScheduleSettingsSnapshot> SaveSettingsAsync(WorkScheduleSettings settings, CancellationToken token = default)
     {
         var copy = settings.CreateValidatedCopy();
@@ -147,7 +193,7 @@ public sealed class WorkScheduleService
             {
                 _cache.Settings = saved.CreateValidatedCopy();
                 _cache.SettingsUpdatedAtUtc = updated;
-                foreach (var page in _cache.Pages.Values)
+                foreach (var page in _cache.Pages.Values.Concat(_cache.QuotePages.Values))
                 {
                     page.Settings = saved.CreateValidatedCopy();
                     page.IsCurrent = false;
@@ -184,6 +230,13 @@ public sealed class WorkScheduleService
                     page.Entries.AddRange(saved.Where(x => x.Date >= page.From && x.Date < page.To).Select(x => x.CreateValidatedCopy()));
                     page.IsCurrent = false;
                 }
+                foreach (var (quoteNumber, page) in _cache.QuotePages)
+                {
+                    page.Entries.RemoveAll(x => saved.Any(y => y.Id == x.Id));
+                    page.Entries.AddRange(saved.Where(x => x.Kind == WorkScheduleEntryKind.Job && x.QuoteNumber == quoteNumber)
+                        .Select(x => x.CreateValidatedCopy()));
+                    page.IsCurrent = false;
+                }
             }
             PersistCache();
             return saved;
@@ -206,6 +259,12 @@ public sealed class WorkScheduleService
                         page.Entries.Add(completed.CreateValidatedCopy());
                     page.IsCurrent = false;
                 }
+                foreach (var (quoteNumber, page) in _cache.QuotePages)
+                {
+                    page.Entries.RemoveAll(entry => entry.Id == completed.Id);
+                    if (completed.QuoteNumber == quoteNumber) page.Entries.Add(completed.CreateValidatedCopy());
+                    page.IsCurrent = false;
+                }
             }
             PersistCache();
             return completed;
@@ -217,7 +276,7 @@ public sealed class WorkScheduleService
         {
             await _repository.DeleteWorkScheduleEntryAsync(id, revision, operationToken).ConfigureAwait(false);
             lock (_cacheLock)
-                foreach (var page in _cache.Pages.Values)
+                foreach (var page in _cache.Pages.Values.Concat(_cache.QuotePages.Values))
                 {
                     page.Entries.RemoveAll(x => x.Id == id);
                     page.IsCurrent = false;
@@ -280,6 +339,9 @@ public sealed class WorkScheduleService
 
     private static string PageKey(DateTime from, DateTime to) => $"{from:yyyy-MM-dd}/{to:yyyy-MM-dd}";
 
+    private static string ValidateQuoteNumber(string quoteNumber) => !string.IsNullOrWhiteSpace(quoteNumber)
+        ? quoteNumber.Trim() : throw new ArgumentException("Indica il numero del preventivo.", nameof(quoteNumber));
+
     private static void ValidateRange(DateTime from, DateTime to)
     {
         if (from.Date >= to.Date) throw new ArgumentException("L'intervallo del calendario non è valido.");
@@ -292,5 +354,6 @@ public sealed class WorkScheduleService
         public WorkScheduleSettings Settings { get; set; } = new();
         public DateTime? SettingsUpdatedAtUtc { get; set; }
         public Dictionary<string, WorkScheduleSnapshot> Pages { get; set; } = [];
+        public Dictionary<string, WorkScheduleSnapshot> QuotePages { get; set; } = [];
     }
 }

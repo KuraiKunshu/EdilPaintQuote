@@ -2,10 +2,12 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 using Microsoft.Win32;
@@ -16,6 +18,7 @@ public partial class RealProfitWindow : Window
 {
     public bool CloseAfterSaved { get; set; }
     private bool _isSaving;
+    private bool _isExporting;
     private readonly QuoteHistoryEntry _quote;
     private readonly ObservableCollection<ProfitMaterialCost> _materials;
     private readonly ObservableCollection<CompanyMaterialCost> _companyMaterials = [];
@@ -23,6 +26,14 @@ public partial class RealProfitWindow : Window
     private readonly Func<RealProfitSnapshot, Task> _saveCalculation;
 
     private readonly bool _excludeMaterials;
+    private CalendarLaborSnapshot? _calendarLabor;
+    private bool _scheduleCurrent = true;
+    private bool _automaticSettingsCurrent = true;
+    private bool _automaticCostsValid = true;
+    private bool _closed;
+    private readonly SemaphoreSlim _sourceRefreshGate = new(1, 1);
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly DispatcherTimer _calendarRefreshTimer = new() { Interval = TimeSpan.FromSeconds(30) };
 
     public RealProfitWindow(
         QuoteHistoryEntry quote,
@@ -37,10 +48,25 @@ public partial class RealProfitWindow : Window
         defaults ??= new RealProfitSettingsModel();
         defaults.Normalize();
         _quote = quote;
+        Loaded += OnLoaded;
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _calendarRefreshTimer.Stop();
+            _lifetime.Cancel();
+        };
+        _calendarRefreshTimer.Tick += async (_, _) =>
+        {
+            if (_isSaving || _isExporting || _sourceRefreshGate.CurrentCount == 0) return;
+            await RefreshCostSourcesAsync(refreshMaterials: false);
+        };
         _saveCalculation = saveCalculation ?? throw new ArgumentNullException(nameof(saveCalculation));
         RealProfitSnapshot? savedCalculation = quote.RealProfit;
         RealProfitInput? savedInput = savedCalculation?.Input;
+        _calendarLabor = savedInput?.CalendarLabor?.CreateCopy();
+        _scheduleCurrent = App.WorkSchedule == null;
         _excludeMaterials = savedInput?.ExcludeMaterials ?? customerIsSupplier;
+        _automaticSettingsCurrent = _excludeMaterials || App.AutomaticMaterials == null;
         _availableCompanyMaterials = companyMaterials
             .Where(material => material.IsCompanyMaterial)
             .OrderBy(material => material.Name, StringComparer.OrdinalIgnoreCase)
@@ -82,7 +108,7 @@ public partial class RealProfitWindow : Window
             }
         }
 
-        if (!_excludeMaterials && savedInput == null && App.AppSettings?.Business.EnableWindowAutomations != false)
+        if (!_excludeMaterials && savedInput == null && App.AutomaticMaterials == null && App.AppSettings?.Business.EnableWindowAutomations != false)
             AddAutomaticWindowMaterials(defaults);
 
         GridMaterialCosts.ItemsSource = _materials;
@@ -110,6 +136,7 @@ public partial class RealProfitWindow : Window
         TxtHourlyCost.Text = (savedInput?.HourlyCost ?? defaults.HourlyCost)
             .ToString("0.##", CultureInfo.CurrentCulture);
         TabMaterials.IsEnabled = !_excludeMaterials;
+        ShowCalendarCrew();
 
         if (savedCalculation != null)
         {
@@ -120,6 +147,144 @@ public partial class RealProfitWindow : Window
         {
             ShowResult(RealProfitCalculator.Calculate(BuildInput()));
         }
+    }
+
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        await RefreshCostSourcesAsync();
+        if (!_closed) _calendarRefreshTimer.Start();
+    }
+
+    private async Task RefreshCostSourcesAsync(bool refreshMaterials = true)
+    {
+        try
+        {
+            await _sourceRefreshGate.WaitAsync(_lifetime.Token);
+            try
+            {
+                if (App.WorkSchedule != null)
+                {
+                    var snapshot = await App.WorkSchedule.GetQuoteLaborAsync(_quote.QuoteNumber, _lifetime.Token);
+                    _scheduleCurrent = snapshot.IsCurrent;
+                    if (snapshot.IsCurrent || snapshot.HasCachedData) _calendarLabor = snapshot.Labor;
+                    ShowCalendarCrew();
+                }
+                if (refreshMaterials && !_excludeMaterials && App.AutomaticMaterials != null)
+                {
+                    var snapshot = await App.AutomaticMaterials.GetLatestAsync(_lifetime.Token);
+                    _automaticSettingsCurrent = snapshot.IsCurrent;
+                    if (snapshot.IsCurrent)
+                    {
+                        var labors = await App.DataService.GetLaborCatalogAsync().WaitAsync(_lifetime.Token);
+                        var materials = await App.DataService.GetPersonalMaterialsAsync().WaitAsync(_lifetime.Token);
+                        _automaticSettingsCurrent = App.DataService.CanSynchronize;
+                        if (_automaticSettingsCurrent)
+                        {
+                            var result = RealProfitAutomaticMaterialBuilder.Build(_quote, snapshot.Settings, labors, materials,
+                                enableWindowAutomations: App.AppSettings?.Business.EnableWindowAutomations != false);
+                            _automaticCostsValid = !result.HasWarnings;
+                            if (_automaticCostsValid)
+                            {
+                                // Shared automatic rows are rebuilt; manually entered costs keep their values.
+                                foreach (var row in _companyMaterials.Where(row =>
+                                    string.Equals(row.Source?.Trim(), "Automatico", StringComparison.OrdinalIgnoreCase)).ToArray())
+                                    _companyMaterials.Remove(row);
+                                foreach (var row in result.Materials) _companyMaterials.Add(row);
+                            }
+                            _availableCompanyMaterials.Clear();
+                            _availableCompanyMaterials.AddRange(materials.Where(material => material.IsCompanyMaterial)
+                                .OrderBy(material => material.Name, StringComparer.OrdinalIgnoreCase));
+                            if (CboCompanyMaterialSearch.SelectedItem == null)
+                                CboCompanyMaterialSearch.ItemsSource = _availableCompanyMaterials;
+                            if (result.Notices.Count > 0)
+                                ShowAutomaticMaterialNotice((result.HasWarnings
+                                    ? "Calcolo automatico incompleto: i costi precedenti sono conservati. Correggi le regole prima di salvare o esportare.\n" : "")
+                                    + string.Join(Environment.NewLine, result.Notices), result.HasWarnings);
+                            else
+                            {
+                                ScrollAutomaticMaterialsInfo.Visibility = Visibility.Collapsed;
+                                TxtCompanyCostsHint.Visibility = Visibility.Visible;
+                            }
+                        }
+                    }
+                }
+                if (!_closed)
+                {
+                    if (!_automaticCostsValid)
+                    {
+                        TxtSaveStatus.Text = "Calcolo automatico incompleto: verifica i materiali segnalati prima di salvare o esportare.";
+                        TxtSaveStatus.Foreground = (Brush)FindResource("DangerRedBrush");
+                    }
+                    else if (!_scheduleCurrent || !_automaticSettingsCurrent)
+                    {
+                        TxtSaveStatus.Text = "Database non aggiornato: ripristina la connessione prima di salvare o esportare i costi.";
+                        TxtSaveStatus.Foreground = (Brush)FindResource("DangerRedBrush");
+                    }
+                    try
+                    {
+                        var input = BuildInput();
+                        ShowResult(RealProfitCalculator.Calculate(input));
+                        if (_scheduleCurrent && _automaticSettingsCurrent && _automaticCostsValid &&
+                            JsonSerializer.Serialize(input) != JsonSerializer.Serialize(_quote.RealProfit?.Input))
+                        {
+                            TxtSaveStatus.Text = "Costi aggiornati. Salva il calcolo per conservarne il riepilogo.";
+                            TxtSaveStatus.Foreground = (Brush)FindResource("PrimaryBlueBrush");
+                        }
+                    }
+                    catch (InvalidOperationException) { /* Keep editable draft values while refreshing the calendar. */ }
+                }
+            }
+            finally { _sourceRefreshGate.Release(); }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            _scheduleCurrent = false;
+            if (refreshMaterials) _automaticSettingsCurrent = false;
+            if (!_closed)
+            {
+                ShowCalendarCrew();
+                TxtSaveStatus.Text = $"Aggiornamento dei costi non riuscito: {ex.Message}";
+                TxtSaveStatus.Foreground = (Brush)FindResource("DangerRedBrush");
+            }
+        }
+    }
+
+    private void ShowCalendarCrew()
+    {
+        bool fromCalendar = _calendarLabor != null;
+        ManualWorkersPanel.Visibility = ManualDaysPanel.Visibility = ManualHoursPanel.Visibility =
+            fromCalendar ? Visibility.Collapsed : Visibility.Visible;
+        CalendarCrewPanel.Visibility = fromCalendar ? Visibility.Visible : Visibility.Collapsed;
+        TxtCrewTitle.Text = fromCalendar ? "Squadra assegnata nel calendario" : "Persone, tempo e costo";
+        TxtCrewHint.Text = fromCalendar
+            ? "Persone e ore seguono gli interventi salvati dell’ordine. Imposta il costo orario per persona."
+            : "Nessun intervento nel calendario: compila i valori operativi per la stima.";
+        TxtCrewSource.Text = fromCalendar
+            ? "Il costo somma le ore di ciascun dipendente negli interventi dell’ordine, anche quando la squadra cambia."
+            : "Indica quante persone lavorano, per quanti giorni e a quale costo orario per persona.";
+        TxtCrewFormula.Text = fromCalendar
+            ? "Costo della squadra = ore totali delle persone assegnate × costo orario per persona."
+            : "Costo della squadra = persone × giorni × ore al giorno × costo orario per persona.";
+        if (!fromCalendar) return;
+        var labor = _calendarLabor!;
+        TxtCalendarCrewTotal.Text = $"{labor.TotalPersonHours:0.##} ore/persona · {labor.DistinctWorkers} persone · {labor.Days} giorni";
+        TxtCalendarCrewStatus.Text = !_scheduleCurrent ? "Copia precedente: calendario non aggiornato dal database."
+            : labor.HasUnassignedInterventions ? "Attenzione: gli interventi senza dipendenti non aggiungono costo alla squadra."
+            : "Aggiornato dal calendario condiviso. La pausa della giornata intera è esclusa.";
+        CalendarCrewRows.ItemsSource = labor.Rows.Select(row => new
+        {
+            Heading = $"{row.Date:dd/MM/yyyy} · {row.StartMinutes / 60:00}:{row.StartMinutes % 60:00}–{row.EndMinutes / 60:00}:{row.EndMinutes % 60:00} · {row.WorkHours:0.##} h × {row.WorkerCount} = {row.PersonHours:0.##} ore/persona",
+            Crew = row.Employees.Count == 0 ? "Nessun dipendente assegnato" : string.Join(", ", row.Employees.Select(employee => employee.Name))
+        }).ToList();
+    }
+
+    private void EnsureCurrentCostSources()
+    {
+        if (!_scheduleCurrent || !_automaticSettingsCurrent)
+            throw new InvalidOperationException("Il calendario o le regole dei materiali non sono aggiornati dal database. Ripristina la connessione prima di salvare o esportare i costi.");
+        if (!_automaticCostsValid)
+            throw new InvalidOperationException("Il calcolo dei materiali automatici è incompleto. Correggi le regole e i materiali segnalati prima di salvare o esportare i costi.");
     }
 
     private RealProfitInput BuildInput()
@@ -134,10 +299,11 @@ public partial class RealProfitWindow : Window
         ProfitReductionPercentage = ParsePercentage(TxtProfitReduction.Text, "riduzione prudenziale"),
         ExcludeMaterials = _excludeMaterials,
         SupplierDiscount = ParsePercentage(TxtSupplierDiscount.Text, "sconto fornitore"),
-        Workers = (int)ParseNonNegative(TxtWorkers.Text, "numero operai"),
-        Days = ParseNonNegative(TxtDays.Text, "giorni"),
-        HoursPerDay = ParseNonNegative(TxtHoursPerDay.Text, "ore al giorno"),
+        Workers = _calendarLabor?.DistinctWorkers ?? (int)ParseNonNegative(TxtWorkers.Text, "numero operai"),
+        Days = _calendarLabor?.Days ?? ParseNonNegative(TxtDays.Text, "giorni"),
+        HoursPerDay = _calendarLabor == null ? ParseNonNegative(TxtHoursPerDay.Text, "ore al giorno") : 0,
         HourlyCost = ParseNonNegative(TxtHourlyCost.Text, "costo orario"),
+        CalendarLabor = _calendarLabor?.CreateCopy(),
         Materials = _materials.ToList(),
         CompanyMaterials = _companyMaterials
             .Where(item => item.Total != 0 || !string.IsNullOrWhiteSpace(item.Name))
@@ -147,17 +313,26 @@ public partial class RealProfitWindow : Window
 
     private async void OnCalculateClick(object sender, RoutedEventArgs e)
     {
-        if (_isSaving) return;
+        if (_isSaving || _isExporting) return;
+        _isSaving = true;
+        BtnCalculate.IsEnabled = false;
+        if (CloseAfterSaved) IsEnabled = false;
         RealProfitInput currentInput;
         RealProfitResult currentResult;
         try
         {
+            await RefreshCostSourcesAsync();
+            if (_closed) { _isSaving = false; return; }
+            EnsureCurrentCostSources();
             currentInput = BuildInput();
             currentResult = RealProfitCalculator.Calculate(currentInput);
             ShowResult(currentResult);
         }
         catch (Exception ex)
         {
+            _isSaving = false;
+            BtnCalculate.IsEnabled = true;
+            if (CloseAfterSaved) IsEnabled = true;
             MessageBox.Show(ex.Message, "Dati non validi", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -203,10 +378,16 @@ public partial class RealProfitWindow : Window
 
     private async void OnExportPdfClick(object sender, RoutedEventArgs e)
     {
+        if (_isExporting || _isSaving) return;
+        _isExporting = true;
         System.Windows.Controls.Button? exportButton = sender as System.Windows.Controls.Button;
+        if (exportButton != null) exportButton.IsEnabled = false;
         try
         {
-            RealProfitInput currentInput = BuildInput();
+            await RefreshCostSourcesAsync();
+            if (_closed) return;
+            EnsureCurrentCostSources();
+            RealProfitInput currentInput = CloneRealProfitInput(BuildInput());
             RealProfitResult currentResult = RealProfitCalculator.Calculate(currentInput);
             ShowResult(currentResult);
 
@@ -278,6 +459,7 @@ public partial class RealProfitWindow : Window
         }
         finally
         {
+            _isExporting = false;
             if (exportButton != null)
                 exportButton.IsEnabled = true;
         }
@@ -293,6 +475,7 @@ public partial class RealProfitWindow : Window
         Days = source.Days,
         HoursPerDay = source.HoursPerDay,
         HourlyCost = source.HourlyCost,
+        CalendarLabor = source.CalendarLabor?.CreateCopy(),
         Materials = source.Materials.Select(material => new ProfitMaterialCost
         {
             Name = material.Name,

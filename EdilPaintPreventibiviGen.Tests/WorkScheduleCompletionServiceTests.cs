@@ -263,7 +263,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
             if (change == "moved") _repository.Entry.Date = selected.Date.AddDays(1);
         }).GenerateCostsAsync(selected));
 
-        Assert.Equal(1, _repository.CompleteCalls);
+        Assert.Equal(0, _repository.CompleteCalls);
         Assert.Equal("previous-pdf", File.ReadAllText(expectedPath));
         Assert.Empty(StagingFiles);
         if (change == "removed")
@@ -365,6 +365,91 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
         Assert.Equal("Tape", context.Input.CompanyMaterials.Single().Name);
     }
 
+    [Fact]
+    public async Task CompletionReplacesSavedManualCrewWithAllCurrentCalendarVisits()
+    {
+        var first = _repository.Entry!.Employees.Single();
+        var second = new EmployeeSettingsModel { FirstName = "Anna", LastName = "Verdi" };
+        _repository.Entry.EmployeeIds.Add(second.Id); _repository.Entry.Employees.Add(second);
+        var previous = _repository.Entry.CreateValidatedCopy();
+        previous.Id = Guid.NewGuid(); previous.Date = previous.Date.AddMonths(-3);
+        previous.StartMinutes = 14 * 60; previous.EndMinutes = 16 * 60;
+        previous.Status = WorkScheduleEntryStatus.Completed;
+        previous.EmployeeIds = [first.Id]; previous.Employees = [first];
+        _repository.AdditionalEntries.Add(previous);
+        var saved = _quotes.Quote!.RealProfit!.Input;
+        saved.Workers = 99; saved.Days = 20; saved.HoursPerDay = 8;
+        saved.CalendarLabor = new() { Rows = [new() { WorkHours = 1, Employees = [new() { Id = first.Id }] }] };
+        RealProfitPdfContext? context = null;
+        await Service((value, path) => { context = value; File.WriteAllText(path, "current-costs"); }).CompleteAsync(Selected);
+        Assert.Equal(8, context!.Input.CalendarLabor!.TotalPersonHours);
+        Assert.Equal(2, context.Input.CalendarLabor.DistinctWorkers);
+        Assert.Equal(2, context.Input.CalendarLabor.Days);
+        Assert.Equal(320, context.Result.LaborCost);
+        Assert.Equal(1, saved.CalendarLabor.TotalPersonHours);
+        Assert.Equal(99, saved.Workers);
+    }
+
+    [Fact]
+    public async Task UnassignedCalendarVisitsCostZeroAndPreserveTheirWarning()
+    {
+        _repository.Entry!.EmployeeIds.Clear(); _repository.Entry.Employees.Clear();
+        _quotes.Quote!.RealProfit!.Input.Workers = 20;
+        RealProfitPdfContext? context = null;
+        await Service((value, path) => { context = value; File.WriteAllText(path, "zero-crew"); }).CompleteAsync(Selected);
+        Assert.Equal(0, context!.Result.LaborCost);
+        Assert.True(context.Input.CalendarLabor!.HasUnassignedInterventions);
+        Assert.Single(context.Input.CalendarLabor.Rows);
+        Assert.Equal(WorkScheduleEntryStatus.Completed, _repository.Entry.Status);
+    }
+
+    [Fact]
+    public async Task CachedQuoteCrewCannotCompleteEvenWhenTheSelectedDayReadWorks()
+    {
+        await _schedule.GetQuoteLaborAsync(Selected.QuoteNumber);
+        _repository.UnavailableLabor = true;
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => Service().CompleteAsync(Selected));
+        Assert.Contains("squadra", exception.Message);
+        Assert.Equal(0, _repository.CompleteCalls);
+        Assert.False(Directory.Exists(_storage.GetWorkScheduleCostsFolder()));
+    }
+
+    [Fact]
+    public async Task AnotherVisitChangedDuringRenderingCannotPublishAnOutdatedCrewCost()
+    {
+        var other = _repository.Entry!.CreateValidatedCopy(); other.Id = Guid.NewGuid(); other.Date = other.Date.AddDays(1);
+        _repository.AdditionalEntries.Add(other);
+        Directory.CreateDirectory(_storage.GetWorkScheduleCostsFolder()); File.WriteAllText(FinalPath, "previous-pdf");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Service((_, path) =>
+        {
+            File.WriteAllText(path, "outdated-pdf");
+            other.EndMinutes += 60; other.Revision++;
+        }).CompleteAsync(Selected));
+        Assert.Equal(0, _repository.CompleteCalls);
+        Assert.Equal("previous-pdf", File.ReadAllText(FinalPath)); Assert.Empty(StagingFiles);
+        Assert.Equal(WorkScheduleEntryStatus.Planned, _repository.Entry.Status);
+    }
+
+    [Fact]
+    public async Task CompletionReportShowsTheSelectedVisitFinishedAndLeavesOtherRowsUnchanged()
+    {
+        var selected = Selected;
+        var other = selected.CreateValidatedCopy(); other.Id = Guid.NewGuid(); other.Date = other.Date.AddDays(1);
+        _repository.AdditionalEntries.Add(other);
+        RealProfitPdfContext? context = null;
+        await Service((value, path) =>
+        {
+            context = value;
+            Assert.Equal(WorkScheduleEntryStatus.Planned, _repository.Entry!.Status);
+            File.WriteAllText(path, "current-costs");
+        }).CompleteAsync(selected);
+        Assert.True(context!.Input.CalendarLabor!.Rows.Single(row => row.EntryId == selected.Id).IsCompleted);
+        Assert.False(context.Input.CalendarLabor.Rows.Single(row => row.EntryId == other.Id).IsCompleted);
+        Assert.Equal(WorkScheduleEntryStatus.Planned, other.Status);
+        Assert.Equal(WorkScheduleEntryStatus.Planned, selected.Status);
+        Assert.Null(_quotes.Quote!.RealProfit!.Input.CalendarLabor);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
@@ -374,6 +459,8 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
     {
         public WorkScheduleEntry? Entry { get; set; }
         public bool Unavailable { get; set; }
+        public bool UnavailableLabor { get; set; }
+        public List<WorkScheduleEntry> AdditionalEntries { get; } = [];
         public bool FailComplete { get; set; }
         public int CompleteCalls { get; private set; }
         public int LoadCalls { get; private set; }
@@ -390,6 +477,14 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
                     {
                         From = (DateTime)args![0]!, To = (DateTime)args[1]!,
                         Entries = Entry == null ? [] : [Entry.CreateValidatedCopy()]
+                    });
+                case nameof(IWorkScheduleRepository.LoadWorkScheduleForQuoteAsync):
+                    if (Unavailable || UnavailableLabor) throw new IOException("Offline");
+                    return Task.FromResult(new WorkScheduleSnapshot
+                    {
+                        Entries = (Entry == null ? AdditionalEntries : AdditionalEntries.Append(Entry))
+                            .Where(entry => entry.Kind == WorkScheduleEntryKind.Job && entry.QuoteNumber == (string)args![0]!)
+                            .Select(entry => entry.CreateValidatedCopy()).ToList()
                     });
                 case nameof(IWorkScheduleRepository.CompleteWorkScheduleEntryAsync):
                     CompleteCalls++;

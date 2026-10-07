@@ -2,7 +2,7 @@ using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
 
-public partial class SqlDataService : IDataService, IEmployeeRepository, IWorkScheduleRepository
+public partial class SqlDataService : IDataService, IEmployeeRepository, IWorkScheduleRepository, IAutomaticMaterialSettingsRepository
 {
     private readonly AppSettingsService _appSettings;
 

@@ -322,6 +322,16 @@ public sealed class WorkScheduleServiceTests : IDisposable
             foreach (var entry in saved) { entry.Revision++; _entries.RemoveAll(x => x.Id == entry.Id); _entries.Add(entry); }
             return Task.FromResult(saved.Select(x => x.CreateValidatedCopy()).ToList());
         }
+        public Task<WorkScheduleSnapshot> LoadWorkScheduleForQuoteAsync(string quoteNumber, CancellationToken token = default)
+        {
+            Check(token);
+            return Task.FromResult(new WorkScheduleSnapshot
+            {
+                Settings = _settings.CreateValidatedCopy(),
+                Entries = _entries.Where(x => x.Kind == WorkScheduleEntryKind.Job && x.QuoteNumber == quoteNumber)
+                    .Select(x => x.CreateValidatedCopy()).ToList()
+            });
+        }
         public Task<WorkScheduleEntry> CompleteWorkScheduleEntryAsync(Guid id, long revision, CancellationToken token = default)
         {
             Check(token);

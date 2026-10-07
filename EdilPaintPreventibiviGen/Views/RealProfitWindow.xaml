@@ -524,6 +524,7 @@
                             </TabItem>
 
                             <TabItem Header="2. Costo della squadra">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                 <Grid Margin="16">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -540,7 +541,7 @@
                                             </Grid.ColumnDefinitions>
                                             <Border Background="{StaticResource CostsOurBrush}"
                                                     CornerRadius="2"/>
-                                            <TextBlock Grid.Column="2"
+                                            <TextBlock x:Name="TxtCrewSource" Grid.Column="2"
                                                        VerticalAlignment="Center"
                                                        Text="Indica quante persone lavorano, per quanti giorni e a quale costo orario per persona. Il totale è il costo della squadra per questo lavoro."
                                                        FontSize="11.5"
@@ -563,11 +564,11 @@
                                             </Grid.RowDefinitions>
 
                                             <StackPanel>
-                                                <TextBlock Text="Persone, tempo e costo"
+                                                <TextBlock x:Name="TxtCrewTitle" Text="Persone, tempo e costo"
                                                            FontSize="14"
                                                            FontWeight="SemiBold"
                                                            Foreground="{StaticResource DefaultTextBrush}"/>
-                                                <TextBlock Margin="0,3,0,0"
+                                                <TextBlock x:Name="TxtCrewHint" Margin="0,3,0,0"
                                                            Text="Compila i quattro valori operativi usati nel calcolo."
                                                            FontSize="11"
                                                            Foreground="{StaticResource MutedTextBrush}"/>
@@ -584,7 +585,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <Border Background="{StaticResource WhiteBrush}"
+                                                <Border x:Name="ManualWorkersPanel" Background="{StaticResource WhiteBrush}"
                                                         BorderBrush="{StaticResource SubtleBorderBrush}"
                                                         BorderThickness="1"
                                                         CornerRadius="7"
@@ -601,7 +602,7 @@
                                                     </StackPanel>
                                                 </Border>
 
-                                                <Border Grid.Column="2"
+                                                <Border x:Name="ManualDaysPanel" Grid.Column="2"
                                                         Background="{StaticResource WhiteBrush}"
                                                         BorderBrush="{StaticResource SubtleBorderBrush}"
                                                         BorderThickness="1"
@@ -619,7 +620,7 @@
                                                     </StackPanel>
                                                 </Border>
 
-                                                <Border Grid.Column="4"
+                                                <Border x:Name="ManualHoursPanel" Grid.Column="4"
                                                         Background="{StaticResource WhiteBrush}"
                                                         BorderBrush="{StaticResource SubtleBorderBrush}"
                                                         BorderThickness="1"
@@ -634,6 +635,36 @@
                                                                  TextAlignment="Right"/>
                                                         <TextBlock Text="Per ogni persona"
                                                                    Style="{StaticResource FieldHintStyle}"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Border x:Name="CalendarCrewPanel" Grid.ColumnSpan="5" Visibility="Collapsed"
+                                                        Background="{StaticResource WhiteBrush}"
+                                                        BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1"
+                                                        CornerRadius="7" Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock x:Name="TxtCalendarCrewTotal" FontSize="14" FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource PrimaryBlueBrush}" TextWrapping="Wrap"/>
+                                                        <TextBlock x:Name="TxtCalendarCrewStatus" Margin="0,4,0,8" FontSize="11"
+                                                                   Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/>
+                                                        <ScrollViewer MaxHeight="145" VerticalScrollBarVisibility="Auto"
+                                                                      HorizontalScrollBarVisibility="Disabled">
+                                                            <ItemsControl x:Name="CalendarCrewRows">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Border BorderBrush="{StaticResource SubtleBorderBrush}"
+                                                                                BorderThickness="0,0,0,1" Padding="0,5">
+                                                                            <StackPanel>
+                                                                                <TextBlock Text="{Binding Heading}" FontSize="11.5" FontWeight="SemiBold"
+                                                                                           Foreground="{StaticResource DefaultTextBrush}" TextWrapping="Wrap"/>
+                                                                                <TextBlock Text="{Binding Crew}" FontSize="11" Margin="0,2,0,0"
+                                                                                           Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"/>
+                                                                            </StackPanel>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </ScrollViewer>
                                                     </StackPanel>
                                                 </Border>
 
@@ -662,7 +693,7 @@
                                                     BorderThickness="1"
                                                     CornerRadius="7"
                                                     Padding="12,9">
-                                                <TextBlock Text="Costo della squadra = persone × giorni × ore al giorno × costo orario per persona."
+                                                <TextBlock x:Name="TxtCrewFormula" Text="Costo della squadra = persone × giorni × ore al giorno × costo orario per persona."
                                                            HorizontalAlignment="Center"
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
@@ -672,6 +703,7 @@
                                         </Grid>
                                     </Border>
                                 </Grid>
+                                </ScrollViewer>
                             </TabItem>
 
                             <TabItem x:Name="TabCompanyCosts" Header="3. Altri costi del lavoro">

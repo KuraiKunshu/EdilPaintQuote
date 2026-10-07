@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
     public DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
     public DbSet<EmployeeEntity> Employees => Set<EmployeeEntity>();
     public DbSet<WorkScheduleSettingsEntity> WorkScheduleSettings => Set<WorkScheduleSettingsEntity>();
+    public DbSet<AutomaticMaterialSettingsEntity> AutomaticMaterialSettings => Set<AutomaticMaterialSettingsEntity>();
     public DbSet<WorkScheduleEntryEntity> WorkScheduleEntries => Set<WorkScheduleEntryEntity>();
     public DbSet<WorkScheduleAssignmentEntity> WorkScheduleAssignments => Set<WorkScheduleAssignmentEntity>();
     public DbSet<CompanySettingsEntity> CompanySettings => Set<CompanySettingsEntity>();
@@ -27,6 +28,15 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<AutomaticMaterialSettingsEntity>(entity =>
+        {
+            entity.ToTable("AutomaticMaterialSettings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.SettingsJson).IsRequired();
+        });
 
         modelBuilder.Entity<WorkScheduleSettingsEntity>(entity =>
         {
