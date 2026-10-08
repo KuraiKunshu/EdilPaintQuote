@@ -122,7 +122,7 @@ public partial class WorkScheduleWindow : Window
         if (ChkShowInactive.IsChecked != true && snapshot.Entries.Any(entry =>
                 conflictsByEntry.ContainsKey(entry.Id) && entry.Kind == WorkScheduleEntryKind.Job && !entry.IsActiveOrder))
             TxtConflictNotice.Text += " Per consultare gli ordini non attivi, abilita il filtro sopra.";
-        ItemsDays.ItemsSource = Enumerable.Range(0, 7).Select(offset =>
+        var days = Enumerable.Range(0, 7).Select(offset =>
         {
             var date = _weekStart.AddDays(offset);
             var entries = snapshot.Entries.Where(entry => entry.Date.Date == date &&
@@ -143,6 +143,7 @@ public partial class WorkScheduleWindow : Window
                 EmptyVisibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed
             };
         }).ToList();
+        ItemsDays.ItemsSource = ItemsAgenda.ItemsSource = days;
         RefreshOrders();
         BtnAbsence.IsEnabled = snapshot.IsCurrent;
         ConnectionNotice.Visibility = snapshot.IsCurrent ? Visibility.Collapsed : Visibility.Visible;
@@ -176,6 +177,13 @@ public partial class WorkScheduleWindow : Window
 
     private void UpdateNewButton() => BtnNewIntervention.IsEnabled = !DocumentsBusy && _snapshot.IsCurrent && ItemsOrders.SelectedItem is WorkScheduleOrder;
     private void OnOrderFilterChanged(object sender, RoutedEventArgs e) => RefreshOrders();
+    private void OnCalendarViewChanged(object sender, RoutedEventArgs e)
+    {
+        if (AgendaScroll == null || WeekScroll == null || DocumentsBusy) return;
+        bool agenda = BtnAgendaView.IsChecked == true;
+        AgendaScroll.Visibility = agenda ? Visibility.Visible : Visibility.Collapsed;
+        WeekScroll.Visibility = agenda ? Visibility.Collapsed : Visibility.Visible;
+    }
     private void OnCalendarFilterChanged(object sender, RoutedEventArgs e)
     {
         if (ItemsDays != null) ApplySnapshot(_snapshot);
@@ -290,6 +298,7 @@ public partial class WorkScheduleWindow : Window
         bool preparingDocument = _documentActions.Any(control => control.IsBusy);
         // Keeping the target enabled lets the open context menu continue receiving its click.
         ItemsDays.IsEnabled = !preparingDocument;
+        ItemsAgenda.IsEnabled = !preparingDocument;
         ItemsOrders.IsEnabled = !preparingDocument;
         BtnPreviousWeek.IsEnabled = !busy;
         BtnToday.IsEnabled = !busy;
@@ -299,6 +308,7 @@ public partial class WorkScheduleWindow : Window
         TxtOrderSearch.IsEnabled = !busy;
         ChkUnplannedOnly.IsEnabled = !busy;
         ChkShowInactive.IsEnabled = !busy;
+        BtnAgendaView.IsEnabled = BtnWeekView.IsEnabled = !busy;
         UpdateNewButton();
         if (!busy)
             Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(async () =>
@@ -362,7 +372,8 @@ public partial class WorkScheduleWindow : Window
             ConflictText = conflictText;
             BorderBrush = (Brush)resources.FindResource(string.IsNullOrWhiteSpace(conflictText) ? "SubtleBorderBrush" : "DangerSoftTextBrush");
             Subtitle = entry.Kind == WorkScheduleEntryKind.Absence ? "Indisponibilità squadra" :
-                $"{entry.CustomerName} · {entry.QuoteNumber}";
+                string.Join(" · ", new[] { entry.ReferenceDetail, entry.CustomerName, entry.QuoteNumber }
+                    .Where(part => !string.IsNullOrWhiteSpace(part)));
             Crew = entry.Employees.Count == 0 ? "Squadra da assegnare" : string.Join(" · ", entry.Employees.Select(employee =>
                 abbreviations && !string.IsNullOrWhiteSpace(employee.Abbreviation) ? employee.Abbreviation :
                     $"{employee.FirstName} {employee.LastName}".Trim()));

@@ -61,8 +61,30 @@
                     <StackPanel x:Name="EditableFields">
                         <StackPanel x:Name="OrderPanel">
                             <TextBlock Text="Cantiere / ordine" Style="{StaticResource FieldTitle}" Margin="0,4,0,9"/>
-                            <ComboBox x:Name="CmbOrder" DisplayMemberPath="Display" SelectionChanged="OnOrderChanged"
-                                      FontSize="15" Padding="7" AutomationProperties.Name="Ordine attivo da programmare"/>
+                            <ComboBox x:Name="CmbOrder" SelectionChanged="OnOrderChanged"
+                                      FontSize="15" Padding="7" AutomationProperties.Name="Ordine attivo da programmare"
+                                      ToolTip="{Binding SelectedItem.Display, RelativeSource={RelativeSource Self}}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel MaxWidth="550">
+                                            <TextBlock Text="{Binding Title}" FontWeight="Bold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding ReferenceDetail}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ReferenceDetail}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding CustomerDetail}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                            <TextBlock Text="{Binding QuoteNumber, StringFormat=Ordine {0}}" FontSize="12" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <TextBlock x:Name="TxtOrderDetails" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,7,0,0"/>
                             <Border x:Name="OrderWarningNotice" Background="{StaticResource WarningPanelBackgroundBrush}"
                                     BorderBrush="{StaticResource WarningPanelBorderBrush}" BorderThickness="1" CornerRadius="6"

@@ -11,6 +11,13 @@
             <Setter Property="Background" Value="{StaticResource NeutralButtonBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding UseLargeButtons, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="FontSize" Value="14"/>
+                    <Setter Property="MinHeight" Value="36"/>
+                    <Setter Property="Padding" Value="10,7"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
     </UserControl.Resources>
     <WrapPanel>

@@ -8,6 +8,19 @@ namespace EdilPaintPreventibiviGen.Android.Services;
 
 public sealed partial class MobileDatabaseService
 {
+    internal static string ActiveSupplierOrderFilter(string alias = "")
+    {
+        string prefix = string.IsNullOrEmpty(alias) ? string.Empty : alias + ".";
+        return $"""
+            not {prefix}"IsDeleted"
+            and {prefix}"Status" not in (@finished, @rejected, @archived)
+            and ({prefix}"MaterialsOrderedByCustomer" or
+                ({prefix}"Status" = @confirmed and
+                 ({prefix}"SupplierName" <> '' or {prefix}"MaterialOrderDate" is not null or
+                  {prefix}"ExpectedDeliveryDate" is not null or {prefix}"MaterialStatus" <> '')))
+            """;
+    }
+
     public Task<DashboardSnapshot> GetDashboardAsync(
         string connectionString,
         CancellationToken cancellationToken = default) =>
@@ -15,7 +28,7 @@ public sealed partial class MobileDatabaseService
         {
             await using var connection = await OpenConnectionAsync(connectionString, token);
             await using var command = connection.CreateCommand();
-            command.CommandText = """
+            command.CommandText = $"""
                 select
                     count(*) filter (where not "IsDeleted"),
                     count(*) filter (where not "IsDeleted" and "Status" = @draft),
@@ -25,10 +38,7 @@ public sealed partial class MobileDatabaseService
                           and "Status" not in (@confirmed, @finished, @rejected, @archived)),
                     count(*) filter (where not "IsDeleted" and "Status" = @confirmed),
                     count(*) filter (
-                        where not "IsDeleted"
-                          and ("MaterialsOrderedByCustomer" or ("Status" = @confirmed and
-                              ("SupplierName" <> '' or "MaterialOrderDate" is not null or
-                               "ExpectedDeliveryDate" is not null or "MaterialStatus" <> '')))
+                        where {ActiveSupplierOrderFilter()}
                           and upper(coalesce("MaterialStatus", '')) not in ('CONSEGNATO', 'NON DISPONIBILE')),
                     coalesce(sum("Total") filter (
                         where not "IsDeleted" and "Status" in (@confirmed, @finished)), 0),
@@ -86,10 +96,12 @@ public sealed partial class MobileDatabaseService
             await using var command = connection.CreateCommand();
             var filters = new List<string>
             {
-                "not q.\"IsDeleted\"",
-                "(q.\"MaterialsOrderedByCustomer\" or (q.\"Status\" = @confirmed and (q.\"SupplierName\" <> '' or q.\"MaterialOrderDate\" is not null or q.\"ExpectedDeliveryDate\" is not null or q.\"MaterialStatus\" <> '')))"
+                ActiveSupplierOrderFilter("q")
             };
             command.Parameters.AddWithValue("confirmed", (int)QuoteStatus.Confermato);
+            command.Parameters.AddWithValue("finished", (int)QuoteStatus.Finito);
+            command.Parameters.AddWithValue("rejected", (int)QuoteStatus.Rifiutato);
+            command.Parameters.AddWithValue("archived", (int)QuoteStatus.Archiviato);
 
             if (!string.IsNullOrWhiteSpace(search))
             {

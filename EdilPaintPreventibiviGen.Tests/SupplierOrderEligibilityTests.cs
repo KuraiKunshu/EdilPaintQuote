@@ -27,11 +27,42 @@ public sealed class SupplierOrderEligibilityTests
     [InlineData(QuoteStatus.Finalizzato)]
     [InlineData(QuoteStatus.Spedito)]
     [InlineData(QuoteStatus.Confermato)]
-    [InlineData(QuoteStatus.Finito)]
-    [InlineData(QuoteStatus.Rifiutato)]
-    [InlineData(QuoteStatus.Archiviato)]
-    public void CustomerOrderedMaterialsKeepTheExistingOrdersWindowCriteria(QuoteStatus status)
+    public void CustomerOrderedMaterialsRemainEligibleForOpenQuotes(QuoteStatus status)
         => Assert.True(SupplierOrderEligibility.IsActive(new() { Status = status, MaterialsOrderedByCustomer = true }));
+
+    [Theory]
+    [InlineData(QuoteStatus.Finito, false)]
+    [InlineData(QuoteStatus.Finito, true)]
+    [InlineData(QuoteStatus.Rifiutato, false)]
+    [InlineData(QuoteStatus.Rifiutato, true)]
+    [InlineData(QuoteStatus.Archiviato, false)]
+    [InlineData(QuoteStatus.Archiviato, true)]
+    public void ClosedQuotesNeverRemainActiveThroughCustomerOrSupplierOrderDetails(
+        QuoteStatus status, bool orderedByCustomer)
+    {
+        var quote = new QuoteEntity
+        {
+            Status = status, MaterialsOrderedByCustomer = orderedByCustomer,
+            SupplierName = "Fornitore", MaterialOrderDate = new DateTime(2026, 10, 6),
+            ExpectedDeliveryDate = new DateTime(2026, 10, 9), MaterialStatus = "In magazzino"
+        };
+        Assert.False(SupplierOrderEligibility.IsActive(quote));
+        Assert.False(SupplierOrderEligibility.ActiveOrderPredicate.Compile()(quote));
+    }
+
+    [Fact]
+    public void CompletedZoccaratoOrderIsExcludedEvenWhenMaflanOrderedMaterials()
+    {
+        var quote = new QuoteEntity
+        {
+            QuoteNumber = "160765", Customer = new() { BusinessName = "MAFLAN SRL" },
+            ReferenceCustomer = new() { BusinessName = "ZOCCARATO GRAZIANO" },
+            Status = QuoteStatus.Finito, MaterialsOrderedByCustomer = true,
+            SupplierName = "MAFLAN SRL", MaterialStatus = "In magazzino"
+        };
+        Assert.False(SupplierOrderEligibility.IsActive(quote));
+        Assert.False(SupplierOrderEligibility.ActiveOrderPredicate.Compile()(quote));
+    }
 
     [Theory]
     [InlineData(QuoteStatus.Finalizzato)]

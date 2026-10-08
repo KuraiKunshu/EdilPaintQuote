@@ -323,10 +323,10 @@ public sealed class WorkScheduleRulesTests
     }
 
     [Fact]
-    public void CustomerOrderedJobsRemainEditableAndReservedEvenWhenNotConfirmed()
+    public void CustomerOrderedOpenJobsRemainEditableAndReservedEvenWhenNotConfirmed()
     {
         var stored = Entry();
-        stored.OrderStatus = QuoteStatus.Finito;
+        stored.OrderStatus = QuoteStatus.Spedito;
         stored.IsOrderActive = true;
         var requested = stored.CreateValidatedCopy();
         requested.Date = Today.AddDays(1);
@@ -392,13 +392,10 @@ public sealed class WorkScheduleRulesTests
     [InlineData(QuoteStatus.Finalizzato)]
     [InlineData(QuoteStatus.Spedito)]
     [InlineData(QuoteStatus.Confermato)]
-    [InlineData(QuoteStatus.Finito)]
-    [InlineData(QuoteStatus.Rifiutato)]
     [InlineData(QuoteStatus.Bozza)]
     [InlineData(QuoteStatus.DaInviare)]
     [InlineData(QuoteStatus.DaSollecitare)]
-    [InlineData(QuoteStatus.Archiviato)]
-    public void OrdersCustomerFlagKeepsEveryExistingStatusEligible(QuoteStatus status)
+    public void OrdersCustomerFlagKeepsNonTerminalStatusesEligible(QuoteStatus status)
     {
         var quote = new QuoteEntity { Status = status, MaterialsOrderedByCustomer = true };
         Assert.True(SupplierOrderEligibility.IsActive(quote));
@@ -434,7 +431,7 @@ public sealed class WorkScheduleRulesTests
         var entity = new WorkScheduleEntryEntity
         {
             Id = Guid.NewGuid(), Date = Today,
-            Quote = new QuoteEntity { QuoteNumber = "2026/001", Status = QuoteStatus.Rifiutato,
+            Quote = new QuoteEntity { QuoteNumber = "2026/001", Status = QuoteStatus.Spedito,
                 MaterialsOrderedByCustomer = true }
         };
         var active = SqlDataService.ScheduleEntryToModel(entity);
@@ -447,6 +444,46 @@ public sealed class WorkScheduleRulesTests
         Assert.False(inactive.IsOrderActive);
         Assert.False(inactive.IsActiveOrder);
         Assert.True(inactive.HasOrderWarning);
+    }
+
+    [Fact]
+    public void FinishedCustomerOrderKeepsItsCompletedVisitAndCrewInTheCalendar()
+    {
+        var employee = new EmployeeEntity { Id = Mario, FirstName = "Mario", LastName = "Rossi" };
+        var entity = new WorkScheduleEntryEntity
+        {
+            Id = Guid.NewGuid(), Date = Today.AddDays(-1), Status = WorkScheduleEntryStatus.Completed,
+            StartMinutes = 480, EndMinutes = 720, Notes = "Lavoro concluso",
+            Quote = new QuoteEntity
+            {
+                QuoteNumber = "160765", Customer = new() { BusinessName = "MAFLAN SRL" },
+                ReferenceCustomer = new() { BusinessName = "ZOCCARATO GRAZIANO" },
+                Status = QuoteStatus.Finito, MaterialsOrderedByCustomer = true,
+                SupplierName = "MAFLAN SRL", MaterialStatus = "In magazzino"
+            }
+        };
+        entity.Assignments.Add(new WorkScheduleAssignmentEntity
+        {
+            EntryId = entity.Id, EmployeeId = Mario, Employee = employee
+        });
+
+        var visit = SqlDataService.ScheduleEntryToModel(entity);
+
+        Assert.Equal(entity.Id, visit.Id);
+        Assert.Equal(entity.Date, visit.Date);
+        Assert.Equal(WorkScheduleEntryStatus.Completed, visit.Status);
+        Assert.Equal("160765", visit.QuoteNumber);
+        Assert.Equal("ZOCCARATO GRAZIANO", visit.Title);
+        Assert.Equal("MAFLAN SRL", visit.CustomerName);
+        Assert.Equal("Lavoro concluso", visit.Notes);
+        Assert.Equal(480, visit.StartMinutes);
+        Assert.Equal(720, visit.EndMinutes);
+        Assert.Equal(Mario, Assert.Single(visit.EmployeeIds));
+        Assert.Equal("Mario", Assert.Single(visit.Employees).FirstName);
+        Assert.False(visit.IsOrderActive);
+        Assert.False(visit.IsActiveOrder);
+        Assert.False(visit.HasOrderWarning);
+        Assert.True(visit.ReservesEmployees(Today));
     }
 
     [Fact]
@@ -494,6 +531,15 @@ public sealed class WorkScheduleRulesTests
         string orderQuery = db.Quotes.Where(SupplierOrderEligibility.ActiveOrderPredicate).ToQueryString();
         Assert.Contains("MaterialsOrderedByCustomer", orderQuery);
         Assert.Contains("MaterialOrderDate", orderQuery);
+        string unquotedQuery = orderQuery.Replace("[", "").Replace("]", "").Replace("\"", "");
+        string closedStatusConditions = string.Join(@"\s+AND\s+", new[]
+        {
+            QuoteStatus.Finito, QuoteStatus.Rifiutato, QuoteStatus.Archiviato
+        }.Select(status => $@"q\.Status\s*<>\s*{(int)status}"));
+        string notDeletedCondition = postgres ? @"NOT\s*\(q\.IsDeleted\)" :
+            @"q\.IsDeleted\s*=\s*CAST\(0 AS bit\)";
+        Assert.Matches($@"\bWHERE\s+{notDeletedCondition}(?:\s+AND\s+{notDeletedCondition})*\s+AND\s+" +
+            $@"{closedStatusConditions}\s+AND\s+\(q\.MaterialsOrderedByCustomer\b", unquotedQuery);
     }
 
     [Theory]

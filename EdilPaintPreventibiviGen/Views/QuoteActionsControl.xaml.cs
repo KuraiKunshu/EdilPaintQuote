@@ -17,6 +17,8 @@ public partial class QuoteActionsControl : UserControl
         nameof(CanComplete), typeof(bool), typeof(QuoteActionsControl), new PropertyMetadata(true, OnQuoteChanged));
     public static readonly DependencyProperty ShowDetailsProperty = DependencyProperty.Register(
         nameof(ShowDetails), typeof(bool), typeof(QuoteActionsControl), new PropertyMetadata(true));
+    public static readonly DependencyProperty UseLargeButtonsProperty = DependencyProperty.Register(
+        nameof(UseLargeButtons), typeof(bool), typeof(QuoteActionsControl), new PropertyMetadata(false));
     private static readonly DependencyPropertyKey IsBusyPropertyKey = DependencyProperty.RegisterReadOnly(
         nameof(IsBusy), typeof(bool), typeof(QuoteActionsControl), new PropertyMetadata(false));
     public static readonly DependencyProperty IsBusyProperty = IsBusyPropertyKey.DependencyProperty;
@@ -27,6 +29,7 @@ public partial class QuoteActionsControl : UserControl
     public string QuoteNumber { get => (string)GetValue(QuoteNumberProperty); set => SetValue(QuoteNumberProperty, value); }
     public WorkScheduleEntry? ScheduleEntry { get => (WorkScheduleEntry?)GetValue(ScheduleEntryProperty); set => SetValue(ScheduleEntryProperty, value); }
     public bool ShowDetails { get => (bool)GetValue(ShowDetailsProperty); set => SetValue(ShowDetailsProperty, value); }
+    public bool UseLargeButtons { get => (bool)GetValue(UseLargeButtonsProperty); set => SetValue(UseLargeButtonsProperty, value); }
     public bool CanComplete { get => (bool)GetValue(CanCompleteProperty); set => SetValue(CanCompleteProperty, value); }
     public bool IsBusy => (bool)GetValue(IsBusyProperty);
     public bool IsMenuOpen => (bool)GetValue(IsMenuOpenProperty);

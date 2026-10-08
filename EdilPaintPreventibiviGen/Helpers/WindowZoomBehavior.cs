@@ -47,7 +47,13 @@ public static class WindowZoomBehavior
     {
         // Ignore any descendant event: only the window owns this scale.
         if (ReferenceEquals(sender, e.OriginalSource))
-            Apply((Window)sender, _scale, GetWorkArea((Window)sender));
+        {
+            var window = (Window)sender;
+            var workArea = GetWorkArea(window);
+            WindowSizeBehavior.RestoreBeforeZoom(window, workArea);
+            Apply(window, _scale, workArea);
+            WindowSizeBehavior.FinishRestore(window, workArea);
+        }
     }
 
     internal static void Apply(Window window, double scale, Rect? workArea = null)
@@ -112,6 +118,18 @@ public static class WindowZoomBehavior
                 window.Top = Math.Clamp(window.Top, area.Top, Math.Max(area.Top, area.Bottom - window.Height));
         }
     }
+
+    internal static Size GetPreferredUnscaledSize(Window window, Size measuredSize)
+    {
+        if (!States.TryGetValue(window, out var state)) return measuredSize;
+        // Retain the requested size when a smaller screen clipped it automatically.
+        double width = NearlyEqual(measuredSize.Width, state.LastWidth) ? state.RequestedWidth : measuredSize.Width;
+        double height = NearlyEqual(measuredSize.Height, state.LastHeight) ? state.RequestedHeight : measuredSize.Height;
+        return new Size(width / state.Scale, height / state.Scale);
+    }
+
+    private static bool NearlyEqual(double left, double right) => double.IsFinite(left) && double.IsFinite(right) &&
+        Math.Abs(left - right) < 0.5;
 
     private static Rect GetWorkArea(Window window)
     {

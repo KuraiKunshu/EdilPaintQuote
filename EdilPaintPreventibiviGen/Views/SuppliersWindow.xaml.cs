@@ -1,7 +1,7 @@
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
@@ -13,11 +13,15 @@ public partial class SuppliersWindow : Window
 {
     private readonly MainViewModel _vm;
     private readonly QuoteHistoryService _historyService;
-    private readonly ObservableCollection<QuoteHistorySummary> _quotes = new();
+    private readonly List<QuoteHistorySummary> _quotes = new();
     private readonly List<QuoteHistorySummary> _loadedQuotes = new();
+    private readonly ListCollectionView _orderView;
     private CancellationTokenSource? _refreshCts;
     private bool _isRefreshing;
     private bool _isSaving;
+    private bool _hasLoaded;
+    private bool _detailsOpen;
+    private bool _closed;
 
     public IReadOnlyList<string> MaterialStatusOptions { get; } =
     [
@@ -46,14 +50,25 @@ public partial class SuppliersWindow : Window
         InitializeComponent();
         _vm = vm;
         _historyService = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
-        GridSuppliers.ItemsSource = _quotes;
+        _orderView = new ListCollectionView(_quotes);
+        ItemsOrders.ItemsSource = _orderView;
         CmbStatusFilter.ItemsSource = MaterialStatusFilterOptions;
         CmbStatusFilter.SelectedIndex = 0;
         CmbSortOrder.ItemsSource = SupplierOrderSortService.Options;
         CmbSortOrder.SelectedIndex = 0;
-        Loaded += async (_, _) => await RefreshAsync();
+        Loaded += async (_, _) =>
+        {
+            _hasLoaded = true;
+            await RefreshAsync(TxtSearch.Text?.Trim() ?? string.Empty);
+        };
+        Activated += async (_, _) =>
+        {
+            if (_hasLoaded && !_detailsOpen && !_isSaving)
+                await RefreshAsync(TxtSearch.Text?.Trim() ?? string.Empty);
+        };
         Closed += (_, _) =>
         {
+            _closed = true;
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
             _refreshCts = null;
@@ -62,7 +77,7 @@ public partial class SuppliersWindow : Window
 
     private async Task RefreshAsync(string searchText = "")
     {
-        if (_isRefreshing)
+        if (_isRefreshing || _closed)
             return;
 
         _refreshCts?.Cancel();
@@ -81,6 +96,8 @@ public partial class SuppliersWindow : Window
             BtnRefresh.IsEnabled = false;
             CmbStatusFilter.IsEnabled = false;
             CmbSortOrder.IsEnabled = false;
+            ChkGroupBySupplier.IsEnabled = false;
+            ItemsOrders.IsEnabled = false;
 
             var summaries = await _historyService.LoadSupplierOrderSummariesAsync(
                 searchText,
@@ -115,11 +132,14 @@ public partial class SuppliersWindow : Window
             BtnRefresh.IsEnabled = true;
             CmbStatusFilter.IsEnabled = true;
             CmbSortOrder.IsEnabled = true;
+            ChkGroupBySupplier.IsEnabled = true;
+            ItemsOrders.IsEnabled = true;
         }
     }
 
     private void ApplyOrderView()
     {
+        if (_orderView == null) return;
         string selectedStatus = CmbStatusFilter.SelectedItem as string ?? "Tutti gli stati";
         IEnumerable<QuoteHistorySummary> filtered = _loadedQuotes;
 
@@ -139,15 +159,28 @@ public partial class SuppliersWindow : Window
             ? sortOption.Mode
             : SupplierOrderSortMode.OrderDateDescending;
 
-        _quotes.Clear();
-        foreach (QuoteHistorySummary summary in SupplierOrderSortService.Sort(filtered, sortMode))
-            _quotes.Add(summary);
+        bool grouped = ChkGroupBySupplier.IsChecked == true;
+        using (_orderView.DeferRefresh())
+        {
+            _orderView.GroupDescriptions.Clear();
+            if (grouped)
+                _orderView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(QuoteHistorySummary.OrderSupplierGroup))
+                    { StringComparison = StringComparison.OrdinalIgnoreCase });
+            _quotes.Clear();
+            foreach (QuoteHistorySummary summary in grouped
+                         ? SupplierOrderSortService.SortBySupplier(filtered, sortMode)
+                         : SupplierOrderSortService.Sort(filtered, sortMode))
+                _quotes.Add(summary);
+        }
+        // The plain list avoids per-row notifications while grouping is deferred.
+        _orderView.Refresh();
+        TxtSortOrderLabel.Text = grouped ? "Ordina nel fornitore" : "Ordina per";
 
         string visibleLabel = _quotes.Count == 1 ? "1 ordine" : $"{_quotes.Count} ordini";
         TxtSubtitle.Text = _quotes.Count == _loadedQuotes.Count
             ? visibleLabel
             : $"{visibleLabel} su {_loadedQuotes.Count}";
-        TxtVisibleCount.Text = visibleLabel;
+        TxtVisibleCount.Text = grouped ? $"{visibleLabel} · {_orderView.Groups?.Count ?? 0} gruppi" : visibleLabel;
 
         bool hasVisibleOrders = _quotes.Count > 0;
         EmptyPanel.Visibility = hasVisibleOrders ? Visibility.Collapsed : Visibility.Visible;
@@ -156,16 +189,15 @@ public partial class SuppliersWindow : Window
             : "Nessun ordine corrisponde ai criteri selezionati.";
     }
 
-    private async Task SaveSupplierAsync(QuoteHistorySummary summary)
+    private async Task<bool> SaveSupplierAsync(QuoteHistorySummary summary, QuoteHistorySummary original)
     {
         if (_isSaving)
-            return;
+            return false;
 
         try
         {
             _isSaving = true;
             Cursor = Cursors.Wait;
-            CommitPendingEdits();
 
             string deviceName = DeviceNameService.GetCurrentDeviceName();
             if (summary.MaterialsOrderedByCustomer)
@@ -181,8 +213,15 @@ public partial class SuppliersWindow : Window
             });
 
             summary.LastModifiedByDevice = deviceName;
+            original.SupplierName = summary.SupplierName;
+            original.MaterialsOrderedByCustomer = summary.MaterialsOrderedByCustomer;
+            original.MaterialOrderDate = summary.MaterialOrderDate;
+            original.ExpectedDeliveryDate = summary.ExpectedDeliveryDate;
+            original.MaterialStatus = summary.MaterialStatus;
+            original.LastModifiedByDevice = deviceName;
             TxtFooterStatus.Text = $"Ordine del preventivo {summary.QuoteNumber} salvato";
             ApplyOrderView();
+            return true;
         }
         catch (Exception ex)
         {
@@ -192,6 +231,7 @@ public partial class SuppliersWindow : Window
                 "Ordini",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
+            return false;
         }
         finally
         {
@@ -200,26 +240,10 @@ public partial class SuppliersWindow : Window
         }
     }
 
-    private void SelectSupplier(QuoteHistorySummary summary)
-    {
-        var win = new SelectCustomerWindow(_vm, suppliersOnly: true)
-        {
-            Owner = this,
-            Title = "Seleziona fornitore"
-        };
-
-        if (win.ShowDialog() != true || win.SelectedResult == null)
-            return;
-
-        summary.MaterialsOrderedByCustomer = false;
-        summary.SupplierName = win.SelectedResult.BusinessName;
-    }
-
-    private async Task PrepareOrderMailAsync(QuoteHistorySummary summary)
+    private async Task PrepareOrderMailAsync(QuoteHistorySummary summary, Window owner, QuoteHistorySummary original)
     {
         try
         {
-            CommitPendingEdits();
             if (summary.MaterialsOrderedByCustomer)
                 SupplierOrderAssignmentService.ApplyCustomerOrderChoice(summary, orderedByCustomer: true);
 
@@ -260,14 +284,14 @@ public partial class SuppliersWindow : Window
                     MessageBoxImage.Information);
             }
 
-            var win = new SupplierOrderMailWindow(fullEntry, draft) { Owner = this };
+            var win = new SupplierOrderMailWindow(fullEntry, draft) { Owner = owner };
             if (win.ShowDialog() == true && win.WasRegisteredAsSent)
             {
                 summary.MaterialOrderDate ??= win.RegisteredAtUtc.ToLocalTime().Date;
                 if (string.IsNullOrWhiteSpace(summary.MaterialStatus))
                     summary.MaterialStatus = "Ordinato";
 
-                await SaveSupplierAsync(summary);
+                await SaveSupplierAsync(summary, original);
             }
         }
         catch (Exception ex)
@@ -281,47 +305,17 @@ public partial class SuppliersWindow : Window
         }
     }
 
-    private void CommitPendingEdits()
+    private async void OnOpenOrderClick(object sender, RoutedEventArgs e)
     {
-        if (Keyboard.FocusedElement is TextBox textBox)
-            textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
-
-        if (Keyboard.FocusedElement is ComboBox comboBox)
-            comboBox.GetBindingExpression(ComboBox.TextProperty)?.UpdateSource();
-
-        GridSuppliers.CommitEdit(DataGridEditingUnit.Cell, true);
-        GridSuppliers.CommitEdit(DataGridEditingUnit.Row, true);
-    }
-
-    private async void OnSaveSupplierClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement element && element.DataContext is QuoteHistorySummary summary)
-            await SaveSupplierAsync(summary);
-    }
-
-    private void OnSelectSupplierClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement element && element.DataContext is QuoteHistorySummary summary)
-            SelectSupplier(summary);
-    }
-
-    private async void OnPrepareOrderMailClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement element && element.DataContext is QuoteHistorySummary summary)
-            await PrepareOrderMailAsync(summary);
-    }
-
-    private void OnMaterialsOrderedByCustomerClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not CheckBox checkBox ||
-            checkBox.DataContext is not QuoteHistorySummary summary)
-        {
-            return;
-        }
-
-        SupplierOrderAssignmentService.ApplyCustomerOrderChoice(
-            summary,
-            checkBox.IsChecked == true);
+        if (sender is not FrameworkElement { DataContext: QuoteHistorySummary summary }) return;
+        var details = new SupplierOrderDetailsWindow(_vm, summary, MaterialStatusOptions,
+            draft => SaveSupplierAsync(draft, summary),
+            (draft, owner) => PrepareOrderMailAsync(draft, owner, summary)) { Owner = this };
+        _detailsOpen = true;
+        try { details.ShowDialog(); }
+        finally { _detailsOpen = false; }
+        // History can change the quote status while the order detail is open.
+        await RefreshAsync(TxtSearch.Text?.Trim() ?? string.Empty);
     }
 
     private async void OnSearchClick(object sender, RoutedEventArgs e)
@@ -344,6 +338,11 @@ public partial class SuppliersWindow : Window
     {
         if (!_isRefreshing)
             ApplyOrderView();
+    }
+
+    private void OnSupplierGroupingChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isRefreshing) ApplyOrderView();
     }
 
     private async void OnSearchKeyDown(object sender, KeyEventArgs e)

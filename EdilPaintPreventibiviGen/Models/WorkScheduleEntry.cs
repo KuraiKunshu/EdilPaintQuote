@@ -29,7 +29,9 @@ public sealed class WorkScheduleEntry
     public bool ReservesEmployees(DateTime today) => Kind == WorkScheduleEntryKind.Absence ||
         Status == WorkScheduleEntryStatus.Completed || Date.Date < today.Date || IsActiveOrder;
     public string Title => Kind == WorkScheduleEntryKind.Absence ? AbsenceReason :
-        !string.IsNullOrWhiteSpace(SiteName) ? SiteName : CustomerName;
+        WorkScheduleSiteDisplay.GetTitle(SiteName, ReferenceName, CustomerName, QuoteNumber);
+    public string ReferenceDetail => Kind == WorkScheduleEntryKind.Absence ? string.Empty :
+        WorkScheduleSiteDisplay.GetReferenceDetail(ReferenceName, Title);
     public string TimeDisplay => $"{WorkScheduleSettings.FormatTime(StartMinutes)}–{WorkScheduleSettings.FormatTime(EndMinutes)}";
     public string SlotDisplay => SlotKind switch
     {
@@ -76,6 +78,24 @@ public sealed class WorkScheduleOrder
     public string MaterialStatus { get; set; } = string.Empty;
     public DateTime? ExpectedDeliveryDate { get; set; }
     public int PlannedInterventions { get; set; }
-    public string Title => string.IsNullOrWhiteSpace(SiteName) ? CustomerName : SiteName;
-    public string Display => $"{Title} · {QuoteNumber}";
+    public string Title => WorkScheduleSiteDisplay.GetTitle(SiteName, ReferenceName, CustomerName, QuoteNumber);
+    public string ReferenceDetail => WorkScheduleSiteDisplay.GetReferenceDetail(ReferenceName, Title);
+    public string CustomerDetail => string.IsNullOrWhiteSpace(CustomerName) ? "Cliente non indicato" : $"Cliente: {CustomerName.Trim()}";
+    public string Display => string.Join(" · ", new[] { Title, ReferenceDetail, CustomerDetail, $"Ordine {QuoteNumber}" }
+        .Where(part => !string.IsNullOrWhiteSpace(part)));
+}
+
+internal static class WorkScheduleSiteDisplay
+{
+    internal static string GetTitle(string? site, string? reference, string? customer, string? number)
+    {
+        if (!string.IsNullOrWhiteSpace(site)) return site.Trim();
+        if (!string.IsNullOrWhiteSpace(reference)) return reference.Trim();
+        if (!string.IsNullOrWhiteSpace(customer)) return customer.Trim();
+        return string.IsNullOrWhiteSpace(number) ? "Cantiere non indicato" : $"Ordine {number.Trim()}";
+    }
+
+    internal static string GetReferenceDetail(string? reference, string title)
+        => string.IsNullOrWhiteSpace(reference) || string.Equals(reference.Trim(), title, StringComparison.OrdinalIgnoreCase)
+            ? string.Empty : $"Riferimento: {reference.Trim()}";
 }

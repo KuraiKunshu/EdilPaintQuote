@@ -7,11 +7,16 @@ namespace EdilPaintPreventibiviGen.Helpers;
 
 public static class WindowResizeBehavior
 {
+    private static readonly DependencyProperty PreventsMaximizationProperty = DependencyProperty.RegisterAttached(
+        "PreventsMaximization", typeof(bool), typeof(WindowResizeBehavior), new PropertyMetadata(false));
+
+    internal static bool PreventsMaximization(Window window) => (bool)window.GetValue(PreventsMaximizationProperty);
     private const int GwlStyle = -16;
     private const int WsMaximizeBox = 0x00010000;
 
     public static void PreventMaximizedState(Window window)
     {
+        window.SetValue(PreventsMaximizationProperty, true);
         window.SourceInitialized += (_, _) => DisableMaximizeBox(window);
         window.StateChanged += (_, _) =>
         {

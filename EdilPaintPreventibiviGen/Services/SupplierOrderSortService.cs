@@ -28,7 +28,7 @@ public static class SupplierOrderSortService
         new(SupplierOrderSortMode.ExpectedDeliveryDescending, "Consegna - più lontana"),
         new(SupplierOrderSortMode.CustomerAscending, "Cliente - A/Z"),
         new(SupplierOrderSortMode.CustomerDescending, "Cliente - Z/A"),
-        new(SupplierOrderSortMode.Status, "Stato ordine")
+        new(SupplierOrderSortMode.Status, "Stato materiali")
     ];
 
     public static IReadOnlyList<QuoteHistorySummary> Sort(
@@ -78,6 +78,13 @@ public static class SupplierOrderSortService
 
     private static int OrderDateMissing(QuoteHistorySummary order) =>
         order.MaterialOrderDate.HasValue ? 0 : 1;
+
+    public static IReadOnlyList<QuoteHistorySummary> SortBySupplier(
+        IEnumerable<QuoteHistorySummary> orders, SupplierOrderSortMode mode)
+        => Sort(orders, mode)
+            .OrderBy(order => order.MaterialsOrderedByCustomer ? 2 : string.IsNullOrWhiteSpace(order.SupplierName) ? 1 : 0)
+            .ThenBy(order => order.OrderSupplierGroup, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
     private static int ExpectedDeliveryMissing(QuoteHistorySummary order) =>
         order.ExpectedDeliveryDate.HasValue ? 0 : 1;

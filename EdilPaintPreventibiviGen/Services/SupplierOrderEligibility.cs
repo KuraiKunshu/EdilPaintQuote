@@ -9,6 +9,9 @@ public static class SupplierOrderEligibility
 {
     public static Expression<Func<QuoteEntity, bool>> ActiveOrderPredicate { get; } = quote =>
         !quote.IsDeleted &&
+        quote.Status != QuoteStatus.Finito &&
+        quote.Status != QuoteStatus.Rifiutato &&
+        quote.Status != QuoteStatus.Archiviato &&
         (quote.MaterialsOrderedByCustomer ||
          quote.Status == QuoteStatus.Confermato &&
          (quote.SupplierName != string.Empty || quote.MaterialOrderDate.HasValue ||
