@@ -24,6 +24,9 @@ public partial class WorkScheduleWindow : Window
     private bool _refreshing;
     private bool _closed;
     private bool _editorOpen;
+    private bool _applyingView;
+    private bool _updatingCalendarDate;
+    private bool? _compactLayout;
     private string? _cacheError;
     private bool DocumentsBusy => _documentActions.Any(control => control.IsBusy || control.IsMenuOpen);
 
@@ -35,6 +38,7 @@ public partial class WorkScheduleWindow : Window
         Loaded += OnLoaded;
         Closing += OnClosing;
         Closed += OnClosed;
+        ((FrameworkElement)Content).SizeChanged += OnContentSizeChanged;
         UpdateWeekLabel();
     }
 
@@ -109,6 +113,7 @@ public partial class WorkScheduleWindow : Window
         // Keep a card attached while its document is being prepared or its actions menu is open.
         if (DocumentsBusy) return;
         _snapshot = snapshot;
+        RefreshEmployeeFilter();
         var conflicts = WorkScheduleConflictDetector.Find(snapshot.Entries);
         var conflictsByEntry = conflicts.SelectMany(conflict => new[]
             {
@@ -122,12 +127,24 @@ public partial class WorkScheduleWindow : Window
         if (ChkShowInactive.IsChecked != true && snapshot.Entries.Any(entry =>
                 conflictsByEntry.ContainsKey(entry.Id) && entry.Kind == WorkScheduleEntryKind.Job && !entry.IsActiveOrder))
             TxtConflictNotice.Text += " Per consultare gli ordini non attivi, abilita il filtro sopra.";
+        var search = TxtCalendarSearch.Text;
+        var employeeId = (CmbEmployeeFilter.SelectedItem as EmployeeFilterOption)?.Id;
+        var filter = (WorkScheduleViewFilterKind)Math.Max(0, CmbActivityFilter.SelectedIndex);
+        var visibleEntries = snapshot.Entries.Where(entry => entry.Date.Date >= _weekStart && entry.Date.Date < _weekStart.AddDays(7) &&
+            WorkScheduleViewFilter.Matches(entry, search, employeeId, filter, ChkShowInactive.IsChecked == true,
+                conflictsByEntry.ContainsKey(entry.Id))).ToList();
+        int planned = visibleEntries.Count(entry => entry.Kind == WorkScheduleEntryKind.Job && entry.Status == WorkScheduleEntryStatus.Planned);
+        int withoutCrew = visibleEntries.Count(entry => entry.Kind == WorkScheduleEntryKind.Job && entry.Status == WorkScheduleEntryStatus.Planned && entry.EmployeeIds.Count == 0);
+        int finished = visibleEntries.Count(entry => entry.Kind == WorkScheduleEntryKind.Job && entry.Status == WorkScheduleEntryStatus.Completed);
+        int absences = visibleEntries.Count(entry => entry.Kind == WorkScheduleEntryKind.Absence);
+        TxtCalendarSummary.Text = $"{planned} {(planned == 1 ? "programmato" : "programmati")} · {withoutCrew} senza squadra · " +
+            $"{finished} {(finished == 1 ? "finito" : "finiti")} · {absences} {(absences == 1 ? "assenza" : "assenze")}";
+        if (!string.IsNullOrWhiteSpace(search) || employeeId.HasValue || filter != WorkScheduleViewFilterKind.All)
+            TxtCalendarSummary.Text = $"Risultati dei filtri: {visibleEntries.Count} attività · " + TxtCalendarSummary.Text;
         var days = Enumerable.Range(0, 7).Select(offset =>
         {
             var date = _weekStart.AddDays(offset);
-            var entries = snapshot.Entries.Where(entry => entry.Date.Date == date &&
-                    (entry.Kind == WorkScheduleEntryKind.Absence || entry.Status == WorkScheduleEntryStatus.Completed ||
-                     entry.IsActiveOrder || ChkShowInactive.IsChecked == true))
+            var entries = visibleEntries.Where(entry => entry.Date.Date == date)
                 .OrderBy(entry => entry.StartMinutes).ThenBy(entry => entry.Title, StringComparer.CurrentCultureIgnoreCase)
                 .Select(entry => new WorkScheduleCard(entry, snapshot.Settings.UseEmployeeAbbreviations, this,
                     conflictsByEntry.GetValueOrDefault(entry.Id, string.Empty), snapshot.IsCurrent)).ToList();
@@ -137,7 +154,7 @@ public partial class WorkScheduleWindow : Window
                 WeekDay = CultureInfo.GetCultureInfo("it-IT").TextInfo.ToTitleCase(date.ToString("dddd", CultureInfo.GetCultureInfo("it-IT"))),
                 DayLabel = date.ToString("dd MMM", CultureInfo.GetCultureInfo("it-IT")),
                 Entries = entries,
-                CountLabel = entries.Count == 0 ? "Nessun intervento" : $"{entries.Count} {(entries.Count == 1 ? "intervento" : "interventi")}",
+                CountLabel = DayCountLabel(entries),
                 Background = (Brush)FindResource(date == DateTime.Today ? "SelectedTabBrush" : "SectionPanelBackgroundBrush"),
                 CanEdit = snapshot.IsCurrent,
                 EmptyVisibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed
@@ -154,6 +171,39 @@ public partial class WorkScheduleWindow : Window
         TxtSyncStatus.Text = snapshot.UpdatedAtUtc is { } timestamp
             ? $"{(snapshot.IsCurrent ? "Database aggiornato" : "Copia locale")} · {timestamp.ToLocalTime():dd/MM HH:mm:ss}"
             : "In attesa del database";
+    }
+
+    private static string DayCountLabel(List<WorkScheduleCard> entries)
+    {
+        if (entries.Count == 0) return "Nessuna attività";
+        int jobs = entries.Count(card => card.Entry.Kind == WorkScheduleEntryKind.Job);
+        int absences = entries.Count - jobs;
+        var parts = new List<string>();
+        if (jobs > 0) parts.Add($"{jobs} {(jobs == 1 ? "intervento" : "interventi")}");
+        if (absences > 0) parts.Add($"{absences} {(absences == 1 ? "assenza" : "assenze")}");
+        return string.Join(" · ", parts);
+    }
+
+    private void RefreshEmployeeFilter()
+    {
+        var selectedId = (CmbEmployeeFilter.SelectedItem as EmployeeFilterOption)?.Id;
+        var directory = _snapshot.Employees.Concat(_snapshot.Entries.SelectMany(entry => entry.Employees))
+            .GroupBy(employee => employee.Id).Select(group => group.First());
+        var options = directory.Select(employee => new EmployeeFilterOption(employee.Id,
+                string.Join(" · ", new[] { $"{employee.FirstName} {employee.LastName}".Trim(), employee.Abbreviation }
+                    .Where(part => !string.IsNullOrWhiteSpace(part)))))
+            .OrderBy(option => option.Label, StringComparer.CurrentCultureIgnoreCase).ToList();
+        // An employee removed from the directory must not silently reset an active filter.
+        if (selectedId.HasValue && options.All(option => option.Id != selectedId) && CmbEmployeeFilter.SelectedItem is EmployeeFilterOption old)
+            options.Add(old);
+        options.Insert(0, new EmployeeFilterOption(null, "Tutti i dipendenti"));
+        _applyingView = true;
+        try
+        {
+            CmbEmployeeFilter.ItemsSource = options;
+            CmbEmployeeFilter.SelectedItem = options.FirstOrDefault(option => option.Id == selectedId) ?? options[0];
+        }
+        finally { _applyingView = false; }
     }
 
     private void RefreshOrders()
@@ -175,7 +225,11 @@ public partial class WorkScheduleWindow : Window
         UpdateNewButton();
     }
 
-    private void UpdateNewButton() => BtnNewIntervention.IsEnabled = !DocumentsBusy && _snapshot.IsCurrent && ItemsOrders.SelectedItem is WorkScheduleOrder;
+    private void UpdateNewButton()
+    {
+        BtnNewIntervention.IsEnabled = !DocumentsBusy && _snapshot.IsCurrent && ItemsOrders.SelectedItem is WorkScheduleOrder;
+        if (BtnQuickNew != null) BtnQuickNew.IsEnabled = !DocumentsBusy && _snapshot.IsCurrent && _snapshot.Orders.Count > 0;
+    }
     private void OnOrderFilterChanged(object sender, RoutedEventArgs e) => RefreshOrders();
     private void OnCalendarViewChanged(object sender, RoutedEventArgs e)
     {
@@ -186,7 +240,52 @@ public partial class WorkScheduleWindow : Window
     }
     private void OnCalendarFilterChanged(object sender, RoutedEventArgs e)
     {
-        if (ItemsDays != null) ApplySnapshot(_snapshot);
+        if (!_applyingView && ItemsDays != null && TxtCalendarSearch != null && CmbEmployeeFilter != null && CmbActivityFilter != null && ChkShowInactive != null)
+            ApplySnapshot(_snapshot);
+    }
+    private void OnClearCalendarFiltersClick(object sender, RoutedEventArgs e)
+    {
+        if (DocumentsBusy) return;
+        _applyingView = true;
+        try
+        {
+            TxtCalendarSearch.Clear();
+            CmbEmployeeFilter.SelectedIndex = 0;
+            CmbActivityFilter.SelectedIndex = 0;
+            ChkShowInactive.IsChecked = false;
+        }
+        finally { _applyingView = false; }
+        ApplySnapshot(_snapshot);
+    }
+    private async void OnCalendarDateChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingCalendarDate || DocumentsBusy || CalendarDate.SelectedDate is not { } date) return;
+        var week = StartOfWeek(date);
+        if (week != _weekStart) await NavigateAsync(week);
+    }
+    private void OnCalendarDateValidationError(object sender, DatePickerDateValidationErrorEventArgs e)
+    {
+        e.ThrowException = false;
+        CalendarDate.ToolTip = "Data non valida. Inserisci una data nel formato gg/mm/aaaa.";
+    }
+    private void OnToggleOrdersClick(object sender, RoutedEventArgs e) => SetOrdersVisible(OrdersPanel.Visibility != Visibility.Visible);
+    private void SetOrdersVisible(bool visible)
+    {
+        if (DocumentsBusy) return;
+        OrdersPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        OrdersColumn.Width = new GridLength(visible ? 300 : 0);
+        OrdersGap.Width = new GridLength(visible ? 16 : 0);
+        BtnToggleOrders.Content = visible ? "Nascondi ordini" : "Mostra ordini";
+    }
+    private void OnContentSizeChanged(object sender, SizeChangedEventArgs e) => ApplyResponsiveLayout();
+    private void ApplyResponsiveLayout()
+    {
+        var body = (FrameworkElement)Content;
+        bool compact = body.ActualWidth < 1100 || body.ActualHeight < 700;
+        if (_compactLayout == compact || DocumentsBusy) return;
+        _compactLayout = compact;
+        SetOrdersVisible(!compact);
+        CalendarFiltersExpander.IsExpanded = !compact;
     }
     private void OnOrderSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateNewButton();
     private async void OnRefreshClick(object sender, RoutedEventArgs e) => await RefreshAsync();
@@ -203,7 +302,14 @@ public partial class WorkScheduleWindow : Window
         await RefreshAsync();
     }
 
-    private void UpdateWeekLabel() => TxtWeek.Text = $"{_weekStart:dd/MM} – {_weekStart.AddDays(6):dd/MM/yyyy}";
+    private void UpdateWeekLabel()
+    {
+        TxtWeek.Text = $"{_weekStart:dd/MM} – {_weekStart.AddDays(6):dd/MM/yyyy}";
+        _updatingCalendarDate = true;
+        try { CalendarDate.SelectedDate = _weekStart; }
+        finally { _updatingCalendarDate = false; }
+        CalendarDate.ToolTip = "Scegli una data per aprire la sua settimana";
+    }
     private static DateTime StartOfWeek(DateTime date) => date.Date.AddDays(-((7 + (int)date.DayOfWeek - (int)DayOfWeek.Monday) % 7));
 
     internal static string OrderWarningText(WorkScheduleEntry entry) => entry.IsOrderDeleted
@@ -303,19 +409,29 @@ public partial class WorkScheduleWindow : Window
         BtnPreviousWeek.IsEnabled = !busy;
         BtnToday.IsEnabled = !busy;
         BtnNextWeek.IsEnabled = !busy;
+        CalendarDate.IsEnabled = !busy;
+        BtnToggleOrders.IsEnabled = !busy;
         BtnAbsence.IsEnabled = !busy && _snapshot.IsCurrent;
         BtnRefresh.IsEnabled = !busy && !_refreshing;
         TxtOrderSearch.IsEnabled = !busy;
         ChkUnplannedOnly.IsEnabled = !busy;
         ChkShowInactive.IsEnabled = !busy;
+        TxtCalendarSearch.IsEnabled = !busy;
+        CmbEmployeeFilter.IsEnabled = !busy;
+        CmbActivityFilter.IsEnabled = !busy;
+        BtnClearFilters.IsEnabled = !busy;
+        CalendarFiltersExpander.IsEnabled = !busy;
         BtnAgendaView.IsEnabled = BtnWeekView.IsEnabled = !busy;
         UpdateNewButton();
         if (!busy)
+        {
+            ApplyResponsiveLayout();
             Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(async () =>
             {
                 // Menu closure can precede MenuItem.Click: let that action mark itself busy first.
                 if (!_closed && !DocumentsBusy) await RefreshAsync();
             }));
+        }
     }
     private void OnClosed(object? sender, EventArgs e)
     {
@@ -349,12 +465,16 @@ public partial class WorkScheduleWindow : Window
         public Visibility EmptyVisibility { get; init; }
     }
 
+    private sealed record EmployeeFilterOption(Guid? Id, string Label);
+
     private sealed class WorkScheduleCard
     {
         public WorkScheduleEntry Entry { get; }
         public string Subtitle { get; }
         public string Crew { get; }
         public string Status { get; }
+        public string NotesPreview => Entry.Notes;
+        public Visibility NotesVisibility => string.IsNullOrWhiteSpace(Entry.Notes) ? Visibility.Collapsed : Visibility.Visible;
         public Brush Background { get; }
         public Brush BorderBrush { get; }
         public string ConflictText { get; }

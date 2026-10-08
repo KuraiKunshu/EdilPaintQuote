@@ -17,6 +17,7 @@ public partial class WorkScheduleEditorWindow : Window
     private WorkScheduleEntry? _original;
     private readonly bool _absence;
     private readonly bool _canEdit;
+    private readonly List<WorkScheduleOrder> _orders = [];
     private readonly List<WorkScheduleEmployeeChoice> _employees = [];
     private readonly Dictionary<DateTime, Guid> _newIds = [];
     private readonly Dictionary<DatePicker, string> _invalidDates = [];
@@ -28,6 +29,10 @@ public partial class WorkScheduleEditorWindow : Window
     private readonly DependencyPropertyDescriptor _documentBusyDescriptor =
         DependencyPropertyDescriptor.FromProperty(QuoteActionsControl.IsBusyProperty, typeof(QuoteActionsControl));
     private ICollectionView? _employeeView;
+    private ICollectionView? _orderView;
+    private WorkScheduleOrder? _retainedOrder;
+    private bool _updatingOrderFilter;
+    private bool _editorHasTwoColumns = true;
     private bool _initializing = true;
     private bool _clearingCrew;
     private bool _presetChanged;
@@ -60,7 +65,13 @@ public partial class WorkScheduleEditorWindow : Window
         TxtTitle.Text = _absence ? (entry == null ? "Segna assenza" : "Assenza squadra") :
             entry == null ? "Programma intervento" : entry.Status == WorkScheduleEntryStatus.Completed ? "Intervento finito" : "Intervento programmato";
         Title = TxtTitle.Text;
+        TxtSubtitle.Text = !_canEdit
+            ? "Consulta l’intervento e i documenti salvati. Connettiti al database per modificare il calendario."
+            : _absence ? "Indica il motivo, il periodo e le persone assenti. La disponibilità si aggiorna per tutti i PC."
+            : entry != null ? "Aggiorna giorno, orario e squadra. Le modifiche saranno visibili su tutti i PC."
+            : "Scegli il cantiere, il giorno e le persone. Tutti i PC vedranno la stessa programmazione.";
         OrderPanel.Visibility = _absence ? Visibility.Collapsed : Visibility.Visible;
+        OrderSearchPanel.Visibility = entry == null ? Visibility.Visible : Visibility.Collapsed;
         AbsencePanel.Visibility = _absence ? Visibility.Visible : Visibility.Collapsed;
         StatusPanel.Visibility = _absence ? Visibility.Collapsed : Visibility.Visible;
         EndDatePanel.Visibility = entry == null ? Visibility.Visible : Visibility.Collapsed;
@@ -71,6 +82,7 @@ public partial class WorkScheduleEditorWindow : Window
         DataObject.AddPastingHandler(StartDate, (_, _) => MarkDateInputPending(StartDate));
         DataObject.AddPastingHandler(EndDate, (_, _) => MarkDateInputPending(EndDate));
         CmbSlot.SelectedIndex = (int)(entry?.SlotKind ?? WorkScheduleSlotKind.FullDay);
+        SetSlotLabels();
         CmbStatus.SelectedIndex = entry?.Status == WorkScheduleEntryStatus.Completed ? 1 : 0;
         TxtAbsenceReason.Text = entry?.AbsenceReason ?? "Indisponibilità";
         TxtNotes.Text = entry?.Notes ?? string.Empty;
@@ -82,8 +94,14 @@ public partial class WorkScheduleEditorWindow : Window
                 QuoteNumber = entry.QuoteNumber, CustomerName = entry.CustomerName, SiteName = entry.SiteName,
                 ReferenceName = entry.ReferenceName, MaterialStatus = entry.MaterialStatus, ExpectedDeliveryDate = entry.ExpectedDeliveryDate
             });
-        CmbOrder.ItemsSource = orders.OrderBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.QuoteNumber).ToList();
-        CmbOrder.SelectedItem = orders.FirstOrDefault(item => item.QuoteNumber == (entry?.QuoteNumber ?? order?.QuoteNumber));
+        _orders.AddRange(orders.OrderBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.QuoteNumber));
+        _retainedOrder = _orders.FirstOrDefault(item => item.QuoteNumber == (entry?.QuoteNumber ?? order?.QuoteNumber));
+        _orderView = new ListCollectionView(_orders);
+        _orderView.Filter = item => item is WorkScheduleOrder candidate &&
+            (ReferenceEquals(candidate, _retainedOrder) || OrderMatchesSearch(candidate));
+        CmbOrder.ItemsSource = _orderView;
+        CmbOrder.SelectedItem = _retainedOrder;
+        RefreshOrderFilter();
         CmbOrder.IsEnabled = entry == null;
         UpdateOrderDetails();
         if (entry?.HasOrderWarning == true)
@@ -107,7 +125,7 @@ public partial class WorkScheduleEditorWindow : Window
             employee.PropertyChanged += (_, change) =>
             {
                 if (!_clearingCrew && change.PropertyName == nameof(WorkScheduleEmployeeChoice.IsSelected))
-                    RefreshEmployees(ChkSelectedOnly.IsChecked == true);
+                    RefreshEmployees(ChkSelectedOnly.IsChecked == true || ChkAvailableOnly.IsChecked == true);
             };
 
         if (entry != null)
@@ -134,6 +152,28 @@ public partial class WorkScheduleEditorWindow : Window
     }
 
     private WorkScheduleSlotKind SelectedSlot => (WorkScheduleSlotKind)Math.Max(0, CmbSlot.SelectedIndex);
+
+    private void SetSlotLabels()
+    {
+        var labels = new[] { "Giornata intera", "Mattina", "Pomeriggio" };
+        for (int index = 0; index < labels.Length; index++)
+        {
+            var range = _settings.GetRange((WorkScheduleSlotKind)index);
+            ((ComboBoxItem)CmbSlot.Items[index]).Content =
+                $"{labels[index]} · {WorkScheduleSettings.FormatTime(range.Start)}–{WorkScheduleSettings.FormatTime(range.End)}";
+        }
+    }
+
+    private void OnEditorBodySizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        bool twoColumns = e.NewSize.Width >= 820;
+        if (_editorHasTwoColumns == twoColumns) return;
+        _editorHasTwoColumns = twoColumns;
+        ColumnGap.Width = new GridLength(twoColumns ? 18 : 0);
+        CrewColumn.Width = twoColumns ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        Grid.SetColumn(CrewSection, twoColumns ? 2 : 0);
+        Grid.SetRow(CrewSection, twoColumns ? 0 : 1);
+    }
 
     private void ApplyPreset()
     {
@@ -199,11 +239,14 @@ public partial class WorkScheduleEditorWindow : Window
             !WorkScheduleSettings.TryParseTime(TxtStartTime.Text, out int from) ||
             !WorkScheduleSettings.TryParseTime(TxtEndTime.Text, out int to) || to <= from)
         {
+            ChkAvailableOnly.IsEnabled = false;
             TxtAvailabilityNotice.Text = "Completa date e orari validi per vedere gli impegni dei dipendenti.";
             foreach (var employee in _employees)
                 employee.SetAvailability("Disponibilità da verificare", neutral, "Completa date e orari dell’intervento.");
+            RefreshEmployees();
             return;
         }
+        ChkAvailableOnly.IsEnabled = true;
         start = start.Date;
         end = end.Date;
         bool fullCoverage = _availabilityCurrent && start >= _availableFrom && end < _availableTo;
@@ -227,7 +270,7 @@ public partial class WorkScheduleEditorWindow : Window
                     $"{item.Date:dd/MM/yyyy} · {item.TimeDisplay} · {item.Title}"));
                 if (commitments.Count > 10) details += $"\nAltri {commitments.Count - 10} impegni.";
                 employee.SetAvailability($"{prefix} · {first.Date:dd/MM} {first.TimeDisplay}{extra}",
-                    (Brush)FindResource("DangerSoftTextBrush"), details);
+                    (Brush)FindResource("DangerSoftTextBrush"), details, hasConflict: true);
             }
             else
                 employee.SetAvailability(fullCoverage ? "Disponibile" : "Nessun impegno noto · da verificare",
@@ -235,9 +278,44 @@ public partial class WorkScheduleEditorWindow : Window
                     fullCoverage ? "Nessun impegno sovrapposto nel calendario scaricato. Verifica definitiva al salvataggio." :
                         "Il calendario disponibile non copre tutto il periodo o non è aggiornato. Verifica definitiva al salvataggio.");
         }
+        RefreshEmployees();
     }
 
-    private void OnOrderChanged(object sender, SelectionChangedEventArgs e) => UpdateOrderDetails();
+    private void OnOrderChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_initializing || _updatingOrderFilter) return;
+        _retainedOrder = CmbOrder.SelectedItem as WorkScheduleOrder;
+        RefreshOrderFilter();
+        UpdateOrderDetails();
+    }
+
+    private bool OrderMatchesSearch(WorkScheduleOrder order) => MatchesSearch(
+        $"{order.Title} {order.SiteName} {order.ReferenceName} {order.CustomerName} {order.QuoteNumber}", TxtOrderSearch.Text);
+
+    private static bool MatchesSearch(string value, string search) => search.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(term =>
+        CultureInfo.GetCultureInfo("it-IT").CompareInfo.IndexOf(value, term, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) >= 0);
+
+    private void RefreshOrderFilter()
+    {
+        if (_orderView == null || _closed) return;
+        _updatingOrderFilter = true;
+        try
+        {
+            _orderView.Refresh();
+            CmbOrder.SelectedItem = _retainedOrder;
+        }
+        finally { _updatingOrderFilter = false; }
+        int matches = _orders.Count(OrderMatchesSearch);
+        bool retainedOutsideSearch = _retainedOrder != null && !OrderMatchesSearch(_retainedOrder);
+        TxtOrderResults.Text = string.IsNullOrWhiteSpace(TxtOrderSearch.Text)
+            ? $"{matches} {(matches == 1 ? "ordine attivo" : "ordini attivi")}. Scegli il cantiere nell’elenco."
+            : matches == 0 ? "Nessun ordine corrisponde alla ricerca." : $"{matches} {(matches == 1 ? "risultato" : "risultati")} su {_orders.Count} ordini.";
+        if (retainedOutsideSearch) TxtOrderResults.Text += " Il cantiere già selezionato resta assegnato.";
+    }
+
+    private void OnOrderSearchChanged(object sender, TextChangedEventArgs e) => RefreshOrderFilter();
+    private void OnClearOrderSearchClick(object sender, RoutedEventArgs e) => TxtOrderSearch.Clear();
+
     private void UpdateOrderDetails()
     {
         if (TxtOrderDetails == null) return;
@@ -247,6 +325,7 @@ public partial class WorkScheduleEditorWindow : Window
         if (CmbOrder.SelectedItem is not WorkScheduleOrder order)
         {
             TxtOrderDetails.Text = "Seleziona l’ordine da collegare all’intervento.";
+            UpdateSummary();
             return;
         }
         var detail = $"{order.CustomerName} · Ordine {order.QuoteNumber}";
@@ -254,14 +333,15 @@ public partial class WorkScheduleEditorWindow : Window
         if (!string.IsNullOrWhiteSpace(order.MaterialStatus)) detail += $"\nMateriali: {order.MaterialStatus}";
         if (order.ExpectedDeliveryDate is { } delivery) detail += $" · Consegna prevista: {delivery:dd/MM/yyyy}";
         TxtOrderDetails.Text = detail;
+        UpdateSummary();
     }
 
     private bool EmployeeMatches(WorkScheduleEmployeeChoice employee)
     {
         if (ChkSelectedOnly.IsChecked == true && !employee.IsSelected) return false;
+        if (ChkAvailableOnly.IsChecked == true && employee.HasConflict && !employee.IsSelected) return false;
         var text = $"{employee.DisplayName} {employee.Employee.Abbreviation}";
-        return TxtEmployeeSearch.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(term =>
-            CultureInfo.GetCultureInfo("it-IT").CompareInfo.IndexOf(text, term, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) >= 0);
+        return MatchesSearch(text, TxtEmployeeSearch.Text);
     }
 
     private void RefreshEmployees(bool refreshFilter = true)
@@ -269,16 +349,54 @@ public partial class WorkScheduleEditorWindow : Window
         if (_employeeView == null) return;
         if (refreshFilter) _employeeView.Refresh();
         var selected = _employees.Where(employee => employee.IsSelected).ToList();
-        TxtSelectedCount.Text = $"Squadra · {selected.Count} {(selected.Count == 1 ? "persona" : "persone")}";
+        TxtSelectedCount.Text = $"{selected.Count} {(selected.Count == 1 ? "persona" : "persone")}";
         TxtSelectedNames.Text = selected.Count == 0 ? (_absence ? "Seleziona almeno una persona per registrare l’assenza." : "Squadra da assegnare: puoi programmarla anche in seguito.") :
             string.Join(" · ", selected.Select(employee => employee.DisplayName));
-        TxtEmployeeResults.Text = $"{_employeeView.Cast<object>().Count()} di {_employees.Count}";
+        TxtSelectedNames.Visibility = selected.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ItemsSelectedEmployees.ItemsSource = selected;
+        int conflicts = selected.Count(employee => employee.HasConflict);
+        TxtCrewWarning.Visibility = conflicts > 0 ? Visibility.Visible : Visibility.Collapsed;
+        TxtCrewWarning.Text = conflicts == 1 ? "1 persona selezionata ha un impegno sovrapposto. Controlla i dettagli nell’elenco." :
+            $"{conflicts} persone selezionate hanno impegni sovrapposti. Controlla i dettagli nell’elenco.";
+        TxtEmployeeResults.Text = $"{_employeeView.Cast<object>().Count()} di {_employees.Count} persone mostrate";
         TxtNoEmployees.Visibility = _employeeView.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
         TxtNoEmployees.Text = _employees.Count == 0 ? "Nessun dipendente disponibile. Aggiungili in Impostazioni → Dipendenti." : "Nessun risultato. Modifica la ricerca o il filtro.";
+        UpdateSummary();
+    }
+
+    private void UpdateSummary()
+    {
+        if (_initializing || _closed || TxtSummaryTitle == null) return;
+        var order = CmbOrder.SelectedItem as WorkScheduleOrder;
+        TxtSummaryTitle.Text = _absence ? string.IsNullOrWhiteSpace(TxtAbsenceReason.Text) ? "Assenza · indica il motivo" : TxtAbsenceReason.Text.Trim() :
+            order == null ? "Scegli un cantiere per programmare l’intervento" : $"{order.Title} · Ordine {order.QuoteNumber}";
+        bool invalidDate = _invalidDates.ContainsKey(StartDate) || _pendingDateInput.Contains(StartDate) ||
+            _original == null && (_invalidDates.ContainsKey(EndDate) || _pendingDateInput.Contains(EndDate));
+        bool valid = DateTime.TryParse(StartDate.Text, CultureInfo.GetCultureInfo("it-IT"), DateTimeStyles.None, out var fromDate);
+        var toDate = fromDate;
+        if (_original == null) valid &= DateTime.TryParse(EndDate.Text, CultureInfo.GetCultureInfo("it-IT"), DateTimeStyles.None, out toDate);
+        string dates = invalidDate || !valid || toDate.Date < fromDate.Date ? "Date da verificare" :
+            fromDate.Date == toDate.Date ? fromDate.ToString("dddd dd/MM/yyyy", CultureInfo.GetCultureInfo("it-IT")) :
+            $"{fromDate:dd/MM/yyyy} → {toDate:dd/MM/yyyy} · {(toDate.Date - fromDate.Date).Days + 1} giorni";
+        bool validTime = WorkScheduleSettings.TryParseTime(TxtStartTime.Text, out int from) &&
+            WorkScheduleSettings.TryParseTime(TxtEndTime.Text, out int to) && to > from;
+        int count = _employees.Count(employee => employee.IsSelected);
+        string crew = count == 0 ? _absence ? "Persone da selezionare" : "Squadra da assegnare" : $"{count} {(count == 1 ? "persona" : "persone")}";
+        TxtSummaryDetails.Text = $"{dates} · {(validTime ? $"{TxtStartTime.Text.Trim()}–{TxtEndTime.Text.Trim()}" : "Orario da verificare")} · {crew}";
+        if (!_absence && CmbStatus.SelectedIndex == 1) TxtSummaryDetails.Text += " · Finito";
+    }
+
+    private void OnSummaryFieldChanged(object sender, TextChangedEventArgs e) => UpdateSummary();
+    private void OnStatusChanged(object sender, SelectionChangedEventArgs e) => UpdateSummary();
+
+    private void OnRemoveEmployeeClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: WorkScheduleEmployeeChoice employee }) employee.IsSelected = false;
     }
 
     private void OnEmployeeSearchChanged(object sender, TextChangedEventArgs e) => RefreshEmployees();
     private void OnSelectedOnlyChanged(object sender, RoutedEventArgs e) => RefreshEmployees();
+    private void OnAvailabilityFilterChanged(object sender, RoutedEventArgs e) => RefreshEmployees();
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => TxtEmployeeSearch.Clear();
     private void OnClearCrewClick(object sender, RoutedEventArgs e)
     {
@@ -488,14 +606,21 @@ public sealed class WorkScheduleEmployeeChoice : INotifyPropertyChanged
     private string _availabilityText = "Disponibilità da verificare";
     private string _availabilityDetails = string.Empty;
     private Brush _availabilityBrush = Brushes.Gray;
+    private bool _hasConflict;
     public EmployeeSettingsModel Employee { get; init; } = new();
     public string DisplayName { get; init; } = string.Empty;
     public string AvailabilityText => _availabilityText;
     public string AvailabilityDetails => _availabilityDetails;
     public Brush AvailabilityBrush => _availabilityBrush;
+    public bool HasConflict => _hasConflict;
 
-    internal void SetAvailability(string text, Brush brush, string details)
+    internal void SetAvailability(string text, Brush brush, string details, bool hasConflict = false)
     {
+        if (_hasConflict != hasConflict)
+        {
+            _hasConflict = hasConflict;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasConflict)));
+        }
         if (_availabilityText != text)
         {
             _availabilityText = text;
