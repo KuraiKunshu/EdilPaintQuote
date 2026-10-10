@@ -47,7 +47,7 @@ public partial class HistoryWindow : Window
 
     public ICollectionView HistoryView { get; private set; } = null!;
 
-    public HistoryWindow(MainViewModel vm)
+    public HistoryWindow(MainViewModel vm, string? initialSearch = null)
     {
         InitializeComponent();
         WindowResizeBehavior.PreventMaximizedState(this);
@@ -63,7 +63,13 @@ public partial class HistoryWindow : Window
         PreviewKeyDown += HistoryWindow_PreviewKeyDown;
         Closed += HistoryWindow_Closed;
 
-        _ = LoadInitialHistoryAsync();
+        if (string.IsNullOrWhiteSpace(initialSearch))
+            _ = LoadInitialHistoryAsync();
+        else
+        {
+            TxtSearchHistory.Text = initialSearch;
+            _ = ExecuteSearchAsync();
+        }
     }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -720,87 +726,13 @@ public partial class HistoryWindow : Window
             $"PDF del preventivo n. {entry.QuoteNumber} non trovato e rigenerazione automatica non riuscita.");
     }
 
-    private async Task<string> RegeneratePdfFromHistoryAsync(
+    private Task<string> RegeneratePdfFromHistoryAsync(
         QuoteHistoryEntry fullEntry,
         string expectedPath,
         CancellationToken cancellationToken)
-    {
-        if (!App.AppSettings.App.GeneratePDF)
-            throw new InvalidOperationException(
-                $"PDF del preventivo n. {fullEntry.QuoteNumber} non trovato e generazione PDF disabilitata nelle impostazioni.");
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
-        Directory.CreateDirectory(tempRoot);
-        string tempPath = Path.Combine(tempRoot, Path.GetFileName(expectedPath));
-
-        var company = await App.DataService.GetCompanyAsync() ?? new Company();
-        var context = new PdfGenerationContext
-        {
-            QuoteNumber = fullEntry.QuoteNumber,
-            Date = fullEntry.Date,
-            PaymentTerms = fullEntry.PaymentTerms,
-            CustomerNotes = fullEntry.CustomerNotes,
-            IvaType = fullEntry.IvaType,
-            CustomerName = fullEntry.CustomerName,
-            ReferenceName = fullEntry.ReferenceName,
-            SiteName = fullEntry.SiteName,
-            BillingCustomerName = fullEntry.BillingCustomerName,
-            SelectedLogo = ResolveLogoForPdf(company),
-            MaterialDiscount = fullEntry.MaterialDiscount,
-            LaborDiscount = fullEntry.LaborDiscount,
-            Materials = fullEntry.Materials.ToList(),
-            Labors = fullEntry.Labors.ToList(),
-            Imponibile = fullEntry.Imponibile,
-            Total = fullEntry.Total,
-            Attachments = fullEntry.Attachments
-                .Where(attachment => attachment.Content.Length > 0)
-                .Select(attachment => new StoredFile
-                {
-                    FileName = attachment.FileName,
-                    ContentType = attachment.ContentType,
-                    Content = attachment.Content,
-                    ImportedAt = attachment.ImportedAt
-                })
-                .ToList(),
-            AllCustomers = _vm.AllCustomers.ToList(),
-            PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
-            PdfNotesTitle = App.AppSettings.PdfTemplate.NotesTitle,
-            PdfFooterText = App.AppSettings.PdfTemplate.FooterText,
-            PdfSignatureText = App.AppSettings.PdfTemplate.SignatureText,
-            PdfShowTemplateName = App.AppSettings.PdfTemplate.ShowTemplateName
-        };
-
-        new PdfService().GenerateQuoteFromContext(context, company, tempPath);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        TryCopyRegeneratedPdf(tempPath, expectedPath);
-
-        if (File.Exists(expectedPath))
-            return expectedPath;
-
-        if (File.Exists(tempPath))
-            return tempPath;
-
-        var refreshedEntry = await _historyService.GetQuoteByNumberAsync(fullEntry.QuoteNumber);
-        if (refreshedEntry != null)
-        {
-            string officialPath = await _historyService.EnsureOfficialPdfExistsAsync(refreshedEntry, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(officialPath) && File.Exists(officialPath))
-                return officialPath;
-
-            if (!string.IsNullOrWhiteSpace(refreshedEntry.PdfPath) && File.Exists(refreshedEntry.PdfPath))
-                return refreshedEntry.PdfPath;
-
-            string? foundPath = _historyService.FindPdfByQuoteNumber(refreshedEntry);
-            if (!string.IsNullOrWhiteSpace(foundPath) && File.Exists(foundPath))
-                return foundPath;
-        }
-
-        return string.Empty;
-    }
+        => new QuotePdfDocumentService(App.DataService, StoragePathService.Instance, App.AppSettings,
+            () => _vm.SelectedLogo, () => _vm.AllCustomers.ToList())
+            .RegenerateAsync(fullEntry, expectedPath, cancellationToken);
 
     private string ResolveLogoForPdf(Company company)
     {
@@ -815,22 +747,6 @@ public partial class HistoryWindow : Window
             : 0;
 
         return company.Logo[index];
-    }
-
-    private static void TryCopyRegeneratedPdf(string tempPath, string expectedPath)
-    {
-        try
-        {
-            string? targetFolder = Path.GetDirectoryName(expectedPath);
-            if (!string.IsNullOrWhiteSpace(targetFolder))
-                Directory.CreateDirectory(targetFolder);
-
-            File.Copy(tempPath, expectedPath, overwrite: true);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[QuotePdf] PDF rigenerato solo in temporaneo, copia su destinazione non riuscita: {ex.Message}");
-        }
     }
 
     private string ResolveDefaultRecipient(QuoteHistorySummary entry)
@@ -930,39 +846,22 @@ public partial class HistoryWindow : Window
 
     private async void OnOpenPastQuotePdfClick(object sender, RoutedEventArgs e)
     {
-        if (!TryGetSummary(sender, out var entry)) return;
+        if (TryGetSummary(sender, out var entry)) await OpenPastQuotePdfAsync(entry);
+    }
 
+    private async Task OpenPastQuotePdfAsync(QuoteHistorySummary entry)
+    {
         try
         {
             Mouse.OverrideCursor = Cursors.Wait;
-
-            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
-            if (fullEntry == null) return;
-
-            string expectedPath = _historyService.GetExpectedPdfPath(fullEntry);
-            string pathToOpen = await RegeneratePdfFromHistoryAsync(
-                fullEntry,
-                expectedPath,
-                AppShutdownManager.ShutdownToken);
-
-            if (!string.IsNullOrWhiteSpace(pathToOpen) && File.Exists(pathToOpen))
-            {
-                Process.Start(new ProcessStartInfo { FileName = pathToOpen, UseShellExecute = true });
-            }
-            else
-            {
-                MessageBox.Show("Il PDF non e' stato rigenerato, quindi non posso aprire una versione affidabile.",
-                    "Avviso", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+            await QuoteDocumentActions.OpenPdfAsync(entry.QuoteNumber, this, AppShutdownManager.ShutdownToken);
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            MessageBox.Show($"Impossibile aprire il preventivo: {ex.Message}", "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, $"Impossibile aprire il preventivo: {ex.Message}", "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        finally
-        {
-            Mouse.OverrideCursor = null;
-        }
+        finally { Mouse.OverrideCursor = null; }
     }
 
     private async void OnGenerateInstallationCertificateClick(object sender, RoutedEventArgs e)
@@ -983,54 +882,14 @@ public partial class HistoryWindow : Window
         _isGeneratingWorkSheet = true;
         try
         {
-            var optionsWindow = new WorkSheetOptionsWindow(App.AppSettings.Employees, entry.QuoteNumber) { Owner = this };
-            if (optionsWindow.ShowDialog() != true)
-                return;
-
-            Mouse.OverrideCursor = Cursors.Wait;
-            var quote = await App.DataService.GetQuoteByNumberAsync(entry.QuoteNumber, includeAttachments: false)
-                ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
-            var catalog = await App.DataService.GetLaborCatalogAsync();
-            var customers = await App.DataService.GetCustomersAsync();
-            var company = await App.DataService.GetCompanyAsync() ?? new Company();
-            var context = WorkSheetService.CreateContext(quote, catalog, customers, optionsWindow.Options);
-            context.SelectedLogo = ResolveLogoForPdf(company);
-            context.IsOfflineSnapshot = App.DataService is FallbackDataService { IsOfflineMode: true };
-            if (context.IsOfflineSnapshot && MessageBox.Show(
-                "Il PC e' offline. La scheda usera' i dati disponibili su questo computer, che potrebbero non essere aggiornati. Continuare?",
-                "Scheda lavoro offline", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-
-            string expectedPath = StoragePathService.Instance.BuildWorkSheetPdfPath(quote.CustomerName, quote.QuoteNumber, quote.ReferenceName);
-            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
-            Directory.CreateDirectory(tempRoot);
-            string temporaryPath = Path.Combine(tempRoot, $"{Guid.NewGuid():N}_{Path.GetFileName(expectedPath)}");
-            await Task.Run(() => new PdfService().GenerateWorkSheet(context, company, temporaryPath));
-
-            string pathToOpen = temporaryPath;
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(expectedPath)!);
-                File.Copy(temporaryPath, expectedPath, overwrite: true);
-                pathToOpen = expectedPath;
-                File.Delete(temporaryPath);
-            }
-            catch (Exception copyEx)
-            {
-                Debug.WriteLine($"[WorkSheet] Copia nella cartella cliente non riuscita: {copyEx.Message}");
-                MessageBox.Show($"La scheda e' stata generata, ma non e' stato possibile salvarla nella cartella cliente.\n\nCopia temporanea:\n{temporaryPath}",
-                    "Scheda lavoro generata", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            OpenFolderAndSelectFile(pathToOpen);
+            await QuoteDocumentActions.GenerateWorkSheetAsync(entry.QuoteNumber, this, AppShutdownManager.ShutdownToken);
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            MessageBox.Show($"Impossibile generare la scheda lavoro.\n\n{ex.Message}", "Scheda lavoro", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, $"Impossibile generare la scheda lavoro.\n\n{ex.Message}", "Scheda lavoro", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        finally
-        {
-            _isGeneratingWorkSheet = false;
-            Mouse.OverrideCursor = null;
-        }
+        finally { _isGeneratingWorkSheet = false; }
     }
 
     private async Task GenerateInstallationCertificateAsync(QuoteHistorySummary entry)
@@ -1173,31 +1032,14 @@ public partial class HistoryWindow : Window
 
     private async Task OpenCustomerFolderAsync(QuoteHistorySummary entry)
     {
-        if (string.IsNullOrWhiteSpace(entry.CustomerName))
-        {
-            MessageBox.Show("Nessun cliente associato a questo preventivo.",
-                "Cartella non disponibile", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
         try
         {
-            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
-            if (fullEntry != null)
-                await _historyService.EnsureAttachmentsFolderExistsAsync(fullEntry);
-
-            string referenceName = string.IsNullOrWhiteSpace(entry.ReferenceName)
-                ? null!
-                : entry.ReferenceName;
-
-            string folder = StoragePathService.Instance.BuildCustomerPdfFolder(
-                entry.CustomerName, referenceName);
-
-            StoragePathService.Instance.OpenFolder(folder);
+            await QuoteDocumentActions.OpenCustomerFolderAsync(entry.QuoteNumber, this, AppShutdownManager.ShutdownToken);
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            MessageBox.Show($"Impossibile aprire la cartella.\n\n{ex.Message}",
+            MessageBox.Show(this, $"Impossibile aprire la cartella.\n\n{ex.Message}",
                 "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -1218,6 +1060,7 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateDisabledMenuItem($"Invio: {entry.SentDisplay}"));
         menu.Items.Add(CreateDisabledMenuItem($"PC: {BlankToDash(entry.LastModifiedByDevice)}"));
         menu.Items.Add(new Separator());
+        menu.Items.Add(CreateMenuItem("Apri PDF", async () => await OpenPastQuotePdfAsync(entry)));
         menu.Items.Add(CreateMenuItem("Copia in nuovo preventivo", async () => await CopyPastQuoteAsync(entry)));
         menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));

@@ -19,6 +19,8 @@ public class SyncService
     private readonly SqlDataService _sqlService;
     private readonly LocalQuotePatchOutboxService _quotePatchOutbox;
     private readonly LocalDeletionOutboxService _deletionOutbox;
+    private readonly EmployeeDirectoryService? _employees;
+    private readonly WorkScheduleService? _workSchedule;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
     private readonly object _statusLock = new();
     private int _activeSyncRequests;
@@ -51,13 +53,17 @@ public class SyncService
         SqlDataService sqlService,
         LocalJsonStoreService localStore,
         LocalQuotePatchOutboxService quotePatchOutbox,
-        LocalDeletionOutboxService deletionOutbox)
+        LocalDeletionOutboxService deletionOutbox,
+        EmployeeDirectoryService? employees = null,
+        WorkScheduleService? workSchedule = null)
     {
         _dataService = dataService;
         _sqlService = sqlService;
         _localStore = localStore;
         _quotePatchOutbox = quotePatchOutbox;
         _deletionOutbox = deletionOutbox;
+        _employees = employees;
+        _workSchedule = workSchedule;
     }
     
     public Task<SyncResult> SyncAllAsync(
@@ -176,6 +182,11 @@ public class SyncService
             await FlushPendingDeletesAsync(cancellationToken);
             await PropagateDeletedQuotesAsync(cancellationToken);
             await FlushPendingQuotePatchesAsync(cancellationToken);
+
+            if (_employees != null)
+                await _employees.RefreshAsync(cancellationToken);
+            if (_workSchedule != null)
+                await _workSchedule.GetSettingsAsync(cancellationToken);
 
             // I preventivi referenziano i clienti tramite SyncId: prima
             // sincronizziamo le anagrafiche complete, poi le quote.

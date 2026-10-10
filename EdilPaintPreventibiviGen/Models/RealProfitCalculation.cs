@@ -69,6 +69,7 @@ public sealed class RealProfitInput
     public double Days { get; set; }
     public double HoursPerDay { get; set; }
     public double HourlyCost { get; set; }
+    public CalendarLaborSnapshot? CalendarLabor { get; set; }
     public List<ProfitMaterialCost> Materials { get; set; } = [];
     public List<CompanyMaterialCost> CompanyMaterials { get; set; } = [];
 }

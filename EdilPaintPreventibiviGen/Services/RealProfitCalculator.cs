@@ -18,11 +18,9 @@ public static class RealProfitCalculator
                 Math.Max(0, material.CustomerUnitPrice) *
                 (double)Math.Max(0, material.Quantity) *
                 (1 - supplierDiscount / 100));
-        double laborCost =
-            Math.Max(0, input.Workers) *
-            Math.Max(0, input.Days) *
-            Math.Max(0, input.HoursPerDay) *
-            Math.Max(0, input.HourlyCost);
+        double personHours = input.CalendarLabor?.TotalPersonHours ??
+            Math.Max(0, input.Workers) * Math.Max(0, input.Days) * Math.Max(0, input.HoursPerDay);
+        double laborCost = Math.Max(0, personHours) * Math.Max(0, input.HourlyCost);
         double companyMaterialCost = input.CompanyMaterials.Sum(cost => cost.Total);
         double totalCosts = supplierMaterialCost + laborCost + companyMaterialCost;
         double profitBeforeReduction = input.QuoteRevenue - totalCosts;

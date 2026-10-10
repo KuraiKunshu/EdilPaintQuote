@@ -317,7 +317,7 @@ public sealed class RealProfitSettingsTests
     }
 
     [Fact]
-    public void PositiveCatalogIdNeverFallsBackToMatchingSnapshotName()
+    public void StaleCatalogIdRebindsToUniqueSnapshotName()
     {
         var labor = new Item { PersistentId = 10, Name = "Finitura interna" };
         var material = new Item
@@ -341,14 +341,32 @@ public sealed class RealProfitSettingsTests
             [labor],
             [material]);
 
-        Assert.Null(editor.SelectedLabor);
-        Assert.Null(editor.SelectedMaterial);
+        Assert.Same(labor, editor.SelectedLabor);
+        Assert.Same(material, editor.SelectedMaterial);
         WindowMaterialRuleSettingsModel saved = editor.CreateSettingsRule(1m);
         Assert.False(saved.IsWindowAutomation);
-        Assert.Equal(999, saved.LaborCatalogId);
+        Assert.Equal(10, saved.LaborCatalogId);
         Assert.Equal("Finitura interna", saved.LaborName);
-        Assert.Equal(998, saved.MaterialCatalogId);
+        Assert.Equal(20, saved.MaterialCatalogId);
         Assert.Equal("Perline", saved.MaterialName);
+    }
+
+    [Fact]
+    public void StaleCatalogIdDoesNotRebindAmbiguousSnapshotNames()
+    {
+        var rule = new WindowMaterialRuleSettingsModel
+        {
+            Enabled = false, LaborCatalogId = 999, LaborName = "Finitura interna",
+            MaterialCatalogId = 998, MaterialName = "Perline"
+        };
+        var editor = WindowMaterialRuleEditor.FromSettings(rule,
+            [new Item { PersistentId = 10, Name = "Finitura interna" }, new Item { PersistentId = 11, Name = "Finitura interna" }],
+            [new Item { PersistentId = 20, Name = "Perline", IsCompanyMaterial = true }, new Item { PersistentId = 21, Name = "Perline", IsCompanyMaterial = true }]);
+        Assert.Null(editor.SelectedLabor);
+        Assert.Null(editor.SelectedMaterial);
+        var saved = editor.CreateSettingsRule(1m);
+        Assert.Equal(999, saved.LaborCatalogId);
+        Assert.Equal(998, saved.MaterialCatalogId);
     }
 
     [Fact]

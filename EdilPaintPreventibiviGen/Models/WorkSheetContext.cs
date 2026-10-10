@@ -15,6 +15,7 @@ public sealed class WorkSheetContext
     public string Notes { get; init; } = string.Empty;
     public IReadOnlyList<string> EmployeeNames { get; init; } = [];
     public DateTime? InterventionDate { get; init; }
+    public string InterventionTime { get; init; } = string.Empty;
     public string AdditionalNotes { get; init; } = string.Empty;
     public string SelectedLogo { get; set; } = string.Empty;
     public bool IsOfflineSnapshot { get; set; }

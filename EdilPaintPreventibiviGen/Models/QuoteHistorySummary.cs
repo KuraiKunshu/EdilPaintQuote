@@ -40,7 +40,7 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     public string QuoteNumber
     {
         get => _quoteNumber;
-        set { _quoteNumber = value; OnPropertyChanged(); }
+        set { _quoteNumber = value; OnPropertyChanged(); OnSiteDisplayChanged(); }
     }
 
     public DateTimeOffset Date
@@ -52,19 +52,19 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     public string CustomerName
     {
         get => _customerName;
-        set { _customerName = value; OnPropertyChanged(); OnPropertyChanged(nameof(CustomerReferenceDisplay)); }
+        set { _customerName = value; OnPropertyChanged(); OnPropertyChanged(nameof(CustomerReferenceDisplay)); OnPropertyChanged(nameof(OrderCustomerDetail)); OnSiteDisplayChanged(); }
     }
 
     public string ReferenceName
     {
         get => _referenceName;
-        set { _referenceName = value; OnPropertyChanged(); OnPropertyChanged(nameof(CustomerReferenceDisplay)); }
+        set { _referenceName = value; OnPropertyChanged(); OnPropertyChanged(nameof(CustomerReferenceDisplay)); OnSiteDisplayChanged(); }
     }
 
     public string SiteName
     {
         get => _siteName;
-        set { _siteName = value; OnPropertyChanged(); }
+        set { _siteName = value; OnPropertyChanged(); OnSiteDisplayChanged(); }
     }
 
     public string BillingCustomerName
@@ -199,6 +199,18 @@ public class QuoteHistorySummary : INotifyPropertyChanged
         ? CustomerName
         : $"{CustomerName} - Rif. {ReferenceName}";
 
+    public string OrderSiteTitle => WorkScheduleSiteDisplay.GetTitle(SiteName, ReferenceName, CustomerName, QuoteNumber);
+
+    public string OrderReferenceDetail => WorkScheduleSiteDisplay.GetReferenceDetail(ReferenceName, OrderSiteTitle);
+
+    public string OrderCustomerDetail => string.IsNullOrWhiteSpace(CustomerName)
+        ? "Cliente non indicato"
+        : $"Cliente: {CustomerName.Trim()}";
+
+    public string OrderSupplierGroup => MaterialsOrderedByCustomer ? "Ordinati dal cliente" :
+        string.IsNullOrWhiteSpace(SupplierName) ? "Senza fornitore" :
+        string.Join(" ", SupplierName.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
     public QuoteStatus Status
     {
         get => _status;
@@ -311,13 +323,13 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     public string SupplierName
     {
         get => _supplierName;
-        set { _supplierName = value; OnPropertyChanged(); OnPropertyChanged(nameof(SupplierDisplay)); }
+        set { _supplierName = value; OnPropertyChanged(); OnPropertyChanged(nameof(SupplierDisplay)); OnPropertyChanged(nameof(OrderSupplierGroup)); }
     }
 
     public bool MaterialsOrderedByCustomer
     {
         get => _materialsOrderedByCustomer;
-        set { _materialsOrderedByCustomer = value; OnPropertyChanged(); }
+        set { _materialsOrderedByCustomer = value; OnPropertyChanged(); OnPropertyChanged(nameof(OrderSupplierGroup)); }
     }
 
     public DateTime? MaterialOrderDate
@@ -386,6 +398,12 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     {
         OnPropertyChanged(nameof(HasDiscount));
         OnPropertyChanged(nameof(DiscountDisplay));
+    }
+
+    private void OnSiteDisplayChanged()
+    {
+        OnPropertyChanged(nameof(OrderSiteTitle));
+        OnPropertyChanged(nameof(OrderReferenceDetail));
     }
 
     private static string FormatPercent(double value) => $"{value:0.#}%";

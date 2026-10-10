@@ -986,13 +986,64 @@ public partial class PdfService
 
                         Parameter("SCONTO FORNITORE", Percentage(input.SupplierDiscount));
                         Parameter("RIDUZIONE PRUDENZIALE", Percentage(input.ProfitReductionPercentage));
-                        Parameter("PERSONE IN SQUADRA", input.Workers.ToString(culture));
-                        Parameter("GIORNI", input.Days.ToString("0.##", culture));
-                        Parameter("ORE AL GIORNO", input.HoursPerDay.ToString("0.##", culture));
+                        Parameter(input.CalendarLabor == null ? "PERSONE IN SQUADRA" : "PERSONE ASSEGNATE",
+                            (input.CalendarLabor?.DistinctWorkers ?? input.Workers).ToString(culture));
+                        Parameter(input.CalendarLabor == null ? "GIORNI" : "GIORNI IN CALENDARIO",
+                            (input.CalendarLabor?.Days ?? input.Days).ToString("0.##", culture));
+                        Parameter(input.CalendarLabor == null ? "ORE AL GIORNO" : "ORE/PERSONA TOTALI",
+                            (input.CalendarLabor?.TotalPersonHours ?? input.HoursPerDay).ToString("0.##", culture));
                         Parameter("COSTO ORARIO PER PERSONA", Money(input.HourlyCost));
                         Parameter("COSTO DELLA SQUADRA", Money(result.LaborCost));
                         Parameter("ALTRI COSTI DEL LAVORO", Money(result.CompanyMaterialCost));
                     });
+
+                    if (input.CalendarLabor is { } calendarLabor)
+                    {
+                        col.Item().Text("SQUADRA DAL CALENDARIO").FontSize(11).Bold().FontColor(navy);
+                        col.Item().Text("Costo della squadra = ore/persona degli interventi × costo orario per persona.")
+                            .FontSize(8.5f).FontColor(muted);
+                        if (calendarLabor.HasUnassignedInterventions)
+                            col.Item().Text("Attenzione: gli interventi senza dipendenti assegnati non aggiungono costo alla squadra.")
+                                .FontSize(8.5f).Bold().FontColor(orange);
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.ConstantColumn(95);
+                                columns.RelativeColumn(3);
+                                columns.ConstantColumn(70);
+                                columns.ConstantColumn(82);
+                            });
+                            static IContainer CrewCell(IContainer cell) => cell.PreventPageBreak().BorderBottom(0.5f)
+                                .BorderColor(Hex("#D9DEE5")).PaddingVertical(4).PaddingHorizontal(3);
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CrewCell).Text("Intervento").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(CrewCell).Text("Dipendenti").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(CrewCell).AlignRight().Text("Ore/persona").Bold().FontSize(8).FontColor(muted);
+                                header.Cell().Element(CrewCell).AlignRight().Text("Costo squadra").Bold().FontSize(8).FontColor(muted);
+                            });
+                            foreach (var visit in calendarLabor.Rows)
+                            {
+                                // Keep each intervention together, including its crew and cost.
+                                // Exceptionally long crews may continue on the next page.
+                                table.Cell().ColumnSpan(4).PreventPageBreak().BorderBottom(0.5f)
+                                    .BorderColor(Hex("#D9DEE5")).PaddingVertical(4).Row(row =>
+                                {
+                                    row.ConstantItem(95).PaddingHorizontal(3).Column(cell =>
+                                    {
+                                        cell.Item().Text(visit.Date.ToString("dd/MM/yyyy", culture)).FontSize(8).Bold();
+                                        cell.Item().Text($"{visit.StartMinutes / 60:00}:{visit.StartMinutes % 60:00}–{visit.EndMinutes / 60:00}:{visit.EndMinutes % 60:00}").FontSize(7.5f);
+                                        cell.Item().Text(visit.IsCompleted ? "Finito" : "Programmato").FontSize(7.5f).FontColor(muted);
+                                    });
+                                    row.RelativeItem(3).PaddingHorizontal(3).Text(visit.Employees.Count == 0 ? "Nessun dipendente assegnato"
+                                        : string.Join(", ", visit.Employees.Select(employee => employee.Name))).FontSize(8);
+                                    row.ConstantItem(70).PaddingHorizontal(3).AlignRight().Text(visit.PersonHours.ToString("0.##", culture)).FontSize(8);
+                                    row.ConstantItem(82).PaddingHorizontal(3).AlignRight().Text(Money(visit.PersonHours * input.HourlyCost)).FontSize(8);
+                                });
+                            }
+                        });
+                    }
 
                     col.Item().Text("MATERIALI ACQUISTATI").FontSize(11).Bold().FontColor(navy);
                     if (input.ExcludeMaterials)

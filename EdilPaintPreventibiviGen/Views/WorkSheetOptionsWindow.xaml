@@ -47,6 +47,9 @@
                     <TextBlock Text="Tutti i campi sono facoltativi. Se li lasci vuoti, nel PDF troverai lo spazio per scrivere a penna."
                                TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,20"/>
                     <TextBlock Text="Chi esegue il lavoro" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="TxtEmployeeCacheNotice" Visibility="Collapsed"
+                               Text="Elenco dipendenti non aggiornato: sono disponibili solo i nomi già scaricati su questo PC."
+                               TextWrapping="Wrap" Foreground="{StaticResource DangerRedBrush}" Margin="0,0,0,10"/>
                     <TextBlock Text="Cerca per nome o cognome e spunta le persone. Le selezioni restano anche cambiando ricerca."
                                TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10"/>
                     <DockPanel Margin="0,0,0,8">

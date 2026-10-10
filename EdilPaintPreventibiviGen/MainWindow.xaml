@@ -352,6 +352,11 @@
                             Background="{StaticResource DiagnosticsButtonBrush}"
                             Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
                             Click="OnOpenDashboardClick"/>
+                    <Button Content="Calendario"
+                            Width="92" Height="30" Margin="0,0,8,0"
+                            Background="{StaticResource HistoryButtonBrush}"
+                            Foreground="{StaticResource WhiteBrush}" BorderThickness="0"
+                            Click="OnOpenWorkScheduleClick"/>
                     <Button Content="Inviati aperti"
                             Width="115" Height="30" Margin="0,0,8,0"
                             Background="{StaticResource HistoryButtonBrush}"

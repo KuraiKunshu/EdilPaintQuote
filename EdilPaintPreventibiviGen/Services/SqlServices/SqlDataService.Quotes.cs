@@ -735,13 +735,7 @@ public partial class SqlDataService
             .AsNoTracking()
             .Include(x => x.Customer)
             .Include(x => x.ReferenceCustomer)
-            .Where(x =>
-                x.MaterialsOrderedByCustomer ||
-                (x.Status == QuoteStatus.Confermato &&
-                 (x.SupplierName != string.Empty ||
-                  x.MaterialOrderDate.HasValue ||
-                  x.ExpectedDeliveryDate.HasValue ||
-                  x.MaterialStatus != string.Empty)));
+            .Where(SupplierOrderEligibility.ActiveOrderPredicate);
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {

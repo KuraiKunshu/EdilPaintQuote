@@ -19,7 +19,10 @@ public sealed class AppSettingsService
 	public DatabaseSettingsModel Database { get; }
 	public MailSettingsModel Mail { get; }
 	public BusinessSettingsModel Business { get; }
+	// Legacy local list, retained only for automatic import into the shared database.
+	// New edits are handled by EmployeeDirectoryService, never by local settings.
 	public List<EmployeeSettingsModel> Employees { get; set; } = [];
+	public string EmployeesDatabaseIdentity { get; set; } = string.Empty;
 	public string SettingsPath { get; }
 
 	public AppSettingsService(IConfiguration configuration)
@@ -35,6 +38,7 @@ public sealed class AppSettingsService
 		Mail = LoadMailSettings(configuration);
 		Business = configuration.GetSection("Business").Get<BusinessSettingsModel>() ?? new();
 		Employees = configuration.GetSection("Employees").Get<List<EmployeeSettingsModel>>() ?? [];
+		EmployeesDatabaseIdentity = configuration["EmployeesDatabaseIdentity"] ?? string.Empty;
 	}
 
 	public void Save()
@@ -59,6 +63,7 @@ public sealed class AppSettingsService
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
 		root["Business"] = JsonSerializer.SerializeToNode(Business, jsonOptions);
 		root["Employees"] = JsonSerializer.SerializeToNode(employees, jsonOptions);
+		root["EmployeesDatabaseIdentity"] = EmployeesDatabaseIdentity;
 		root["RealProfit"] = JsonSerializer.SerializeToNode(RealProfit, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
 		root["PdfTemplate"] = JsonSerializer.SerializeToNode(PdfTemplate, jsonOptions);

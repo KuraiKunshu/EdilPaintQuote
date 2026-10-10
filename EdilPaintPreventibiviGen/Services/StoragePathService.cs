@@ -18,8 +18,13 @@ public class StoragePathService
 
     #region Constructor
     private StoragePathService(AppSettingsService appSettings)
+        : this(appSettings.PdfStorage)
     {
-        _pdfStorage = appSettings.PdfStorage;
+    }
+
+    internal StoragePathService(PdfStorageSettingsModel pdfStorage)
+    {
+        _pdfStorage = pdfStorage ?? throw new ArgumentNullException(nameof(pdfStorage));
     }
 
     
@@ -151,6 +156,26 @@ public class StoragePathService
     public string BuildWorkSheetPdfPath(string customerName, string quoteNumber, string? referenceName = null) =>
         Path.Combine(BuildCustomerPdfFolder(customerName, referenceName),
             $"SchedaLavoro_{SanitizeFolderName(quoteNumber)}.pdf");
+
+    public string GetWorkScheduleCostsFolder() =>
+        Path.Combine(GetPdfRootPath(), "CostiLavori");
+
+    public string BuildWorkScheduleCostsPdfPath(
+        string quoteNumber,
+        DateTime interventionDate,
+        Guid interventionId)
+    {
+        if (string.IsNullOrWhiteSpace(quoteNumber))
+            throw new ArgumentException("Il numero del preventivo è obbligatorio.", nameof(quoteNumber));
+        if (interventionDate == default)
+            throw new ArgumentException("La data dell'intervento è obbligatoria.", nameof(interventionDate));
+        if (interventionId == Guid.Empty)
+            throw new ArgumentException("L'identificativo dell'intervento è obbligatorio.", nameof(interventionId));
+
+        string date = interventionDate.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
+        string fileName = $"CostiLavoro_{SanitizeFolderName(quoteNumber)}_{date}_{interventionId:N}.pdf";
+        return Path.Combine(GetWorkScheduleCostsFolder(), fileName);
+    }
 
     public void OpenFolder(string folderPath)
     {

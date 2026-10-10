@@ -618,6 +618,12 @@ public partial class MainWindow : Window
         win.ShowDialog();
     }
 
+    private void OnOpenWorkScheduleClick(object sender, RoutedEventArgs e)
+    {
+        var window = new WorkScheduleWindow { Owner = this };
+        window.ShowDialog();
+    }
+
     private void OnOpenSentOpenQuotesClick(object sender, RoutedEventArgs e)
     {
         var win = new SentOpenQuotesWindow { Owner = this };

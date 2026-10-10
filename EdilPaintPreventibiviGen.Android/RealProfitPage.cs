@@ -61,6 +61,15 @@ public sealed class RealProfitPage : OperationPage
         Form.Add(Field("Giorni", _days));
         Form.Add(Field("Ore al giorno", _hours));
         Form.Add(Field("Costo orario", _hourly));
+        if (saved?.CalendarLabor is { } calendarLabor)
+        {
+            _workers.IsReadOnly = _days.IsReadOnly = _hours.IsReadOnly = true;
+            Form.Add(new Label
+            {
+                Text = $"Squadra dal calendario salvato: {calendarLabor.TotalPersonHours:0.##} ore/persona, {calendarLabor.DistinctWorkers} persone, {calendarLabor.Days} giorni. Il costo usa queste ore e il costo orario per persona.",
+                FontSize = 13, TextColor = Color.FromArgb("#616166")
+            });
+        }
         Form.Add(Heading("Materiali e costi aziendali"));
         Form.Add(Action("Calcola materiali automatici", CalculateAutomaticAsync, true));
         Form.Add(Action("Regole materiali", async () => await Navigation.PushAsync(new AutomaticMaterialSettingsPage(ConnectionString)), true));
@@ -164,6 +173,7 @@ public sealed class RealProfitPage : OperationPage
         SupplierDiscount = Number(_discount, "Sconto", 100), ProfitReductionPercentage = Number(_reduction, "Riduzione", 100),
         Workers = WholeNumber(_workers, "Operai"), Days = Number(_days, "Giorni"),
         HoursPerDay = Number(_hours, "Ore al giorno", 24), HourlyCost = Number(_hourly, "Costo orario"),
+        CalendarLabor = _quote.RealProfit?.Input.CalendarLabor?.CreateCopy(),
         Materials = _materials,
         CompanyMaterials = _costRows.Select(row => new CompanyMaterialCost
         {
