@@ -6,6 +6,8 @@
   "ProjectPath": "EdilPaintPreventibiviGen\\EdilPaintPreventibiviGen.csproj",
   "SolutionPath": "EdilPaintPreventibiviGen.sln",
   "Configuration": "Release",
+  "RuntimeIdentifier": "win-x64",
+  "SelfContained": true,
   "RunTests": true,
   "ProcessName": "EdilPaintPreventibiviGen",
   "StartDelaySeconds": 60,

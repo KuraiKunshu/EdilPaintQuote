@@ -98,6 +98,31 @@ public static class DiagnosticsService
         if (CompanyInstallationService.IsGenericInstallation)
             return ("Pacchetto aziendale: aggiornamento manuale", string.Empty);
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string resultPath = Path.Combine(baseDir, ".edilpaint-update-status.json");
+        if (File.Exists(resultPath))
+        {
+            try
+            {
+                using var result = JsonDocument.Parse(File.ReadAllText(resultPath));
+                if (result.RootElement.GetProperty("Status").GetString() == "failed")
+                    return ($"Ultimo aggiornamento non riuscito · {result.RootElement.GetProperty("Message").GetString()} · log: {result.RootElement.GetProperty("LogPath").GetString()}", resultPath);
+                if (result.RootElement.GetProperty("Status").GetString() == "restart-pending")
+                    return ($"Riavvio da verificare · {result.RootElement.GetProperty("Message").GetString()} · log: {result.RootElement.GetProperty("LogPath").GetString()}", resultPath);
+            }
+            catch { }
+        }
+        string manifestPath = Path.Combine(baseDir, "edilpaint-update.json");
+        if (File.Exists(manifestPath))
+        {
+            try
+            {
+                using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+                string commit = manifest.RootElement.GetProperty("Commit").GetString() ?? "";
+                string installed = manifest.RootElement.GetProperty("InstalledAtUtc").GetString() ?? "";
+                return ($"Commit installato {commit[..Math.Min(commit.Length, 12)]} · {installed}", manifestPath);
+            }
+            catch { return ("Registro dell’aggiornamento non leggibile", manifestPath); }
+        }
         string[] candidates =
         [
             Path.GetFullPath(Path.Combine(baseDir, "updater", "state", "deployed-commit.txt")),

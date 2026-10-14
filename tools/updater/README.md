@@ -1,91 +1,127 @@
-# EdilPaint updater
+# Aggiornamenti EdilPaint
 
-Questi script aggiornano il programma solo quando l'utente accede a Windows.
+L’updater aggiorna un’installazione EdilPaint già configurata dal branch indicato
+nelle impostazioni locali. Il database e i dati personali del PC rimangono separati.
 
-Il codice scaricato da GitHub e' uguale per tutti i PC. Il percorso di installazione invece resta locale nel file:
+## Aggiorna ora
 
-```text
-C:\EdilPaintUpdater\updater-settings.json
-```
+Il programma prepara la nuova versione mentre rimane aperto. Scarica il commit,
+controlla l’SDK, esegue i test configurati e pubblica il pacchetto in una cartella
+temporanea. Chiude l’app solo quando il pacchetto è completo. Se non ci sono
+aggiornamenti, oppure la preparazione fallisce, l’app rimane aperta.
 
-Quel file non va committato.
+Prima di installare verifica che `InstallPath` coincida con la cartella del
+programma aperto, che nessun altro updater possieda il blocco dell’installazione
+e che i file da sostituire non siano in uso. Un’altra copia dell’app avviata da
+una cartella diversa non impedisce l’aggiornamento.
 
-L'installer salva inoltre `updater-path.txt` accanto al programma. Il file contiene
-il percorso dello script updater e permette al pulsante `Aggiorna ora` di funzionare
-anche quando programma e updater sono su dischi o cartelle differenti. In assenza
-del file, il programma controlla anche `C:\EdilPaintUpdater` e le cartelle standard
-di Windows.
+L’installazione conserva un backup e un registro della sostituzione. Verifica
+con SHA-256 tutti i file installati prima di dichiarare riuscito l’aggiornamento.
+Se la copia fallisce, ripristina la versione precedente. Dopo un’interruzione del
+PC o del processo, il prossimo avvio dell’updater recupera il backup prima di
+tentare un altro aggiornamento. Finché un ripristino è incompleto, l’app evita di
+avviarsi con file appartenenti a versioni diverse.
 
-Ogni versione pubblicata include inoltre una copia aggiornata dello script. Quando
-si preme **Aggiorna ora**, l'app aggiorna prima lo script esterno mantenendo intatto
-`updater-settings.json`: le correzioni dell'updater arrivano quindi insieme al
-programma.
+Dopo un aggiornamento manuale l’updater riapre il programma, anche se ha dovuto
+ripristinare la versione precedente. La nuova app conferma il riavvio solo dopo
+aver aperto la finestra principale. Un processo che si chiude subito viene
+segnalato come errore, anche se Windows aveva accettato di avviarlo. Gli errori
+di avvio dopo un aggiornamento vengono mostrati anche con avvio silenzioso
+abilitato; le preferenze salvate rimangono invariate. I dettagli dell’eccezione
+sono conservati in `%LOCALAPPDATA%\EdilPaintUpdater\startup-errors`.
 
-Nel repository c'e' anche `updater-settings.example.json`, utile come modello da copiare e modificare su ogni PC.
+Se dopo due minuti il processo è ancora in caricamento, l’esito indica un
+riavvio da verificare: il programma non viene terminato e i file verificati
+restano installati. Un errore di avvio può dipendere anche dalla configurazione
+o dal database: non viene annullata automaticamente un’installazione completa
+per un errore applicativo. Le vecchie versioni recuperate dal backup possono
+confermare solo la presenza di una finestra, senza il nuovo protocollo di avvio.
 
-## Aggiornare un updater già installato
+## Aggiornamenti automatici
 
-Per copiare la versione più recente di `Update-EdilPaint.ps1` mantenendo le impostazioni locali esistenti, rieseguire l'installer con lo stesso `InstallPath`, senza l'opzione `-OverwriteSettings`.
+La task esegue il controllo al login dell’utente configurato e ogni 30 minuti.
+Non installa mentre quella copia del programma è aperta. Un aggiornamento
+rinviato verrà tentato di nuovo, senza aspettare il login successivo. La task
+ignora avvii sovrapposti e ogni installazione ha anche un blocco esclusivo su file.
 
-## Installazione PC 1
+Se Windows non permette di registrare la task, resta il collegamento di avvio
+automatico dell’utente: in questo caso il controllo avviene solo al login.
+Le impostazioni del programma indicano quale modalità è disponibile.
 
-Da PowerShell, nella cartella `tools\updater` del progetto:
+Gli errori automatici vengono registrati, senza mostrare una finestra bloccante a
+ogni tentativo. Il pulsante **Aggiorna ora** e la finestra **Diagnostica** permettono
+di vedere l’errore e il percorso del log.
+
+La registrazione passa a Windows l’oggetto che definisce la task; l’API richiede
+questo argomento prima dei flag, come nella
+[documentazione Microsoft](https://learn.microsoft.com/en-us/windows/win32/taskschd/taskfolder-registertaskdefinition).
+La ripetizione usa il
+[modello del Task Scheduler](https://learn.microsoft.com/en-us/windows/win32/taskschd/repetitionpattern).
+
+## Requisiti e impostazioni
+
+Questa distribuzione prepara ancora il pacchetto sul PC: servono Git, un SDK
+.NET compatibile con il progetto (attualmente .NET 10 o successivo), accesso al
+repository e a NuGet. L’SDK è necessario per compilare; installare solo il runtime
+non basta. Il pacchetto predefinito include invece il runtime Windows, così
+l’eseguibile distribuito non dipende da un runtime installato separatamente.
+
+Le impostazioni sono in `updater-settings.json`, accanto allo script. Sono locali
+e non vanno committate. Il modello è `updater-settings.example.json`.
+
+- `InstallPath`: cartella contenente l’eseguibile che si vuole aggiornare.
+- `SourcePath`: cache Git, distinta dalla cartella dell’app. La compilazione usa
+  un archivio del commit scaricato e non esegue `pull`, `reset` o `switch` nel checkout.
+- `Branch` e `RepositoryUrl`: sorgente della nuova versione.
+- `RuntimeIdentifier`: `win-x64` predefinito; disponibili anche `win-x86` e `win-arm64`.
+- `SelfContained`: `true` predefinito, per includere il runtime nel pacchetto.
+- `RunTests`: se attivo, i test devono esistere e passare; non vengono saltati in silenzio.
+- `LogPath`: percorso del log, con gli output di Git, restore, test e publish.
+
+Vengono conservati `appsettings*.json`, l’identità aziendale, il collegamento
+all’updater, le impostazioni dell’updater e i JSON aziendali già presenti in
+`Assets`. I file utente estranei al pacchetto non vengono rimossi. I file
+obsoleti vengono eliminati solo se erano elencati dal manifesto precedente.
+
+## Riparare un updater già installato
+
+Sul PC con il problema, dalla versione aggiornata del progetto:
 
 ```powershell
-.\Install-EdilPaintUpdaterTask.ps1 -InstallPath "D:\EdilPaint Condiviso\Preventivi\Programma Preventivi" -RunTests
+.\tools\updater\Install-EdilPaintUpdaterTask.ps1 -InstallPath "D:\Cartella programma" -UpdaterPath "C:\EdilPaintUpdater"
 ```
 
-## Installazione PC 2
+Usare gli stessi percorsi dell’installazione reale. Senza `-OverwriteSettings`
+rimangono le impostazioni esistenti; `InstallPath` viene riallineato al percorso
+richiesto. Branch e repository cambiano solo se passati esplicitamente.
 
-Da PowerShell, nella cartella `tools\updater` del progetto:
+Questa operazione iniziale serve sui PC il cui updater precedente non riesce più
+a completare un aggiornamento. Quando la nuova app si avvia, aggiorna anche la
+copia esterna dello script. Se gli aggiornamenti automatici erano già abilitati,
+aggiorna la loro registrazione; se erano disabilitati, mantiene quella scelta.
+Una copia vecchia inclusa nell’app non può sovrascrivere un updater con protocollo
+più recente.
+
+Per lanciare manualmente lo script con il programma già chiuso:
 
 ```powershell
-.\Install-EdilPaintUpdaterTask.ps1 -InstallPath "$env:USERPROFILE\Documents\EdilPaint Preventivi" -RunTests
+& "C:\EdilPaintUpdater\Update-EdilPaint.ps1" -ManualUpdate
 ```
 
-## Cosa fa
+## Stato e verifiche
 
-1. All'accesso a Windows parte l'attivita pianificata.
-2. Lo script aspetta 60 secondi, salvo configurazione diversa.
-3. Lo script controlla il branch `main` su GitHub.
-4. Se non ci sono nuovi commit, non modifica nulla.
-5. Se ci sono nuovi commit, scarica il codice, esegue build/test e pubblica l'app.
-6. Prima di copiare i file controlla di nuovo che il programma sia chiuso.
-7. Copia i file pubblicati nella cartella locale del PC.
-8. Non sovrascrive `appsettings.json`.
-9. Se il programma e' gia' aperto, salta l'aggiornamento.
-10. Dopo un aggiornamento riuscito salva data, ora e commit in `ultimo-aggiornamento.txt` nella cartella dell'updater.
-11. Se l'aggiornamento fallisce mostra un messaggio bloccante con il percorso del log; se non sono disponibili aggiornamenti non mostra finestre.
+`edilpaint-update.json`, nella cartella dell’app, identifica commit, configurazione
+del pacchetto e hash dei file installati. Il vecchio `deployed-commit.txt` rimane
+solo diagnostico: la sua presenza non permette di saltare un aggiornamento.
 
-Per cambiare l'attesa iniziale:
+`.edilpaint-update-status.json` contiene il risultato dell’ultimo tentativo.
+`.edilpaint-update-transaction.json` esiste solo finché una sostituzione o il suo
+ripristino non sono completati: **non eliminarlo per aggirare il blocco di avvio**.
+Le copie di ripristino sono in `%LOCALAPPDATA%\EdilPaintUpdater\work` del PC che
+ha eseguito l’aggiornamento. Dopo un’interruzione su una cartella condivisa,
+eseguire il recupero dallo stesso PC, dove è disponibile il backup.
 
-```powershell
-.\Install-EdilPaintUpdaterTask.ps1 -InstallPath "$env:USERPROFILE\Documents\EdilPaint Preventivi" -StartDelaySeconds 30 -RunTests -OverwriteSettings
-```
-
-## Esecuzione manuale
-
-Il pulsante **Aggiorna ora** nell'app chiude il programma, attende che il processo
-sia terminato e poi avvia subito l'aggiornamento, senza l'attesa prevista per
-l'avvio automatico. Se il programma non riesce a chiudersi, viene mostrato il
-motivo nel messaggio di errore.
-
-Per provare subito l'aggiornamento da PowerShell (prima chiudere il programma):
-
-```powershell
-& "C:\EdilPaintUpdater\Update-EdilPaint.ps1"
-```
-
-## Log
-
-Il log resta qui:
-
-```text
-C:\EdilPaintUpdater\logs\update.log
-```
-
-L'ultimo aggiornamento riuscito resta qui:
-
-```text
-C:\EdilPaintUpdater\ultimo-aggiornamento.txt
-```
+La suite .NET include prove su Windows PowerShell 5.1 delle funzioni effettive
+dell’updater: configurazioni preservate, hash, rollback, file in uso, recupero
+dopo interruzione e rifiuto di percorsi fuori dall’installazione. I test usano
+cartelle temporanee e non aggiornano un’installazione reale o task di Windows.

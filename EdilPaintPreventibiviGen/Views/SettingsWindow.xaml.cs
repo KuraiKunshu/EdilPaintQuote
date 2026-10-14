@@ -1072,8 +1072,9 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnRunUpdaterClick(object sender, RoutedEventArgs e)
+    private async void OnRunUpdaterClick(object sender, RoutedEventArgs e)
     {
+        BtnRunUpdater.IsEnabled = false;
         try
         {
             string? scriptPath = UpdaterLauncherService.ResolveUpdaterScriptPath();
@@ -1104,7 +1105,7 @@ public partial class SettingsWindow : Window
 
             var result = MessageBox.Show(
                 this,
-                $"Verrà avviato l'updater e l'applicazione verrà chiusa.\n\nScript:\n{scriptPath}\n\nContinuare?",
+                "Preparo e verifico la nuova versione. Il programma si chiuderà solo quando l’aggiornamento sarà pronto e verrà riaperto al termine.\n\nContinuare?",
                 "Aggiorna programma",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -1112,12 +1113,16 @@ public partial class SettingsWindow : Window
             if (result != MessageBoxResult.Yes)
                 return;
 
-            UpdaterLauncherService.StartUpdater(scriptPath);
+            TxtManualUpdateStatus.Text = "Preparazione della nuova versione in corso. Il programma rimane aperto; può richiedere alcuni minuti.";
+            bool ready = await UpdaterLauncherService.StartUpdaterAsync(scriptPath, _employeeLoadCts.Token);
+            if (!ready) { TxtManualUpdateStatus.Text = "Il programma è già aggiornato. File installati verificati."; return; }
             AppShutdownManager.RequestShutdown();
             Application.Current.Shutdown();
         }
+        catch (OperationCanceledException) when (_employeeLoadCts.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            TxtManualUpdateStatus.Text = "Aggiornamento non completato. Il programma rimane disponibile.";
             MessageBox.Show(
                 this,
                 $"Impossibile avviare l'aggiornamento.\n\n{ex.Message}",
@@ -1125,6 +1130,7 @@ public partial class SettingsWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+        finally { BtnRunUpdater.IsEnabled = true; }
     }
 
     private async void OnAutomaticUpdatesChanged(object sender, RoutedEventArgs e)
@@ -1181,7 +1187,11 @@ public partial class SettingsWindow : Window
 
         string settingsPath = Path.Combine(Path.GetDirectoryName(scriptPath)!, "updater-settings.json");
         if (File.Exists(settingsPath))
+        {
+            UpdaterLauncherService.ValidateManualUpdateSettings(settingsPath, AppContext.BaseDirectory);
+            UpdaterLauncherService.RefreshUpdaterScriptFromBundledCopy(scriptPath);
             return scriptPath;
+        }
 
         MessageBox.Show(
             this,

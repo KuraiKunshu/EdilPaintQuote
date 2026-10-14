@@ -452,9 +452,10 @@
                                                                        Style="{StaticResource SectionTitleStyle}"/>
                                                             <TextBlock Style="{StaticResource HintStyle}"
                                                                        Margin="0"
-                                                                       Text="Avvia lo script updater configurato. L'app verrà chiusa durante la sostituzione dei file."/>
+                                                                       Text="Prepara e verifica la nuova versione prima di chiudere il programma. Al termine lo riapre automaticamente."/>
+                                                            <TextBlock x:Name="TxtManualUpdateStatus" Style="{StaticResource HintStyle}" TextWrapping="Wrap"/>
                                                         </StackPanel>
-                                                        <Button Grid.Column="1"
+                                                        <Button x:Name="BtnRunUpdater" Grid.Column="1"
                                                                 Content="Aggiorna ora"
                                                                 Margin="14,0,0,0"
                                                                 VerticalAlignment="Center"

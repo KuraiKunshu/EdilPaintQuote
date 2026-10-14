@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace EdilPaintPreventibiviGen.Services;
 
@@ -56,42 +58,92 @@ public static class UpdaterLauncherService
         return null;
     }
 
-    public static void StartUpdater(string scriptPath, int waitForApplicationExitSeconds = 15)
+    public static async Task<bool> StartUpdaterAsync(string scriptPath, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(scriptPath) || !File.Exists(scriptPath))
             throw new FileNotFoundException("Script updater non trovato.", scriptPath);
 
-        string? workingDirectory = Path.GetDirectoryName(scriptPath);
-        if (string.IsNullOrWhiteSpace(workingDirectory))
-            workingDirectory = AppContext.BaseDirectory;
-
-        string arguments = BuildManualUpdaterArguments(scriptPath, waitForApplicationExitSeconds);
-
-        var process = Process.Start(new ProcessStartInfo
+        ValidateManualUpdateSettings(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(scriptPath))!, "updater-settings.json"), AppContext.BaseDirectory);
+        string session = Path.Combine(Path.GetTempPath(), "EdilPaintUpdater", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(session);
+        string ready = Path.Combine(session, "ready.json");
+        bool handedOff = false;
+        Process? process = null;
+        try
         {
-            FileName = "powershell.exe",
-            Arguments = arguments,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = true,
-            WindowStyle = ProcessWindowStyle.Hidden
-        });
-
-        if (process == null)
-            throw new InvalidOperationException("Impossibile avviare il processo updater.");
+            process = Process.Start(new ProcessStartInfo
+            {
+                FileName = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"),
+                Arguments = BuildManualUpdaterArguments(scriptPath, 60, AppContext.BaseDirectory, Environment.ProcessId, ready),
+                WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath)),
+                UseShellExecute = false, CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            }) ?? throw new InvalidOperationException("Impossibile avviare il processo updater.");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromMinutes(20));
+            while (true)
+            {
+                timeout.Token.ThrowIfCancellationRequested();
+                if (File.Exists(ready))
+                {
+                    using var result = JsonDocument.Parse(await File.ReadAllTextAsync(ready, timeout.Token));
+                    string? status = result.RootElement.GetProperty("Status").GetString();
+                    if (status == "ready") { handedOff = true; return true; }
+                    if (status == "up-to-date") return false;
+                    string message = result.RootElement.GetProperty("Message").GetString() ?? "Aggiornamento non riuscito.";
+                    string log = result.RootElement.GetProperty("LogPath").GetString() ?? "";
+                    throw new InvalidOperationException($"{message}\n\nLog: {log}");
+                }
+                if (process.HasExited)
+                {
+                    if (File.Exists(ready)) continue;
+                    throw new InvalidOperationException($"L’updater è terminato prima di preparare l’aggiornamento (codice {process.ExitCode}). Il programma rimane aperto.");
+                }
+                await Task.Delay(250, timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        { throw new InvalidOperationException("La preparazione dell’aggiornamento ha superato 20 minuti. Nessun file del programma è stato sostituito. Controlla la connessione e il log dell’updater."); }
+        finally
+        {
+            if (!handedOff && process != null)
+                try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+            process?.Dispose();
+            try { Directory.Delete(session, recursive: true); } catch { }
+        }
     }
 
-    public static string BuildManualUpdaterArguments(string scriptPath, int waitForApplicationExitSeconds = 15)
+    public static void ValidateManualUpdateSettings(string settingsPath, string applicationDirectory)
+    {
+        using var settings = JsonDocument.Parse(File.ReadAllText(settingsPath));
+        string? configured = settings.RootElement.TryGetProperty("InstallPath", out var path) ? path.GetString() : null;
+        if (string.IsNullOrWhiteSpace(configured)) throw new InvalidOperationException("InstallPath non è configurato nell’updater.");
+        string expanded = Environment.ExpandEnvironmentVariables(configured);
+        string install = Path.GetFullPath(Path.IsPathRooted(expanded) ? expanded : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(settingsPath))!, expanded));
+        if (!string.Equals(install.TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(applicationDirectory).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"L’updater aggiorna {install}, ma il programma aperto si trova in {applicationDirectory}. Correggi InstallPath: il programma rimane aperto.");
+        if (settings.RootElement.TryGetProperty("ProcessName", out var name) && !string.IsNullOrWhiteSpace(name.GetString()) &&
+            !string.Equals(name.GetString(), typeof(App).Assembly.GetName().Name, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("ProcessName nell’updater non corrisponde al programma aperto.");
+    }
+
+    public static string BuildManualUpdaterArguments(string scriptPath, int waitForApplicationExitSeconds = 60,
+        string? expectedInstallPath = null, int applicationProcessId = 0, string? readyPath = null)
     {
         if (string.IsNullOrWhiteSpace(scriptPath))
             throw new ArgumentException("Il percorso dello script updater è obbligatorio.", nameof(scriptPath));
 
-        if (waitForApplicationExitSeconds < 0)
+        if (waitForApplicationExitSeconds is < 0 or > 300)
             throw new ArgumentOutOfRangeException(
                 nameof(waitForApplicationExitSeconds),
-                "L'attesa per la chiusura dell'app non può essere negativa.");
+                "L’attesa per la chiusura deve essere fra 0 e 300 secondi.");
 
         string fullPath = Path.GetFullPath(scriptPath);
-        return $"-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File {QuoteArgument(fullPath)} -ManualUpdate -WaitForApplicationExitSeconds {waitForApplicationExitSeconds}";
+        string arguments = $"-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File {QuoteArgument(fullPath)} -ManualUpdate -WaitForApplicationExitSeconds {waitForApplicationExitSeconds}";
+        if (expectedInstallPath != null) arguments += $" -ExpectedInstallPath {QuoteArgument(Path.GetFullPath(expectedInstallPath).TrimEnd(Path.DirectorySeparatorChar))}";
+        if (applicationProcessId > 0) arguments += $" -ApplicationProcessId {applicationProcessId}";
+        if (readyPath != null) arguments += $" -ReadyPath {QuoteArgument(Path.GetFullPath(readyPath))}";
+        return arguments;
     }
 
     /// <summary>
@@ -115,8 +167,31 @@ public static class UpdaterLauncherService
         if (string.Equals(bundledScriptPath, targetPath, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        File.Copy(bundledScriptPath, targetPath, overwrite: true);
-        return true;
+        static int Protocol(string path)
+        {
+            var match = Regex.Match(File.ReadAllText(path), @"(?m)^# EdilPaint updater protocol: (\d+)");
+            return match.Success ? int.Parse(match.Groups[1].Value) : 0;
+        }
+        if (File.Exists(targetPath) && Protocol(targetPath) > Protocol(bundledScriptPath)) return false;
+        if (File.Exists(targetPath) && File.ReadAllBytes(targetPath).SequenceEqual(File.ReadAllBytes(bundledScriptPath))) return false;
+        string temporary = targetPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.Copy(bundledScriptPath, temporary);
+            File.Move(temporary, targetPath, overwrite: true);
+            return true;
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
+    internal static bool IsInstallationUpdateInProgress(string directory)
+    {
+        if (File.Exists(Path.Combine(directory, ".edilpaint-update-transaction.json"))) return true;
+        string path = Path.Combine(directory, ".edilpaint-install.lock");
+        if (!File.Exists(path)) return false;
+        try { using var file = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete); return false; }
+        catch (IOException) { return true; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 
     private static IEnumerable<string> EnumerateCandidateDirectories(string startDirectory)
