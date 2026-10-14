@@ -10,6 +10,33 @@ namespace EdilPaintPreventibiviGen.Services;
 /// <summary>Common document actions for every view of a saved quote.</summary>
 public static class QuoteDocumentActions
 {
+    public static async Task OpenPosDraftAsync(string quoteNumber, Window owner, CancellationToken token = default)
+    {
+        var service = PosService.ForApplication();
+        var draft = await service.LoadDraftAsync(quoteNumber, token);
+        var templates = await service.LoadTemplatesAsync(token);
+        if (draft == null)
+        {
+            var quote = await App.DataService.GetQuoteByNumberAsync(quoteNumber, token, includeAttachments: false)
+                ?? throw new InvalidOperationException("Lavoro non trovato nello storico.");
+            var company = await App.DataService.GetCompanyAsync().WaitAsync(token) ?? new Company();
+            var customers = await App.DataService.GetCustomersAsync(token);
+            draft = PosDraftRules.Create(quote, company, customers);
+        }
+        var employees = App.EmployeeDirectory == null ? new EmployeeDirectorySnapshot([], false) :
+            await App.EmployeeDirectory.GetLatestAsync(token);
+        token.ThrowIfCancellationRequested();
+        new PosDraftWindow(service, draft, templates, employees) { Owner = owner }.ShowDialog();
+    }
+
+    public static async Task OpenPosTemplatesAsync(Window owner, CancellationToken token = default)
+    {
+        var service = PosService.ForApplication();
+        var templates = await service.LoadTemplatesAsync(token);
+        token.ThrowIfCancellationRequested();
+        new PosTemplatesWindow(service, templates) { Owner = owner }.ShowDialog();
+    }
+
     internal static QuotePdfDocumentService CreatePdfService() => new(App.DataService, StoragePathService.Instance,
         App.AppSettings, () => App.MainVm?.SelectedLogo ?? string.Empty,
         App.MainVm == null ? null : () => App.MainVm.AllCustomers.ToList());

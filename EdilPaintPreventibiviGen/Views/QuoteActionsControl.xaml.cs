@@ -105,6 +105,7 @@ public partial class QuoteActionsControl : UserControl
         Add("Scheda lavoro", (owner, token) => intervention == null
             ? QuoteDocumentActions.GenerateWorkSheetAsync(number, owner, token)
             : WorkScheduleActions.GenerateWorkSheetAsync(intervention, owner, token));
+        Add("Stesura POS", (owner, token) => QuoteDocumentActions.OpenPosDraftAsync(number, owner, token));
         Add("Cartella cliente", (owner, token) => QuoteDocumentActions.OpenCustomerFolderAsync(number, owner, token));
         if (intervention is { Kind: WorkScheduleEntryKind.Job, Revision: > 0 })
         {

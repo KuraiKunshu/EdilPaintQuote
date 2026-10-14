@@ -1066,6 +1066,12 @@ public partial class HistoryWindow : Window
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
         if (App.AppSettings.Business.EnableInstallationCertificate) menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
         menu.Items.Add(CreateMenuItem("Genera scheda lavoro", async () => await GenerateWorkSheetAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Stesura POS", async () =>
+        {
+            try { await QuoteDocumentActions.OpenPosDraftAsync(entry.QuoteNumber, this, AppShutdownManager.ShutdownToken); }
+            catch (OperationCanceledException) when (AppShutdownManager.ShutdownToken.IsCancellationRequested) { }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Bozza POS", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        }));
         menu.Items.Add(CreateMenuItem("Costi e guadagno", async () => await OpenRealProfitCalculatorAsync(entry)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));

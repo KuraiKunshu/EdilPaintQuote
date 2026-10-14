@@ -1,0 +1,170 @@
+<Window x:Class="EdilPaintPreventibiviGen.Views.PosDraftWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Stesura POS" Width="1100" Height="840" MinWidth="820" MinHeight="620"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource ShellBackgroundBrush}"
+        Foreground="{StaticResource DefaultTextBrush}" FontSize="14" Closing="OnClosing">
+    <Window.Resources>
+        <Style TargetType="Button"><Setter Property="Padding" Value="14,8"/><Setter Property="Margin" Value="0,0,8,0"/><Setter Property="MinHeight" Value="36"/></Style>
+        <Style TargetType="TextBox"><Setter Property="Padding" Value="9,7"/><Setter Property="Margin" Value="0,5,0,14"/><Setter Property="VerticalContentAlignment" Value="Top"/></Style>
+        <Style x:Key="LongText" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Setter Property="AcceptsReturn" Value="True"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="MinHeight" Value="85"/><Setter Property="VerticalScrollBarVisibility" Value="Auto"/></Style>
+        <Style TargetType="Expander"><Setter Property="Margin" Value="0,0,0,16"/><Setter Property="Padding" Value="12"/><Setter Property="Background" Value="{StaticResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{StaticResource ModalFieldBorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+        <Style TargetType="DatePicker"><Setter Property="Margin" Value="0,5,8,14"/></Style>
+    </Window.Resources>
+    <Grid Margin="20">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,18">
+            <Button x:Name="CatalogButton" DockPanel.Dock="Right" Content="Catalogo POS" Click="OnCatalogClick" VerticalAlignment="Top"/>
+            <StackPanel>
+                <TextBlock Text="Stesura POS" FontSize="27" FontWeight="SemiBold"/>
+                <TextBlock x:Name="QuoteText" Margin="0,5,0,0"/>
+                <TextBlock Text="Bozza condivisa · le lavorazioni POS si scelgono manualmente" Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}"/>
+            </StackPanel>
+        </DockPanel>
+        <ScrollViewer x:Name="BodyScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="FormPanel" TextBox.TextChanged="OnFormTextChanged">
+                <Expander Header="Lavorazioni POS" IsExpanded="True">
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Seleziona una o più schede del catalogo POS" TextWrapping="Wrap"/>
+                            <TextBlock Text="Cerca lavorazione" Margin="0,10,0,0" FontSize="12"/>
+                            <TextBox x:Name="WorkSearch" TextChanged="OnWorkSearchChanged" AutomationProperties.Name="Cerca lavorazione POS"/>
+                            <ListBox x:Name="WorkList" MaxHeight="330" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate><DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Checked="OnWorkSelectionChanged" Unchecked="OnWorkSelectionChanged" Margin="0,8" HorizontalContentAlignment="Stretch">
+                                        <StackPanel><TextBlock Text="{Binding Sheet.Name}" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/></StackPanel>
+                                    </CheckBox>
+                                </DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock x:Name="EmptyCatalogText" Text="Non ci sono lavorazioni POS. Apri Catalogo POS e aggiungi le tue schede." TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,10,0,0" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Scheda del singolo POS" FontWeight="SemiBold"/>
+                            <ComboBox x:Name="SheetSelector" DisplayMemberPath="Sheet.Name" SelectionChanged="OnSheetChanged" Margin="0,6,0,12"/>
+                            <StackPanel x:Name="SheetEditor" IsEnabled="False">
+                                <TextBlock Text="Le modifiche valgono solo per questo POS." TextWrapping="Wrap" FontSize="12" Margin="0,0,0,12" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBlock Text="Categoria"/><TextBox Text="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Descrizione della lavorazione"/>
+                                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                <Expander Header="Fasi, attrezzature, rischi e prevenzione">
+                                    <StackPanel Margin="0,10,0,0">
+                                        <TextBlock Text="Fasi operative"/><TextBox Text="{Binding Phases, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                        <TextBlock Text="Attrezzature utilizzate · note" TextWrapping="Wrap"/><TextBox Text="{Binding Equipment, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                        <TextBlock Text="Schede attrezzature utilizzate in questa lavorazione" TextWrapping="Wrap"/><ListBox x:Name="WorkEquipmentLinks" MaxHeight="180"><ListBox.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="4"><TextBlock Text="{Binding Sheet.Name}" TextWrapping="Wrap"/></CheckBox></DataTemplate></ListBox.ItemTemplate></ListBox>
+                                        <TextBlock Text="Rischi e valutazione" TextWrapping="Wrap"/><TextBox Text="{Binding Risks, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                        <TextBlock Text="DPI richiesti"/><TextBox Text="{Binding Dpi, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                        <TextBlock Text="Procedure operative"/><TextBox Text="{Binding Procedures, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                        <TextBlock Text="Misure preventive e protettive"/><TextBox Text="{Binding Measures, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                        <TextBlock Text="Scelte progettuali e organizzative"/><TextBox Text="{Binding Organization, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                        <TextBlock Text="Misure di coordinamento"/><TextBox Text="{Binding Coordination, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                    </StackPanel>
+                                </Expander>
+                                <CheckBox Content="Testi verificati per questo cantiere" IsChecked="{Binding Verified, Mode=TwoWay}" Checked="OnVerifiedChanged" Unchecked="OnVerifiedChanged" Margin="0,0,0,12"/>
+                                <Button Content="Riprendi testo standard" Click="OnRestoreStandardClick" HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Expander>
+                <Expander Header="Attrezzature utilizzate e schede di sicurezza">
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Seleziona le attrezzature realmente utilizzate. Le schede collegate alle lavorazioni vengono proposte automaticamente e inserite una sola volta." TextWrapping="Wrap"/>
+                            <TextBox x:Name="EquipmentSearch" TextChanged="OnEquipmentSearchChanged" AutomationProperties.Name="Cerca attrezzatura POS"/>
+                            <ListBox x:Name="EquipmentList" MaxHeight="330" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,8"><StackPanel><TextBlock Text="{Binding Sheet.Name}" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12"/></StackPanel></CheckBox></DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Text="Aggiungi o modifica i modelli in Impostazioni → POS → Attrezzature." TextWrapping="Wrap" Margin="0,10,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Scheda attrezzatura del singolo POS" FontWeight="SemiBold"/>
+                            <ComboBox x:Name="EquipmentSelector" DisplayMemberPath="Sheet.Name" SelectionChanged="OnEquipmentSheetChanged" Margin="0,6,0,12"/>
+                            <StackPanel x:Name="EquipmentEditor" IsEnabled="False">
+                                <TextBlock Text="Categoria"/><TextBox Text="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Descrizione"/><TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                <Expander Header="Rischi, istruzioni operative e DPI"><StackPanel Margin="0,10,0,0">
+                                    <TextBlock Text="Rischi e valutazione"/><TextBox Text="{Binding Risks, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                    <TextBlock Text="Istruzioni operative · prima, durante e dopo l’uso" TextWrapping="Wrap"/><TextBox Text="{Binding Procedures, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                    <TextBlock Text="Misure preventive e protettive"/><TextBox Text="{Binding Measures, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                    <TextBlock Text="DPI richiesti"/><TextBox Text="{Binding Dpi, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                                </StackPanel></Expander>
+                                <CheckBox Content="Scheda verificata per questo cantiere" IsChecked="{Binding Verified, Mode=TwoWay}" Checked="OnVerifiedChanged" Unchecked="OnVerifiedChanged" Margin="0,0,0,12"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Expander>
+                <Expander Header="Dati del cantiere e dell’impresa">
+                    <StackPanel Margin="0,14,0,0">
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel><TextBlock Text="Nome del cantiere"/><TextBox Text="{Binding SiteName, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Committente"/><TextBox Text="{Binding Client, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                            <StackPanel Grid.Column="2"><TextBlock Text="Indirizzo del cantiere"/><TextBox Text="{Binding SiteAddress, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Impresa affidataria (se presente)"/><TextBox Text="{Binding Contractor, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                        </Grid>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel><TextBlock Text="Inizio lavori"/><DockPanel><Button DockPanel.Dock="Right" Content="Svuota" Tag="start" Click="OnClearDateClick"/><DatePicker x:Name="StartPicker" SelectedDate="{Binding StartDate, Mode=TwoWay}" DateValidationError="OnDateValidationError" PreviewKeyDown="OnDateKeyDown" SelectedDateChanged="OnDateChanged"/></DockPanel></StackPanel>
+                            <StackPanel Grid.Column="2"><TextBlock Text="Fine lavori"/><DockPanel><Button DockPanel.Dock="Right" Content="Svuota" Tag="end" Click="OnClearDateClick"/><DatePicker x:Name="EndPicker" SelectedDate="{Binding EndDate, Mode=TwoWay}" DateValidationError="OnDateValidationError" PreviewKeyDown="OnDateKeyDown" SelectedDateChanged="OnDateChanged"/></DockPanel></StackPanel>
+                        </Grid>
+                        <TextBlock Text="Descrizione complessiva del lavoro"/><TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel><TextBlock Text="Accessi e condizioni del sito"/><TextBox Text="{Binding Access, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/></StackPanel>
+                            <StackPanel Grid.Column="2"><TextBlock Text="Vincoli e interferenze"/><TextBox Text="{Binding Constraints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/></StackPanel>
+                        </Grid>
+                        <TextBlock Text="Impresa esecutrice"/><TextBox Text="{Binding CompanyName, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel><TextBlock Text="Indirizzo impresa"/><TextBox Text="{Binding CompanyAddress, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                            <StackPanel Grid.Column="2"><TextBlock Text="Partita IVA"/><TextBox Text="{Binding CompanyVat, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Expander>
+                <Expander Header="Squadra e responsabilità">
+                    <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Dipendenti coinvolti" FontWeight="SemiBold"/>
+                            <TextBlock Text="Cerca dipendente" Margin="0,10,0,0" FontSize="12"/>
+                            <TextBox x:Name="EmployeeSearch" TextChanged="OnEmployeeSearchChanged" AutomationProperties.Name="Cerca dipendente POS"/>
+                            <TextBlock x:Name="EmployeeNotice" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,12"/>
+                            <ListBox x:Name="EmployeeList" MaxHeight="310" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate><DataTemplate>
+                                    <StackPanel Margin="0,7">
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Checked="OnEmployeeSelectionChanged" Unchecked="OnEmployeeSelectionChanged">
+                                            <TextBlock Text="{Binding Employee.Name}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                        </CheckBox>
+                                        <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
+                                        <TextBlock Text="Qualifica nel cantiere" Margin="22,5,0,0" FontSize="12"/>
+                                        <TextBox Text="{Binding Employee.Qualification, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsSelected}" ToolTip="Qualifica nel cantiere" AutomationProperties.Name="Qualifica nel POS" Margin="22,5,0,0"/>
+                                    </StackPanel>
+                                </DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Preposto del cantiere"/><TextBox Text="{Binding Supervisor, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="Datore di lavoro"/><TextBox Text="{Binding Employer, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="RSPP"/><TextBox Text="{Binding Rspp, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="RLS"/><TextBox Text="{Binding Rls, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Text="Medico competente"/><TextBox Text="{Binding Doctor, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                    </Grid>
+                </Expander>
+                <Expander x:Name="ReviewSection" Header="Revisione della bozza">
+                    <StackPanel Margin="0,14,0,0">
+                        <TextBlock Text="Revisione del documento"/><TextBox Text="{Binding DocumentRevision, UpdateSourceTrigger=PropertyChanged}" Width="140" HorizontalAlignment="Left"/>
+                        <TextBlock Text="Ulteriori indicazioni per questo POS"/><TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LongText}"/>
+                        <TextBlock x:Name="ReviewText" TextWrapping="Wrap" Margin="0,8,0,12"/>
+                        <TextBlock Text="Il riepilogo aiuta a completare la bozza. L’esportazione Word/PDF verrà aggiunta nel prossimo passo." TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+        <StackPanel Grid.Row="2" Margin="0,14,0,0">
+            <Border Background="{StaticResource SearchResultSelectedBrush}" Padding="12" CornerRadius="6"><TextBlock x:Name="SummaryText" TextWrapping="Wrap"/></Border>
+            <DockPanel Margin="0,12,0,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Riepilogo bozza" Click="OnReviewClick"/>
+                    <Button x:Name="SaveButton" Content="Salva bozza POS" Click="OnSaveClick" Background="{StaticResource ModalPrimaryActionBrush}" Foreground="{StaticResource WhiteBrush}"/>
+                    <Button Content="Chiudi" Click="OnCloseClick"/>
+                </StackPanel>
+                <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center"/>
+            </DockPanel>
+        </StackPanel>
+    </Grid>
+</Window>

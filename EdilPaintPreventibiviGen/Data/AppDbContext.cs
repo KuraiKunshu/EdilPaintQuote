@@ -8,6 +8,8 @@ public class AppDbContext : DbContext
 {
     public DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
     public DbSet<EmployeeEntity> Employees => Set<EmployeeEntity>();
+    public DbSet<PosTemplateEntity> PosTemplates => Set<PosTemplateEntity>();
+    public DbSet<PosDraftEntity> PosDrafts => Set<PosDraftEntity>();
     public DbSet<WorkScheduleSettingsEntity> WorkScheduleSettings => Set<WorkScheduleSettingsEntity>();
     public DbSet<AutomaticMaterialSettingsEntity> AutomaticMaterialSettings => Set<AutomaticMaterialSettingsEntity>();
     public DbSet<WorkScheduleEntryEntity> WorkScheduleEntries => Set<WorkScheduleEntryEntity>();
@@ -28,6 +30,26 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<PosTemplateEntity>(entity =>
+        {
+            entity.ToTable("PosTemplates");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.PayloadJson).IsRequired();
+        });
+        modelBuilder.Entity<PosDraftEntity>(entity =>
+        {
+            entity.ToTable("PosDrafts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.QuoteNumber).HasMaxLength(250).IsRequired();
+            entity.HasIndex(x => x.QuoteNumber).IsUnique();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.PayloadJson).IsRequired();
+        });
 
         modelBuilder.Entity<AutomaticMaterialSettingsEntity>(entity =>
         {

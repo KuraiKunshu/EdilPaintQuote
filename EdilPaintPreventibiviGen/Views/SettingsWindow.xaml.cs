@@ -17,6 +17,16 @@ namespace EdilPaintPreventibiviGen.Views;
 
 public partial class SettingsWindow : Window
 {
+    private async void OnPosTemplatesClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button) return;
+        button.IsEnabled = false;
+        try { await QuoteDocumentActions.OpenPosTemplatesAsync(this, _employeeLoadCts.Token); }
+        catch (OperationCanceledException) when (_employeeLoadCts.IsCancellationRequested) { }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Testi standard POS", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally { button.IsEnabled = true; }
+    }
+
     private readonly ObservableCollection<WindowMaterialRuleEditor> _windowMaterialRuleEditors = [];
     private readonly ObservableCollection<EmployeeSettingsModel> _employees = [];
     private List<EmployeeSettingsModel> _originalEmployees = [];
