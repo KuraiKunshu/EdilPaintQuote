@@ -9,6 +9,7 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public static class WorkScheduleActions
 {
+    public static event EventHandler<WorkScheduleCompletedEventArgs>? WorkCompleted;
     public static async Task<WorkScheduleEntry?> CompleteAndGenerateCostsAsync(WorkScheduleEntry selectedEntry,
         Window owner, CancellationToken token = default)
     {
@@ -34,6 +35,7 @@ public static class WorkScheduleActions
                 });
             }
             catch (Exception ex) { Debug.WriteLine($"[Completion] PDF salvato; apertura cartella non riuscita: {ex.Message}"); }
+            WorkCompleted?.Invoke(null, new WorkScheduleCompletedEventArgs(result.Entry));
             return result.Entry;
         }
         catch (WorkScheduleCostsPublicationException ex)
@@ -42,6 +44,7 @@ public static class WorkScheduleActions
                 MessageBox.Show(owner,
                     $"L’intervento è finito e rimane salvato nel calendario, ma il PDF non è stato archiviato.\n\n{ex.Message}\n\nPremi PDF costi per riprovare.",
                     "Intervento finito", MessageBoxButton.OK, MessageBoxImage.Warning);
+            WorkCompleted?.Invoke(null, new WorkScheduleCompletedEventArgs(ex.Entry));
             return ex.Entry;
         }
 

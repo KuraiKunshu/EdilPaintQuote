@@ -252,6 +252,16 @@ public sealed class WorkScheduleService
                 .ConfigureAwait(false);
             lock (_cacheLock)
             {
+                if (completed.OrderStatus == QuoteStatus.Finito && !completed.IsOrderDeleted)
+                    foreach (var page in _cache.Pages.Values.Concat(_cache.QuotePages.Values))
+                    {
+                        page.Orders.RemoveAll(order => order.QuoteNumber == completed.QuoteNumber);
+                        foreach (var entry in page.Entries.Where(entry => entry.QuoteNumber == completed.QuoteNumber))
+                        {
+                            entry.OrderStatus = QuoteStatus.Finito;
+                            entry.IsOrderActive = false;
+                        }
+                    }
                 foreach (var page in _cache.Pages.Values)
                 {
                     page.Entries.RemoveAll(entry => entry.Id == completed.Id);

@@ -62,6 +62,7 @@ public partial class HistoryWindow : Window
 
         PreviewKeyDown += HistoryWindow_PreviewKeyDown;
         Closed += HistoryWindow_Closed;
+        WorkScheduleActions.WorkCompleted += OnCalendarWorkCompleted;
 
         if (string.IsNullOrWhiteSpace(initialSearch))
             _ = LoadInitialHistoryAsync();
@@ -82,6 +83,7 @@ public partial class HistoryWindow : Window
 
     private void HistoryWindow_Closed(object? sender, EventArgs e)
     {
+        WorkScheduleActions.WorkCompleted -= OnCalendarWorkCompleted;
         _searchCts?.Cancel();
         _searchCts?.Dispose();
         _searchCts = null;
@@ -90,6 +92,27 @@ public partial class HistoryWindow : Window
         CboFilterStatus.SelectedIndex = 0;
         DpStart.SelectedDate = null;
         DpEnd.SelectedDate = null;
+    }
+
+    private void OnCalendarWorkCompleted(object? sender, WorkScheduleCompletedEventArgs e)
+    {
+        var entry = e.Entry;
+        if (entry.IsOrderDeleted || entry.OrderStatus != QuoteStatus.Finito) return;
+        bool wasSavingStatus = _isSavingStatus;
+        _isSavingStatus = true;
+        try
+        {
+            // Updating the bound combo boxes must not save the same status again.
+            foreach (var summary in _currentSummaries.Concat(_vm.HistorySummaries).Distinct().Where(x => x.QuoteNumber == entry.QuoteNumber))
+                summary.Status = QuoteStatus.Finito;
+            foreach (var quote in _vm.History.Where(x => x.QuoteNumber == entry.QuoteNumber))
+                quote.Status = QuoteStatus.Finito;
+            var selectedNumber = (GridHistory.SelectedItem as QuoteHistorySummary)?.QuoteNumber;
+            ApplyLocalFilters();
+            var selected = _vm.HistorySummaries.FirstOrDefault(x => x.QuoteNumber == selectedNumber);
+            if (selected != null) GridHistory.SelectedItem = selected;
+        }
+        finally { _isSavingStatus = wasSavingStatus; }
     }
 
     private void HistoryWindow_PreviewKeyDown(object sender, KeyEventArgs e)
