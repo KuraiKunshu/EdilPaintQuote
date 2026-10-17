@@ -473,7 +473,7 @@ public sealed class WorkScheduleRulesTests
         Assert.Equal(entity.Date, visit.Date);
         Assert.Equal(WorkScheduleEntryStatus.Completed, visit.Status);
         Assert.Equal("160765", visit.QuoteNumber);
-        Assert.Equal("ZOCCARATO GRAZIANO", visit.Title);
+        Assert.Equal("MAFLAN SRL · Rif. ZOCCARATO GRAZIANO", visit.Title);
         Assert.Equal("MAFLAN SRL", visit.CustomerName);
         Assert.Equal("Lavoro concluso", visit.Notes);
         Assert.Equal(480, visit.StartMinutes);

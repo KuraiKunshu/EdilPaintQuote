@@ -81,21 +81,23 @@ public sealed class WorkScheduleOrder
     public string Title => WorkScheduleSiteDisplay.GetTitle(SiteName, ReferenceName, CustomerName, QuoteNumber);
     public string ReferenceDetail => WorkScheduleSiteDisplay.GetReferenceDetail(ReferenceName, Title);
     public string CustomerDetail => string.IsNullOrWhiteSpace(CustomerName) ? "Cliente non indicato" : $"Cliente: {CustomerName.Trim()}";
-    public string Display => string.Join(" · ", new[] { Title, ReferenceDetail, CustomerDetail, $"Ordine {QuoteNumber}" }
-        .Where(part => !string.IsNullOrWhiteSpace(part)));
+    public string Display => $"{Title} · Ordine {QuoteNumber}";
 }
 
 internal static class WorkScheduleSiteDisplay
 {
     internal static string GetTitle(string? site, string? reference, string? customer, string? number)
     {
-        if (!string.IsNullOrWhiteSpace(site)) return site.Trim();
-        if (!string.IsNullOrWhiteSpace(reference)) return reference.Trim();
-        if (!string.IsNullOrWhiteSpace(customer)) return customer.Trim();
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(customer)) parts.Add(customer.Trim());
+        if (!string.IsNullOrWhiteSpace(reference)) parts.Add($"Rif. {reference.Trim()}");
+        if (!string.IsNullOrWhiteSpace(site)) parts.Add($"Cantiere: {site.Trim()}");
+        if (parts.Count > 0) return string.Join(" · ", parts);
         return string.IsNullOrWhiteSpace(number) ? "Cantiere non indicato" : $"Ordine {number.Trim()}";
     }
 
     internal static string GetReferenceDetail(string? reference, string title)
-        => string.IsNullOrWhiteSpace(reference) || string.Equals(reference.Trim(), title, StringComparison.OrdinalIgnoreCase)
+        => string.IsNullOrWhiteSpace(reference) || string.Equals(reference.Trim(), title, StringComparison.OrdinalIgnoreCase) ||
+           title.Contains($"Rif. {reference.Trim()}", StringComparison.OrdinalIgnoreCase)
             ? string.Empty : $"Riferimento: {reference.Trim()}";
 }
