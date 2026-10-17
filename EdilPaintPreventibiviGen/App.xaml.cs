@@ -73,6 +73,7 @@ public partial class App : Application
             AppSettings = new AppSettingsService(configuration);
             Helpers.WindowSizeBehavior.Initialize(new WindowSizeStore(
                 Path.Combine(CompanyInstallationService.RootDirectory, "dimensioni-finestre.json")));
+            Helpers.WindowCaptionTheme.Initialize();
             Helpers.WindowZoomBehavior.Initialize(AppSettings.App.GetEffectiveMainWindowScale());
             IsSilentStartup = _updateStartupReport == null && !CompanyInstallationService.IsGenericInstallation && AppSettings.App.IsSilentStartup;
             ShutdownMode = ShutdownMode.OnExplicitShutdown;

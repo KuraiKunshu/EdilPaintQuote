@@ -132,6 +132,12 @@ public partial class MainWindow : Window
     #region Window events
     private void Window_Closing(object sender, CancelEventArgs e)
     {
+        if (!AppShutdownManager.IsShutdownRequested && HistoryWindow.FindBusy() is { } busyHistory)
+        {
+            e.Cancel = true;
+            busyHistory.Activate();
+            return;
+        }
         if (!AppShutdownManager.IsShutdownRequested && _workManagementWindow is { CanClose: false })
         {
             e.Cancel = true;
@@ -556,9 +562,9 @@ public partial class MainWindow : Window
     }
     private void OnOpenHistoryClick(object sender, RoutedEventArgs e)
     {
-        OpenWorkManagement(history: true);
+        if (DataContext is MainViewModel vm) HistoryWindow.Open(vm);
     }
-    private void OpenWorkManagement(bool history = false)
+    private void OpenWorkManagement()
     {
         if (DataContext is not MainViewModel vm) return;
         if (_workManagementWindow == null)
@@ -567,7 +573,7 @@ public partial class MainWindow : Window
             _workManagementWindow.Closed += (_, _) => _workManagementWindow = null;
             _workManagementWindow.Show();
         }
-        _workManagementWindow.ShowSection(history);
+        _workManagementWindow.ShowSection(false);
     }
     private async void OnNewCustomerClick(object sender, RoutedEventArgs e)
     {
@@ -611,6 +617,7 @@ public partial class MainWindow : Window
     }
     private async void OnOpenSettingsClick(object sender, RoutedEventArgs e)
     {
+        if (HistoryWindow.FindBusy() is { } busyHistory) { busyHistory.Activate(); return; }
         if (_workManagementWindow is { CanClose: false }) { _workManagementWindow.Activate(); return; }
         string previousDatabase = App.AppSettings.Database.GetCatalogIdentity();
         var win = DataContext is MainViewModel vm
@@ -621,7 +628,10 @@ public partial class MainWindow : Window
         win.Owner = this;
         win.ShowDialog();
         if (!string.Equals(previousDatabase, App.AppSettings.Database.GetCatalogIdentity(), StringComparison.OrdinalIgnoreCase))
+        {
             _workManagementWindow?.Close();
+            foreach (var history in Application.Current.Windows.OfType<HistoryWindow>().ToArray()) history.Close();
+        }
         if (DataContext is MainViewModel currentVm && string.Equals(previousDatabase,
                 App.AppSettings.Database.GetCatalogIdentity(), StringComparison.OrdinalIgnoreCase))
         {

@@ -75,7 +75,7 @@ public static class WorkScheduleActions
         if (App.MainVm == null) throw new InvalidOperationException("La finestra principale non è disponibile.");
         var workspace = Application.Current.Windows.OfType<WorkManagementWindow>().FirstOrDefault();
         if (workspace != null) { _ = workspace.ShowQuoteAsync(quoteNumber); return; }
-        new HistoryWindow(App.MainVm, quoteNumber) { Owner = owner }.Show();
+        HistoryWindow.Open(App.MainVm, quoteNumber);
     }
 
     internal static WorkSheetOptions CreateWorkSheetOptions(WorkScheduleEntry entry) => new()

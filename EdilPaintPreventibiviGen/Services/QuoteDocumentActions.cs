@@ -4,12 +4,27 @@ using System.Windows;
 using System.Windows.Input;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Views;
+using EdilPaintPreventibiviGen.ViewModels;
 
 namespace EdilPaintPreventibiviGen.Services;
 
 /// <summary>Common document actions for every view of a saved quote.</summary>
 public static class QuoteDocumentActions
 {
+    public static async Task OpenCostsAsync(string quoteNumber, MainViewModel vm, Window owner)
+    {
+        var history = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
+        var quote = await history.GetQuoteByNumberAsync(quoteNumber)
+            ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
+        double supplierDiscount = vm.AllCustomers.FirstOrDefault(customer => customer.IsSupplier &&
+            string.Equals(customer.BusinessName, quote.SupplierName, StringComparison.OrdinalIgnoreCase))?.SupplierDiscount ?? 0;
+        bool customerIsSupplier = vm.AllCustomers.Any(customer => customer.IsSupplier &&
+            string.Equals(customer.BusinessName, quote.CustomerName, StringComparison.OrdinalIgnoreCase));
+        new RealProfitWindow(quote, supplierDiscount, customerIsSupplier, vm.PersonalMaterialsView,
+            snapshot => history.UpdateRealProfitAsync(quote.QuoteNumber, snapshot), App.AppSettings.RealProfit)
+        { Owner = owner }.ShowDialog();
+    }
+
     internal static QuotePdfDocumentService CreatePdfService() => new(App.DataService, StoragePathService.Instance,
         App.AppSettings, () => App.MainVm?.SelectedLogo ?? string.Empty,
         App.MainVm == null ? null : () => App.MainVm.AllCustomers.ToList());

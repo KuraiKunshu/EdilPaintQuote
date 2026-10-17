@@ -286,7 +286,7 @@ public partial class HistoryView : UserControl, IDisposable
         catch (Exception ex)
         {
             Debug.WriteLine($"[LoadInitialHistory] Errore: {ex.Message}");
-            MessageBox.Show($"Errore durante il caricamento: {ex.Message}", "Errore", 
+            if (!_backgroundRefresh && !_closed) MessageBox.Show($"Errore durante il caricamento: {ex.Message}", "Errore",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
@@ -330,7 +330,7 @@ public partial class HistoryView : UserControl, IDisposable
         catch (OperationCanceledException)
         {
             Debug.WriteLine("[RunSearch] Task cancellato o timeout");
-            if (!token.IsCancellationRequested)
+            if (!token.IsCancellationRequested && !_backgroundRefresh && !_closed)
             {
                 MessageBox.Show("La ricerca ha superato il tempo limite (30 secondi).",
                     "Ricerca interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -339,7 +339,7 @@ public partial class HistoryView : UserControl, IDisposable
         catch (Exception ex)
         {
             Debug.WriteLine($"[RunSearch] Errore: {ex.Message}\n{ex.StackTrace}");
-            MessageBox.Show($"Errore durante la ricerca: {ex.Message}\n\nDettagli: {ex.GetType().Name}",
+            if (!_backgroundRefresh && !_closed) MessageBox.Show($"Errore durante la ricerca: {ex.Message}\n\nDettagli: {ex.GetType().Name}",
                 "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
@@ -477,34 +477,7 @@ public partial class HistoryView : UserControl, IDisposable
     {
         try
         {
-            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
-            if (fullEntry == null)
-            {
-                MessageBox.Show("Preventivo non trovato nello storico.", "Costi e guadagno",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            double supplierDiscount = _vm.AllCustomers
-                .FirstOrDefault(customer =>
-                    customer.IsSupplier &&
-                    string.Equals(customer.BusinessName, fullEntry.SupplierName, StringComparison.OrdinalIgnoreCase))
-                ?.SupplierDiscount ?? 0;
-
-            bool customerIsSupplier = _vm.AllCustomers.Any(customer =>
-                customer.IsSupplier &&
-                string.Equals(customer.BusinessName, fullEntry.CustomerName, StringComparison.OrdinalIgnoreCase));
-
-            new RealProfitWindow(
-                fullEntry,
-                supplierDiscount,
-                customerIsSupplier,
-                _vm.PersonalMaterialsView,
-                snapshot => _historyService.UpdateRealProfitAsync(fullEntry.QuoteNumber, snapshot),
-                App.AppSettings.RealProfit)
-            {
-                Owner = HostWindow
-            }.ShowDialog();
+            await QuoteDocumentActions.OpenCostsAsync(entry.QuoteNumber, _vm, HostWindow);
         }
         catch (Exception ex)
         {
