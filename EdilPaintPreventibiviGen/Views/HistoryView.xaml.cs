@@ -1,0 +1,1230 @@
+using System;
+using System.ComponentModel;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Input;
+using EdilPaintPreventibiviGen.Models;
+using EdilPaintPreventibiviGen.Services;
+using EdilPaintPreventibiviGen.ViewModels;
+using EdilPaintPreventibiviGen.Helpers;
+
+namespace EdilPaintPreventibiviGen.Views;
+
+public partial class HistoryView : UserControl, IDisposable
+{
+    private Window HostWindow => Window.GetWindow(this) ?? throw new InvalidOperationException("La sezione non e' collegata a una finestra.");
+    public event EventHandler? CloseRequested;
+    private void RequestClose() => CloseRequested?.Invoke(this, EventArgs.Empty);
+
+    private const int MaxVisibleHistoryRows = 250;
+
+    private readonly MainViewModel _vm;
+    private readonly QuoteHistoryService _historyService;
+    private readonly int _initialHistoryCount;
+    private bool _isLoadingHistory;
+    private bool _isSavingStatus;
+    private bool _isSavingSupplierInfo;
+    private bool _isGeneratingWorkSheet;
+    private bool _isGeneratingInstallationCertificate;
+    private readonly HashSet<string> _loadedQuoteNumbers = new();
+    private readonly List<QuoteHistorySummary> _currentSummaries = new();
+    private CancellationTokenSource? _searchCts;
+    private readonly ObservableCollection<QuoteHistorySummary> _visibleSummaries = [];
+    private bool _closed;
+    private bool _started;
+    private bool _replacingRows;
+    private int _searchRequest;
+    private bool _backgroundRefresh;
+    private bool _openingDocument;
+    private string _supplierBaseline = "";
+    private bool? _compactHistoryLayout;
+    private bool _embedded;
+    public bool CanClose => !_isSavingStatus && !_isSavingSupplierInfo && !_isGeneratingWorkSheet && !_isGeneratingInstallationCertificate &&
+        !_openingDocument && !HistoryCommonActions.IsBusy && !HistoryCommonActions.IsMenuOpen;
+    private static string SupplierSignature(QuoteHistorySummary row) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        row.QuoteNumber, row.SupplierName, row.MaterialStatus, row.MaterialOrderDate, row.ExpectedDeliveryDate, row.MaterialsOrderedByCustomer
+    });
+    private bool HasSupplierDraft => GridHistory.SelectedItem is QuoteHistorySummary row && _supplierBaseline.Length > 0 && SupplierSignature(row) != _supplierBaseline;
+    public event EventHandler<WorkContextEventArgs>? ContextSelected;
+    public event EventHandler? OpenQuoteRequested;
+    public string SelectedNumber => (GridHistory.SelectedItem as QuoteHistorySummary)?.QuoteNumber ?? "";
+    public Task OpenCostsAsync(string number) => OpenRealProfitCalculatorAsync(new QuoteHistorySummary { QuoteNumber = number });
+    public void ConfigureEmbedded()
+    {
+        _embedded = true;
+        HistoryHeader.Visibility = Visibility.Collapsed;
+        HistoryHeaderRow.Height = new GridLength(0);
+        HistoryFooter.Visibility = Visibility.Collapsed;
+    }
+    public async Task FocusQuoteAsync(string number)
+    {
+        if (_closed || !CanClose || string.IsNullOrWhiteSpace(number)) return;
+        TxtSearchHistory.Text = number;
+        CboFilterStatus.SelectedIndex = 0;
+        DpStart.SelectedDate = DpEnd.SelectedDate = null;
+        await ExecuteSearchAsync();
+        if (_closed || !string.Equals(TxtSearchHistory.Text?.Trim(), number, StringComparison.Ordinal)) return;
+        var row = _visibleSummaries.FirstOrDefault(item => item.QuoteNumber == number);
+        GridHistory.SelectedItem = row;
+        if (row != null) GridHistory.ScrollIntoView(row);
+    }
+    public async Task RefreshCurrentAsync()
+    {
+        if (!_started || _closed || !IsVisible || _isLoadingHistory || !CanClose || HistoryDetailPanel.IsKeyboardFocusWithin || HasSupplierDraft) return;
+        var scroll = FindScrollViewer(GridHistory);
+        double offset = scroll?.VerticalOffset ?? 0;
+        _backgroundRefresh = true;
+        try { await ExecuteSearchAsync(); }
+        finally { _backgroundRefresh = false; }
+        _ = Dispatcher.BeginInvoke(new Action(() => { if (!_closed) scroll?.ScrollToVerticalOffset(offset); }));
+    }
+    private static ScrollViewer? FindScrollViewer(DependencyObject parent)
+    {
+        for (int index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, index);
+            if (child is ScrollViewer scroll) return scroll;
+            if (FindScrollViewer(child) is { } nested) return nested;
+        }
+        return null;
+    }
+    private void ApplyResponsiveLayout()
+    {
+        bool compact = ActualWidth < 900;
+        if (_compactHistoryLayout != compact) { HistoryAdvancedFilters.IsExpanded = !compact; _compactHistoryLayout = compact; }
+        HistoryListColumn.MinWidth = HistoryDetailColumn.MinWidth = 0;
+        HistoryDetailColumn.Width = compact ? new GridLength(0) : new GridLength(360);
+        HistoryGapColumn.Width = compact ? new GridLength(0) : new GridLength(8);
+        HistoryListRow.Height = new GridLength(1, GridUnitType.Star);
+        HistoryGapRow.Height = compact ? new GridLength(8) : new GridLength(0);
+        HistoryDetailRow.Height = compact ? new GridLength(1.3, GridUnitType.Star) : new GridLength(0);
+        Grid.SetRow(HistoryDetailPanel, compact ? 2 : 0);
+        Grid.SetColumn(HistoryDetailPanel, compact ? 0 : 2);
+        Grid.SetColumnSpan(HistoryDetailPanel, compact ? 3 : 1);
+        HistorySplitter.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    public IReadOnlyList<string> MaterialStatusOptions { get; } =
+    [
+        "Da ordinare",
+        "Ordinato",
+        "Da ritirare",
+        "In magazzino",
+        "Consegnato",
+        "Non disponibile"
+    ];
+
+    public Visibility CertificateVisibility => App.AppSettings.Business.EnableInstallationCertificate ? Visibility.Visible : Visibility.Collapsed;
+
+    public ICollectionView HistoryCollectionView { get; private set; } = null!;
+
+    public HistoryView(MainViewModel vm, string? initialSearch = null)
+    {
+        InitializeComponent();
+
+        _vm = vm;
+        _historyService = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
+        _initialHistoryCount = NormalizeHistoryTake(App.AppSettings.App.NumberOfQuote);
+
+        DataContext = _vm;
+        HistoryCollectionView = CollectionViewSource.GetDefaultView(_visibleSummaries);
+        GridHistory.ItemsSource = _visibleSummaries;
+
+        PreviewKeyDown += HistoryView_PreviewKeyDown;
+        WorkScheduleActions.WorkCompleted += OnCalendarWorkCompleted;
+
+        GridHistory.SelectionChanged += (_, args) =>
+        {
+            if (!ReferenceEquals(args.OriginalSource, GridHistory)) return;
+            _supplierBaseline = GridHistory.SelectedItem is QuoteHistorySummary current ? SupplierSignature(current) : "";
+            if (!_replacingRows && GridHistory.SelectedItem is QuoteHistorySummary summary)
+                ContextSelected?.Invoke(this, new(summary.QuoteNumber, summary.OrderSiteTitle));
+        };
+        TxtSearchHistory.Text = initialSearch ?? "";
+        Loaded += async (_, _) => { if (_started) return; _started = true; await ExecuteSearchAsync(); };
+        SizeChanged += (_, _) => ApplyResponsiveLayout();
+    }
+
+    private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed)
+            HostWindow.DragMove();
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => RequestClose();
+
+    public void Dispose()
+    {
+        if (_closed) return;
+        _closed = true;
+        WorkScheduleActions.WorkCompleted -= OnCalendarWorkCompleted;
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = null;
+
+        TxtSearchHistory.Text = string.Empty;
+        CboFilterStatus.SelectedIndex = 0;
+        DpStart.SelectedDate = null;
+        DpEnd.SelectedDate = null;
+    }
+
+    private void OnCalendarWorkCompleted(object? sender, WorkScheduleCompletedEventArgs e)
+    {
+        var entry = e.Entry;
+        if (entry.IsOrderDeleted || entry.OrderStatus != QuoteStatus.Finito) return;
+        bool wasSavingStatus = _isSavingStatus;
+        _isSavingStatus = true;
+        try
+        {
+            // Updating the bound combo boxes must not save the same status again.
+            foreach (var summary in _currentSummaries.Concat(_visibleSummaries).Distinct().Where(x => x.QuoteNumber == entry.QuoteNumber))
+                summary.Status = QuoteStatus.Finito;
+            foreach (var quote in _vm.History.Where(x => x.QuoteNumber == entry.QuoteNumber))
+                quote.Status = QuoteStatus.Finito;
+            var selectedNumber = (GridHistory.SelectedItem as QuoteHistorySummary)?.QuoteNumber;
+            ApplyLocalFilters();
+            var selected = _visibleSummaries.FirstOrDefault(x => x.QuoteNumber == selectedNumber);
+            if (selected != null) GridHistory.SelectedItem = selected;
+        }
+        finally { _isSavingStatus = wasSavingStatus; }
+    }
+
+    private void HistoryView_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+            RequestClose();
+    }
+
+    private void OnSearchKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            _ = ExecuteSearchAsync();
+        }
+    }
+
+    private void OnSearchButtonClick(object sender, RoutedEventArgs e)
+    {
+        _ = ExecuteSearchAsync();
+    }
+
+    public async Task ExecuteSearchAsync()
+    {
+        int request = ++_searchRequest;
+        // Cancella qualsiasi ricerca precedente
+        _searchCts?.Cancel();
+        while (_isLoadingHistory && !_closed) await Task.Delay(30);
+        if (_closed || request != _searchRequest) return;
+        _searchCts?.Dispose();
+        _searchCts = AppShutdownManager.CreateLinkedTokenSource();
+        var token = _searchCts.Token;
+
+        // Previeni ricerche multiple simultanee
+        if (_isLoadingHistory)
+        {
+            Debug.WriteLine("[ExecuteSearch] Ricerca gia' in corso, ignorata");
+            return;
+        }
+
+        string searchText = TxtSearchHistory.Text?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            await LoadInitialHistoryAsync();
+        }
+        else
+        {
+            await RunSearchAsync(searchText, token);
+        }
+    }
+
+    private async Task LoadInitialHistoryAsync()
+    {
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = AppShutdownManager.CreateLinkedTokenSource();
+        var token = _searchCts.Token;
+
+        if (_isLoadingHistory) return;
+
+        try
+        {
+            _isLoadingHistory = true;
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+            if (!_backgroundRefresh) LoadingOverlay.Visibility = Visibility.Visible;
+
+            _loadedQuoteNumbers.Clear();
+
+            Debug.WriteLine($"[LoadInitialHistory] Caricamento primi {_initialHistoryCount} preventivi...");
+
+            var summaries = await _historyService.LoadTopSummariesAsync(_initialHistoryCount, token);
+
+            if (token.IsCancellationRequested)
+            {
+                Debug.WriteLine("[LoadInitialHistory] Operazione cancellata");
+                return;
+            }
+
+            SetCurrentHistorySummaries(summaries);
+
+            Debug.WriteLine($"[LoadInitialHistory] Caricati {_visibleSummaries.Count} preventivi");
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.WriteLine("[LoadInitialHistory] Task cancellato");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[LoadInitialHistory] Errore: {ex.Message}");
+            MessageBox.Show($"Errore durante il caricamento: {ex.Message}", "Errore", 
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            LoadingOverlay.Visibility = Visibility.Collapsed;
+            if (!_backgroundRefresh) Mouse.OverrideCursor = null;
+            _isLoadingHistory = false;
+        }
+    }
+    
+    private async Task RunSearchAsync(string searchText, CancellationToken token)
+    {
+        if (_isLoadingHistory) return;
+
+        try
+        {
+            _isLoadingHistory = true;
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+            if (!_backgroundRefresh) LoadingOverlay.Visibility = Visibility.Visible;
+
+            Debug.WriteLine($"[RunSearch] Inizio ricerca per: '{searchText}'");
+
+            int take = NormalizeHistoryTake(App.AppSettings.App.NumberOfQuote);
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
+
+            Debug.WriteLine("[RunSearch] Chiamata a SearchHistorySummariesAsync...");
+            var results = await _vm.SearchHistorySummariesAsync(searchText, take, linkedCts.Token);
+            Debug.WriteLine($"[RunSearch] Ricevuti {results?.Count ?? 0} risultati");
+
+            if (token.IsCancellationRequested)
+            {
+                Debug.WriteLine("[RunSearch] Operazione cancellata");
+                return;
+            }
+
+            SetCurrentHistorySummaries(results ?? []);
+            Debug.WriteLine($"[RunSearch] Aggiunti {results?.Count ?? 0} preventivi alla UI");
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.WriteLine("[RunSearch] Task cancellato o timeout");
+            if (!token.IsCancellationRequested)
+            {
+                MessageBox.Show("La ricerca ha superato il tempo limite (30 secondi).",
+                    "Ricerca interrotta", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[RunSearch] Errore: {ex.Message}\n{ex.StackTrace}");
+            MessageBox.Show($"Errore durante la ricerca: {ex.Message}\n\nDettagli: {ex.GetType().Name}",
+                "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            LoadingOverlay.Visibility = Visibility.Collapsed;
+            if (!_backgroundRefresh) Mouse.OverrideCursor = null;
+            _isLoadingHistory = false;
+            Debug.WriteLine("[RunSearch] Ricerca completata");
+        }
+    }
+    
+    private void ApplyLocalFilters()
+    {
+        if (!IsInitialized || GridHistory == null)
+            return;
+
+        string selectedStatus = (CboFilterStatus.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Tutti";
+
+        var filtered = _currentSummaries.Where(quote =>
+        {
+            bool matchesStatus = selectedStatus == "Tutti" ||
+                quote.Status.ToString().Equals(selectedStatus, StringComparison.OrdinalIgnoreCase);
+
+            bool matchesDate = true;
+            if (DpStart.SelectedDate.HasValue)
+                matchesDate &= quote.Date.Date >= DpStart.SelectedDate.Value.Date;
+
+            if (DpEnd.SelectedDate.HasValue)
+                matchesDate &= quote.Date.Date <= DpEnd.SelectedDate.Value.Date;
+
+            return matchesStatus && matchesDate;
+        }).ToList();
+
+        ReplaceVisibleHistorySummaries(filtered);
+    }
+
+    private static int NormalizeHistoryTake(int configuredTake)
+        => Math.Clamp(configuredTake <= 0 ? 100 : configuredTake, 1, MaxVisibleHistoryRows);
+
+    private void SetCurrentHistorySummaries(IEnumerable<QuoteHistorySummary> summaries)
+    {
+        var incoming = summaries.ToList();
+        if (_backgroundRefresh && string.Equals(System.Text.Json.JsonSerializer.Serialize(_currentSummaries), System.Text.Json.JsonSerializer.Serialize(incoming), StringComparison.Ordinal)) return;
+        _currentSummaries.Clear();
+        _currentSummaries.AddRange(incoming);
+        ApplyLocalFilters();
+    }
+
+    private void ReplaceVisibleHistorySummaries(IEnumerable<QuoteHistorySummary> summaries)
+    {
+        string selectedNumber = SelectedNumber;
+        _replacingRows = true;
+        try
+        {
+        _loadedQuoteNumbers.Clear();
+
+        GridHistory.ItemsSource = null;
+        _visibleSummaries.Clear();
+        foreach (var summary in summaries)
+        {
+            _visibleSummaries.Add(summary);
+            _loadedQuoteNumbers.Add(summary.QuoteNumber);
+        }
+        GridHistory.ItemsSource = _visibleSummaries;
+        GridHistory.SelectedItem = _visibleSummaries.FirstOrDefault(row => row.QuoteNumber == selectedNumber);
+        if (!_embedded && GridHistory.SelectedItem == null && _visibleSummaries.Count > 0) GridHistory.SelectedIndex = 0;
+        }
+        finally { _replacingRows = false; }
+    }
+
+    private void OnFilterChanged(object sender, EventArgs e)
+    {
+        ApplyLocalFilters();
+    }
+
+    private async void OnCopyPastQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await CopyPastQuoteAsync(entry);
+    }
+
+    private async Task CopyPastQuoteAsync(QuoteHistorySummary entry)
+    {
+        var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+        if (fullEntry == null) return;
+
+        if (MessageBox.Show($"Vuoi creare un NUOVO preventivo copiando i dati del n. {entry.QuoteNumber}?",
+                "Copia Preventivo", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+        {
+            await _vm.LoadQuoteFromHistoryAsync(fullEntry, isEdit: false);
+            if (OpenQuoteRequested != null) OpenQuoteRequested.Invoke(this, EventArgs.Empty); else RequestClose();
+        }
+    }
+
+    private async void OnEditPastQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await EditPastQuoteAsync(entry);
+    }
+
+    private async Task EditPastQuoteAsync(QuoteHistorySummary entry)
+    {
+        var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+        if (fullEntry == null) return;
+
+        if (MessageBox.Show($"Vuoi MODIFICARE il preventivo n. {entry.QuoteNumber}?",
+                "Modifica Preventivo", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+        {
+            await _vm.LoadQuoteFromHistoryAsync(fullEntry, isEdit: true);
+            if (OpenQuoteRequested != null) OpenQuoteRequested.Invoke(this, EventArgs.Empty); else RequestClose();
+        }
+    }
+
+    private async void OnNotesClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await EditNotesAsync(entry);
+    }
+
+    private async Task EditNotesAsync(QuoteHistorySummary entry)
+    {
+        var notesWin = new NotesWindow(entry.Notes) { Owner = HostWindow };
+
+        if (notesWin.ShowDialog() == true)
+        {
+            await _historyService.UpdateNotesAsync(entry.QuoteNumber, notesWin.ResultNotes);
+            entry.Notes = notesWin.ResultNotes;
+        }
+    }
+
+    private async Task OpenRealProfitCalculatorAsync(QuoteHistorySummary entry)
+    {
+        try
+        {
+            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+            if (fullEntry == null)
+            {
+                MessageBox.Show("Preventivo non trovato nello storico.", "Costi e guadagno",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            double supplierDiscount = _vm.AllCustomers
+                .FirstOrDefault(customer =>
+                    customer.IsSupplier &&
+                    string.Equals(customer.BusinessName, fullEntry.SupplierName, StringComparison.OrdinalIgnoreCase))
+                ?.SupplierDiscount ?? 0;
+
+            bool customerIsSupplier = _vm.AllCustomers.Any(customer =>
+                customer.IsSupplier &&
+                string.Equals(customer.BusinessName, fullEntry.CustomerName, StringComparison.OrdinalIgnoreCase));
+
+            new RealProfitWindow(
+                fullEntry,
+                supplierDiscount,
+                customerIsSupplier,
+                _vm.PersonalMaterialsView,
+                snapshot => _historyService.UpdateRealProfitAsync(fullEntry.QuoteNumber, snapshot),
+                App.AppSettings.RealProfit)
+            {
+                Owner = HostWindow
+            }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Impossibile aprire il calcolo del guadagno.\n\n{ex.Message}",
+                "Costi e guadagno", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void OnCalculateRealProfitClick(object sender, RoutedEventArgs e)
+    {
+        if (TryGetSummary(sender, out var entry))
+            await OpenRealProfitCalculatorAsync(entry);
+    }
+
+    private void OnSelectSupplierClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        var win = new SelectCustomerWindow(_vm, suppliersOnly: true)
+        {
+            Owner = HostWindow,
+            Title = "Seleziona fornitore"
+        };
+
+        if (win.ShowDialog() == true && win.SelectedResult != null)
+        {
+            entry.MaterialsOrderedByCustomer = false;
+            entry.SupplierName = win.SelectedResult.BusinessName;
+        }
+    }
+
+    private void OnMaterialsOrderedByCustomerClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox checkBox ||
+            checkBox.DataContext is not QuoteHistorySummary entry)
+        {
+            return;
+        }
+
+        SupplierOrderAssignmentService.ApplyCustomerOrderChoice(
+            entry,
+            checkBox.IsChecked == true);
+    }
+
+    private async void OnSaveSupplierInfoClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+        if (_isSavingSupplierInfo) return;
+
+        try
+        {
+            _isSavingSupplierInfo = true;
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+            if (entry.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(entry, orderedByCustomer: true);
+
+            await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
+            {
+                SupplierName = entry.SupplierName,
+                MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
+                MaterialOrderDate = entry.MaterialOrderDate,
+                ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+                MaterialStatus = entry.MaterialStatus,
+                DeviceName = DeviceNameService.GetCurrentDeviceName()
+            });
+
+            entry.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            _supplierBaseline = SupplierSignature(entry);
+            MessageBox.Show(
+                "Dati dell'ordine salvati.",
+                "Ordini",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SupplierInfo] Errore salvataggio: {ex.Message}");
+            MessageBox.Show(
+                $"Errore durante il salvataggio dell'ordine:\n\n{ex.Message}",
+                "Ordini",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (!_backgroundRefresh) Mouse.OverrideCursor = null;
+            _isSavingSupplierInfo = false;
+        }
+    }
+
+    private async void OnPrepareSupplierOrderMailClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        try
+        {
+            if (entry.MaterialsOrderedByCustomer)
+                SupplierOrderAssignmentService.ApplyCustomerOrderChoice(entry, orderedByCustomer: true);
+
+            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+            if (fullEntry == null)
+            {
+                MessageBox.Show(
+                    "Preventivo non trovato nello storico.",
+                    "Ordini",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            fullEntry.SupplierName = entry.SupplierName;
+            fullEntry.MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer;
+            fullEntry.MaterialOrderDate = entry.MaterialOrderDate;
+            fullEntry.ExpectedDeliveryDate = entry.ExpectedDeliveryDate;
+            fullEntry.MaterialStatus = entry.MaterialStatus;
+
+            if (string.IsNullOrWhiteSpace(fullEntry.SupplierName))
+            {
+                MessageBox.Show(
+                    "Seleziona prima un fornitore.",
+                    "Ordini",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var draft = SupplierOrderMailService.CreateDraft(fullEntry, _vm.AllCustomers);
+            if (string.IsNullOrWhiteSpace(draft.Recipient))
+            {
+                MessageBox.Show(
+                    "Il fornitore selezionato non ha un indirizzo email in anagrafica. La finestra verra' preparata senza destinatario.",
+                    "Ordini",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            var win = new SupplierOrderMailWindow(fullEntry, draft) { Owner = HostWindow };
+            if (win.ShowDialog() == true && win.WasRegisteredAsSent)
+            {
+                entry.MaterialOrderDate ??= win.RegisteredAtUtc.ToLocalTime().Date;
+                if (string.IsNullOrWhiteSpace(entry.MaterialStatus))
+                    entry.MaterialStatus = "Ordinato";
+
+                string deviceName = DeviceNameService.GetCurrentDeviceName();
+                await _historyService.UpdateSupplierInfoAsync(entry.QuoteNumber, new QuoteSupplierInfo
+                {
+                    SupplierName = entry.SupplierName,
+                    MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
+                    MaterialOrderDate = entry.MaterialOrderDate,
+                    ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
+                    MaterialStatus = entry.MaterialStatus,
+                    DeviceName = deviceName
+                });
+                entry.LastModifiedByDevice = deviceName;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SupplierMail] Errore preparazione mail: {ex.Message}");
+            MessageBox.Show(
+                $"Errore durante la gestione dell'ordine.\n\n{ex.Message}",
+                "Ordini",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private async void OnSendQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await SendQuoteAsync(entry);
+    }
+
+    private async Task SendQuoteAsync(QuoteHistorySummary entry)
+    {
+        var win = new QuoteSendWindow(
+            entry,
+            ResolveDefaultRecipient(entry),
+            FormatMailTemplate(App.AppSettings.Mail.DefaultSubject, entry),
+            FormatMailTemplate(App.AppSettings.Mail.DefaultBody, entry),
+            ResolveDefaultWhatsAppPhone(entry))
+        {
+            Owner = HostWindow
+        };
+
+        if (win.ShowDialog() != true)
+            return;
+
+        try
+        {
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+
+            SmtpEmailSendResult? emailResult = null;
+            if (App.AppSettings.Mail.Enabled)
+            {
+                emailResult = await SendQuoteEmailAsync(entry, win);
+            }
+            else if (MessageBox.Show(
+                "L'invio email SMTP non e' abilitato nelle impostazioni.\nVuoi registrare comunque l'invio manualmente?",
+                "Invio email",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            await _historyService.UpdateSendInfoAsync(entry.QuoteNumber, win.Result);
+            entry.Status = QuoteStatus.Spedito;
+            entry.SentAtUtc = win.Result.SentAtUtc;
+            entry.SentMethod = win.Result.Method;
+            entry.SentRecipient = win.Result.Recipient;
+            entry.SentByDevice = win.Result.DeviceName;
+            entry.LastModifiedByDevice = win.Result.DeviceName;
+            ApplyLocalFilters();
+
+            if (emailResult != null)
+            {
+                MessageBox.Show(
+                    "Preventivo inviato correttamente.",
+                    "Invio preventivo",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            if (win.ShouldOpenWhatsApp)
+                TryOpenWhatsAppMessage(win);
+        }
+        catch (OperationCanceledException)
+        {
+            string logPath = SmtpEmailDebugLog.WriteFailure(
+                $"Invio preventivo {entry.QuoteNumber} annullato o interrotto per timeout.",
+                new TimeoutException("Timeout invio email."));
+            ShowSendFailureMessage(logPath, "Invio email annullato o interrotto per timeout.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] Errore invio/salvataggio: {ex}");
+            string logPath = SmtpEmailDebugLog.WriteFailure(
+                $"Preventivo {entry.QuoteNumber} non inviato.",
+                ex);
+            ShowSendFailureMessage(logPath, ex.GetBaseException().Message);
+        }
+        finally
+        {
+            if (!_backgroundRefresh) Mouse.OverrideCursor = null;
+        }
+    }
+
+    private static void ShowSendFailureMessage(string logPath, string detail)
+    {
+        string message =
+            "Preventivo non inviato.\n\n" +
+            $"{detail}\n\n" +
+            $"Log SMTP:\n{logPath}\n\n" +
+            "Vuoi aprire la cartella dei log?";
+
+        if (MessageBox.Show(
+                message,
+                "Invio preventivo",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            string? directory = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] Impossibile aprire cartella log SMTP: {ex.Message}");
+        }
+    }
+
+    private async Task<SmtpEmailSendResult> SendQuoteEmailAsync(QuoteHistorySummary entry, QuoteSendWindow win)
+    {
+        using var emailCts = AppShutdownManager.CreateLinkedTokenSource();
+        emailCts.CancelAfter(TimeSpan.FromSeconds(45));
+        var token = emailCts.Token;
+
+        string pdfPath = await ResolvePdfPathForEmailAsync(entry, token);
+        var service = new SmtpEmailService(App.AppSettings.Mail);
+        return await service.SendAsync(new SmtpEmailRequest
+        {
+            Recipient = win.PrimaryEmailRecipient,
+            CcRecipients = win.EmailCcRecipients,
+            Subject = win.EmailSubject,
+            Body = win.EmailBody,
+            AttachmentPath = pdfPath
+        }, token);
+    }
+
+    private void TryOpenWhatsAppMessage(QuoteSendWindow win)
+    {
+        try
+        {
+            OpenWhatsAppMessage(win.WhatsAppPhone, win.WhatsAppMessage);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SendQuote] Impossibile aprire WhatsApp: {ex}");
+            MessageBox.Show(
+                "Preventivo inviato, ma non sono riuscito ad aprire WhatsApp.",
+                "WhatsApp",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static void OpenWhatsAppMessage(string phone, string message)
+    {
+        string digits = new(phone.Where(char.IsDigit).ToArray());
+        string encodedMessage = Uri.EscapeDataString(message ?? string.Empty);
+        string url = string.IsNullOrWhiteSpace(digits)
+            ? $"https://wa.me/?text={encodedMessage}"
+            : $"https://wa.me/{digits}?text={encodedMessage}";
+
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    }
+
+    private async Task<string> ResolvePdfPathForEmailAsync(
+        QuoteHistorySummary entry,
+        CancellationToken cancellationToken)
+    {
+        var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber)
+            ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
+
+        string expectedPath = _historyService.GetExpectedPdfPath(fullEntry);
+        string regeneratedPath = await RegeneratePdfFromHistoryAsync(fullEntry, expectedPath, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(regeneratedPath) && File.Exists(regeneratedPath))
+            return regeneratedPath;
+
+        throw new InvalidOperationException(
+            $"PDF del preventivo n. {entry.QuoteNumber} non trovato e rigenerazione automatica non riuscita.");
+    }
+
+    private Task<string> RegeneratePdfFromHistoryAsync(
+        QuoteHistoryEntry fullEntry,
+        string expectedPath,
+        CancellationToken cancellationToken)
+        => new QuotePdfDocumentService(App.DataService, StoragePathService.Instance, App.AppSettings,
+            () => _vm.SelectedLogo, () => _vm.AllCustomers.ToList())
+            .RegenerateAsync(fullEntry, expectedPath, cancellationToken);
+
+    private string ResolveLogoForPdf(Company company)
+    {
+        if (!string.IsNullOrWhiteSpace(_vm.SelectedLogo))
+            return _vm.SelectedLogo;
+
+        if (company.Logo.Count == 0)
+            return string.Empty;
+
+        int index = company.Logo_index >= 0 && company.Logo_index < company.Logo.Count
+            ? company.Logo_index
+            : 0;
+
+        return company.Logo[index];
+    }
+
+    private string ResolveDefaultRecipient(QuoteHistorySummary entry)
+    {
+        if (!string.IsNullOrWhiteSpace(entry.SentRecipient))
+            return entry.SentRecipient;
+
+        return ResolveCustomer(entry)?.Email ?? string.Empty;
+    }
+
+    private string ResolveDefaultWhatsAppPhone(QuoteHistorySummary entry) =>
+        ResolveCustomer(entry)?.Phone ?? string.Empty;
+
+    private Customer? ResolveCustomer(QuoteHistorySummary entry) =>
+        _vm.AllCustomers.FirstOrDefault(customer => string.Equals(
+            customer.BusinessName,
+            entry.CustomerName,
+            StringComparison.OrdinalIgnoreCase));
+
+    private static string FormatMailTemplate(string template, QuoteHistorySummary entry)
+    {
+        string text = string.IsNullOrWhiteSpace(template) ? string.Empty : template;
+        return text
+            .Replace("{QuoteNumber}", entry.QuoteNumber, StringComparison.OrdinalIgnoreCase)
+            .Replace("{CustomerName}", entry.CustomerName, StringComparison.OrdinalIgnoreCase)
+            .Replace("{ReferenceName}", BlankToDash(entry.ReferenceName), StringComparison.OrdinalIgnoreCase)
+            .Replace("{Date}", entry.Date.ToLocalTime().ToString("dd/MM/yyyy", CultureInfo.GetCultureInfo("it-IT")), StringComparison.OrdinalIgnoreCase)
+            .Replace("{Total}", entry.Total.ToString("N2", CultureInfo.GetCultureInfo("it-IT")), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async void OnStatusChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingHistory) return;
+        if (_isSavingStatus) return;
+
+        if (e.RemovedItems.Count == 0) return;
+
+        if (sender is not ComboBox cb || cb.DataContext is not QuoteHistorySummary summary) return;
+
+        if (e.AddedItems.Count == 0 || e.RemovedItems.Count == 0) return;
+        if (e.AddedItems[0] is not QuoteStatus newStatus) return;
+        if (e.RemovedItems[0] is not QuoteStatus oldStatus) return;
+        if (newStatus == oldStatus) return;
+
+        if (!_loadedQuoteNumbers.Contains(summary.QuoteNumber)) return;
+
+        try
+        {
+            _isSavingStatus = true;
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+
+            summary.Status = newStatus;
+            await _historyService.UpdateStatusAsync(summary.QuoteNumber, newStatus);
+        }
+        catch (Exception ex)
+        {
+            summary.Status = oldStatus;
+            Debug.WriteLine($"[OnStatusChanged] Errore salvataggio stato: {ex.Message}");
+            MessageBox.Show($"Errore durante il salvataggio dello stato: {ex.Message}",
+                "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (!_backgroundRefresh) Mouse.OverrideCursor = null;
+            _isSavingStatus = false;
+        }
+    }
+
+    private async void OnDeletePastQuoteClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await DeletePastQuoteAsync(entry);
+    }
+
+    private async Task DeletePastQuoteAsync(QuoteHistorySummary entry)
+    {
+        var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber);
+        if (fullEntry == null) return;
+
+        if (MessageBox.Show($"Sei sicuro di voler eliminare definitivamente il preventivo n. {entry.QuoteNumber}?\n\nQuesta operazione cancellera' anche il file PDF.",
+                "Conferma Eliminazione", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            _historyService.DeleteQuoteFiles(fullEntry);
+            await _historyService.DeleteQuoteAsync(fullEntry.QuoteNumber);
+            _currentSummaries.Remove(entry);
+            _visibleSummaries.Remove(entry);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Errore durante l'eliminazione: {ex.Message}", "Avviso", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    private async void OnOpenPastQuotePdfClick(object sender, RoutedEventArgs e)
+    {
+        if (TryGetSummary(sender, out var entry)) await OpenPastQuotePdfAsync(entry);
+    }
+
+    private async Task OpenPastQuotePdfAsync(QuoteHistorySummary entry)
+    {
+        if (_openingDocument) return;
+        _openingDocument = true;
+        try
+        {
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+            await QuoteDocumentActions.OpenPdfAsync(entry.QuoteNumber, HostWindow, AppShutdownManager.ShutdownToken);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            MessageBox.Show(HostWindow, $"Impossibile aprire il preventivo: {ex.Message}", "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally { _openingDocument = false; if (!_backgroundRefresh) Mouse.OverrideCursor = null; }
+    }
+
+    private async void OnGenerateInstallationCertificateClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await GenerateInstallationCertificateAsync(entry);
+    }
+
+    private async void OnGenerateWorkSheetClick(object sender, RoutedEventArgs e)
+    {
+        if (TryGetSummary(sender, out var entry)) await GenerateWorkSheetAsync(entry);
+    }
+
+    private async Task GenerateWorkSheetAsync(QuoteHistorySummary entry)
+    {
+        if (_isGeneratingWorkSheet) return;
+        _isGeneratingWorkSheet = true;
+        try
+        {
+            await QuoteDocumentActions.GenerateWorkSheetAsync(entry.QuoteNumber, HostWindow, AppShutdownManager.ShutdownToken);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            MessageBox.Show(HostWindow, $"Impossibile generare la scheda lavoro.\n\n{ex.Message}", "Scheda lavoro", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally { _isGeneratingWorkSheet = false; }
+    }
+
+    private async Task GenerateInstallationCertificateAsync(QuoteHistorySummary entry)
+    {
+        if (_isGeneratingInstallationCertificate || !App.AppSettings.Business.EnableInstallationCertificate)
+            return;
+
+        _isGeneratingInstallationCertificate = true;
+        string? temporaryPath = null;
+        try
+        {
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+
+            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber)
+                ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
+            var materials = fullEntry.Materials
+                .Where(material => !string.IsNullOrWhiteSpace(material.Name) && material.Quantity > 0)
+                .OrderBy(material => material.SortOrder)
+                .ToList();
+            if (materials.Count == 0)
+                throw new InvalidOperationException("Il preventivo non contiene materiali da inserire nel certificato.");
+
+            if (!_backgroundRefresh) Mouse.OverrideCursor = null;
+            var inputWindow = new InstallationCertificateWindow(entry, materials) { Owner = HostWindow };
+            if (inputWindow.ShowDialog() != true)
+                return;
+
+            if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
+            var company = await App.DataService.GetCompanyAsync() ?? new Company();
+            string expectedPath = StoragePathService.Instance.BuildInstallationCertificatePdfPath(
+                fullEntry.CustomerName,
+                fullEntry.QuoteNumber,
+                string.IsNullOrWhiteSpace(fullEntry.ReferenceName) ? null : fullEntry.ReferenceName);
+
+            string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
+            Directory.CreateDirectory(tempRoot);
+            temporaryPath = Path.Combine(
+                tempRoot,
+                $"{Guid.NewGuid():N}_{Path.GetFileName(expectedPath)}");
+
+            var context = new InstallationCertificateContext
+            {
+                QuoteNumber = fullEntry.QuoteNumber,
+                CompletionDate = inputWindow.CompletionDate,
+                WorkSite = ResolveCertificateWorkSite(fullEntry, inputWindow.WorkSite),
+                CustomerName = fullEntry.CustomerName,
+                ReferenceName = fullEntry.ReferenceName,
+                SelectedLogo = ResolveLogoForPdf(company),
+                Materials = inputWindow.SelectedMaterials.ToList(),
+                AllCustomers = _vm.AllCustomers.ToList(),
+                PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
+                FooterText = App.AppSettings.PdfTemplate.FooterText
+            };
+
+            new PdfService().GenerateInstallationCertificate(context, company, temporaryPath);
+
+            string pathToOpen = temporaryPath;
+            try
+            {
+                string? targetFolder = Path.GetDirectoryName(expectedPath);
+                if (!string.IsNullOrWhiteSpace(targetFolder))
+                    Directory.CreateDirectory(targetFolder);
+
+                File.Copy(temporaryPath, expectedPath, overwrite: true);
+                pathToOpen = expectedPath;
+                File.Delete(temporaryPath);
+                temporaryPath = null;
+            }
+            catch (Exception copyEx)
+            {
+                Debug.WriteLine($"[InstallationCertificate] Copia nella cartella cliente non riuscita: {copyEx.Message}");
+                MessageBox.Show(
+                    $"La cartella condivisa non e' disponibile. Il certificato e' stato generato temporaneamente qui:\n\n{temporaryPath}",
+                    "Certificato generato",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            OpenFolderAndSelectFile(pathToOpen);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Impossibile generare il certificato di corretta posa.\n\n{ex.Message}",
+                "Errore certificato",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            _isGeneratingInstallationCertificate = false;
+            if (!_backgroundRefresh) Mouse.OverrideCursor = null;
+        }
+    }
+
+    private string ResolveCertificateWorkSite(QuoteHistoryEntry entry, string enteredWorkSite)
+    {
+        if (!string.IsNullOrWhiteSpace(enteredWorkSite))
+            return enteredWorkSite.Trim();
+
+        if (!string.IsNullOrWhiteSpace(entry.SiteName))
+            return entry.SiteName.Trim();
+
+        string addressOwner = !string.IsNullOrWhiteSpace(entry.ReferenceName)
+            ? entry.ReferenceName
+            : entry.CustomerName;
+        string address = _vm.AllCustomers.FirstOrDefault(customer =>
+                string.Equals(customer.BusinessName?.Trim(), addressOwner.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?.Address?.Trim() ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(address))
+            return address;
+
+        string subject = !string.IsNullOrWhiteSpace(entry.ReferenceName)
+                ? $"il riferimento '{entry.ReferenceName}'"
+                : $"il cliente '{entry.CustomerName}'";
+        throw new InvalidOperationException(
+            $"Il campo 'Cantiere presso' e' vuoto e {subject} non ha un indirizzo salvato.");
+    }
+
+    private static void OpenFolderAndSelectFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Certificato generato non trovato.", filePath);
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"/select,\"{Path.GetFullPath(filePath)}\"",
+            UseShellExecute = true
+        });
+    }
+    
+    private async void OnOpenCustomerFolderClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSummary(sender, out var entry)) return;
+
+        await OpenCustomerFolderAsync(entry);
+    }
+
+    private async Task OpenCustomerFolderAsync(QuoteHistorySummary entry)
+    {
+        try
+        {
+            await QuoteDocumentActions.OpenCustomerFolderAsync(entry.QuoteNumber, HostWindow, AppShutdownManager.ShutdownToken);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            MessageBox.Show(HostWindow, $"Impossibile aprire la cartella.\n\n{ex.Message}",
+                "Errore", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OnMoreActionsClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.DataContext is not QuoteHistorySummary entry)
+            return;
+
+        var menu = new ContextMenu
+        {
+            PlacementTarget = btn
+        };
+
+        menu.Items.Add(CreateDisabledMenuItem($"Preventivo {entry.QuoteNumber}"));
+        menu.Items.Add(CreateDisabledMenuItem($"IVA: {entry.IvaDisplay}"));
+        menu.Items.Add(CreateDisabledMenuItem($"Sconti: {entry.DiscountDisplay}"));
+        menu.Items.Add(CreateDisabledMenuItem($"Invio: {entry.SentDisplay}"));
+        menu.Items.Add(CreateDisabledMenuItem($"PC: {BlankToDash(entry.LastModifiedByDevice)}"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateMenuItem("Apri PDF", async () => await OpenPastQuotePdfAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Copia in nuovo preventivo", async () => await CopyPastQuoteAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Apri cartella cliente", async () => await OpenCustomerFolderAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
+        if (App.AppSettings.Business.EnableInstallationCertificate) menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Genera scheda lavoro", async () => await GenerateWorkSheetAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Costi e guadagno", async () => await OpenRealProfitCalculatorAsync(entry)));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));
+
+        btn.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
+    private static bool TryGetSummary(object sender, out QuoteHistorySummary entry)
+    {
+        if (sender is FrameworkElement element && element.DataContext is QuoteHistorySummary summary)
+        {
+            entry = summary;
+            return true;
+        }
+
+        entry = null!;
+        return false;
+    }
+
+    private static MenuItem CreateDisabledMenuItem(string header)
+    {
+        return new MenuItem
+        {
+            Header = header,
+            IsEnabled = false
+        };
+    }
+
+    private static MenuItem CreateMenuItem(string header, Func<Task> action)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += async (_, _) => await action();
+        return item;
+    }
+
+    private static string BlankToDash(string value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value;
+            
+    private void OnCloseClick(object sender, RoutedEventArgs e) => RequestClose();
+}

@@ -107,7 +107,7 @@ public partial class WorkScheduleEditorWindow : Window
         if (entry?.HasOrderWarning == true)
         {
             OrderWarningNotice.Visibility = Visibility.Visible;
-            TxtOrderWarning.Text = WorkScheduleWindow.OrderWarningText(entry);
+        TxtOrderWarning.Text = WorkScheduleView.OrderWarningText(entry);
         }
 
         var directory = snapshot.Employees.ToDictionary(employee => employee.Id);

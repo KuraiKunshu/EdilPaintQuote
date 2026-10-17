@@ -73,7 +73,9 @@ public static class WorkScheduleActions
     public static void OpenOrder(string quoteNumber, Window owner)
     {
         if (App.MainVm == null) throw new InvalidOperationException("La finestra principale non è disponibile.");
-        new HistoryWindow(App.MainVm, quoteNumber) { Owner = owner }.ShowDialog();
+        var workspace = Application.Current.Windows.OfType<WorkManagementWindow>().FirstOrDefault();
+        if (workspace != null) { _ = workspace.ShowQuoteAsync(quoteNumber); return; }
+        new HistoryWindow(App.MainVm, quoteNumber) { Owner = owner }.Show();
     }
 
     internal static WorkSheetOptions CreateWorkSheetOptions(WorkScheduleEntry entry) => new()

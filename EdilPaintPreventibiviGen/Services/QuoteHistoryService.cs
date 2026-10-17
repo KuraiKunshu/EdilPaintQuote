@@ -7,6 +7,7 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public sealed class QuoteHistoryService
 {
+    public static event EventHandler? Changed;
     private static readonly HashSet<QuoteStatus> SentOpenExcludedStatuses =
     [
         QuoteStatus.Confermato,
@@ -139,6 +140,11 @@ public sealed class QuoteHistoryService
         {
             DatabaseOperationCoordinator.Gate.Release();
         }
+        // Observers refresh their own views; a UI failure must not turn a saved mutation into an error.
+        if (Changed is { } handlers)
+            foreach (EventHandler handler in handlers.GetInvocationList())
+                try { handler(this, EventArgs.Empty); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[History] Aggiornamento vista: {ex.Message}"); }
     }
 
     public string GetExpectedPdfPath(QuoteHistoryEntry entry)
