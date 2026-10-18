@@ -81,6 +81,7 @@
                  Link="updater\Update-EdilPaint.ps1">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <Content Include="updater-startup-protocol.txt" CopyToOutputDirectory="PreserveNewest" />
 
     </ItemGroup>
 

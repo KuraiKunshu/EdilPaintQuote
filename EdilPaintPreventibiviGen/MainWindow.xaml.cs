@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private bool _isInitializingMainWindowScale;
     private DateTime _lastSharedDataRefreshUtc = DateTime.MinValue;
     private bool _isMainWindowLoaded;
+    private WorkManagementWindow? _workManagementWindow;
     
     #region Constructor
     public MainWindow()
@@ -131,6 +132,18 @@ public partial class MainWindow : Window
     #region Window events
     private void Window_Closing(object sender, CancelEventArgs e)
     {
+        if (!AppShutdownManager.IsShutdownRequested && HistoryWindow.FindBusy() is { } busyHistory)
+        {
+            e.Cancel = true;
+            busyHistory.Activate();
+            return;
+        }
+        if (!AppShutdownManager.IsShutdownRequested && _workManagementWindow is { CanClose: false })
+        {
+            e.Cancel = true;
+            _workManagementWindow.Activate();
+            return;
+        }
         if (AppShutdownManager.IsShutdownRequested)
         {
             StopDraftAutosave();
@@ -549,11 +562,18 @@ public partial class MainWindow : Window
     }
     private void OnOpenHistoryClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel vm)
+        if (DataContext is MainViewModel vm) HistoryWindow.Open(vm);
+    }
+    private void OpenWorkManagement()
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (_workManagementWindow == null)
         {
-            var win = new HistoryWindow(vm) { Owner = this }; 
-            win.ShowDialog();
+            _workManagementWindow = new WorkManagementWindow(vm);
+            _workManagementWindow.Closed += (_, _) => _workManagementWindow = null;
+            _workManagementWindow.Show();
         }
+        _workManagementWindow.ShowSection(false);
     }
     private async void OnNewCustomerClick(object sender, RoutedEventArgs e)
     {
@@ -597,6 +617,8 @@ public partial class MainWindow : Window
     }
     private async void OnOpenSettingsClick(object sender, RoutedEventArgs e)
     {
+        if (HistoryWindow.FindBusy() is { } busyHistory) { busyHistory.Activate(); return; }
+        if (_workManagementWindow is { CanClose: false }) { _workManagementWindow.Activate(); return; }
         string previousDatabase = App.AppSettings.Database.GetCatalogIdentity();
         var win = DataContext is MainViewModel vm
             ? new SettingsWindow(
@@ -605,6 +627,11 @@ public partial class MainWindow : Window
             : new SettingsWindow();
         win.Owner = this;
         win.ShowDialog();
+        if (!string.Equals(previousDatabase, App.AppSettings.Database.GetCatalogIdentity(), StringComparison.OrdinalIgnoreCase))
+        {
+            _workManagementWindow?.Close();
+            foreach (var history in Application.Current.Windows.OfType<HistoryWindow>().ToArray()) history.Close();
+        }
         if (DataContext is MainViewModel currentVm && string.Equals(previousDatabase,
                 App.AppSettings.Database.GetCatalogIdentity(), StringComparison.OrdinalIgnoreCase))
         {
@@ -620,8 +647,7 @@ public partial class MainWindow : Window
 
     private void OnOpenWorkScheduleClick(object sender, RoutedEventArgs e)
     {
-        var window = new WorkScheduleWindow { Owner = this };
-        window.ShowDialog();
+        OpenWorkManagement();
     }
 
     private void OnOpenSentOpenQuotesClick(object sender, RoutedEventArgs e)
@@ -632,11 +658,7 @@ public partial class MainWindow : Window
 
     private void OnOpenSuppliersClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel vm)
-        {
-            var win = new SuppliersWindow(vm) { Owner = this };
-            win.ShowDialog();
-        }
+        OpenWorkManagement();
     }
 
     private void OnEditRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item) { var win = new EditItemWindow(item) { Owner = this }; if (win.ShowDialog() == true) (DataContext as MainViewModel)?.CalculateTotals(); } }

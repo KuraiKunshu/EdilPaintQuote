@@ -33,6 +33,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
         _storage = new(new PdfStorageSettingsModel { RootPath = Path.Combine(_root, "pdf") });
         _data = DispatchProxy.Create<IDataService, DataProxy>();
         _quotes = (DataProxy)_data;
+        _repository.Quotes = _quotes;
     }
 
     private WorkScheduleCompletionService Service(Action<RealProfitPdfContext, string>? writer = null) =>
@@ -131,7 +132,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CompletionPublishesFlatPdfAndPreservesAllSavedVisitDetailsAndQuoteStatus()
+    public async Task CompletionPublishesFlatPdfFinishesHistoryQuoteAndPreservesSavedVisitDetails()
     {
         var selected = Selected;
         RealProfitPdfContext? context = null;
@@ -139,6 +140,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
         {
             context = value;
             Assert.Equal(0, _repository.CompleteCalls);
+            Assert.Equal(QuoteStatus.Confermato, _quotes.Quote!.Status);
             Assert.False(File.Exists(FinalPath));
             File.WriteAllText(path, "new-pdf");
         }).CompleteAsync(selected);
@@ -159,7 +161,8 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
         Assert.Equal("Mario", result.Entry.Employees.Single().FirstName);
         Assert.Equal("Rossi", result.Entry.Employees.Single().LastName);
         Assert.False(result.Entry.IsActiveOrder);
-        Assert.Equal(QuoteStatus.Confermato, _quotes.Quote!.Status);
+        Assert.Equal(QuoteStatus.Finito, _quotes.Quote!.Status);
+        Assert.Equal(QuoteStatus.Finito, result.Entry.OrderStatus);
         Assert.Equal(FinalPath, result.PdfPath);
         Assert.Equal(_storage.GetWorkScheduleCostsFolder(), Path.GetDirectoryName(result.PdfPath));
         Assert.Equal("new-pdf", File.ReadAllText(result.PdfPath));
@@ -183,6 +186,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
 
         Assert.Equal(WorkScheduleEntryStatus.Planned, _repository.Entry!.Status);
         Assert.Equal(4, _repository.Entry.Revision);
+        Assert.Equal(QuoteStatus.Confermato, _quotes.Quote!.Status);
         Assert.Equal("previous-pdf", File.ReadAllText(FinalPath));
         Assert.Empty(StagingFiles);
     }
@@ -215,6 +219,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
         Assert.Equal(5, exception.Entry.Revision);
         Assert.Equal(FinalPath, exception.PdfPath);
         Assert.Equal(WorkScheduleEntryStatus.Completed, _repository.Entry!.Status);
+        Assert.Equal(QuoteStatus.Finito, _quotes.Quote!.Status);
         Assert.Equal(1, _repository.CompleteCalls);
         Assert.Empty(StagingFiles);
 
@@ -235,6 +240,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
         Assert.Equal(selected.Revision, result.Entry.Revision);
         Assert.Equal(WorkScheduleEntryStatus.Completed, result.Entry.Status);
         Assert.True(File.Exists(result.PdfPath));
+        Assert.Equal(QuoteStatus.Confermato, _quotes.Quote!.Status);
     }
 
     [Theory]
@@ -457,6 +463,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
 
     public class ScheduleProxy : DispatchProxy
     {
+        public DataProxy? Quotes { get; set; }
         public WorkScheduleEntry? Entry { get; set; }
         public bool Unavailable { get; set; }
         public bool UnavailableLabor { get; set; }
@@ -489,7 +496,15 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
                 case nameof(IWorkScheduleRepository.CompleteWorkScheduleEntryAsync):
                     CompleteCalls++;
                     if (FailComplete) throw new IOException("Database failure");
-                    Entry = WorkScheduleRules.CreateCompletedCopy(Entry, (Guid)args![0]!, (long)args[1]!);
+                    var wasPlanned = Entry?.Status == WorkScheduleEntryStatus.Planned;
+                    var completed = WorkScheduleRules.CreateCompletedCopy(Entry, (Guid)args![0]!, (long)args[1]!);
+                    if (wasPlanned && Quotes?.Quote is { } quote)
+                    {
+                        quote.Status = QuoteStatus.Finito;
+                        completed.OrderStatus = QuoteStatus.Finito;
+                        completed.IsOrderActive = false;
+                    }
+                    Entry = completed;
                     AfterComplete?.Invoke();
                     return Task.FromResult(Entry.CreateValidatedCopy());
                 default:

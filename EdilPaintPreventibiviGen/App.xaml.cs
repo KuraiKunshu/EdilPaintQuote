@@ -32,13 +32,36 @@ public partial class App : Application
     private static System.Timers.Timer? _syncTimer;
     private static CancellationTokenSource? _shutdownCts;
     private static bool _isShuttingDown;
+    private UpdateStartupReportService? _updateStartupReport;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        _updateStartupReport = UpdateStartupReportService.FromArguments(e.Args);
+
+        if (UpdaterLauncherService.IsInstallationUpdateInProgress(AppContext.BaseDirectory))
+        {
+            _updateStartupReport?.ReportFailure("L’installazione è ancora bloccata da un aggiornamento o ripristino incompleto.", dialogShown: true);
+            MessageBox.Show("È in corso un aggiornamento oppure un ripristino deve essere completato. Attendi il termine dell’updater; in caso di interruzione rieseguilo per recuperare la versione precedente.",
+                "Aggiornamento EdilPaint", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown(); return;
+        }
 
         try
         {
+            // Migrate old external updater copies when this app version first starts.
+            // Settings and disabled automatic-update preferences remain intact.
+            try
+            {
+                string? updater = UpdaterLauncherService.ResolveUpdaterScriptPath();
+                if (updater != null && File.Exists(Path.Combine(Path.GetDirectoryName(updater)!, "updater-settings.json")))
+                {
+                    UpdaterLauncherService.ValidateManualUpdateSettings(Path.Combine(Path.GetDirectoryName(updater)!, "updater-settings.json"), AppContext.BaseDirectory);
+                    if (UpdaterLauncherService.RefreshUpdaterScriptFromBundledCopy(updater) && UpdaterAutoUpdateService.GetStatus().IsEnabled)
+                        UpdaterAutoUpdateService.Enable(updater);
+                }
+            }
+            catch (Exception ex) { Debug.WriteLine($"[Updater] Migrazione automatica non completata: {ex.Message}"); }
             _isShuttingDown = false;
             _shutdownCts = AppShutdownManager.CreateLinkedTokenSource();
             var shutdownToken = _shutdownCts.Token;
@@ -50,8 +73,9 @@ public partial class App : Application
             AppSettings = new AppSettingsService(configuration);
             Helpers.WindowSizeBehavior.Initialize(new WindowSizeStore(
                 Path.Combine(CompanyInstallationService.RootDirectory, "dimensioni-finestre.json")));
+            Helpers.WindowCaptionTheme.Initialize();
             Helpers.WindowZoomBehavior.Initialize(AppSettings.App.GetEffectiveMainWindowScale());
-            IsSilentStartup = !CompanyInstallationService.IsGenericInstallation && AppSettings.App.IsSilentStartup;
+            IsSilentStartup = _updateStartupReport == null && !CompanyInstallationService.IsGenericInstallation && AppSettings.App.IsSilentStartup;
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             if (CompanyInstallationService.IsGenericInstallation)
             {
@@ -191,6 +215,7 @@ public partial class App : Application
                     _ = RunStartupPdfGenerationAsync(shutdownToken);
 
                 Debug.WriteLine($"[STARTUP] Startup completato in {startupWatch.Elapsed}");
+                _updateStartupReport?.ReportReady();
             }
             finally
             {
@@ -199,6 +224,8 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
+            string logPath = UpdateStartupReportService.WriteFailureLog(ex);
+            _updateStartupReport?.ReportFailure(ex.Message, logPath, dialogShown: !IsSilentStartup);
             if (IsSilentStartup)
             {
                 Debug.WriteLine($"[STARTUP][ERROR] {ex}");
@@ -207,7 +234,7 @@ public partial class App : Application
             }
 
             MessageBox.Show(
-                $"Errore durante l'avvio dell'applicazione.\n\n{ex.Message}",
+                $"Errore durante l'avvio dell'applicazione.\n\n{ex.Message}" + (string.IsNullOrEmpty(logPath) ? "" : $"\n\nDettagli salvati in:\n{logPath}"),
                 "Errore di avvio",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -217,6 +244,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _updateStartupReport?.ReportFailure("Il programma è stato chiuso prima di aprire la finestra principale.");
         AppShutdownManager.ArmProcessKillSwitch(TimeSpan.FromSeconds(HardShutdownTimeoutSeconds));
 
         try

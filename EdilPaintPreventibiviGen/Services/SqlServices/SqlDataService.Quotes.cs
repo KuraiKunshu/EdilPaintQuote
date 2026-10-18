@@ -58,6 +58,13 @@ public partial class SqlDataService
     {
         await using var db = AppDbContextFactory.Create();
 
+        return await GetQuoteSyncSnapshotsAsync(db, quoteNumbers, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<List<QuoteHistoryEntry>> GetQuoteSyncSnapshotsAsync(
+        AppDbContext db, IEnumerable<string> quoteNumbers, CancellationToken cancellationToken)
+    {
+
         var numberList = quoteNumbers
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -71,7 +78,7 @@ public partial class SqlDataService
             foreach (var batch in numberList.Chunk(QuoteQueryBatchSize))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                combined.AddRange(await GetQuoteSyncSnapshotsAsync(batch, cancellationToken));
+                combined.AddRange(await GetQuoteSyncSnapshotsAsync(db, batch, cancellationToken));
             }
 
             return combined;

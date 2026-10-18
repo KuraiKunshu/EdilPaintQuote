@@ -13,6 +13,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$InstallPath = [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallPath)).TrimEnd('\', '/')
+$UpdaterPath = [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($UpdaterPath)).TrimEnd('\', '/')
 
 $targetScript = Join-Path $UpdaterPath "Update-EdilPaint.ps1"
 $settingsPath = Join-Path $UpdaterPath "updater-settings.json"
@@ -44,6 +46,8 @@ if (-not (Test-Path -LiteralPath $settingsPath) -or $OverwriteSettings) {
         SolutionPath = "EdilPaintPreventibiviGen.sln"
         TestProjectPath = "EdilPaintPreventibiviGen.Tests\EdilPaintPreventibiviGen.Tests.csproj"
         Configuration = "Release"
+        RuntimeIdentifier = "win-x64"
+        SelfContained = $true
         RunTests = [bool]$RunTests
         ProcessName = "EdilPaintPreventibiviGen"
         StartDelaySeconds = $StartDelaySeconds
@@ -54,7 +58,14 @@ if (-not (Test-Path -LiteralPath $settingsPath) -or $OverwriteSettings) {
     Write-Host "Creato file impostazioni: $settingsPath"
 }
 else {
-    Write-Host "File impostazioni gia' presente, lo mantengo: $settingsPath"
+    $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    $settings | Add-Member -NotePropertyName InstallPath -NotePropertyValue $InstallPath -Force
+    if ($PSBoundParameters.ContainsKey('Branch')) { $settings | Add-Member -NotePropertyName Branch -NotePropertyValue $Branch -Force }
+    if ($PSBoundParameters.ContainsKey('RepositoryUrl')) { $settings | Add-Member -NotePropertyName RepositoryUrl -NotePropertyValue $RepositoryUrl -Force }
+    if ($PSBoundParameters.ContainsKey('RunTests')) { $settings | Add-Member -NotePropertyName RunTests -NotePropertyValue ([bool]$RunTests) -Force }
+    if ($PSBoundParameters.ContainsKey('StartDelaySeconds')) { $settings | Add-Member -NotePropertyName StartDelaySeconds -NotePropertyValue $StartDelaySeconds -Force }
+    $settings | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $settingsPath -Encoding UTF8
+    Write-Host "Impostazioni locali mantenute; percorso del programma riallineato: $InstallPath"
 }
 
 try {
@@ -68,13 +79,6 @@ catch {
 
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $actionArgument = "-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$targetScript`""
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgument
-$trigger = New-ScheduledTaskTrigger -AtLogOn
-$principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
-$taskSettings = New-ScheduledTaskSettingsSet `
-    -AllowStartIfOnBatteries `
-    -DontStopIfGoingOnBatteries `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
 
 function Get-StartupShortcutPath {
     $startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
@@ -122,6 +126,11 @@ function New-StartupFallback {
 }
 
 try {
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgument -WorkingDirectory $UpdaterPath
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
+    $trigger.Repetition = New-CimInstance -Namespace Root/Microsoft/Windows/TaskScheduler -ClassName MSFT_TaskRepetitionPattern -ClientOnly -Property @{ Interval = 'PT30M'; StopAtDurationEnd = $false }
+    $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
+    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
     Register-ScheduledTask `
         -TaskName $TaskName `
         -Action $action `

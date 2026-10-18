@@ -49,7 +49,9 @@ public static class UpdaterAutoUpdateService
             {
                 return new(
                     AutomaticUpdateRegistration.ScheduledTask,
-                    "Attivi: il controllo viene eseguito a ogni accesso a Windows.");
+                    task!.Definition.Triggers.Item(1).Repetition.Interval == "PT30M"
+                        ? "Attivi: controllo al login e ogni 30 minuti; installazione quando il programma è chiuso."
+                        : "Attivi: controllo al login. Riattivali per abilitare i tentativi periodici.");
             }
         }
         catch
@@ -94,23 +96,21 @@ public static class UpdaterAutoUpdateService
             taskDefinition.Settings.DisallowStartIfOnBatteries = false;
             taskDefinition.Settings.StopIfGoingOnBatteries = false;
             taskDefinition.Settings.ExecutionTimeLimit = "PT30M";
+            taskDefinition.Settings.MultipleInstances = 2; // TASK_INSTANCES_IGNORE_NEW
 
             dynamic trigger = taskDefinition.Triggers.Create(TaskTriggerLogon);
             trigger.Id = "Logon";
+            string userName = WindowsIdentity.GetCurrent().Name;
+            trigger.UserId = userName;
+            trigger.Repetition.Interval = "PT30M";
+            trigger.Repetition.StopAtDurationEnd = false;
 
             dynamic action = taskDefinition.Actions.Create(TaskActionExec);
             action.Path = "powershell.exe";
             action.Arguments = arguments;
             action.WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(updaterScriptPath));
 
-            string userName = WindowsIdentity.GetCurrent().Name;
-            rootFolder.RegisterTaskDefinition(
-                TaskName,
-                TaskCreateOrUpdate,
-                userName,
-                null,
-                TaskLogonInteractiveToken,
-                null);
+            RegisterTask(rootFolder, taskDefinition, userName);
 
             try
             {
@@ -124,7 +124,7 @@ public static class UpdaterAutoUpdateService
 
             return new(
                 AutomaticUpdateRegistration.ScheduledTask,
-                "Attivati: il controllo verrà eseguito a ogni accesso a Windows.");
+                "Attivati: controllo al login e ogni 30 minuti; installazione quando il programma è chiuso.");
         }
         catch (Exception scheduledTaskException)
         {
@@ -143,6 +143,9 @@ public static class UpdaterAutoUpdateService
             }
         }
     }
+
+    internal static void RegisterTask(dynamic folder, dynamic definition, string userName) =>
+        folder.RegisterTaskDefinition(TaskName, definition, TaskCreateOrUpdate, userName, null, TaskLogonInteractiveToken, null);
 
     public static void Disable()
     {

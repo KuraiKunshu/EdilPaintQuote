@@ -224,19 +224,46 @@ public partial class SqlDataService
             {
                 var stored = await ScheduleEntriesQuery(db).SingleOrDefaultAsync(entry => entry.Id == id, ct)
                     .ConfigureAwait(false);
-                var completed = WorkScheduleRules.CreateCompletedCopy(
-                    stored == null ? null : ScheduleEntryToModel(stored), id, revision, stored?.IsDeleted == true);
-                if (stored!.Status != completed.Status)
+                var quoteRevision = stored?.Quote?.Revision;
+                var completed = ApplyWorkScheduleCompletion(stored, id, revision);
+                if (db.ChangeTracker.HasChanges())
                 {
-                    // Only the visit status changes; keep the original dates, crew and order.
-                    stored.Status = completed.Status;
-                    stored.Revision = completed.Revision;
                     await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                    if (stored!.Quote is { } quote && quote.Revision != quoteRevision)
+                    {
+                        var snapshot = (await GetQuoteSyncSnapshotsAsync(db, [quote.QuoteNumber], ct).ConfigureAwait(false)).Single();
+                        quote.SyncHash = QuoteSyncHashService.Compute(snapshot);
+                        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                    }
                 }
-                return ScheduleEntryToModel(stored);
+                return completed;
             }, token).ConfigureAwait(false);
         }
         catch (DbUpdateConcurrencyException ex) { throw WorkScheduleRules.Conflict(ex); }
+    }
+
+    internal static WorkScheduleEntry ApplyWorkScheduleCompletion(WorkScheduleEntryEntity? stored, Guid id, long revision)
+    {
+        var completed = WorkScheduleRules.CreateCompletedCopy(
+            stored == null ? null : ScheduleEntryToModel(stored), id, revision, stored?.IsDeleted == true);
+        // Regenerating a PDF for an already completed visit must not close an order
+        // that was subsequently reopened by the user.
+        if (stored!.Status == completed.Status) return completed;
+        var quote = stored.Quote;
+        if (quote is { IsDeleted: false } && quote.Status != QuoteStatus.Finito)
+        {
+            var nextRevision = checked(quote.Revision + 1);
+            quote.Status = QuoteStatus.Finito;
+            quote.LastModifiedUtc = DateTime.UtcNow;
+            quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
+            quote.Revision = nextRevision;
+            AppendQuoteEvent(quote, "stato", "Stato aggiornato: Finito (intervento completato dal calendario)",
+                quote.LastModifiedByDevice, quote.LastModifiedUtc);
+        }
+        // Keep dates, crew, notes and the relationship with the order intact.
+        stored.Status = completed.Status;
+        stored.Revision = completed.Revision;
+        return ScheduleEntryToModel(stored);
     }
 
     public async Task DeleteWorkScheduleEntryAsync(Guid id, long revision, CancellationToken token = default)

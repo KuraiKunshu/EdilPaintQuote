@@ -238,6 +238,30 @@ public sealed class WorkScheduleServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task FinishedQuoteDisappearsFromCachedOrdersWhileAllItsVisitsArePreserved()
+    {
+        var service = Pc("first");
+        var visits = await service.SaveEntriesAsync([Entry(_monday), Entry(_monday.AddDays(1))]);
+        var from = _monday; var to = _monday.AddDays(7);
+        var loaded = await service.GetLatestAsync(from, to);
+        Assert.Single(loaded.Orders);
+        await service.GetQuoteLaborAsync("2026/001");
+        await service.CompleteEntryAsync(visits[0].Id, visits[0].Revision);
+        var cached = service.CachedSnapshot(from, to);
+        Assert.Empty(cached.Orders);
+        Assert.Equal(2, cached.Entries.Count);
+        Assert.All(cached.Entries, visit =>
+        {
+            Assert.Equal(QuoteStatus.Finito, visit.OrderStatus);
+            Assert.False(visit.IsOrderActive);
+        });
+        Assert.Equal(WorkScheduleEntryStatus.Planned, cached.Entries.Single(x => x.Id == visits[1].Id).Status);
+        var restarted = Pc("first").CachedSnapshot(from, to);
+        Assert.Empty(restarted.Orders);
+        Assert.Equal(2, restarted.Entries.Count);
+    }
+
+    [Fact]
     public async Task OfflineCompletionDoesNotChangeTheKnownVisit()
     {
         var service = Pc("first");
@@ -307,7 +331,9 @@ public sealed class WorkScheduleServiceTests : IDisposable
             return Task.FromResult(new WorkScheduleSnapshot
             {
                 Settings = _settings.CreateValidatedCopy(),
-                Entries = _entries.Where(x => x.Date >= from && x.Date < to).Select(x => x.CreateValidatedCopy()).ToList()
+                Entries = _entries.Where(x => x.Date >= from && x.Date < to).Select(x => x.CreateValidatedCopy()).ToList(),
+                Orders = _entries.Where(x => x.Kind == WorkScheduleEntryKind.Job && x.OrderStatus != QuoteStatus.Finito)
+                    .Select(x => x.QuoteNumber).Distinct().Select(number => new WorkScheduleOrder { QuoteNumber = number }).ToList()
             });
         }
         public Task<WorkScheduleSettings> GetWorkScheduleSettingsAsync(CancellationToken token = default)
@@ -337,6 +363,12 @@ public sealed class WorkScheduleServiceTests : IDisposable
             Check(token);
             CompleteCalls++;
             var completed = WorkScheduleRules.CreateCompletedCopy(_entries.SingleOrDefault(entry => entry.Id == id), id, revision);
+            if (_entries.Single(entry => entry.Id == id).Status == WorkScheduleEntryStatus.Planned)
+            {
+                completed.OrderStatus = QuoteStatus.Finito; completed.IsOrderActive = false;
+                foreach (var visit in _entries.Where(entry => entry.QuoteNumber == completed.QuoteNumber))
+                { visit.OrderStatus = QuoteStatus.Finito; visit.IsOrderActive = false; }
+            }
             _entries.RemoveAll(entry => entry.Id == id);
             _entries.Add(completed);
             return Task.FromResult(completed.CreateValidatedCopy());
