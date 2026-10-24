@@ -19,6 +19,11 @@ public static class UpdaterLauncherService
             ? AppContext.BaseDirectory
             : Path.GetFullPath(baseDirectory);
 
+        string localScript = UpdaterConfigurationService.GetLocalScriptPath(baseDirectory);
+        if (File.Exists(localScript) && File.Exists(Path.Combine(Path.GetDirectoryName(localScript)!, UpdaterConfigurationService.SettingsName)))
+            return localScript;
+
+        var candidates = new List<string>();
         foreach (string directory in EnumerateCandidateDirectories(baseDirectory))
         {
             string? configuredPath = ReadConfiguredUpdaterPath(directory);
@@ -44,7 +49,7 @@ public static class UpdaterLauncherService
             {
                 string candidate = Path.GetFullPath(Path.Combine(directory, relativePath));
                 if (File.Exists(candidate))
-                    return candidate;
+                    candidates.Add(candidate);
             }
         }
 
@@ -52,10 +57,21 @@ public static class UpdaterLauncherService
         {
             string candidate = Path.Combine(directory, UpdaterScriptName);
             if (File.Exists(candidate))
-                return Path.GetFullPath(candidate);
+                candidates.Add(Path.GetFullPath(candidate));
         }
 
-        return null;
+        return SelectUpdaterCandidate(candidates, baseDirectory);
+    }
+
+    internal static string? SelectUpdaterCandidate(IEnumerable<string> candidates, string applicationDirectory)
+    {
+        var existing = candidates.Distinct(StringComparer.OrdinalIgnoreCase).Where(File.Exists).ToArray();
+        foreach (string candidate in existing)
+        {
+            try { _ = UpdaterConfigurationService.Read(candidate, applicationDirectory); return candidate; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or ArgumentException) { }
+        }
+        return existing.FirstOrDefault();
     }
 
     public static async Task<bool> StartUpdaterAsync(string scriptPath, CancellationToken token = default)

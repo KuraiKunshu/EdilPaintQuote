@@ -1075,33 +1075,12 @@ public partial class SettingsWindow : Window
     private async void OnRunUpdaterClick(object sender, RoutedEventArgs e)
     {
         BtnRunUpdater.IsEnabled = false;
+        BtnConfigureUpdater.IsEnabled = false;
+        ChkAutomaticUpdates.IsEnabled = false;
         try
         {
-            string? scriptPath = UpdaterLauncherService.ResolveUpdaterScriptPath();
-            if (string.IsNullOrWhiteSpace(scriptPath))
-            {
-                MessageBox.Show(
-                    this,
-                    "Script updater non trovato. Metti Update-EdilPaint.ps1 nella cartella updater accanto al programma o in tools/updater nel progetto.",
-                    "Aggiornamento",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            UpdaterLauncherService.RefreshUpdaterScriptFromBundledCopy(scriptPath);
-
-            string settingsPath = Path.Combine(Path.GetDirectoryName(scriptPath)!, "updater-settings.json");
-            if (!File.Exists(settingsPath))
-            {
-                MessageBox.Show(
-                    this,
-                    $"File updater-settings.json non trovato accanto allo script.\n\nPercorso atteso:\n{settingsPath}",
-                    "Aggiornamento",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
+            string? scriptPath = await GetConfiguredUpdaterScriptPathAsync();
+            if (scriptPath == null) return;
 
             var result = MessageBox.Show(
                 this,
@@ -1130,7 +1109,37 @@ public partial class SettingsWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
-        finally { BtnRunUpdater.IsEnabled = true; }
+        finally
+        {
+            BtnRunUpdater.IsEnabled = true;
+            BtnConfigureUpdater.IsEnabled = true;
+            ChkAutomaticUpdates.IsEnabled = true;
+            RefreshAutomaticUpdateStatus();
+        }
+    }
+
+    private async void OnConfigureUpdaterClick(object sender, RoutedEventArgs e)
+    {
+        BtnConfigureUpdater.IsEnabled = BtnRunUpdater.IsEnabled = ChkAutomaticUpdates.IsEnabled = false;
+        try { await ConfigureUpdaterAsync(); }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Configurazione aggiornamenti", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally
+        {
+            BtnConfigureUpdater.IsEnabled = BtnRunUpdater.IsEnabled = ChkAutomaticUpdates.IsEnabled = true;
+            RefreshAutomaticUpdateStatus();
+        }
+    }
+
+    private async Task<string?> ConfigureUpdaterAsync()
+    {
+        if (CompanyInstallationService.IsGenericInstallation) return null;
+        bool automaticEnabled = UpdaterAutoUpdateService.GetStatus().IsEnabled;
+        var window = new UpdaterConfigurationWindow { Owner = this };
+        bool saved = window.ShowDialog() == true;
+        if (saved && automaticEnabled && window.ScriptPath is { } script)
+            await Task.Run(() => UpdaterAutoUpdateService.Enable(script));
+        RefreshAutomaticUpdateStatus();
+        return saved ? window.ScriptPath : null;
     }
 
     private async void OnAutomaticUpdatesChanged(object sender, RoutedEventArgs e)
@@ -1142,7 +1151,7 @@ public partial class SettingsWindow : Window
         {
             if (ChkAutomaticUpdates.IsChecked == true)
             {
-                string? scriptPath = GetConfiguredUpdaterScriptPath();
+                string? scriptPath = await GetConfiguredUpdaterScriptPathAsync();
                 if (string.IsNullOrWhiteSpace(scriptPath))
                     return;
 
@@ -1171,35 +1180,21 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private string? GetConfiguredUpdaterScriptPath()
+    private async Task<string?> GetConfiguredUpdaterScriptPathAsync()
     {
+        if (CompanyInstallationService.IsGenericInstallation) return null;
         string? scriptPath = UpdaterLauncherService.ResolveUpdaterScriptPath();
-        if (string.IsNullOrWhiteSpace(scriptPath))
+        if (scriptPath != null && File.Exists(Path.Combine(Path.GetDirectoryName(scriptPath)!, UpdaterConfigurationService.SettingsName)))
         {
-            MessageBox.Show(
-                this,
-                "Script updater non trovato. Prima installa o configura l'updater, poi potrai attivare gli aggiornamenti automatici.",
-                "Aggiornamenti automatici",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return null;
+            try
+            {
+                _ = UpdaterConfigurationService.Read(scriptPath, AppContext.BaseDirectory);
+                UpdaterLauncherService.RefreshUpdaterScriptFromBundledCopy(scriptPath);
+                return scriptPath;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException or ArgumentException) { }
         }
-
-        string settingsPath = Path.Combine(Path.GetDirectoryName(scriptPath)!, "updater-settings.json");
-        if (File.Exists(settingsPath))
-        {
-            UpdaterLauncherService.ValidateManualUpdateSettings(settingsPath, AppContext.BaseDirectory);
-            UpdaterLauncherService.RefreshUpdaterScriptFromBundledCopy(scriptPath);
-            return scriptPath;
-        }
-
-        MessageBox.Show(
-            this,
-            $"File updater-settings.json non trovato accanto allo script.\n\nPercorso atteso:\n{settingsPath}",
-            "Aggiornamenti automatici",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
-        return null;
+        return await ConfigureUpdaterAsync();
     }
 
     public void SelectDatabaseTab() => TabDatabaseSettings.IsSelected = true;
@@ -1216,8 +1211,11 @@ public partial class SettingsWindow : Window
 
     private void RefreshAutomaticUpdateStatus()
     {
+        TxtUpdaterConfiguration.Text = UpdaterConfigurationService.DescribeVersion(AppContext.BaseDirectory);
         if (CompanyInstallationService.IsGenericInstallation)
         {
+            BtnConfigureUpdater.IsEnabled = false;
+            BtnRunUpdater.IsEnabled = false;
             ChkAutomaticUpdates.IsEnabled = false;
             TxtAutomaticUpdatesStatus.Text = "Aggiornamenti tramite pacchetto della propria azienda.";
             return;
@@ -1225,6 +1223,18 @@ public partial class SettingsWindow : Window
         _updatingAutomaticUpdatesControl = true;
         try
         {
+            string? script = UpdaterLauncherService.ResolveUpdaterScriptPath();
+            if (script == null || !File.Exists(Path.Combine(Path.GetDirectoryName(script)!, UpdaterConfigurationService.SettingsName)))
+                TxtUpdaterConfiguration.Text += "\nAggiornamenti da configurare: premi Configura aggiornamenti.";
+            else
+            {
+                try
+                {
+                    var configuration = UpdaterConfigurationService.Read(script, AppContext.BaseDirectory);
+                    TxtUpdaterConfiguration.Text += $"\nSorgente: {configuration.RepositoryUrl}\nBranch: {configuration.Branch}";
+                }
+                catch { TxtUpdaterConfiguration.Text += "\nConfigurazione non valida: premi Configura aggiornamenti."; }
+            }
             AutomaticUpdateStatus status = UpdaterAutoUpdateService.GetStatus();
             ChkAutomaticUpdates.IsChecked = status.IsEnabled;
             TxtAutomaticUpdatesStatus.Text = status.Description;

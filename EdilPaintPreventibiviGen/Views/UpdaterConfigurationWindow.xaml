@@ -1,0 +1,49 @@
+<Window x:Class="EdilPaintPreventibiviGen.Views.UpdaterConfigurationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configura aggiornamenti" Width="720" Height="650" MinWidth="560" MinHeight="480"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        Background="{StaticResource ShellBackgroundBrush}"
+        Icon="pack://application:,,,/EdilPaintPreventibiviGen;component/Assets/Windowsicon/main.ico">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="Configura aggiornamenti" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource DefaultTextBrush}"/>
+            <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"
+                       Text="Scegli da dove ricevere le nuove versioni. La configurazione vale per questa copia del programma, su questo PC."/>
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,8,0">
+                <Border Padding="16" Background="{StaticResource SurfaceBrush}" CornerRadius="8" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Programma da aggiornare" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                        <TextBlock x:Name="TxtVersion" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="TxtInstallation" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}"/>
+                        <TextBlock x:Name="TxtDevelopmentNotice" TextWrapping="Wrap" Margin="0,12,0,0"
+                                   Text="Questa copia si trova nella cartella di sviluppo. Gli aggiornamenti sostituiranno questa copia. Per l’uso quotidiano è consigliata un’installazione in una cartella dedicata."/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="Repository delle nuove versioni" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <TextBox x:Name="TxtRepository" MinHeight="36" VerticalContentAlignment="Center" Padding="8"/>
+                <TextBlock Text="Branch di aggiornamento" FontWeight="SemiBold" Margin="0,16,0,6"/>
+                <TextBox x:Name="TxtBranch" MinHeight="36" VerticalContentAlignment="Center" Padding="8"/>
+                <TextBlock Text="Per la versione EdilPaint usa main. Cambiare branch cambia la versione del programma che verrà installata."
+                           Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                <CheckBox x:Name="ChkRunTests" IsChecked="True" Margin="0,18,0,0">
+                    <TextBlock Text="Verifica la nuova versione con i test prima di installarla" TextWrapping="Wrap"/>
+                </CheckBox>
+                <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"
+                           Text="Il salvataggio prepara i file necessari. Puoi poi usare Aggiorna ora oppure abilitare gli aggiornamenti automatici. Servono Git e .NET SDK sul PC."/>
+                <TextBlock x:Name="TxtError" Margin="0,14,0,0" TextWrapping="Wrap" Foreground="#B42318"/>
+            </StackPanel>
+        </ScrollViewer>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button Content="Annulla" IsCancel="True" MinWidth="100" Padding="14,8" Margin="0,0,10,0"/>
+            <Button Content="Salva configurazione" IsDefault="True" Padding="14,8" Click="OnSaveClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

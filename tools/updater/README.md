@@ -5,6 +5,27 @@ nelle impostazioni locali. Il database e i dati personali del PC rimangono separ
 
 ## Aggiorna ora
 
+Da **Impostazioni → Aggiornamenti → Configura aggiornamenti** è possibile
+creare o modificare la configurazione senza compilare JSON a mano. La finestra
+mostra versione e cartella della copia aperta; propone il repository EdilPaint
+e il branch `main`. Una configurazione esistente mantiene la propria sorgente,
+il branch, i percorsi personalizzati e gli altri parametri. Salvare non avvia
+un aggiornamento e non abilita gli aggiornamenti automatici. Se erano già attivi,
+la loro registrazione viene riallineata alla configurazione salvata.
+
+Se manca la configurazione, **Aggiorna ora** e l’attivazione degli aggiornamenti
+automatici aprono questa finestra. I nuovi file vengono conservati sotto
+`%LOCALAPPDATA%\EdilPaintUpdater\installations\<identità della cartella>`,
+separati per installazione e utente, senza richiedere scrittura nella cartella
+del programma. Una copia inclusa dello script priva di impostazioni non ha
+priorità su un updater già configurato per la stessa installazione.
+
+Nella schermata delle impostazioni sono visibili versione, repository e branch.
+Per l’uso quotidiano pubblicare il programma in una cartella dedicata e avviarlo
+da lì: se viene eseguito da `bin` o `obj` del progetto, la configurazione segnala
+che si sta aggiornando una copia di sviluppo. Non impostare `main` per una
+distribuzione che deve ricevere aggiornamenti da un altro branch.
+
 Il programma prepara la nuova versione mentre rimane aperto. Scarica il commit,
 controlla l’SDK, esegue i test configurati e pubblica il pacchetto in una cartella
 temporanea. Chiude l’app solo quando il pacchetto è completo. Se non ci sono
