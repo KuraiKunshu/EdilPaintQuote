@@ -34,6 +34,9 @@ public partial class WorkScheduleView : UserControl, IDisposable
     private string? _cacheError;
     private bool _loaded;
     private bool _embedded;
+    public static readonly DependencyProperty InlineActionsVisibilityProperty = DependencyProperty.Register(
+        nameof(InlineActionsVisibility), typeof(Visibility), typeof(WorkScheduleView), new PropertyMetadata(Visibility.Visible));
+    public Visibility InlineActionsVisibility { get => (Visibility)GetValue(InlineActionsVisibilityProperty); set => SetValue(InlineActionsVisibilityProperty, value); }
     private string _selectedQuoteNumber = "";
     public bool CanClose => !_editorOpen && !DocumentsBusy;
     public IReadOnlyList<WorkScheduleEntry> Entries => _snapshot.Entries;
@@ -149,8 +152,13 @@ public partial class WorkScheduleView : UserControl, IDisposable
         int withoutCrew = visibleEntries.Count(entry => entry.Kind == WorkScheduleEntryKind.Job && entry.Status == WorkScheduleEntryStatus.Planned && entry.EmployeeIds.Count == 0);
         int finished = visibleEntries.Count(entry => entry.Kind == WorkScheduleEntryKind.Job && entry.Status == WorkScheduleEntryStatus.Completed);
         int absences = visibleEntries.Count(entry => entry.Kind == WorkScheduleEntryKind.Absence);
-        TxtCalendarSummary.Text = $"{planned} {(planned == 1 ? "programmato" : "programmati")} · {withoutCrew} senza squadra · " +
-            $"{finished} {(finished == 1 ? "finito" : "finiti")} · {absences} {(absences == 1 ? "assenza" : "assenze")}";
+        var summary = new List<string> { $"{planned} {(planned == 1 ? "intervento programmato" : "interventi programmati")}" };
+        if (withoutCrew > 0) summary.Add($"{withoutCrew} senza squadra");
+        if (finished > 0) summary.Add($"{finished} {(finished == 1 ? "finito" : "finiti")}");
+        if (absences > 0) summary.Add($"{absences} {(absences == 1 ? "assenza" : "assenze")}");
+        TxtCalendarSummary.Text = string.Join(" · ", summary);
+        bool filtered = !string.IsNullOrWhiteSpace(search) || employeeId.HasValue || filter != WorkScheduleViewFilterKind.All || ChkShowInactive.IsChecked == true;
+        CalendarFiltersExpander.Header = filtered ? "Filtri calendario · attivi" : "Cerca e filtra interventi";
         if (!string.IsNullOrWhiteSpace(search) || employeeId.HasValue || filter != WorkScheduleViewFilterKind.All)
             TxtCalendarSummary.Text = $"Risultati dei filtri: {visibleEntries.Count} attività · " + TxtCalendarSummary.Text;
         var days = Enumerable.Range(0, 7).Select(offset =>
@@ -298,7 +306,6 @@ public partial class WorkScheduleView : UserControl, IDisposable
         if (_compactLayout == compact || DocumentsBusy) return;
         _compactLayout = compact;
         SetOrdersVisible(!compact);
-        CalendarFiltersExpander.IsExpanded = !compact;
     }
     private void OnOrderSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -312,7 +319,14 @@ public partial class WorkScheduleView : UserControl, IDisposable
         CalendarHeader.Visibility = Visibility.Collapsed;
         BtnToggleOrders.Visibility = Visibility.Collapsed;
         TxtCalendarHelp.Text = "Clic per selezionare · Doppio clic per modificare · Azioni disponibili anche nella barra del cantiere.";
+        UseSharedCommands(true);
         SetOrdersVisible(false);
+    }
+    public void UseSharedCommands(bool shared)
+    {
+        BtnRefresh.Visibility = shared ? Visibility.Collapsed : Visibility.Visible;
+        InlineActionsVisibility = shared ? Visibility.Collapsed : Visibility.Visible;
+        TxtCalendarHelp.Visibility = shared ? Visibility.Collapsed : Visibility.Visible;
     }
     public void SelectQuote(string number)
     {

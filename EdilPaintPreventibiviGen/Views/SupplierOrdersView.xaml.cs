@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -28,9 +29,21 @@ public partial class SupplierOrdersView : UserControl, IDisposable
     private bool _closed;
     public static readonly DependencyProperty CardWidthProperty = DependencyProperty.Register(nameof(CardWidth), typeof(double), typeof(SupplierOrdersView), new PropertyMetadata(240d));
     public double CardWidth { get => (double)GetValue(CardWidthProperty); set => SetValue(CardWidthProperty, value); }
-    public bool IsEmbedded { get; set; }
+    private bool _isEmbedded;
+    public bool IsEmbedded
+    {
+        get => _isEmbedded;
+        set
+        {
+            _isEmbedded = value;
+            BtnRefresh.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
+            if (value) TxtFooterStatus.Text = "";
+        }
+    }
     public bool CanClose => !_isSaving && !_detailsOpen;
-    public string SelectedNumber { get; private set; } = "";
+    public static readonly DependencyProperty SelectedNumberProperty = DependencyProperty.Register(
+        nameof(SelectedNumber), typeof(string), typeof(SupplierOrdersView), new PropertyMetadata(""));
+    public string SelectedNumber { get => (string)GetValue(SelectedNumberProperty); private set => SetValue(SelectedNumberProperty, value); }
     public event EventHandler<WorkContextEventArgs>? ContextSelected;
     public event EventHandler? Refreshed;
     public QuoteHistorySummary? FindOrder(string number) => _loadedQuotes.FirstOrDefault(order => order.QuoteNumber == number);
@@ -73,8 +86,8 @@ public partial class SupplierOrdersView : UserControl, IDisposable
         CmbSortOrder.SelectedIndex = 0;
         SizeChanged += (_, _) =>
         {
-            double available = Math.Max(200, ActualWidth - 70);
-            int columns = Math.Max(1, (int)(available / 252));
+            double available = Math.Max(180, ActualWidth - 64);
+            int columns = Math.Max(1, (int)(available / 248));
             CardWidth = available / columns - 12;
         };
         Loaded += async (_, _) =>
@@ -118,7 +131,7 @@ public partial class SupplierOrdersView : UserControl, IDisposable
             ItemsOrders.IsEnabled = false;
 
             var summaries = await _historyService.LoadSupplierOrderSummariesAsync(
-                searchText,
+                string.Empty,
                 int.MaxValue,
                 token);
 
@@ -166,6 +179,7 @@ public partial class SupplierOrdersView : UserControl, IDisposable
         if (_orderView == null) return;
         string selectedStatus = CmbStatusFilter.SelectedItem as string ?? "Tutti gli stati";
         IEnumerable<QuoteHistorySummary> filtered = _loadedQuotes;
+        filtered = filtered.Where(summary => MatchesSearch(summary, TxtSearch.Text));
 
         if (string.Equals(selectedStatus, "Senza stato", StringComparison.Ordinal))
         {
@@ -335,6 +349,25 @@ public partial class SupplierOrdersView : UserControl, IDisposable
         SelectedNumber = summary.QuoteNumber;
         ContextSelected?.Invoke(this, new(summary.QuoteNumber, summary.OrderSiteTitle));
         if (!IsEmbedded) await OpenOrderAsync(summary.QuoteNumber);
+    }
+
+    private async void OnOrderDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (!IsEmbedded || sender is not FrameworkElement { DataContext: QuoteHistorySummary summary }) return;
+        e.Handled = true;
+        await OpenOrderAsync(summary.QuoteNumber);
+    }
+
+    internal static bool MatchesSearch(QuoteHistorySummary order, string search)
+    {
+        string text = $"{order.CustomerName} {order.ReferenceName} {order.SiteName} {order.QuoteNumber} {order.SupplierName}";
+        return search.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(term =>
+            CultureInfo.GetCultureInfo("it-IT").CompareInfo.IndexOf(text, term, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) >= 0);
+    }
+
+    private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_isRefreshing) ApplyOrderView();
     }
 
     public async Task OpenOrderAsync(string number)

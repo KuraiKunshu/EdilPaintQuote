@@ -18,7 +18,7 @@ public partial class WorkManagementWindow : Window
     private readonly DependencyPropertyDescriptor _busyDescriptor = DependencyPropertyDescriptor.FromProperty(QuoteActionsControl.IsBusyProperty, typeof(QuoteActionsControl));
     private readonly DependencyPropertyDescriptor _menuDescriptor = DependencyPropertyDescriptor.FromProperty(QuoteActionsControl.IsMenuOpenProperty, typeof(QuoteActionsControl));
     private readonly DispatcherTimer _changeTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
-    private bool _closed, _actionBusy, _expanded, _refreshing, _updatingSelection, _changingSection;
+    private bool _closed, _actionBusy, _refreshing, _updatingSelection, _changingSection;
     private double _sideWidth = 600;
     public bool CanClose => IsEnabled && !_actionBusy && !CommonActions.IsBusy && !CommonActions.IsMenuOpen &&
         _calendar.CanClose && _orders.CanClose && _history.CanClose && _detached.Values.All(window => window.IsEnabled);
@@ -51,12 +51,29 @@ public partial class WorkManagementWindow : Window
         Closing += OnClosing;
         Closed += OnClosed;
         UpdateContext();
+        ApplySplit();
+    }
+
+    public void ShowCalendar()
+    {
+        _changingSection = true;
+        try { BtnCalendarTab.IsChecked = true; }
+        finally { _changingSection = false; }
+        UpdateSection();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
     }
 
     public void ShowSection(bool history, bool followContext = true)
     {
         _changingSection = true;
-        try { BtnHistoryTab.IsChecked = history; BtnOrdersTab.IsChecked = !history; }
+        try
+        {
+            BtnCalendarTab.IsChecked = false;
+            BtnHistoryTab.IsChecked = history;
+            BtnOrdersTab.IsChecked = !history;
+            if (history) ChkSideBySide.IsChecked = true;
+        }
         finally { _changingSection = false; }
         UpdateSection();
         if (history && followContext) _ = FollowSelectedQuoteAsync();
@@ -97,14 +114,19 @@ public partial class WorkManagementWindow : Window
         string crew = entry == null ? "" : string.Join(", ", entry.Employees.Select(employee =>
             string.IsNullOrWhiteSpace(employee.Abbreviation) ? $"{employee.FirstName} {employee.LastName}".Trim() : employee.Abbreviation));
         TxtSelectedInfo.Text = entry != null ? $"{entry.Date:dd/MM/yyyy} · {entry.TimeDisplay} · {(crew.Length == 0 ? "Squadra da assegnare" : crew)}" :
-            _selection.QuoteNumber.Length > 0 ? $"Preventivo / ordine {_selection.QuoteNumber} · Le azioni si riferiscono al cantiere selezionato." :
-            "Scegli un ordine, un preventivo o un intervento: le azioni qui sotto seguono la selezione.";
+            _selection.QuoteNumber.Length > 0 ? $"Ordine {_selection.QuoteNumber}" :
+            "Scegli un riquadro nel calendario o negli ordini per vedere qui i comandi del lavoro.";
+        TxtSelectionLabel.Text = entry != null ? "INTERVENTO SELEZIONATO" : "ORDINE SELEZIONATO";
+        TxtSelectionLabel.Visibility = entry != null || _selection.QuoteNumber.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ContextToolbar.Visibility = entry != null || _selection.QuoteNumber.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         CommonActions.QuoteNumber = _selection.QuoteNumber;
         CommonActions.ScheduleEntry = entry;
         CommonActions.CanComplete = _calendar.IsCurrent;
         bool busy = _actionBusy || CommonActions.IsBusy || CommonActions.IsMenuOpen;
+        BtnCalendarTab.IsEnabled = BtnOrdersTab.IsEnabled = BtnHistoryTab.IsEnabled = ChkSideBySide.IsEnabled = !busy;
         _calendar.IsEnabled = _orders.IsEnabled = _history.IsEnabled = !busy;
         bool quote = _selection.QuoteNumber.Length > 0;
+        CommonActions.Visibility = BtnPlan.Visibility = BtnMaterials.Visibility = BtnCosts.Visibility = quote ? Visibility.Visible : Visibility.Collapsed;
         BtnPlan.IsEnabled = !busy && quote && _calendar.IsCurrent && _calendar.HasOrder(_selection.QuoteNumber);
         BtnEditEntry.IsEnabled = !busy && entry != null;
         BtnMaterials.IsEnabled = !busy && quote && _orders.FindOrder(_selection.QuoteNumber) != null;
@@ -171,6 +193,7 @@ public partial class WorkManagementWindow : Window
         if (_history == null || _changingSection) return;
         UpdateSection();
         if (BtnHistoryTab.IsChecked == true) await FollowSelectedQuoteAsync();
+        else await RefreshSideViewsAsync();
     }
     private Task FollowSelectedQuoteAsync() => !_closed && _selection.QuoteNumber.Length > 0 && _history.SelectedNumber != _selection.QuoteNumber
         ? _history.FocusQuoteAsync(_selection.QuoteNumber) : Task.CompletedTask;
@@ -180,6 +203,7 @@ public partial class WorkManagementWindow : Window
         OrdersHost.Visibility = history ? Visibility.Collapsed : Visibility.Visible;
         HistoryHost.Visibility = history ? Visibility.Visible : Visibility.Collapsed;
         BtnDetached.Visibility = _detached.ContainsKey(history ? _history : _orders) ? Visibility.Visible : Visibility.Collapsed;
+        ApplySplit();
     }
     private async void OnPlanClick(object sender, RoutedEventArgs e) => await RunAsync(() => _calendar.PlanSelectedAsync(_selection.QuoteNumber));
     private async void OnEditEntryClick(object sender, RoutedEventArgs e) { if (_selection.Entry is { } entry) await RunAsync(() => _calendar.EditEntryAsync(entry)); }
@@ -187,23 +211,36 @@ public partial class WorkManagementWindow : Window
     private async void OnCostsClick(object sender, RoutedEventArgs e) => await RunAsync(() => _history.OpenCostsAsync(_selection.QuoteNumber));
     private async void OnShowQuoteClick(object sender, RoutedEventArgs e) => await ShowQuoteAsync(_selection.QuoteNumber);
     private async void OnRefreshClick(object sender, RoutedEventArgs e) { await _calendar.RefreshAsync(); await RefreshSideViewsAsync(); }
-    private void OnExpandClick(object sender, RoutedEventArgs e)
+    private void OnLayoutChanged(object sender, RoutedEventArgs e)
     {
-        _expanded = !_expanded;
-        if (_expanded) _sideWidth = SideColumn.ActualWidth;
+        if (_calendar == null || _changingSection) return;
         ApplySplit();
     }
     private void ApplySplit()
     {
-        bool hideCalendar = _expanded || _detached.ContainsKey(_calendar);
-        CalendarColumn.MinWidth = hideCalendar ? 0 : 360;
-        CalendarColumn.Width = hideCalendar ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
-        DividerColumn.Width = hideCalendar ? new GridLength(0) : new GridLength(8);
-        WorkspaceSplitter.Visibility = hideCalendar ? Visibility.Collapsed : Visibility.Visible;
-        SideColumn.Width = hideCalendar ? new GridLength(1, GridUnitType.Star) : new GridLength(Math.Max(380, _sideWidth));
-        BtnExpand.Content = _expanded ? "Torna affiancato" : "Allarga sezione";
-        BtnExpand.IsEnabled = !_detached.ContainsKey(_calendar);
-        BtnDetachCalendar.Content = _detached.ContainsKey(_calendar) ? "Mostra calendario ↗" : "Separa calendario ↗";
+        bool detachedCalendar = _detached.ContainsKey(_calendar);
+        bool calendar = (BtnCalendarTab.IsChecked == true || ChkSideBySide.IsChecked == true) && !detachedCalendar;
+        bool side = BtnCalendarTab.IsChecked != true || ChkSideBySide.IsChecked == true || detachedCalendar;
+        bool split = calendar && side;
+        CalendarHost.Visibility = calendar ? Visibility.Visible : Visibility.Collapsed;
+        SidePane.Visibility = side ? Visibility.Visible : Visibility.Collapsed;
+        CalendarColumn.MinWidth = calendar ? 360 : 0;
+        CalendarColumn.Width = calendar ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        SideColumn.MinWidth = side ? 380 : 0;
+        double available = WorkspaceRoot.ActualWidth > 0 ? WorkspaceRoot.ActualWidth - 28 : Width - 28;
+        double sideWidth = Math.Clamp(_sideWidth, 380, Math.Max(380, available * 0.46));
+        SideColumn.Width = !side ? new GridLength(0) : split ? new GridLength(sideWidth) : new GridLength(1, GridUnitType.Star);
+        DividerColumn.Width = new GridLength(split ? 8 : 0);
+        WorkspaceSplitter.Visibility = split ? Visibility.Visible : Visibility.Collapsed;
+        BtnDetachCalendar.Header = detachedCalendar ? "Mostra calendario separato" : "Separa calendario";
+    }
+    private void OnWorkspaceSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_calendar != null && e.WidthChanged) ApplySplit();
+    }
+    private void OnWindowMenuClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { ContextMenu: { } menu } button) { menu.PlacementTarget = button; menu.IsOpen = true; }
     }
     private void OnSplitResized(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e) => _sideWidth = SideColumn.ActualWidth;
     private void OnDetachCalendarClick(object sender, RoutedEventArgs e) => Detach(_calendar, CalendarHost, "Calendario lavori");
@@ -229,12 +266,16 @@ public partial class WorkManagementWindow : Window
         window.Icon = Icon; window.Background = Background;
         window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         _detached.Add(view, window);
+        if (view == _calendar) _calendar.UseSharedCommands(false);
+        if (view == _orders) _orders.IsEmbedded = false;
         window.Closing += (_, e) => { if (!_closed && !AppShutdownManager.IsShutdownRequested && !CanClose) e.Cancel = true; };
         window.Closed += (_, _) =>
         {
             floatingRoot.Children.Remove(view);
             window.Content = null;
             _detached.Remove(view);
+            if (view == _calendar) _calendar.UseSharedCommands(true);
+            if (view == _orders) _orders.IsEmbedded = true;
             if (!_closed) { host.Content = view; UpdateSection(); ApplySplit(); }
         };
         window.Show(); UpdateSection(); ApplySplit();

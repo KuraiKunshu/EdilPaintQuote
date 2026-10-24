@@ -564,7 +564,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel vm) HistoryWindow.Open(vm);
     }
-    private void OpenWorkManagement()
+    private void OpenWorkManagement(bool orders = false)
     {
         if (DataContext is not MainViewModel vm) return;
         if (_workManagementWindow == null)
@@ -573,7 +573,8 @@ public partial class MainWindow : Window
             _workManagementWindow.Closed += (_, _) => _workManagementWindow = null;
             _workManagementWindow.Show();
         }
-        _workManagementWindow.ShowSection(false);
+        if (orders) _workManagementWindow.ShowSection(false);
+        else _workManagementWindow.ShowCalendar();
     }
     private async void OnNewCustomerClick(object sender, RoutedEventArgs e)
     {
@@ -658,7 +659,7 @@ public partial class MainWindow : Window
 
     private void OnOpenSuppliersClick(object sender, RoutedEventArgs e)
     {
-        OpenWorkManagement();
+        OpenWorkManagement(orders: true);
     }
 
     private void OnEditRowClick(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is Item item) { var win = new EditItemWindow(item) { Owner = this }; if (win.ShowDialog() == true) (DataContext as MainViewModel)?.CalculateTotals(); } }

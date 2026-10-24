@@ -6,6 +6,7 @@
              xmlns:converters="clr-namespace:EdilPaintPreventibiviGen.Converters"
              FontSize="14" Language="it-IT" Foreground="{StaticResource DefaultTextBrush}" Background="{StaticResource ShellBackgroundBrush}">
     <UserControl.Resources>
+        <converters:OrderSelectionConverter x:Key="OrderSelectionConverter"/>
         <SolidColorBrush x:Key="StatusToOrderBackgroundBrush" Color="#FFF4F4"/>
         <SolidColorBrush x:Key="StatusToOrderBrush" Color="#B42318"/>
         <SolidColorBrush x:Key="StatusOrderedBackgroundBrush" Color="#FFF4E5"/>
@@ -34,9 +35,9 @@
         </Style>
         <Style x:Key="OrderCardStyle" TargetType="Button">
             <Setter Property="Width" Value="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=views:SupplierOrdersView}}"/>
-            <Setter Property="MinHeight" Value="240"/>
+            <Setter Property="MinHeight" Value="220"/>
             <Setter Property="Margin" Value="0,0,12,12"/>
-            <Setter Property="Padding" Value="18"/>
+            <Setter Property="Padding" Value="16"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
             <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
@@ -44,7 +45,7 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Foreground" Value="{StaticResource DefaultTextBrush}"/>
-            <Setter Property="ToolTip" Value="Apri i dettagli e i documenti dell'ordine"/>
+            <Setter Property="ToolTip" Value="Seleziona ordine · Doppio clic per aprire i dettagli"/>
             <Setter Property="AutomationProperties.Name" Value="{Binding OrderSiteTitle}"/>
             <Setter Property="AutomationProperties.HelpText" Value="Apri i dettagli dell'ordine"/>
             <Setter Property="Template">
@@ -68,6 +69,17 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource SelectedTabBrush}"/>
                             </Trigger>
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{StaticResource OrderSelectionConverter}">
+                                        <Binding Path="QuoteNumber"/>
+                                        <Binding Path="SelectedNumber" RelativeSource="{RelativeSource AncestorType=views:SupplierOrdersView}"/>
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}"/>
+                                <Setter TargetName="CardBorder" Property="BorderThickness" Value="2"/>
+                                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource SelectedTabBrush}"/>
+                            </DataTrigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="CardBorder" Property="Opacity" Value="0.5"/>
                             </Trigger>
@@ -108,47 +120,53 @@
         <ItemsPanelTemplate x:Key="CardsWrapPanel"><WrapPanel/></ItemsPanelTemplate>
         <ItemsPanelTemplate x:Key="SupplierGroupsPanel"><StackPanel/></ItemsPanelTemplate>
     </UserControl.Resources>
-    <DockPanel Margin="20">
-        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
-            <DockPanel Margin="0,0,0,16">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <DockPanel Margin="0,0,0,12">
                 <Border DockPanel.Dock="Right" Background="{StaticResource WhiteBrush}" BorderBrush="{StaticResource SubtleBorderBrush}"
                         BorderThickness="1" CornerRadius="6" Padding="18,9" VerticalAlignment="Top" Margin="16,0,0,0">
-                    <TextBlock x:Name="TxtSubtitle" FontSize="18" FontWeight="SemiBold" Text="Caricamento..."/>
+                    <TextBlock x:Name="TxtSubtitle" FontSize="15" FontWeight="SemiBold" Text="Caricamento..."/>
                 </Border>
-                <Border BorderBrush="{StaticResource DangerRedBrush}" BorderThickness="5,0,0,0" Padding="14,0,0,0">
+                <Border BorderBrush="{StaticResource PrimaryBlueBrush}" BorderThickness="3,0,0,0" Padding="12,0,0,0">
                     <StackPanel>
-                        <TextBlock Text="Ordini" FontSize="32" FontWeight="Bold"/>
-                        <TextBlock Text="Scegli un cantiere per aprire i dettagli dell'ordine" Margin="0,3,0,0" FontSize="15" TextWrapping="Wrap"/>
+                        <TextBlock Text="Ordini materiali" FontSize="22" FontWeight="Bold"/>
+                        <TextBlock Text="Seleziona un cantiere · Doppio clic per aprire i materiali" Margin="0,3,0,0" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                     </StackPanel>
                 </Border>
             </DockPanel>
             <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource SubtleBorderBrush}"
                     BorderThickness="1" CornerRadius="6" Padding="14,12,2,4">
+                <StackPanel>
                 <WrapPanel>
-                    <StackPanel Width="270" Margin="0,0,12,8">
+                    <StackPanel Width="240" Margin="0,0,12,8">
                         <TextBlock Text="Cerca un ordine" Style="{StaticResource FieldLabelStyle}"/>
                         <TextBox x:Name="TxtSearch" Height="40" Padding="11,6" VerticalContentAlignment="Center"
-                                 ToolTip="Cerca cliente, riferimento, numero preventivo o fornitore" KeyDown="OnSearchKeyDown"/>
+                                 ToolTip="Cerca cliente, riferimento, cantiere, numero o fornitore" KeyDown="OnSearchKeyDown" TextChanged="OnSearchTextChanged"/>
                     </StackPanel>
                     <StackPanel Width="180" Margin="0,0,12,8">
                         <TextBlock Text="Stato materiali" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="CmbStatusFilter" Height="40" Padding="8,5" VerticalContentAlignment="Center"
                                   SelectionChanged="OnStatusFilterChanged"/>
                     </StackPanel>
-                    <StackPanel Width="230" Margin="0,0,12,8">
-                        <TextBlock x:Name="TxtSortOrderLabel" Text="Ordina per" Style="{StaticResource FieldLabelStyle}"/>
-                        <ComboBox x:Name="CmbSortOrder" Height="40" Padding="8,5" VerticalContentAlignment="Center"
-                                  SelectionChanged="OnSortOrderChanged"/>
-                    </StackPanel>
-                    <Button x:Name="BtnSearch" Content="Cerca" Style="{StaticResource ToolbarButtonStyle}"
+                    <Button x:Name="BtnSearch" Content="Cerca" Style="{StaticResource ToolbarButtonStyle}" Visibility="Collapsed"
                             Margin="0,24,8,8" Click="OnSearchClick"/>
                     <Button x:Name="BtnRefresh" Content="Aggiorna" Style="{StaticResource ToolbarButtonStyle}"
                             Background="{StaticResource NeutralButtonBackgroundBrush}" Foreground="{StaticResource NeutralButtonTextBrush}"
                             Margin="0,24,12,8" Click="OnRefreshClick"/>
                 </WrapPanel>
+                <Expander Header="Ordinamento e fornitori" Margin="0,2,12,8">
+                <WrapPanel Margin="0,10,0,0">
+                    <StackPanel Width="230" Margin="0,0,12,8">
+                        <TextBlock x:Name="TxtSortOrderLabel" Text="Ordina per" Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="CmbSortOrder" Height="40" Padding="8,5" VerticalContentAlignment="Center"
+                                  SelectionChanged="OnSortOrderChanged"/>
+                    </StackPanel>
+                    <CheckBox x:Name="ChkGroupBySupplier" Content="Raggruppa per fornitore" IsChecked="True" Margin="0,24,0,8"
+                              VerticalAlignment="Center" Checked="OnSupplierGroupingChanged" Unchecked="OnSupplierGroupingChanged"/>
+                </WrapPanel>
+                </Expander>
+                </StackPanel>
             </Border>
-            <CheckBox x:Name="ChkGroupBySupplier" Content="Raggruppa per fornitore" IsChecked="True" Margin="2,12,0,0"
-                      FontWeight="SemiBold" Checked="OnSupplierGroupingChanged" Unchecked="OnSupplierGroupingChanged"/>
         </StackPanel>
         <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="0,1,0,0" Padding="2,10,2,0" Margin="0,8,0,0">
             <DockPanel>
@@ -187,15 +205,24 @@
                     </ItemsControl.GroupStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Button Style="{StaticResource OrderCardStyle}" Click="OnOpenOrderClick">
+                            <Button Style="{StaticResource OrderCardStyle}" Click="OnOpenOrderClick" MouseDoubleClick="OnOrderDoubleClick">
                                 <Grid>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" MinHeight="96"/>
+                                        <RowDefinition Height="Auto" MinHeight="84"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="{Binding OrderSiteTitle}" FontSize="18" FontWeight="Bold" TextWrapping="Wrap"
-                                               VerticalAlignment="Top" ToolTip="{Binding OrderSiteTitle}"/>
+                                    <StackPanel VerticalAlignment="Top" ToolTip="{Binding OrderSiteTitle}">
+                                        <TextBlock Text="{Binding CustomerName}" FontSize="17" FontWeight="Bold" TextWrapping="Wrap"/>
+                                        <TextBlock FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,0">
+                                            <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding ReferenceName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                            <Run Text="Rif. "/><Run Text="{Binding ReferenceName, Mode=OneWay}"/>
+                                        </TextBlock>
+                                        <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}">
+                                            <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding SiteName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                            <Run Text="Cantiere: "/><Run Text="{Binding SiteName, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </StackPanel>
                                     <Border Grid.Row="1" Style="{StaticResource MaterialStatusBadgeStyle}" Margin="0,10,0,14">
                                         <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="42" TextTrimming="CharacterEllipsis">
                                             <TextBlock.Style>
@@ -212,7 +239,7 @@
                                     </Border>
                                     <StackPanel Grid.Row="2">
                                         <TextBlock Text="Data ordine" FontSize="13"/>
-                                        <TextBlock FontSize="18" FontWeight="SemiBold" Margin="0,4,0,0">
+                                        <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Text" Value="{Binding MaterialOrderDateDisplay}"/>
