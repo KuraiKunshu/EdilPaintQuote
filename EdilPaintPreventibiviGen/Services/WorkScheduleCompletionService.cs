@@ -40,17 +40,20 @@ public sealed class WorkScheduleCompletionService
     private readonly Func<DateTime> _clock;
     private readonly AutomaticMaterialSettingsService? _automaticMaterials;
     private readonly bool _enableWindowAutomations;
+    private readonly RealProfitSettingsModel? _costDefaults;
 
     public WorkScheduleCompletionService(WorkScheduleService schedule, IDataService data, StoragePathService storage,
-        AutomaticMaterialSettingsService? automaticMaterials = null, bool enableWindowAutomations = true)
+        AutomaticMaterialSettingsService? automaticMaterials = null, bool enableWindowAutomations = true,
+        RealProfitSettingsModel? costDefaults = null)
         : this(schedule, data, storage, (context, path) => new PdfService().GenerateRealProfitPdf(context, path),
-            null, automaticMaterials, enableWindowAutomations)
+            null, automaticMaterials, enableWindowAutomations, costDefaults)
     {
     }
 
     internal WorkScheduleCompletionService(WorkScheduleService schedule, IDataService data,
         StoragePathService storage, Action<RealProfitPdfContext, string> writePdf, Func<DateTime>? clock = null,
-        AutomaticMaterialSettingsService? automaticMaterials = null, bool enableWindowAutomations = true)
+        AutomaticMaterialSettingsService? automaticMaterials = null, bool enableWindowAutomations = true,
+        RealProfitSettingsModel? costDefaults = null)
     {
         _schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
         _data = data ?? throw new ArgumentNullException(nameof(data));
@@ -59,6 +62,7 @@ public sealed class WorkScheduleCompletionService
         _clock = clock ?? (() => DateTime.Now);
         _automaticMaterials = automaticMaterials;
         _enableWindowAutomations = enableWindowAutomations;
+        _costDefaults = costDefaults;
     }
 
     public Task<WorkScheduleCompletionResult> CompleteAsync(WorkScheduleEntry selected,
@@ -90,6 +94,24 @@ public sealed class WorkScheduleCompletionService
             throw new InvalidOperationException("La squadra del calendario non è aggiornata dal database. " +
                 "Ripristina la connessione prima di archiviare il PDF dei costi.");
         var context = CreatePdfContext(quote, company, _clock(), labor.Labor);
+        if (_costDefaults != null)
+        {
+            var customers = await _data.GetCustomersAsync(token).ConfigureAwait(false);
+            EnsureCurrentData();
+            var percentages = RealProfitDefaultsService.Resolve(quote.RealProfit.Input,
+                RealProfitDefaultsService.FindSupplier(quote, customers)?.SupplierDiscount ?? 0,
+                _costDefaults.ProfitReductionPercentage);
+            context.Input.SupplierDiscount = percentages.SupplierDiscount;
+            context.Input.ProfitReductionPercentage = percentages.ProfitReduction;
+            context.Input.UseSupplierDiscount = percentages.UseSupplierDiscount;
+            context.Input.UseDefaultProfitReduction = percentages.UseDefaultReduction;
+            context = new RealProfitPdfContext
+            {
+                CompanyName = context.CompanyName, QuoteNumber = context.QuoteNumber, QuoteDate = context.QuoteDate,
+                CustomerName = context.CustomerName, CustomerIsSupplier = context.CustomerIsSupplier,
+                GeneratedAt = context.GeneratedAt, Input = context.Input, Result = RealProfitCalculator.Calculate(context.Input)
+            };
+        }
         if (context.Input.CalendarLabor != null)
             foreach (var row in context.Input.CalendarLabor.Rows.Where(row => row.EntryId == current.Id))
                 row.IsCompleted = true;
@@ -206,6 +228,8 @@ public sealed class WorkScheduleCompletionService
             ProfitReductionPercentage = saved.ProfitReductionPercentage,
             ExcludeMaterials = saved.ExcludeMaterials,
             SupplierDiscount = saved.SupplierDiscount,
+            UseSupplierDiscount = saved.UseSupplierDiscount,
+            UseDefaultProfitReduction = saved.UseDefaultProfitReduction,
             Workers = saved.Workers,
             Days = saved.Days,
             HoursPerDay = saved.HoursPerDay,

@@ -4,7 +4,7 @@ using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
 
-/// <summary>The registered orders shown by both Orders and the work calendar.</summary>
+/// <summary>Confirmed jobs and open customer-managed orders shown by Orders and the calendar.</summary>
 public static class SupplierOrderEligibility
 {
     public static Expression<Func<QuoteEntity, bool>> ActiveOrderPredicate { get; } = quote =>
@@ -12,10 +12,7 @@ public static class SupplierOrderEligibility
         quote.Status != QuoteStatus.Finito &&
         quote.Status != QuoteStatus.Rifiutato &&
         quote.Status != QuoteStatus.Archiviato &&
-        (quote.MaterialsOrderedByCustomer ||
-         quote.Status == QuoteStatus.Confermato &&
-         (quote.SupplierName != string.Empty || quote.MaterialOrderDate.HasValue ||
-          quote.ExpectedDeliveryDate.HasValue || quote.MaterialStatus != string.Empty));
+        (quote.MaterialsOrderedByCustomer || quote.Status == QuoteStatus.Confermato);
 
     private static readonly Func<QuoteEntity, bool> Matches = ActiveOrderPredicate.Compile();
 

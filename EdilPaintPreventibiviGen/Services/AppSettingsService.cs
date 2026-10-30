@@ -271,6 +271,7 @@ public sealed class AppSettingsServiceModel
     public string GetEffectiveDefaultVatType() => DefaultVatType is "22%" or "10%" or "RC 10%+22%" or "esclusa" ? DefaultVatType : "22%";
 	public bool FirstStartup { get; set; } = true;
 	public bool GeneratePDF { get; set; } = true;
+	public bool SaveDraftOnlyOnPdfOrClose { get; set; }
 	public bool RestoreMissingPdfsOnStartup { get; set; }
 	public bool DatabaseCostSavingMode { get; set; } = true;
 	public bool IsSilentStartup { get; set; } = true;

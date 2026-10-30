@@ -8,8 +8,8 @@ namespace EdilPaintPreventibiviGen.Tests;
 public sealed class SupplierOrderEligibilityTests
 {
     [Fact]
-    public void ConfirmedQuoteWithoutOrderInformationDoesNotAppearInEitherOrderList()
-        => Assert.False(SupplierOrderEligibility.IsActive(new() { Status = QuoteStatus.Confermato }));
+    public void ConfirmedQuoteWithoutOrderInformationAppearsInBothOrdersAndCalendar()
+        => Assert.True(SupplierOrderEligibility.IsActive(new() { Status = QuoteStatus.Confermato }));
 
     [Fact]
     public void EveryRegisteredOrderFieldCanIdentifyAConfirmedOrder()

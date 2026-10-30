@@ -7,6 +7,7 @@ using System.Windows.Input;
 using EdilPaintPreventibiviGen.Models;
 using EdilPaintPreventibiviGen.Services;
 using EdilPaintPreventibiviGen.ViewModels;
+using EdilPaintPreventibiviGen.Converters;
 
 namespace EdilPaintPreventibiviGen.Views;
 
@@ -27,6 +28,7 @@ public partial class SupplierOrdersView : UserControl, IDisposable
     private bool _hasLoaded;
     private bool _detailsOpen;
     private bool _closed;
+    private MaterialOrdersWindow? _registerWindow;
     public static readonly DependencyProperty CardWidthProperty = DependencyProperty.Register(nameof(CardWidth), typeof(double), typeof(SupplierOrdersView), new PropertyMetadata(240d));
     public double CardWidth { get => (double)GetValue(CardWidthProperty); set => SetValue(CardWidthProperty, value); }
     private bool _isEmbedded;
@@ -99,10 +101,23 @@ public partial class SupplierOrdersView : UserControl, IDisposable
     }
     public void Dispose()
     {
+        _registerWindow?.Close();
         _closed = true;
         _refreshCts?.Cancel();
         _refreshCts?.Dispose();
         _refreshCts = null;
+    }
+
+    private void OnOpenRegisterClick(object sender, RoutedEventArgs e)
+    {
+        if (_registerWindow == null)
+        {
+            _registerWindow = new MaterialOrdersWindow(App.DataService) { Owner = HostWindow };
+            _registerWindow.Closed += (_, _) => _registerWindow = null;
+            _registerWindow.Show();
+        }
+        if (_registerWindow.WindowState == WindowState.Minimized) _registerWindow.WindowState = WindowState.Normal;
+        _registerWindow.Activate();
     }
 
     private async Task RefreshAsync(string searchText = "")
@@ -188,7 +203,7 @@ public partial class SupplierOrdersView : UserControl, IDisposable
         else if (!string.Equals(selectedStatus, "Tutti gli stati", StringComparison.Ordinal))
         {
             filtered = filtered.Where(summary => string.Equals(
-                summary.MaterialStatus?.Trim(),
+                SupplierOrderQueue.StatusDisplay(summary)?.Trim(),
                 selectedStatus,
                 StringComparison.OrdinalIgnoreCase));
         }
@@ -198,16 +213,16 @@ public partial class SupplierOrdersView : UserControl, IDisposable
             : SupplierOrderSortMode.OrderDateDescending;
 
         bool grouped = ChkGroupBySupplier.IsChecked == true;
+        var rows = filtered.ToList();
+        int pending = rows.Count(SupplierOrderQueue.NeedsOrdering);
         using (_orderView.DeferRefresh())
         {
             _orderView.GroupDescriptions.Clear();
-            if (grouped)
-                _orderView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(QuoteHistorySummary.OrderSupplierGroup))
+            if (grouped || pending > 0)
+                _orderView.GroupDescriptions.Add(new PropertyGroupDescription(null, new SupplierOrderQueueConverter { GroupBySupplier = grouped })
                     { StringComparison = StringComparison.OrdinalIgnoreCase });
             _quotes.Clear();
-            foreach (QuoteHistorySummary summary in grouped
-                         ? SupplierOrderSortService.SortBySupplier(filtered, sortMode)
-                         : SupplierOrderSortService.Sort(filtered, sortMode))
+            foreach (QuoteHistorySummary summary in SupplierOrderQueue.Sort(rows, sortMode, grouped))
                 _quotes.Add(summary);
         }
         // The plain list avoids per-row notifications while grouping is deferred.
@@ -219,6 +234,7 @@ public partial class SupplierOrdersView : UserControl, IDisposable
             ? visibleLabel
             : $"{visibleLabel} su {_loadedQuotes.Count}";
         TxtVisibleCount.Text = grouped ? $"{visibleLabel} · {_orderView.Groups?.Count ?? 0} gruppi" : visibleLabel;
+        if (pending > 0) TxtVisibleCount.Text += $" · {pending} da ordinare";
 
         bool hasVisibleOrders = _quotes.Count > 0;
         EmptyPanel.Visibility = hasVisibleOrders ? Visibility.Collapsed : Visibility.Visible;

@@ -171,6 +171,7 @@ public sealed class RealProfitPage : OperationPage
     {
         QuoteRevenue = Number(_revenue, "Ricavo"), ExcludeMaterials = _exclude.IsToggled,
         SupplierDiscount = Number(_discount, "Sconto", 100), ProfitReductionPercentage = Number(_reduction, "Riduzione", 100),
+        UseSupplierDiscount = false, UseDefaultProfitReduction = false,
         Workers = WholeNumber(_workers, "Operai"), Days = Number(_days, "Giorni"),
         HoursPerDay = Number(_hours, "Ore al giorno", 24), HourlyCost = Number(_hourly, "Costo orario"),
         CalendarLabor = _quote.RealProfit?.Input.CalendarLabor?.CreateCopy(),

@@ -988,7 +988,8 @@ public class FallbackDataService : IDataService
 
     internal async Task SaveQuoteDatabaseOnlyAsync(
         QuoteHistoryEntry quote,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        long? expectedRevision = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         quote.LastModifiedUtc = DateTime.UtcNow;
@@ -998,7 +999,7 @@ public class FallbackDataService : IDataService
         var lightEntry = CreateLightEntry(quote);
         quote.SyncHash = QuoteSyncHashService.Compute(lightEntry);
 
-        bool savedOnline = await SaveQuoteOnlineWithRetryAsync(quote, cancellationToken);
+        bool savedOnline = await SaveQuoteOnlineWithRetryAsync(quote, cancellationToken, expectedRevision);
         if (!savedOnline)
         {
             throw new DatabaseWritePendingException(
@@ -1042,7 +1043,8 @@ public class FallbackDataService : IDataService
 
     private async Task<bool> SaveQuoteOnlineWithRetryAsync(
         QuoteHistoryEntry onlineEntry,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? expectedRevision = null)
     {
         Exception? lastError = null;
 
@@ -1054,12 +1056,17 @@ public class FallbackDataService : IDataService
             {
                 if (!IsDatabaseAvailable())
                     await EnsureDatabaseReachableAsync(DbInteractiveWakeupTimeout, cancellationToken);
-                await _sqlService.SaveQuoteAsync(onlineEntry, cancellationToken);
+                if (expectedRevision.HasValue)
+                    await _sqlService.SaveQuoteWithExpectedRevisionAsync(onlineEntry, cancellationToken, expectedRevision);
+                else
+                    await _sqlService.SaveQuoteAsync(onlineEntry, cancellationToken);
                 MarkDatabaseAvailable($"Preventivo {onlineEntry.QuoteNumber} salvato online.");
                 return true;
             }
             catch (QuoteConflictException)
             {
+                // Autosave is never authoritative over a newer revision from another PC.
+                if (expectedRevision.HasValue) throw;
                 // Il salvataggio completo nasce dall'editor: il contenuto del
                 // file aperto e modificato e' autorevole. Una concorrenza nella
                 // stretta finestra SELECT->UPDATE viene quindi ritentata una

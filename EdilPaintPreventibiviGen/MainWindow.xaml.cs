@@ -205,7 +205,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task PrepareForCloseAsync()
+    internal async Task PrepareForCloseAsync()
     {
         if (_isCloseCleanupRunning)
             return;
@@ -281,7 +281,7 @@ public partial class MainWindow : Window
         if (_isAutosavingDraft ||
             AppShutdownManager.IsShutdownRequested ||
             cancellationToken.IsCancellationRequested ||
-            DataContext is not MainViewModel vm)
+            DataContext is not MainViewModel vm || !vm.IsPeriodicDraftSaveEnabled)
             return;
 
         _isAutosavingDraft = true;
@@ -359,7 +359,7 @@ public partial class MainWindow : Window
             : draft.LastModifiedUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
 
         var result = MessageBox.Show(
-            $"Ho trovato una bozza autosalvata del {savedAt}. Vuoi recuperarla?",
+            $"Ho trovato una bozza salvata del {savedAt}. Vuoi recuperarla?",
             "Bozza disponibile",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);

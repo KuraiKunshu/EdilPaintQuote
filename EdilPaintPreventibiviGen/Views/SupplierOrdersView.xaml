@@ -7,6 +7,7 @@
              FontSize="14" Language="it-IT" Foreground="{StaticResource DefaultTextBrush}" Background="{StaticResource ShellBackgroundBrush}">
     <UserControl.Resources>
         <converters:OrderSelectionConverter x:Key="OrderSelectionConverter"/>
+        <converters:SupplierOrderQueueConverter x:Key="SupplierOrderQueueConverter"/>
         <SolidColorBrush x:Key="StatusToOrderBackgroundBrush" Color="#FFF4F4"/>
         <SolidColorBrush x:Key="StatusToOrderBrush" Color="#B42318"/>
         <SolidColorBrush x:Key="StatusOrderedBackgroundBrush" Color="#FFF4E5"/>
@@ -95,23 +96,23 @@
             <Setter Property="Padding" Value="10,7"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding MaterialStatusDisplay}" Value="Da ordinare">
+                <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="Da ordinare">
                     <Setter Property="Background" Value="{StaticResource StatusToOrderBackgroundBrush}"/>
                     <Setter Property="TextElement.Foreground" Value="{StaticResource StatusToOrderBrush}"/>
                 </DataTrigger>
-                <DataTrigger Binding="{Binding MaterialStatusDisplay}" Value="Ordinato">
+                <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="Ordinato">
                     <Setter Property="Background" Value="{StaticResource StatusOrderedBackgroundBrush}"/>
                     <Setter Property="TextElement.Foreground" Value="{StaticResource StatusOrderedBrush}"/>
                 </DataTrigger>
-                <DataTrigger Binding="{Binding MaterialStatusDisplay}" Value="Da ritirare">
+                <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="Da ritirare">
                     <Setter Property="Background" Value="{StaticResource StatusPickupBackgroundBrush}"/>
                     <Setter Property="TextElement.Foreground" Value="{StaticResource StatusPickupBrush}"/>
                 </DataTrigger>
-                <DataTrigger Binding="{Binding MaterialStatusDisplay}" Value="In magazzino">
+                <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="In magazzino">
                     <Setter Property="Background" Value="{StaticResource StatusWarehouseBackgroundBrush}"/>
                     <Setter Property="TextElement.Foreground" Value="{StaticResource StatusWarehouseBrush}"/>
                 </DataTrigger>
-                <DataTrigger Binding="{Binding MaterialStatusDisplay}" Value="Consegnato">
+                <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="Consegnato">
                     <Setter Property="Background" Value="{StaticResource StatusDeliveredBackgroundBrush}"/>
                     <Setter Property="TextElement.Foreground" Value="{StaticResource StatusDeliveredBrush}"/>
                 </DataTrigger>
@@ -122,6 +123,8 @@
     </UserControl.Resources>
     <DockPanel Margin="16">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <Button Content="Registro ordini materiali" Click="OnOpenRegisterClick" HorizontalAlignment="Right" Padding="12,7" Margin="0,0,0,10"
+                    ToolTip="Consulta date e fornitori anche per i lavori finiti e archiviati"/>
             <DockPanel Margin="0,0,0,12">
                 <Border DockPanel.Dock="Right" Background="{StaticResource WhiteBrush}" BorderBrush="{StaticResource SubtleBorderBrush}"
                         BorderThickness="1" CornerRadius="6" Padding="18,9" VerticalAlignment="Top" Margin="16,0,0,0">
@@ -227,9 +230,9 @@
                                         <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="42" TextTrimming="CharacterEllipsis">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="{Binding MaterialStatusDisplay}"/>
+                                                    <Setter Property="Text" Value="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding MaterialStatusDisplay}" Value="-">
+                                                        <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="-">
                                                             <Setter Property="Text" Value="Da impostare"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>

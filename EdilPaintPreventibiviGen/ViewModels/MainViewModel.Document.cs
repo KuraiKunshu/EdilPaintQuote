@@ -44,6 +44,7 @@ public partial class MainViewModel
         _partnerCompanyName = string.Empty;
 
         _isEditingExistingQuote = false;
+        _loadedQuoteStatus = null;
         _hasPersistedCurrentQuote = false;
         _loadedQuoteDate = null;
         _loadedQuoteBaseVersionUtc = default;
@@ -275,6 +276,9 @@ public partial class MainViewModel
             await _draftSaveLock.WaitAsync();
             lockTaken = true;
 
+            // An explicit PDF request also preserves recoverable input if generation fails.
+            await _draftService.SaveIfChangedAsync(CreateDraftEntry(), CancellationToken.None);
+
             // Lo stato puo' essere cambiato da un autosalvataggio che era gia'
             // in corso quando l'utente ha premuto il pulsante. Decidiamo la
             // numerazione soltanto dopo aver atteso quel salvataggio.
@@ -458,6 +462,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(LaborDiscount));
 
         _isEditingExistingQuote = isEdit;
+        _loadedQuoteStatus = isEdit ? entry.Status : null;
         _hasPersistedCurrentQuote = isEdit;
         _loadedQuoteDate = isEdit ? entry.Date : null;
         _loadedQuoteBaseVersionUtc = isEdit ? entry.BaseVersionUtc : default;
@@ -477,11 +482,11 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(PartnerCompanyName));
 
         OurCosts.Clear();
-        foreach (var c in entry.OurCosts) OurCosts.Add(c);
+        foreach (var c in entry.OurCosts) OurCosts.Add(CloneCost(c));
         PartnerCosts.Clear();
-        foreach (var c in entry.PartnerCosts) PartnerCosts.Add(c);
+        foreach (var c in entry.PartnerCosts) PartnerCosts.Add(CloneCost(c));
         AdditionalCosts.Clear();
-        foreach (var c in entry.AdditionalCosts) AdditionalCosts.Add(c);
+        foreach (var c in entry.AdditionalCosts) AdditionalCosts.Add(CloneCost(c));
 
         foreach (var m in entry.Materials)
         {

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace EdilPaintPreventibiviGen.Models;
 
@@ -65,6 +66,10 @@ public sealed class RealProfitInput
     public double ProfitReductionPercentage { get; set; }
     public bool ExcludeMaterials { get; set; }
     public double SupplierDiscount { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? UseSupplierDiscount { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? UseDefaultProfitReduction { get; set; }
     public int Workers { get; set; }
     public double Days { get; set; }
     public double HoursPerDay { get; set; }

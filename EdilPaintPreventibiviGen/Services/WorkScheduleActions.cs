@@ -16,6 +16,7 @@ public static class WorkScheduleActions
         var schedule = App.WorkSchedule ?? throw new InvalidOperationException("Il calendario non è disponibile.");
         var completion = new WorkScheduleCompletionService(schedule, App.DataService, StoragePathService.Instance,
             automaticMaterials: App.AutomaticMaterials,
+            costDefaults: App.AppSettings.RealProfit,
             enableWindowAutomations: App.AppSettings?.Business.EnableWindowAutomations != false);
         try
         {
@@ -57,10 +58,10 @@ public static class WorkScheduleActions
         var quote = await App.DataService.GetQuoteByNumberAsync(quoteNumber, token, includeAttachments: false)
             ?? throw new InvalidOperationException("Ordine non trovato nello storico.");
         var customers = await App.DataService.GetCustomersAsync(token);
-        var customer = customers.FirstOrDefault(item => item.BusinessName == quote.CustomerName);
+        var supplier = RealProfitDefaultsService.FindSupplier(quote, customers);
         var materials = await App.DataService.GetPersonalMaterialsAsync().WaitAsync(token);
         token.ThrowIfCancellationRequested();
-        var window = new RealProfitWindow(quote, customer?.SupplierDiscount ?? 0, customer?.IsSupplier == true,
+        var window = new RealProfitWindow(quote, supplier?.SupplierDiscount ?? 0, RealProfitDefaultsService.CustomerIsSupplier(quote, customers),
             materials, snapshot => App.DataService.UpdateQuoteRealProfitAsync(quoteNumber, snapshot, token),
             App.AppSettings.RealProfit) { Owner = owner, CloseAfterSaved = true };
         ((System.Windows.Controls.Button)window.FindName("BtnCalculate")).Content = "Salva e termina intervento";

@@ -305,9 +305,12 @@ public partial class MainViewModel
 
     private Task SaveQuoteToAuthoritativeDatabaseAsync(
         QuoteHistoryEntry entry,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        long? expectedRevision = null) =>
         _dataService is FallbackDataService fallback
-            ? fallback.SaveQuoteDatabaseOnlyAsync(entry, cancellationToken)
+            ? fallback.SaveQuoteDatabaseOnlyAsync(entry, cancellationToken, expectedRevision)
+            : _dataService is SqlDataService sql && expectedRevision.HasValue
+                ? sql.SaveQuoteWithExpectedRevisionAsync(entry, cancellationToken, expectedRevision)
             : _dataService.SaveQuoteAsync(entry, cancellationToken);
 
     private static void PreserveDatabaseManagedMetadata(
@@ -346,6 +349,7 @@ public partial class MainViewModel
             entry.BaseVersionUtc = persistedVersion;
 
         _isEditingExistingQuote = true;
+        _loadedQuoteStatus = entry.Status;
         _loadedQuoteDate = entry.Date;
         _loadedQuoteBaseVersionUtc = persistedVersion;
         _loadedQuoteBaseRevision = entry.BaseRevision;

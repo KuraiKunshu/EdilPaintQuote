@@ -138,6 +138,9 @@ public class QuoteHistoryEntry
 	[JsonPropertyName("wasCreatedByDraftAutosave")]
 	public bool WasCreatedByDraftAutosave { get; set; }
 
+	[JsonPropertyName("draftSourceStatus")]
+	public QuoteStatus? DraftSourceStatus { get; set; }
+
 	[JsonPropertyName("sharedDraftContentHash")]
 	public string SharedDraftContentHash { get; set; } = string.Empty;
 }

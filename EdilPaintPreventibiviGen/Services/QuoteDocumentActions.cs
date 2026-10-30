@@ -16,10 +16,9 @@ public static class QuoteDocumentActions
         var history = new QuoteHistoryService(App.DataService, StoragePathService.Instance);
         var quote = await history.GetQuoteByNumberAsync(quoteNumber)
             ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
-        double supplierDiscount = vm.AllCustomers.FirstOrDefault(customer => customer.IsSupplier &&
-            string.Equals(customer.BusinessName, quote.SupplierName, StringComparison.OrdinalIgnoreCase))?.SupplierDiscount ?? 0;
-        bool customerIsSupplier = vm.AllCustomers.Any(customer => customer.IsSupplier &&
-            string.Equals(customer.BusinessName, quote.CustomerName, StringComparison.OrdinalIgnoreCase));
+        var customers = await App.DataService.GetCustomersAsync();
+        double supplierDiscount = RealProfitDefaultsService.FindSupplier(quote, customers)?.SupplierDiscount ?? 0;
+        bool customerIsSupplier = RealProfitDefaultsService.CustomerIsSupplier(quote, customers);
         new RealProfitWindow(quote, supplierDiscount, customerIsSupplier, vm.PersonalMaterialsView,
             snapshot => history.UpdateRealProfitAsync(quote.QuoteNumber, snapshot), App.AppSettings.RealProfit)
         { Owner = owner }.ShowDialog();

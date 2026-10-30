@@ -410,10 +410,10 @@ public sealed class WorkScheduleRulesTests
     [InlineData("ordered")]
     [InlineData("delivery")]
     [InlineData("materials")]
-    public void ConfirmedOrdersNeedAtLeastOneSupplierOrderDetail(string detail)
+    public void ConfirmedOrdersRemainEligibleBeforeAndAfterSupplierDetailsAreAdded(string detail)
     {
         var quote = new QuoteEntity { Status = QuoteStatus.Confermato };
-        Assert.False(SupplierOrderEligibility.IsActive(quote));
+        Assert.True(SupplierOrderEligibility.IsActive(quote));
         if (detail == "supplier") quote.SupplierName = "Fornitore";
         if (detail == "ordered") quote.MaterialOrderDate = Today;
         if (detail == "delivery") quote.ExpectedDeliveryDate = Today;
@@ -440,6 +440,11 @@ public sealed class WorkScheduleRulesTests
         Assert.False(active.HasOrderWarning);
         entity.Quote.Status = QuoteStatus.Confermato;
         entity.Quote.MaterialsOrderedByCustomer = false;
+        var pending = SqlDataService.ScheduleEntryToModel(entity);
+        Assert.True(pending.IsOrderActive);
+        Assert.True(pending.IsActiveOrder);
+        Assert.False(pending.HasOrderWarning);
+        entity.Quote.Status = QuoteStatus.Finito;
         var inactive = SqlDataService.ScheduleEntryToModel(entity);
         Assert.False(inactive.IsOrderActive);
         Assert.False(inactive.IsActiveOrder);

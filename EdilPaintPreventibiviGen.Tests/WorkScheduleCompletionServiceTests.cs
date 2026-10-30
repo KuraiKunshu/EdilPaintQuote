@@ -40,6 +40,31 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
         new(_schedule, _data, _storage, writer ?? ((_, path) => File.WriteAllText(path, "new-pdf")), () => Now);
 
     private WorkScheduleEntry Selected => _repository.Entry!.CreateValidatedCopy();
+
+    [Theory]
+    [InlineData(false, 50, 20, 624)]
+    [InlineData(true, 0, 0, 680)]
+    public async Task CompletionAppliesActualSupplierAndPrudentialDefaultsWhileRespectingManualZero(
+        bool manualZero, double expectedDiscount, double expectedReduction, double expectedProfit)
+    {
+        _quotes.Quote!.SupplierName = "Supplier";
+        _quotes.Customers = [new() { BusinessName = "Customer", IsSupplier = true, SupplierDiscount = 80 },
+            new() { BusinessName = "Supplier", IsSupplier = true, SupplierDiscount = 50 }];
+        var saved = _quotes.Quote.RealProfit!.Input;
+        saved.Materials = [new() { CustomerUnitPrice = 100, Quantity = 2 }];
+        if (manualZero) saved.UseSupplierDiscount = saved.UseDefaultProfitReduction = false;
+        RealProfitPdfContext? pdf = null;
+        var service = new WorkScheduleCompletionService(_schedule, _data, _storage,
+            (context, path) => { pdf = context; File.WriteAllText(path, "costs"); }, () => Now,
+            costDefaults: new() { ProfitReductionPercentage = 20 });
+        await service.CompleteAsync(Selected);
+        Assert.Equal(expectedDiscount, pdf!.Input.SupplierDiscount);
+        Assert.Equal(expectedReduction, pdf.Input.ProfitReductionPercentage);
+        Assert.Equal(expectedProfit, pdf.Result.Profit, 6);
+        Assert.Equal(0, saved.SupplierDiscount);
+        Assert.Equal(0, saved.ProfitReductionPercentage);
+        Assert.Equal(WorkScheduleEntryStatus.Completed, _repository.Entry!.Status);
+    }
     private string FinalPath => _storage.BuildWorkScheduleCostsPdfPath(Selected.QuoteNumber, Selected.Date, Selected.Id);
     private string[] StagingFiles => Directory.Exists(_storage.GetWorkScheduleCostsFolder())
         ? Directory.GetFiles(_storage.GetWorkScheduleCostsFolder(), "*.tmp.pdf") : [];
@@ -515,6 +540,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
 
     public class DataProxy : DispatchProxy
     {
+        public List<Customer> Customers { get; set; } = [];
         public bool CanSynchronize { get; set; } = true;
         public int QuoteReads { get; private set; }
         public bool IncludeAttachments { get; private set; } = true;
@@ -535,6 +561,7 @@ public sealed class WorkScheduleCompletionServiceTests : IDisposable
                     Assert.Equal("Q-51", args[0]);
                     return Task.FromResult(Quote);
                 case nameof(IDataService.GetCompanyAsync): return Task.FromResult<Company?>(new() { Nome = "Company" });
+                case nameof(IDataService.GetCustomersAsync): return Task.FromResult(Customers);
                 default: throw new InvalidOperationException($"Unexpected data mutation: {method.Name}");
             }
         }

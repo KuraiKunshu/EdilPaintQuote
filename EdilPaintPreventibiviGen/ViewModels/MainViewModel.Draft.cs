@@ -14,6 +14,8 @@ public partial class MainViewModel
     private DateTime _lastSharedDraftSaveAttemptUtc = DateTime.MinValue;
     private bool _isDraftQuoteNumberAllocated;
     private bool _sharedDraftCreatedByAutosave;
+    private QuoteStatus? _loadedQuoteStatus;
+    public bool IsPeriodicDraftSaveEnabled => App.AppSettings?.App.SaveDraftOnlyOnPdfOrClose != true;
 
     public async Task<QuoteHistoryEntry?> LoadDraftAsync(CancellationToken cancellationToken = default)
     {
@@ -24,6 +26,7 @@ public partial class MainViewModel
         CancellationToken cancellationToken = default,
         bool forceDatabaseSave = false)
     {
+        if (!forceDatabaseSave && !IsPeriodicDraftSaveEnabled) return;
         bool lockTaken = false;
         bool databaseGateTaken = false;
         CancellationTokenSource? cloudSaveCts = null;
@@ -42,6 +45,8 @@ public partial class MainViewModel
             await _draftSaveLock.WaitAsync(cancellationToken);
             lockTaken = true;
 
+            if (!forceDatabaseSave && !IsPeriodicDraftSaveEnabled) return;
+
             if (_isGeneratingPdf || _isGeneratingCostsPdf)
                 return;
 
@@ -54,10 +59,27 @@ public partial class MainViewModel
             }
 
             var draft = CreateDraftEntry();
+            bool requiresPdf = _isEditingExistingQuote && _loadedQuoteStatus is { } status && status != QuoteStatus.Bozza;
+            if (requiresPdf && !string.IsNullOrEmpty(_lastSharedDraftContentHash) &&
+                string.Equals(await Task.Run(() => ComputeSharedDraftContentHash(draft), cancellationToken),
+                    _lastSharedDraftContentHash, StringComparison.Ordinal))
+            {
+                // Merely reopening a finalized quote must not create a recovery draft.
+                await _draftService.DeleteAsync(cancellationToken);
+                DraftSyncStatus = "Preventivo invariato: le modifiche si confermano con Genera PDF";
+                HasDraftSyncError = false;
+                return;
+            }
 
             // Il file locale viene sempre aggiornato per primo: resta disponibile
             // anche quando il database cloud e' temporaneamente irraggiungibile.
             await _draftService.SaveIfChangedAsync(draft, cancellationToken);
+
+            if (requiresPdf)
+            {
+                SetPdfConfirmationRequiredStatus();
+                return;
+            }
 
             if (IsBillingCustomerEnabled && SelectedBillingCustomer == null)
             {
@@ -203,6 +225,15 @@ public partial class MainViewModel
                 databaseCancellationToken);
             ReleaseDatabaseGate();
 
+            _loadedQuoteStatus = savedState.Status;
+            draft.DraftSourceStatus = savedState.Status;
+            if (!savedState.WasSaved)
+            {
+                await _draftService.SaveIfChangedAsync(draft, cancellationToken, forceWrite: true);
+                SetPdfConfirmationRequiredStatus();
+                return;
+            }
+
             // Questi campi alimentano il binding WPF: vengono applicati solo
             // quando il lavoro DB e' terminato e l'await e' tornato al chiamante.
             _isEditingExistingQuote = true;
@@ -236,6 +267,11 @@ public partial class MainViewModel
         {
             DraftSyncStatus = "Bozza salvata su questo PC: database lento, condivisione rinviata";
             HasDraftSyncError = false;
+        }
+        catch (QuoteConflictException)
+        {
+            DraftSyncStatus = "Bozza conservata su questo PC: il preventivo è cambiato su un’altra postazione. Riaprilo prima di confermare le modifiche.";
+            HasDraftSyncError = true;
         }
         catch (OperationCanceledException)
         {
@@ -408,6 +444,7 @@ public partial class MainViewModel
         bool resumesExistingQuote = draft.IsEditingExistingQuoteDraft &&
                                     (draft.BaseRevision > 0 || draft.BaseVersionUtc != default);
         _isEditingExistingQuote = resumesExistingQuote;
+        _loadedQuoteStatus = resumesExistingQuote ? draft.DraftSourceStatus : null;
         _hasPersistedCurrentQuote = resumesExistingQuote;
         _loadedQuoteDate = resumesExistingQuote ? draft.Date : null;
         _loadedQuoteBaseVersionUtc = resumesExistingQuote
@@ -487,6 +524,7 @@ public partial class MainViewModel
             HasCompleteAttachmentSnapshot = true,
             IsDraftQuoteNumberAllocated = _isDraftQuoteNumberAllocated,
             WasCreatedByDraftAutosave = _sharedDraftCreatedByAutosave,
+            DraftSourceStatus = _loadedQuoteStatus,
             SharedDraftContentHash = _lastSharedDraftContentHash,
             Events = []
         };
@@ -508,6 +546,10 @@ public partial class MainViewModel
         bool createdByAutosave = draft.WasCreatedByDraftAutosave || existing == null;
         if (existing != null)
         {
+            // Also check the authoritative record: another PC may have finalized a draft.
+            if (existing.Status != QuoteStatus.Bozza)
+                return new(existing.Date, existing.BaseVersionUtc, existing.BaseRevision,
+                    createdByAutosave, existing.Status, WasSaved: false);
             draft.Date = existing.Date;
             draft.PdfPath = existing.PdfPath;
             draft.Notes = existing.Notes;
@@ -551,13 +593,21 @@ public partial class MainViewModel
 
         // Il gate copre soltanto il commit autorevole SQL. history.json e' una
         // cache e verra' riallineato in un unico batch dalla sync periodica.
-        await SaveQuoteToAuthoritativeDatabaseAsync(draft, cancellationToken)
+        long expectedRevision = loadedBaseRevision > 0 ? loadedBaseRevision : existing?.Revision ?? 0;
+        if (existing != null && expectedRevision == 0) expectedRevision = existing.BaseRevision;
+        await SaveQuoteToAuthoritativeDatabaseAsync(draft, cancellationToken, expectedRevision)
             .ConfigureAwait(false);
         return new SharedDraftSaveState(
             draft.Date,
             draft.BaseVersionUtc,
             draft.BaseRevision,
-            createdByAutosave);
+            createdByAutosave, draft.Status, WasSaved: true);
+    }
+
+    private void SetPdfConfirmationRequiredStatus()
+    {
+        DraftSyncStatus = "Modifiche conservate solo su questo PC: premi Genera PDF per aggiornare il preventivo";
+        HasDraftSyncError = false;
     }
 
     private static async Task<T> RunDraftDatabaseOperationAsync<T>(
@@ -670,7 +720,9 @@ public partial class MainViewModel
         DateTime Date,
         DateTime BaseVersionUtc,
         long BaseRevision,
-        bool WasCreatedByAutosave);
+        bool WasCreatedByAutosave,
+        QuoteStatus Status,
+        bool WasSaved);
 
     private bool HasDraftContent()
     {

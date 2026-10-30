@@ -430,6 +430,11 @@
                                                     <CheckBox x:Name="ChkRestoreMissingPdfsOnStartup"
                                                               Content="Ripristina automaticamente i PDF mancanti all'avvio"
                                                               Margin="0,0,0,10"/>
+                                                    <CheckBox x:Name="ChkSaveDraftOnlyOnPdfOrClose" Margin="0,0,0,6">
+                                                        <TextBlock Text="Salva le bozze solo con Genera PDF o alla chiusura" TextWrapping="Wrap"/>
+                                                    </CheckBox>
+                                                    <TextBlock Style="{StaticResource HintStyle}" Margin="0,0,0,14"
+                                                               Text="Se attivo, il salvataggio periodico è disabilitato. I preventivi già finalizzati vengono sempre aggiornati solo con Genera PDF: la chiusura conserva le modifiche soltanto come bozza di recupero locale."/>
                                                     <CheckBox x:Name="ChkDatabaseCostSavingMode"
                                                               Content="Modalità risparmio database"
                                                               Margin="0,0,0,10"/>

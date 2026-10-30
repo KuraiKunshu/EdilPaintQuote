@@ -274,6 +274,7 @@ public sealed class LocalDraftService
         IsEditingExistingQuoteDraft = draft.IsEditingExistingQuoteDraft,
         IsDraftQuoteNumberAllocated = draft.IsDraftQuoteNumberAllocated,
         WasCreatedByDraftAutosave = draft.WasCreatedByDraftAutosave,
+        DraftSourceStatus = draft.DraftSourceStatus,
         SharedDraftContentHash = draft.SharedDraftContentHash
     };
 
@@ -401,7 +402,8 @@ public sealed class LocalDraftService
             Attachments = draft.Attachments.Select(CreateStableFileMetadata).ToList(),
             AttachmentContentKeys = attachmentContentKeys,
             draft.HasCompleteAttachmentSnapshot,
-            draft.IsDraftQuoteNumberAllocated
+            draft.IsDraftQuoteNumberAllocated,
+            draft.DraftSourceStatus
         };
 
         byte[] metadataPayload = JsonSerializer.SerializeToUtf8Bytes(stablePayload);

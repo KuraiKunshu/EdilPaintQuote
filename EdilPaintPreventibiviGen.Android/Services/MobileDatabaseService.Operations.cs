@@ -14,10 +14,7 @@ public sealed partial class MobileDatabaseService
         return $"""
             not {prefix}"IsDeleted"
             and {prefix}"Status" not in (@finished, @rejected, @archived)
-            and ({prefix}"MaterialsOrderedByCustomer" or
-                ({prefix}"Status" = @confirmed and
-                 ({prefix}"SupplierName" <> '' or {prefix}"MaterialOrderDate" is not null or
-                  {prefix}"ExpectedDeliveryDate" is not null or {prefix}"MaterialStatus" <> '')))
+            and ({prefix}"MaterialsOrderedByCustomer" or {prefix}"Status" = @confirmed)
             """;
     }
 

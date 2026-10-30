@@ -117,6 +117,7 @@ public partial class SettingsWindow : Window
         TxtSupplierOrderMailSubject.Text = mail.SupplierOrderSubjectTemplate;
         TxtSupplierOrderMailBody.Text = mail.SupplierOrderBodyTemplate;
         ChkGeneratePdf.IsChecked = app.GeneratePDF;
+        ChkSaveDraftOnlyOnPdfOrClose.IsChecked = app.SaveDraftOnlyOnPdfOrClose;
         ChkRestoreMissingPdfsOnStartup.IsChecked = app.RestoreMissingPdfsOnStartup;
         ChkDatabaseCostSavingMode.IsChecked = app.DatabaseCostSavingMode;
         ChkSilentStartup.IsChecked = app.IsSilentStartup;
@@ -467,6 +468,7 @@ public partial class SettingsWindow : Window
             App.AppSettings.Business.EnableWindowAutomations = ChkWindowAutomations.IsChecked == true;
             App.AppSettings.Business.EnableInstallationCertificate = ChkInstallationCertificate.IsChecked == true;
             app.GeneratePDF = ChkGeneratePdf.IsChecked == true;
+            app.SaveDraftOnlyOnPdfOrClose = ChkSaveDraftOnlyOnPdfOrClose.IsChecked == true;
             app.RestoreMissingPdfsOnStartup = ChkRestoreMissingPdfsOnStartup.IsChecked == true;
             app.DatabaseCostSavingMode = ChkDatabaseCostSavingMode.IsChecked == true;
             app.IsSilentStartup = ChkSilentStartup.IsChecked == true;
@@ -1095,6 +1097,8 @@ public partial class SettingsWindow : Window
             TxtManualUpdateStatus.Text = "Preparazione della nuova versione in corso. Il programma rimane aperto; può richiedere alcuni minuti.";
             bool ready = await UpdaterLauncherService.StartUpdaterAsync(scriptPath, _employeeLoadCts.Token);
             if (!ready) { TxtManualUpdateStatus.Text = "Il programma è già aggiornato. File installati verificati."; return; }
+            if (Application.Current.MainWindow is MainWindow mainWindow)
+                await mainWindow.PrepareForCloseAsync();
             AppShutdownManager.RequestShutdown();
             Application.Current.Shutdown();
         }

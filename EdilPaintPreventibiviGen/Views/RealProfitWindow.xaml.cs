@@ -31,6 +31,8 @@ public partial class RealProfitWindow : Window
     private bool _automaticSettingsCurrent = true;
     private bool _automaticCostsValid = true;
     private bool _closed;
+    private bool _percentagesInitialized;
+    private double _supplierDiscountDefault, _reductionDefault;
     private readonly SemaphoreSlim _sourceRefreshGate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private readonly DispatcherTimer _calendarRefreshTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -123,9 +125,12 @@ public partial class RealProfitWindow : Window
             : quote.Imponibile;
         TxtRevenue.Text = (savedInput?.QuoteRevenue ?? defaultRevenue)
             .ToString("0.00", CultureInfo.CurrentCulture);
-        TxtSupplierDiscount.Text = (savedInput?.SupplierDiscount ?? supplierDiscount)
+        _supplierDiscountDefault = RealProfitDefaultsService.Percentage(supplierDiscount);
+        _reductionDefault = RealProfitDefaultsService.Percentage(defaults.ProfitReductionPercentage);
+        var percentages = RealProfitDefaultsService.Resolve(savedInput, supplierDiscount, defaults.ProfitReductionPercentage);
+        TxtSupplierDiscount.Text = percentages.SupplierDiscount
             .ToString("0.##", CultureInfo.CurrentCulture);
-        TxtProfitReduction.Text = (savedInput?.ProfitReductionPercentage ?? defaults.ProfitReductionPercentage)
+        TxtProfitReduction.Text = percentages.ProfitReduction
             .ToString("0.##", CultureInfo.CurrentCulture);
         TxtWorkers.Text = (savedInput?.Workers ?? defaults.Workers)
             .ToString(CultureInfo.CurrentCulture);
@@ -136,16 +141,39 @@ public partial class RealProfitWindow : Window
         TxtHourlyCost.Text = (savedInput?.HourlyCost ?? defaults.HourlyCost)
             .ToString("0.##", CultureInfo.CurrentCulture);
         TabMaterials.IsEnabled = !_excludeMaterials;
+        ChkUseSupplierDiscount.IsChecked = percentages.UseSupplierDiscount;
+        ChkUseDefaultReduction.IsChecked = percentages.UseDefaultReduction;
+        _percentagesInitialized = true;
+        OnPercentageSourceChanged(this, new RoutedEventArgs());
         ShowCalendarCrew();
 
         if (savedCalculation != null)
         {
-            ShowResult(savedCalculation.Result);
+            ShowResult(RealProfitCalculator.Calculate(BuildInput()));
             ShowSavedStatus(savedCalculation);
+            if (savedInput!.SupplierDiscount != percentages.SupplierDiscount || savedInput.ProfitReductionPercentage != percentages.ProfitReduction)
+            {
+                TxtSaveStatus.Text = "Percentuali aggiornate da fornitore e impostazioni: ricalcola e salva per confermarle.";
+                TxtSaveStatus.Foreground = (Brush)FindResource("MutedTextBrush");
+            }
         }
         else
         {
             ShowResult(RealProfitCalculator.Calculate(BuildInput()));
+        }
+    }
+
+    private void OnPercentageSourceChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_percentagesInitialized) return;
+        TxtSupplierDiscount.IsReadOnly = ChkUseSupplierDiscount.IsChecked == true;
+        TxtProfitReduction.IsReadOnly = ChkUseDefaultReduction.IsChecked == true;
+        if (TxtSupplierDiscount.IsReadOnly) TxtSupplierDiscount.Text = _supplierDiscountDefault.ToString("0.##", CultureInfo.CurrentCulture);
+        if (TxtProfitReduction.IsReadOnly) TxtProfitReduction.Text = _reductionDefault.ToString("0.##", CultureInfo.CurrentCulture);
+        if (IsLoaded)
+        {
+            TxtSaveStatus.Text = "Percentuali modificate: salva il calcolo per aggiornare il risultato.";
+            TxtSaveStatus.Foreground = (Brush)FindResource("MutedTextBrush");
         }
     }
 
@@ -299,6 +327,8 @@ public partial class RealProfitWindow : Window
         ProfitReductionPercentage = ParsePercentage(TxtProfitReduction.Text, "riduzione prudenziale"),
         ExcludeMaterials = _excludeMaterials,
         SupplierDiscount = ParsePercentage(TxtSupplierDiscount.Text, "sconto fornitore"),
+        UseSupplierDiscount = ChkUseSupplierDiscount.IsChecked == true,
+        UseDefaultProfitReduction = ChkUseDefaultReduction.IsChecked == true,
         Workers = _calendarLabor?.DistinctWorkers ?? (int)ParseNonNegative(TxtWorkers.Text, "numero operai"),
         Days = _calendarLabor?.Days ?? ParseNonNegative(TxtDays.Text, "giorni"),
         HoursPerDay = _calendarLabor == null ? ParseNonNegative(TxtHoursPerDay.Text, "ore al giorno") : 0,
@@ -471,6 +501,8 @@ public partial class RealProfitWindow : Window
         ProfitReductionPercentage = source.ProfitReductionPercentage,
         ExcludeMaterials = source.ExcludeMaterials,
         SupplierDiscount = source.SupplierDiscount,
+        UseSupplierDiscount = source.UseSupplierDiscount,
+        UseDefaultProfitReduction = source.UseDefaultProfitReduction,
         Workers = source.Workers,
         Days = source.Days,
         HoursPerDay = source.HoursPerDay,

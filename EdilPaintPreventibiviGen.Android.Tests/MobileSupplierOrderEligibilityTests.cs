@@ -31,9 +31,9 @@ public sealed class MobileSupplierOrderEligibilityTests
         => AssertEligibility(QuoteStatus.Confermato, true, false, isDeleted: true);
 
     [Fact]
-    public void ConfirmedQuoteNeedsAtLeastOneOrderField()
+    public void ConfirmedQuoteIsVisibleEvenWithoutOrderFields()
     {
-        AssertEligibility(QuoteStatus.Confermato, false, false);
+        AssertEligibility(QuoteStatus.Confermato, false, true);
         AssertEligibility(QuoteStatus.Confermato, false, true, supplier: "Fornitore");
         AssertEligibility(QuoteStatus.Confermato, false, true, orderDate: new(2026, 10, 8));
         AssertEligibility(QuoteStatus.Confermato, false, true, deliveryDate: new(2026, 10, 9));
