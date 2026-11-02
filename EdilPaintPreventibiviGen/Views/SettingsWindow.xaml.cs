@@ -59,6 +59,7 @@ public partial class SettingsWindow : Window
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         CmbDatabaseProvider.ItemsSource = DatabaseSettingsModel.AvailableProviders;
         CmbPdfTemplate.ItemsSource = PdfTemplateSettingsModel.AvailableTemplates;
+        CmbWorkSheetPhotosPerPage.ItemsSource = new[] { 1, 2 };
         ItemsWindowMaterialRules.ItemsSource = _windowMaterialRuleEditors;
         ItemsEmployees.ItemsSource = _employees;
         TxtNoCompanyMaterials.Visibility = CompanyMaterialCatalog.Count == 0
@@ -166,6 +167,7 @@ public partial class SettingsWindow : Window
         TxtPdfFooterText.Text = template.FooterText;
         TxtPdfSignatureText.Text = template.SignatureText;
         ChkPdfShowTemplateName.IsChecked = template.ShowTemplateName;
+        CmbWorkSheetPhotosPerPage.SelectedItem = App.AppSettings.WorkSheet.GetEffectivePhotosPerPage();
         RefreshAutomaticUpdateStatus();
 
         if (database.RequiresCredentialReset)
@@ -499,6 +501,7 @@ public partial class SettingsWindow : Window
             template.FooterText = TxtPdfFooterText.Text.Trim();
             template.SignatureText = TxtPdfSignatureText.Text.Trim();
             template.ShowTemplateName = ChkPdfShowTemplateName.IsChecked == true;
+            App.AppSettings.WorkSheet.PhotosPerPage = CmbWorkSheetPhotosPerPage.SelectedItem is int perPage ? perPage : 1;
             template.Normalize();
 
             App.AppSettings.Save();

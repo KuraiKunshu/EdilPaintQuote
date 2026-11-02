@@ -1257,6 +1257,12 @@
                                                         HorizontalAlignment="Left"
                                                         Style="{StaticResource CompactActionButtonStyle}"
                                                         Click="OnPreviewPdfTemplateClick"/>
+                                                <Separator Margin="0,20,0,14"/>
+                                                <TextBlock Text="Scheda lavoro" Style="{StaticResource SectionTitleStyle}"/>
+                                                <TextBlock Text="Fotografie per pagina" Style="{StaticResource LabelStyle}"/>
+                                                <ComboBox x:Name="CmbWorkSheetPhotosPerPage"/>
+                                                <TextBlock Text="Scegli una fotografia grande oppure due fotografie su ogni pagina della scheda lavoro."
+                                                           Style="{StaticResource HintStyle}"/>
                                             </StackPanel>
                                         </Border>
                                     </Grid>

@@ -410,10 +410,10 @@ public sealed class WorkScheduleRulesTests
     [InlineData("ordered")]
     [InlineData("delivery")]
     [InlineData("materials")]
-    public void ConfirmedOrdersRemainEligibleBeforeAndAfterSupplierDetailsAreAdded(string detail)
+    public void LegacyConfirmedQuotesEnterTheOrderListOnlyAfterExplicitOrderDetailsAreAdded(string detail)
     {
         var quote = new QuoteEntity { Status = QuoteStatus.Confermato };
-        Assert.True(SupplierOrderEligibility.IsActive(quote));
+        Assert.False(SupplierOrderEligibility.IsActive(quote));
         if (detail == "supplier") quote.SupplierName = "Fornitore";
         if (detail == "ordered") quote.MaterialOrderDate = Today;
         if (detail == "delivery") quote.ExpectedDeliveryDate = Today;
@@ -440,6 +440,8 @@ public sealed class WorkScheduleRulesTests
         Assert.False(active.HasOrderWarning);
         entity.Quote.Status = QuoteStatus.Confermato;
         entity.Quote.MaterialsOrderedByCustomer = false;
+        // This visit was already planned manually; it must not release its employees when the order list is cleaned up.
+        Assert.False(SupplierOrderEligibility.IsActive(entity.Quote));
         var pending = SqlDataService.ScheduleEntryToModel(entity);
         Assert.True(pending.IsOrderActive);
         Assert.True(pending.IsActiveOrder);

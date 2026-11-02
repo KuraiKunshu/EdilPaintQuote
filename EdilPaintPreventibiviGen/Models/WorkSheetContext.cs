@@ -20,6 +20,7 @@ public sealed class WorkSheetContext
     public string SelectedLogo { get; set; } = string.Empty;
     public bool IsOfflineSnapshot { get; set; }
     public TrelloWorkSheetDetails? Trello { get; init; }
+    public int PhotosPerPage { get; set; } = 1;
     public bool MaterialsOrderedByCustomer { get; init; }
     public string SupplierName { get; init; } = string.Empty;
     public string MaterialStatus { get; init; } = string.Empty;

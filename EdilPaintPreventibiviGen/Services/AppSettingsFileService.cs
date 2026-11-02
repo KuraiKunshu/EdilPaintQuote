@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
 
@@ -135,6 +136,7 @@ public static class AppSettingsFileService
                 SignatureText = "Firma per accettazione",
                 ShowTemplateName = false
             },
+            WorkSheet = new WorkSheetSettingsModel(),
             Mail = new
             {
                 Enabled = false,

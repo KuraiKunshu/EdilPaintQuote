@@ -8,8 +8,13 @@ namespace EdilPaintPreventibiviGen.Tests;
 public sealed class SupplierOrderEligibilityTests
 {
     [Fact]
-    public void ConfirmedQuoteWithoutOrderInformationAppearsInBothOrdersAndCalendar()
-        => Assert.True(SupplierOrderEligibility.IsActive(new() { Status = QuoteStatus.Confermato }));
+    public void ExistingConfirmedQuoteWithoutOrderInformationDoesNotEnterOrdersOrCalendar()
+        => Assert.False(SupplierOrderEligibility.IsActive(new() { Status = QuoteStatus.Confermato }));
+
+    [Fact]
+    public void BlankLegacyOrderFieldsDoNotCreateAnOrder()
+        => Assert.False(SupplierOrderEligibility.IsActive(new()
+        { Status = QuoteStatus.Confermato, SupplierName = "  ", MaterialStatus = "\t " }));
 
     [Fact]
     public void EveryRegisteredOrderFieldCanIdentifyAConfirmedOrder()

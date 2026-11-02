@@ -2,7 +2,7 @@
 
 Il NAS copia le schede Trello in NeonDB. Nel programma l'operatore sceglie la scheda e la associa al preventivo: la sincronizzazione **non crea clienti, non cerca corrispondenze e non associa schede a preventivi**. Il numero del preventivo e l'anagrafica restano gestiti dal programma.
 
-Una scheda può essere associata manualmente a più preventivi. Ogni preventivo conserva il proprio collegamento tramite l'ID Trello, che rimane valido dopo rinomina o spostamento della scheda. La duplicazione di un preventivo richiede una nuova scelta della scheda. I dati operativi e il riferimento Trello sono riservati alla scheda lavoro e non entrano nel PDF commerciale.
+Una scheda può essere associata manualmente a più preventivi. Ogni preventivo conserva il proprio collegamento tramite l'ID Trello, che rimane valido dopo rinomina o spostamento della scheda. La duplicazione di un preventivo richiede una nuova scelta della scheda. Nella scheda lavoro compaiono soltanto la scadenza della scheda associata, quando presente, e le fotografie incorporate. Il PDF del preventivo commerciale resta invariato.
 
 ## Uso nel programma Windows
 
@@ -12,9 +12,21 @@ Il pulsante è disponibile anche prima di scegliere il cliente. Per un preventiv
 
 **Ricarica dal database** rilegge la copia sincronizzata; non forza una nuova lettura di Trello. La finestra mostra quando i dati sono stati sincronizzati e segnala l'uso della cache locale. Le nuove bozze conservano la scelta anche prima dell'assegnazione del cliente. Nuovi preventivi e duplicati partono senza collegamento; la modifica e il recupero della stessa bozza conservano il collegamento esplicito.
 
-La scheda lavoro recupera la scheda per il solo ID associato e riporta titolo, link, bacheca/lista, appuntamento Trello, descrizione, campi personalizzati e checklist. Questi dati rimangono separati dai recapiti e dalla programmazione del lavoro già confermati nel preventivo. I commenti e i riferimenti agli allegati restano nella copia sincronizzata e non diventano automaticamente istruzioni stampate o allegati commerciali. Se il database non risponde, la stampa può utilizzare lo snapshot della scheda salvato con il preventivo, con un avviso di verifica.
+La scheda lavoro recupera la scheda per il solo ID associato. La sua scadenza viene riportata come **Data sopralluogo** soltanto se valorizzata: una scadenza assente non viene sostituita con la data del preventivo, di stampa o dell'intervento. Le fotografie della stessa scheda vengono incorporate nel PDF su pagine dedicate, una per pagina come impostazione predefinita, con proporzioni conservate e numerazione semplice. In **Impostazioni → PDF e archiviazione → Scheda lavoro → Fotografie per pagina** si può scegliere fra una e due fotografie per pagina; la scelta viene salvata nelle impostazioni del programma.
+
+Titolo e link Trello, ID, bacheca, lista, descrizione, checklist, campi personalizzati, commenti, data di sincronizzazione e messaggi tecnici non vengono stampati nella scheda lavoro. Rimangono consultabili nell'archivio o nell'interfaccia dove previsto. Cliente, recapiti, lavorazioni e programmazione del lavoro restano quelli confermati nel programma. Le fotografie del sopralluogo non vengono aggiunte al PDF commerciale del preventivo.
 
 Dopo una modifica del collegamento a un preventivo già salvato, la cache locale dello storico si allinea alla sincronizzazione ordinaria del programma: una riapertura immediata offline può mostrare temporaneamente il collegamento precedente. Il collegamento nel database è già salvato.
+
+## Fotografie su richiesta
+
+Durante la generazione della scheda lavoro, il programma identifica le fotografie della scheda già associata manualmente. Se è disponibile una copia completa delle immagini attese nel database o nella cache locale, la utilizza. Altrimenti crea una richiesta in `TrelloPhotoRequests`; il worker n8n recupera le sole fotografie di quella richiesta e le conserva in `TrelloPhotos`. Questo passaggio non associa schede, clienti o preventivi e non scarica tutte le immagini dell'archivio.
+
+Per predisporre il worker importare `tools/trello-n8n/photo-workflow.json`, applicare `photos-schema.sql` oppure avviare il programma aggiornato, e selezionare le connessioni indicate in [photos-README.md](../tools/trello-n8n/photos-README.md). I valori della credenziale **Header Auth** vengono inseriti dall'utente direttamente in n8n: nome dell'header `Authorization`, valore nel formato `OAuth oauth_consumer_key="API_KEY_TRELLO", oauth_token="TOKEN_TRELLO"`. I valori reali non vanno inseriti in chat, nel workflow o nel database. La credenziale Trello API standard di n8n rimane adatta alla sincronizzazione dei metadati; i download privati richiedono l'header dedicato.
+
+Il workflow esportato è inattivo. Dopo la configurazione occorre provarlo con una scheda associata, verificare immagini e PDF, quindi pubblicarlo. Una volta pubblicato controlla la coda ogni minuto e prende una richiesta alla volta. Il programma mostra il caricamento in corso e permette di annullarlo; attende al massimo due minuti. Un errore, una fotografia mancante o l'attesa scaduta interrompono la generazione con un messaggio, senza dichiarare completo o salvare un PDF con foto mancanti. Se le fotografie sono ancora in preparazione, ripetere la generazione dopo il completamento del worker.
+
+Sono incorporabili fotografie caricate su Trello in JPEG, PNG, WebP, GIF e BMP. PDF, video e collegamenti esterni non diventano fotografie della scheda lavoro. Per immagini non supportate, come HEIC o TIFF, occorre la conversione in JPEG o PNG. I limiti del worker sono 25 MB per fotografia, 100 fotografie e 200 MB complessivi per richiesta. In assenza di fotografie non viene creato un lavoro di download.
 
 ## File pronti
 
@@ -24,6 +36,9 @@ Dopo una modifica del collegamento a un preventivo già salvato, la cache locale
 - `tools/trello-n8n/build-workflow.mjs` e `sync-core.mjs`: sorgenti riproducibili del workflow.
 - `tools/trello-n8n/sync-core.test.mjs`: verifiche offline del formato, della paginazione, dell'idempotenza e dell'assenza di associazioni automatiche.
 - `tools/trello-n8n/verify-workflow.json`: verificatore manuale separato, con quattro nodi, che effettua soltanto GET su Trello e SELECT sul database.
+- `tools/trello-n8n/photo-workflow.json`: worker separato per le fotografie richieste dalla scheda lavoro, esportato inattivo e senza credenziali.
+- `tools/trello-n8n/photos-schema.sql`: schema delle tabelle `TrelloPhotoRequests` e `TrelloPhotos`.
+- `tools/trello-n8n/photos-README.md`: configurazione della credenziale Header Auth, comportamento del worker e verifica delle immagini.
 
 Il workflow usa nodi standard: Manual Trigger 1, Schedule Trigger 1.2, HTTP Request 4.2, Code 2, If 2.2, Postgres 2.5. La compatibilità con la versione effettiva installata sul NAS va verificata durante l'importazione; non richiede community node, moduli JavaScript aggiuntivi o accesso HTTP dai nodi Code.
 
@@ -61,9 +76,9 @@ Ogni riga contiene ID, bacheca, lista, titolo, descrizione, URL, stato archiviat
 - metadati e collegamenti degli allegati, con eventuali anteprime fornite da Trello;
 - i campi geografici o altri campi restituiti da Trello.
 
-I binari di foto e documenti non vengono scaricati: i collegamenti privati continuano a richiedere accesso a Trello. Gli allegati non diventano automaticamente allegati del preventivo.
+La sincronizzazione ordinaria conserva i riferimenti agli allegati. Il worker fotografico separato copia i binari delle sole immagini richieste per una scheda associata manualmente, usando il download autenticato descritto sopra. Gli allegati non diventano automaticamente allegati commerciali del preventivo.
 
-Le chiavi del payload usate dalla scheda lavoro sono quelle Trello: `checklists[].checkItems[]`, `customFieldItems[]`, `customFields[]`, `address` e `locationName` quando disponibili. Tutti i commenti restano consultabili nella copia, senza riversare automaticamente l'intera conversazione nella scheda lavoro.
+Per la scheda lavoro vengono utilizzati `DueUtc` e i riferimenti fotografici in `attachments[]`, insieme ai binari recuperati dal worker. Checklist, campi personalizzati, indirizzi liberi, descrizioni e commenti continuano a essere conservati dalla sincronizzazione ma non vengono riportati nella stampa.
 
 ## Aggiornamenti e recupero degli errori
 
@@ -86,6 +101,8 @@ node build-workflow.mjs
 node --test sync-core.test.mjs
 node verify-workflow.mjs
 node --test verify-workflow.test.mjs
+node photo-workflow.mjs
+node --test photo-workflow.test.mjs
 ```
 
 Questi test non contattano Trello, Neon o n8n. Provano anche pagine oltre 1000 elementi, aggiornamenti fuori ordine, schede archiviate e testo contenente frammenti SQL. Non sostituiscono la prima esecuzione controllata sul NAS con le sue credenziali.

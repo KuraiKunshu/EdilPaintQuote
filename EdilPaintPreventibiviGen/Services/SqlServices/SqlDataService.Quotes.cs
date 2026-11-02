@@ -1039,6 +1039,8 @@ public partial class SqlDataService
         CancellationToken cancellationToken = default) =>
         UpdateQuoteMetadataAsync(quoteNumber, quote =>
         {
+            quote.MaterialStatus = SupplierOrderQueue.MaterialStatusAfterStatusChange(quote.Status, status,
+                quote.MaterialsOrderedByCustomer, quote.MaterialOrderDate, quote.ExpectedDeliveryDate, quote.MaterialStatus);
             quote.Status = status;
             quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
             AppendQuoteEvent(quote, "stato", $"Stato aggiornato: {status}");

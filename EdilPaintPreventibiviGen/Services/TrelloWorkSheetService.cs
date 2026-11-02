@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using EdilPaintPreventibiviGen.Models;
 
@@ -7,13 +7,19 @@ namespace EdilPaintPreventibiviGen.Services;
 
 public static class TrelloWorkSheetService
 {
+    private static readonly TimeSpan PhotoWaitTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan PhotoPollInterval = TimeSpan.FromSeconds(2);
+    private const int MaxPhotoBytes = 25 * 1024 * 1024;
+    private const long MaxRequestPhotoBytes = 200L * 1024 * 1024;
+
     public static async Task<WorkSheetContext> CreateContextAsync(
         IDataService dataService,
         QuoteHistoryEntry quote,
         IEnumerable<Item> laborCatalog,
         IEnumerable<Customer> customers,
         WorkSheetOptions? options = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<string>? progress = null)
     {
         TrelloCard? card = null;
         bool lookupFailed = false;
@@ -32,120 +38,171 @@ public static class TrelloWorkSheetService
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        return WorkSheetService.CreateContext(quote, laborCatalog, customers, options, card, lookupFailed);
+        var selected = ResolveSelectedCard(quote, card);
+        if (!string.IsNullOrWhiteSpace(quote.TrelloCardId) && selected == null)
+            throw new InvalidOperationException("La scheda Trello associata non è disponibile. Ricaricala dal database prima di generare la scheda lavoro: non è possibile verificare se mancano fotografie.");
+        IReadOnlyList<TrelloWorkSheetPhoto> photos = [];
+        if (selected != null)
+        {
+            string[] ids = GetExpectedPhotoIds(selected);
+            if (ids.Length > 0)
+            {
+                progress?.Report($"Caricamento delle fotografie del sopralluogo ({ids.Length})…");
+                photos = await LoadPhotosAsync(dataService, selected, ids, cancellationToken);
+            }
+        }
+        return WorkSheetService.CreateContext(quote, laborCatalog, customers, options, card, lookupFailed, photos);
     }
 
-    public static TrelloWorkSheetDetails? CreateDetails(
-        QuoteHistoryEntry quote, TrelloCard? currentCard = null, bool lookupFailed = false)
+    public static TrelloWorkSheetDetails? CreateDetails(QuoteHistoryEntry quote,
+        TrelloCard? currentCard = null, bool lookupFailed = false,
+        IReadOnlyList<TrelloWorkSheetPhoto>? photos = null)
     {
-        // Only an explicit persisted ID establishes the association. Names and contacts are never matched.
+        // This method never establishes an association, even if names or contacts match.
         if (string.IsNullOrWhiteSpace(quote.TrelloCardId)) return null;
-        bool currentMatches = currentCard != null && string.Equals(currentCard.Id, quote.TrelloCardId, StringComparison.Ordinal);
-        var card = currentMatches ? currentCard : TrelloCard.FromSnapshot(quote.TrelloCardSnapshotJson);
-        if (card == null || !string.Equals(card.Id, quote.TrelloCardId, StringComparison.Ordinal))
+        var card = ResolveSelectedCard(quote, currentCard);
+        if (card == null)
             return new TrelloWorkSheetDetails
             {
                 CardId = quote.TrelloCardId,
-                Name = "Scheda Trello collegata",
-                Warning = "Dati della scheda Trello non disponibili. Verificare il collegamento nel programma prima dell'intervento."
+                Warning = "Dati della scheda associata non disponibili."
             };
-
-        var fields = new List<TrelloWorkSheetField>();
-        var checklists = new List<TrelloWorkSheetChecklist>();
-        bool payloadInvalid = false;
-        if (!string.IsNullOrWhiteSpace(card.PayloadJson))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(card.PayloadJson);
-                if (document.RootElement.ValueKind != JsonValueKind.Object) payloadInvalid = true;
-                else ReadOperationalData(document.RootElement, fields, checklists);
-            }
-            catch (JsonException) { payloadInvalid = true; }
-        }
-        var warnings = new List<string>();
-        if (!currentMatches || lookupFailed || card.IsOfflineSnapshot)
-            warnings.Add("Copia dei dati Trello disponibile al momento del salvataggio o dell'ultima sincronizzazione: verificare eventuali aggiornamenti.");
-        if (card.IsDeleted) warnings.Add("La scheda risulta eliminata in Trello. Il collegamento storico è conservato.");
-        else if (card.IsArchived) warnings.Add("La scheda risulta archiviata in Trello.");
-        if (payloadInvalid) warnings.Add("Dettagli Trello non leggibili: checklist e campi aggiuntivi potrebbero essere incompleti.");
-
+        bool usingSnapshot = !ReferenceEquals(card, currentCard) || lookupFailed || card.IsOfflineSnapshot;
         return new TrelloWorkSheetDetails
         {
             CardId = card.Id,
-            Name = card.Name,
-            Url = card.GetSafeUrl(),
-            BoardName = card.BoardName,
-            ListName = card.ListName,
-            Description = card.Description,
             DueUtc = card.DueUtc,
-            SyncedAtUtc = card.SyncedAtUtc == default ? null : card.SyncedAtUtc,
-            IsArchived = card.IsArchived,
-            IsDeleted = card.IsDeleted,
-            Warning = string.Join(" ", warnings),
-            Fields = fields,
-            Checklists = checklists
+            Photos = photos ?? [],
+            Warning = usingSnapshot ? "Copia del sopralluogo conservata su questo PC." : string.Empty
         };
     }
 
-    private static void ReadOperationalData(JsonElement root, List<TrelloWorkSheetField> fields,
-        List<TrelloWorkSheetChecklist> checklists)
+    private static TrelloCard? ResolveSelectedCard(QuoteHistoryEntry quote, TrelloCard? currentCard)
     {
-        string address = Text(root, "address");
-        string location = Text(root, "locationName");
-        if (!string.IsNullOrWhiteSpace(address)) fields.Add(new("Indirizzo in Trello", address));
-        if (!string.IsNullOrWhiteSpace(location) && !string.Equals(address, location, StringComparison.Ordinal))
-            fields.Add(new("Luogo in Trello", location));
-
-        var definitions = Array(root, "customFields").Where(x => x.ValueKind == JsonValueKind.Object)
-            .Where(x => Text(x, "id").Length > 0).GroupBy(x => Text(x, "id"))
-            .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
-        foreach (var field in Array(root, "customFieldItems"))
-        {
-            if (field.ValueKind != JsonValueKind.Object) continue;
-            if (!definitions.TryGetValue(Text(field, "idCustomField"), out var definition)) continue;
-            string name = Text(definition, "name");
-            string value = string.Empty;
-            if (field.TryGetProperty("value", out var raw) && raw.ValueKind == JsonValueKind.Object)
-            {
-                value = Text(raw, "text");
-                if (value.Length == 0) value = Text(raw, "number");
-                if (value.Length == 0 && raw.TryGetProperty("checked", out var check))
-                    value = check.ToString().Equals("true", StringComparison.OrdinalIgnoreCase) ? "Sì" : "No";
-                if (value.Length == 0 && DateTimeOffset.TryParse(Text(raw, "date"), CultureInfo.InvariantCulture,
-                        DateTimeStyles.AssumeUniversal, out var date))
-                    value = date.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("it-IT"));
-            }
-            if (value.Length == 0)
-            {
-                string selectedId = Text(field, "idValue");
-                foreach (var option in Array(definition, "options"))
-                    if (option.ValueKind == JsonValueKind.Object && Text(option, "id") == selectedId && option.TryGetProperty("value", out var optionValue))
-                    { value = Text(optionValue, "text"); break; }
-            }
-            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(value)) fields.Add(new(name, value));
-        }
-        foreach (var checklist in Array(root, "checklists"))
-        {
-            var items = Array(checklist, "checkItems").OrderBy(x => Position(x))
-                .Where(x => !string.IsNullOrWhiteSpace(Text(x, "name")))
-                .Select(x => new TrelloWorkSheetCheckItem(Text(x, "name"), Text(x, "state") == "complete")).ToArray();
-            if (items.Length > 0) checklists.Add(new(Text(checklist, "name"), items));
-        }
-        // Comments, attachment metadata and member data are preserved by sync, but are not printed as operational instructions.
+        if (string.IsNullOrWhiteSpace(quote.TrelloCardId)) return null;
+        if (string.Equals(currentCard?.Id, quote.TrelloCardId, StringComparison.Ordinal)) return currentCard;
+        var snapshot = TrelloCard.FromSnapshot(quote.TrelloCardSnapshotJson);
+        return string.Equals(snapshot?.Id, quote.TrelloCardId, StringComparison.Ordinal) ? snapshot : null;
     }
 
-    private static IEnumerable<JsonElement> Array(JsonElement element, string property) =>
-        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var array) && array.ValueKind == JsonValueKind.Array
-            ? array.EnumerateArray() : [];
+    internal static string[] GetExpectedPhotoIds(TrelloCard card)
+    {
+        if (string.IsNullOrWhiteSpace(card.PayloadJson))
+            throw new InvalidDataException("I riferimenti alle fotografie del sopralluogo non sono disponibili. Ricarica la scheda dal database.");
+        try
+        {
+            using var document = JsonDocument.Parse(card.PayloadJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("I riferimenti alle fotografie del sopralluogo non sono leggibili.");
+            if (!document.RootElement.TryGetProperty("attachments", out var attachments))
+                throw new InvalidDataException("L'elenco degli allegati del sopralluogo non è disponibile. Ricarica la scheda dal database.");
+            if (attachments.ValueKind != JsonValueKind.Array)
+                throw new InvalidDataException("I riferimenti alle fotografie del sopralluogo non sono leggibili.");
+            var photoSizes = new Dictionary<string, long>(StringComparer.Ordinal);
+            foreach (var attachment in attachments.EnumerateArray())
+            {
+                if (attachment.ValueKind != JsonValueKind.Object ||
+                    !attachment.TryGetProperty("isUpload", out var upload) || upload.ValueKind != JsonValueKind.True) continue;
+                string mime = Text(attachment, "mimeType").Split(';', 2)[0].Trim().ToLowerInvariant();
+                if (mime == "image/jpg") mime = "image/jpeg";
+                string fileName = PhotoFileName(attachment);
+                string extension = Path.GetExtension(fileName).ToLowerInvariant();
+                bool supported = mime is "image/jpeg" or "image/png" or "image/webp" or "image/gif" or "image/bmp" ||
+                    (mime.Length == 0 && extension is ".jpg" or ".jpeg" or ".png" or ".webp" or ".gif" or ".bmp");
+                if (!supported)
+                {
+                    if (mime.StartsWith("image/", StringComparison.Ordinal) || extension is ".heic" or ".heif" or ".tif" or ".tiff")
+                        throw new InvalidOperationException($"La fotografia «{fileName}» richiede la conversione in JPEG o PNG prima di essere inserita nella scheda lavoro.");
+                    continue;
+                }
+                string id = Text(attachment, "id");
+                if (string.IsNullOrWhiteSpace(id) || id.Length > 64)
+                    throw new InvalidDataException("Una fotografia del sopralluogo ha un riferimento non valido.");
+                if (string.IsNullOrWhiteSpace(fileName) || fileName.Contains('/') || fileName.Contains('\\') || fileName.Any(char.IsControl))
+                    throw new InvalidDataException("Una fotografia del sopralluogo ha un nome del file non valido.");
+                if (!attachment.TryGetProperty("bytes", out var size) || size.ValueKind != JsonValueKind.Number ||
+                    !size.TryGetInt64(out long bytes) || bytes <= 0)
+                    throw new InvalidDataException($"La dimensione della fotografia «{fileName}» non è disponibile. Ricarica la scheda dal database.");
+                if (bytes > MaxPhotoBytes)
+                    throw new InvalidOperationException($"La fotografia «{fileName}» supera 25 MB. Riducila prima di generare la scheda lavoro.");
+                photoSizes[id] = bytes;
+            }
+            if (photoSizes.Count > 100) throw new InvalidOperationException("La scheda associata contiene più di 100 fotografie: riduci il numero di allegati prima di generare la scheda lavoro.");
+            if (photoSizes.Values.Sum() > MaxRequestPhotoBytes)
+                throw new InvalidOperationException("Le fotografie del sopralluogo superano complessivamente 200 MB. Riducile prima di generare la scheda lavoro.");
+            return photoSizes.Keys.OrderBy(x => x, StringComparer.Ordinal).ToArray();
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException("I riferimenti alle fotografie del sopralluogo non sono leggibili. Ricarica la scheda dal database.", ex);
+        }
+    }
+
+    private static string PhotoFileName(JsonElement attachment)
+    {
+        string fileName = Text(attachment, "fileName");
+        if (!string.IsNullOrWhiteSpace(fileName)) return fileName;
+        if (Uri.TryCreate(Text(attachment, "url"), UriKind.Absolute, out var source))
+        {
+            fileName = Uri.UnescapeDataString(source.AbsolutePath.Split('/').LastOrDefault() ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(fileName)) return fileName;
+        }
+        return Text(attachment, "name");
+    }
+
+    internal static async Task<IReadOnlyList<TrelloWorkSheetPhoto>> LoadPhotosAsync(
+        IDataService dataService, TrelloCard card, string[] expectedIds, CancellationToken token)
+    {
+        var batch = await dataService.GetTrelloPhotosAsync(card.Id, token);
+        if (IsReady(batch, card.Id, expectedIds)) return DecodePhotos(batch, expectedIds);
+        if (batch.IsOfflineSnapshot || card.IsOfflineSnapshot)
+            throw new InvalidOperationException("Le fotografie complete del sopralluogo non sono disponibili su questo PC. Collega il database e riprova.");
+        await dataService.RequestTrelloPhotosAsync(card.Id, expectedIds, token);
+        var timer = Stopwatch.StartNew();
+        while (timer.Elapsed < PhotoWaitTimeout)
+        {
+            token.ThrowIfCancellationRequested();
+            batch = await dataService.GetTrelloPhotosAsync(card.Id, token);
+            if (IsReady(batch, card.Id, expectedIds)) return DecodePhotos(batch, expectedIds);
+            if (batch.Status == "failed")
+                throw new InvalidOperationException("Impossibile caricare tutte le fotografie del sopralluogo. " + batch.Error);
+            await Task.Delay(PhotoPollInterval, token);
+        }
+        throw new InvalidOperationException("Le fotografie del sopralluogo sono ancora in preparazione. Riprova a generare la scheda lavoro fra poco; nessun PDF incompleto è stato salvato.");
+    }
+
+    private static bool IsReady(TrelloPhotoBatch batch, string cardId, string[] ids) =>
+        string.Equals(batch.CardId, cardId, StringComparison.Ordinal) && batch.IsComplete &&
+        ids.SequenceEqual(batch.GetExpectedAttachmentIds(), StringComparer.Ordinal);
+
+    private static IReadOnlyList<TrelloWorkSheetPhoto> DecodePhotos(TrelloPhotoBatch batch, string[] ids)
+    {
+        var photos = new List<TrelloWorkSheetPhoto>();
+        foreach (string id in ids)
+        {
+            var photo = batch.Photos.Single(x => x.CardId == batch.CardId && x.AttachmentId == id);
+            byte[] bytes;
+            try
+            {
+                if (photo.ContentBase64.Length > (long)MaxPhotoBytes * 4 / 3 + 4)
+                    throw new InvalidDataException("Fotografia troppo grande.");
+                bytes = Convert.FromBase64String(photo.ContentBase64);
+            }
+            catch (FormatException ex) { throw new InvalidDataException($"La fotografia «{photo.FileName}» non è leggibile.", ex); }
+            if (bytes.Length == 0 || bytes.Length > MaxPhotoBytes || !IsRaster(bytes))
+                throw new InvalidDataException($"La fotografia «{photo.FileName}» non è un'immagine utilizzabile nella scheda lavoro.");
+            photos.Add(new(photo.FileName, bytes));
+        }
+        return photos;
+    }
+
+    private static bool IsRaster(ReadOnlySpan<byte> bytes) =>
+        bytes.StartsWith(new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a }) ||
+        bytes.StartsWith(new byte[] { 0xff, 0xd8, 0xff }) || bytes.StartsWith("GIF87a"u8) ||
+        bytes.StartsWith("GIF89a"u8) || bytes.StartsWith("BM"u8) ||
+        (bytes.Length >= 12 && bytes.StartsWith("RIFF"u8) && bytes.Slice(8, 4).SequenceEqual("WEBP"u8));
 
     private static string Text(JsonElement element, string property) =>
-        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value) &&
-        value.ValueKind is JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False
-            ? value.ToString() : string.Empty;
-
-    private static decimal Position(JsonElement element) =>
-        element.ValueKind == JsonValueKind.Object && element.TryGetProperty("pos", out var position) &&
-        position.ValueKind == JsonValueKind.Number && position.TryGetDecimal(out var value)
-            ? value : decimal.MaxValue;
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty : string.Empty;
 }

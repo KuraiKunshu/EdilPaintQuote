@@ -19,6 +19,7 @@ public partial class SqlDataService
         await EnsureEmployeeSchemaAsync(db, cancellationToken);
         await EnsureWorkScheduleSchemaAsync(db, cancellationToken);
         await EnsureTrelloSchemaAsync(db, cancellationToken);
+        await EnsureTrelloPhotosSchemaAsync(db, cancellationToken);
 
         if (!await db.CompanySettings.AnyAsync(cancellationToken))
         {

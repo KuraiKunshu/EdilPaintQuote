@@ -372,6 +372,8 @@ public partial class LocalJsonStoreService
     public Task<QuoteHistoryEntry?> UpdateQuoteStatusAsync(string quoteNumber, QuoteStatus status) =>
         UpdateQuoteMetadataAsync(quoteNumber, quote =>
         {
+            quote.MaterialStatus = SupplierOrderQueue.MaterialStatusAfterStatusChange(quote.Status, status,
+                quote.MaterialsOrderedByCustomer, quote.MaterialOrderDate, quote.ExpectedDeliveryDate, quote.MaterialStatus);
             quote.Status = status;
             quote.LastModifiedByDevice = DeviceNameService.GetCurrentDeviceName();
             AddEvent(quote, "stato", $"Stato aggiornato: {status}");

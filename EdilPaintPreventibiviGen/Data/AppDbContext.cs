@@ -20,6 +20,8 @@ public class AppDbContext : DbContext
     public DbSet<QuoteLaborEntity> QuoteLabors => Set<QuoteLaborEntity>();
     public DbSet<QuoteAttachmentEntity> QuoteAttachments => Set<QuoteAttachmentEntity>();
     public DbSet<TrelloCard> TrelloCards => Set<TrelloCard>();
+    public DbSet<TrelloPhoto> TrelloPhotos => Set<TrelloPhoto>();
+    public DbSet<TrelloPhotoRequest> TrelloPhotoRequests => Set<TrelloPhotoRequest>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
@@ -29,6 +31,29 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<TrelloPhoto>(entity =>
+        {
+            entity.ToTable("TrelloPhotos");
+            entity.HasKey(x => new { x.CardId, x.AttachmentId });
+            entity.Property(x => x.CardId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.AttachmentId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.FileName).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.ContentBase64).IsRequired();
+            entity.Property(x => x.SourceUrl).IsRequired();
+        });
+
+        modelBuilder.Entity<TrelloPhotoRequest>(entity =>
+        {
+            entity.ToTable("TrelloPhotoRequests");
+            entity.HasKey(x => x.CardId);
+            entity.Property(x => x.CardId).HasMaxLength(64).ValueGeneratedNever();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Error).IsRequired();
+            entity.Property(x => x.ExpectedAttachmentIdsJson).IsRequired();
+            entity.HasIndex(x => new { x.Status, x.RequestedAtUtc });
+        });
 
         modelBuilder.Entity<TrelloCard>(entity =>
         {

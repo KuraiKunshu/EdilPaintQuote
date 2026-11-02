@@ -31,9 +31,10 @@ public sealed class MobileSupplierOrderEligibilityTests
         => AssertEligibility(QuoteStatus.Confermato, true, false, isDeleted: true);
 
     [Fact]
-    public void ConfirmedQuoteIsVisibleEvenWithoutOrderFields()
+    public void ExistingConfirmedQuoteNeedsExplicitOrderInformation()
     {
-        AssertEligibility(QuoteStatus.Confermato, false, true);
+        AssertEligibility(QuoteStatus.Confermato, false, false);
+        AssertEligibility(QuoteStatus.Confermato, false, false, supplier: "  ", materialStatus: "  ");
         AssertEligibility(QuoteStatus.Confermato, false, true, supplier: "Fornitore");
         AssertEligibility(QuoteStatus.Confermato, false, true, orderDate: new(2026, 10, 8));
         AssertEligibility(QuoteStatus.Confermato, false, true, deliveryDate: new(2026, 10, 9));
@@ -45,6 +46,34 @@ public sealed class MobileSupplierOrderEligibilityTests
     [InlineData(QuoteStatus.Spedito)]
     public void SupplierDetailsDoNotTurnUnconfirmedQuotesIntoOrders(QuoteStatus status)
         => AssertEligibility(status, false, false, supplier: "Fornitore", materialStatus: "Ordinato");
+
+    [Theory]
+    [InlineData(QuoteStatus.Spedito, QuoteStatus.Confermato, false, false, false, "", true)]
+    [InlineData(QuoteStatus.Finalizzato, QuoteStatus.Confermato, false, false, false, "  ", true)]
+    [InlineData(QuoteStatus.Confermato, QuoteStatus.Confermato, false, false, false, "", false)]
+    [InlineData(QuoteStatus.Spedito, QuoteStatus.Finito, false, false, false, "", false)]
+    [InlineData(QuoteStatus.Spedito, QuoteStatus.Confermato, true, false, false, "", false)]
+    [InlineData(QuoteStatus.Spedito, QuoteStatus.Confermato, false, true, false, "", false)]
+    [InlineData(QuoteStatus.Spedito, QuoteStatus.Confermato, false, false, true, "", false)]
+    [InlineData(QuoteStatus.Spedito, QuoteStatus.Confermato, false, false, false, "Ordinato", false)]
+    public void PendingOrderSqlUsesTheStatusTransitionInsteadOfTheCurrentStatus(
+        QuoteStatus previous, QuoteStatus next, bool orderedByCustomer, bool hasOrderDate,
+        bool hasDeliveryDate, string materialStatus, bool expected)
+    {
+        using var rows = new DataTable { Locale = CultureInfo.InvariantCulture };
+        rows.Columns.Add("Status", typeof(int));
+        rows.Columns.Add("MaterialsOrderedByCustomer", typeof(bool));
+        rows.Columns.Add("MaterialOrderDate", typeof(DateTime));
+        rows.Columns.Add("ExpectedDeliveryDate", typeof(DateTime));
+        rows.Columns.Add("MaterialStatus", typeof(string));
+        rows.Rows.Add((int)previous, orderedByCustomer,
+            hasOrderDate ? new DateTime(2026, 11, 2) : DBNull.Value,
+            hasDeliveryDate ? new DateTime(2026, 11, 3) : DBNull.Value, materialStatus);
+        string condition = Regex.Replace(MobileDatabaseService.PendingOrderTransitionCondition, "\"([A-Za-z]+)\"", "[$1]")
+            .Replace("@confirmed", ((int)QuoteStatus.Confermato).ToString(CultureInfo.InvariantCulture))
+            .Replace("@status", ((int)next).ToString(CultureInfo.InvariantCulture));
+        Assert.Equal(expected, rows.Select(condition).Length == 1);
+    }
 
     private static void AssertEligibility(
         QuoteStatus status,

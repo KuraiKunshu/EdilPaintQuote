@@ -67,7 +67,8 @@ public static class QuoteDocumentActions
             var catalog = await App.DataService.GetLaborCatalogAsync().WaitAsync(token);
             var customers = await App.DataService.GetCustomersAsync(token);
             var company = await App.DataService.GetCompanyAsync().WaitAsync(token) ?? new Company();
-            var context = await TrelloWorkSheetService.CreateContextAsync(App.DataService, quote, catalog, customers, input.Options, token);
+            var context = await WorkSheetContextLoader.CreateContextAsync(owner, App.DataService, quote, catalog, customers, input.Options, token);
+            if (context == null) return;
             context.SelectedLogo = App.MainVm?.SelectedLogo ?? string.Empty;
             if (string.IsNullOrWhiteSpace(context.SelectedLogo) && company.Logo.Count > 0)
                 context.SelectedLogo = company.Logo[Math.Clamp(company.Logo_index, 0, company.Logo.Count - 1)];

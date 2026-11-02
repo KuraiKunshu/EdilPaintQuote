@@ -8,8 +8,13 @@ public static class SupplierOrderQueue
 
     public static bool NeedsOrdering(QuoteHistorySummary quote) => quote.Status == QuoteStatus.Confermato &&
         !quote.MaterialsOrderedByCustomer &&
-        (string.Equals(quote.MaterialStatus?.Trim(), PendingGroup, StringComparison.OrdinalIgnoreCase) ||
-         string.IsNullOrWhiteSpace(quote.MaterialStatus) && !quote.MaterialOrderDate.HasValue);
+        string.Equals(quote.MaterialStatus?.Trim(), PendingGroup, StringComparison.OrdinalIgnoreCase);
+
+    public static string MaterialStatusAfterStatusChange(QuoteStatus previousStatus, QuoteStatus nextStatus,
+        bool orderedByCustomer, DateTime? orderDate, DateTime? deliveryDate, string? materialStatus) =>
+        previousStatus != QuoteStatus.Confermato && nextStatus == QuoteStatus.Confermato &&
+        !orderedByCustomer && !orderDate.HasValue && !deliveryDate.HasValue && string.IsNullOrWhiteSpace(materialStatus)
+            ? PendingGroup : materialStatus ?? string.Empty;
 
     public static string StatusDisplay(QuoteHistorySummary quote) => NeedsOrdering(quote) ? PendingGroup : quote.MaterialStatusDisplay;
 

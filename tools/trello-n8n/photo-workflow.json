@@ -1,0 +1,447 @@
+{
+  "name": "EdilPaint — Fotografie Trello su richiesta",
+  "nodes": [
+    {
+      "id": "avvio-manuale",
+      "name": "Avvio manuale",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ogni-minuto",
+      "name": "Ogni minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "prendi-una-richiesta",
+      "name": "Prendi una richiesta",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        80
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A worker claims one request. The program creates requests only after manual association.\nWITH candidate AS (\n    SELECT \"CardId\"\n    FROM public.\"TrelloPhotoRequests\"\n    WHERE \"Status\" = 'pending'\n       OR (\"Status\" = 'processing' AND (\"StartedAtUtc\" IS NULL OR \"StartedAtUtc\" < now() - interval '15 minutes'))\n    ORDER BY \"RequestedAtUtc\"\n    FOR UPDATE SKIP LOCKED\n    LIMIT 1\n)\nUPDATE public.\"TrelloPhotoRequests\" AS request\nSET \"Status\" = 'processing', \"StartedAtUtc\" = now(), \"CompletedAtUtc\" = NULL, \"Error\" = ''\nFROM candidate\nWHERE request.\"CardId\" = candidate.\"CardId\"\nRETURNING request.\"CardId\", request.\"RequestedAtUtc\"::text AS \"RequestedAtUtc\", request.\"ExpectedAttachmentIdsJson\",\n    (SELECT \"PayloadJson\" FROM public.\"TrelloCards\" WHERE \"Id\" = request.\"CardId\") AS \"PayloadJson\";\n",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "prepara-fotografie-richieste",
+      "name": "Prepara fotografie richieste",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const MAX_PHOTO_BYTES = 26214400;\nconst MAX_PHOTOS_PER_REQUEST = 100;\nconst MAX_REQUEST_BYTES = 209715200;\nfunction photoError(request, message) {\n  return { CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'error', Error: message };\n}\nfunction preparePhotoRequest(request) {\n  try {\n    if (!/^[a-f0-9]{24}$/.test(request.CardId) || typeof request.RequestedAtUtc !== 'string' || Number.isNaN(Date.parse(request.RequestedAtUtc)))\n      throw new Error('Richiesta fotografie non valida.');\n    const expected = JSON.parse(request.ExpectedAttachmentIdsJson);\n    if (!Array.isArray(expected) || expected.some(id => !/^[a-f0-9]{24}$/.test(id)) || new Set(expected).size !== expected.length)\n      throw new Error('Elenco delle fotografie richieste non valido.');\n    if (expected.length > MAX_PHOTOS_PER_REQUEST) throw new Error('La scheda supera il limite di 100 fotografie per richiesta.');\n    if (!expected.length) return [{ CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'empty', Error: '' }];\n    const payload = JSON.parse(request.PayloadJson);\n    if (!Array.isArray(payload.attachments)) throw new Error('Metadati degli allegati non disponibili. Sincronizzare la scheda Trello.');\n    const attachments = new Map(payload.attachments.map(attachment => [attachment.id, attachment]));\n    const photos = expected.map(id => {\n      const attachment = attachments.get(id);\n      if (!attachment || attachment.isUpload !== true) throw new Error('Una fotografia richiesta non è più disponibile negli allegati Trello.');\n      let fileName = attachment.fileName;\n      if (!fileName && typeof attachment.url === 'string') {\n        try {\n          const source = new URL(attachment.url);\n          fileName = decodeURIComponent(source.pathname.split('/').at(-1));\n        } catch { /* Legacy metadata can still contain the original name. */ }\n      }\n      if (!fileName) fileName = attachment.name;\n      if (typeof fileName !== 'string' || !fileName || fileName.includes('/') || fileName.includes('\\\\') || /[\\u0000-\\u001f]/.test(fileName))\n        throw new Error('Nome del file fotografico non valido.');\n      let mime = typeof attachment.mimeType === 'string' ? attachment.mimeType.toLowerCase().split(';')[0].trim() : '';\n      if (mime === 'image/jpg') mime = 'image/jpeg';\n      const inferred = ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' })[fileName.split('.').at(-1).toLowerCase()];\n      const contentType = mime || inferred;\n      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp'].includes(contentType))\n        throw new Error('Una fotografia usa un formato non supportato. Usare JPEG, PNG, WebP, GIF o BMP.');\n      if (!Number.isSafeInteger(attachment.bytes) || attachment.bytes <= 0 || attachment.bytes > MAX_PHOTO_BYTES)\n        throw new Error('Dimensione della fotografia non valida o superiore a 25 MB.');\n      return {\n        CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: id,\n        FileName: fileName, ContentType: contentType, ExpectedBytes: attachment.bytes,\n        SourceUrl: 'https://api.trello.com/1/cards/' + request.CardId + '/attachments/' + id + '/download/' + encodeURIComponent(fileName),\n      };\n    });\n    if (photos.reduce((bytes, photo) => bytes + photo.ExpectedBytes, 0) > MAX_REQUEST_BYTES)\n      throw new Error('Le fotografie della scheda superano il limite di 200 MB per richiesta.');\n    return photos;\n  } catch (error) {\n    return [photoError(request, error instanceof SyntaxError ? 'Metadati delle fotografie non leggibili. Sincronizzare la scheda Trello.' : error.message)];\n  }\n}\nfunction classifyPhotoResponse(photo, response, hasBinary) {\n  const status = Number(response?.statusCode);\n  if (status === 200 && hasBinary) return { ...photo, statusCode: status, SignedUrl: '', Error: '' };\n  if (status !== 302 && status !== 303 && status !== 307)\n    return photoError(photo, 'Download Trello non riuscito. Verificare la credenziale delle fotografie.');\n  const headers = response.headers || {};\n  const key = Object.keys(headers).find(name => name.toLowerCase() === 'location');\n  try {\n    const signed = new URL(headers[key]);\n    // Only the signed storage URL returned by authenticated Trello is downloaded without credentials.\n    if (signed.protocol !== 'https:' || signed.username || signed.password || (signed.port && signed.port !== '443') ||\n        !signed.hostname.toLowerCase().endsWith('.amazonaws.com')) throw new Error('Unexpected storage host');\n    return { ...photo, SignedUrl: signed.href, Error: '' };\n  } catch {\n    return photoError(photo, 'Trello ha restituito un collegamento di download non valido.');\n  }\n}\nfunction imageMime(bytes) {\n  if (bytes.length >= 8 && bytes[0] === 0x89 && Buffer.from(bytes.subarray(1, 4)).toString('ascii') === 'PNG' &&\n      bytes[4] === 13 && bytes[5] === 10 && bytes[6] === 26 && bytes[7] === 10) return 'image/png';\n  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';\n  if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(Buffer.from(bytes.subarray(0, 6)).toString('ascii'))) return 'image/gif';\n  if (bytes.length >= 12 && Buffer.from(bytes.subarray(0, 4)).toString('ascii') === 'RIFF' && Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP') return 'image/webp';\n  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return 'image/bmp';\n  return '';\n}\nfunction encodePhoto(photo, response, bytes, downloadedAtUtc) {\n  if (photo.Error) return photoError(photo, photo.Error);\n  if (Number(response?.statusCode) !== 200 || !bytes || !bytes.length || bytes.length > MAX_PHOTO_BYTES || bytes.length !== photo.ExpectedBytes)\n    return photoError(photo, 'Fotografia incompleta o non scaricabile. La scheda lavoro non può essere stampata con fotografie mancanti.');\n  const mime = imageMime(bytes);\n  if (!mime || mime !== photo.ContentType)\n    return photoError(photo, 'Il contenuto scaricato non è una fotografia valida nel formato previsto.');\n  return {\n    CardId: photo.CardId, RequestedAtUtc: photo.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: photo.AttachmentId,\n    FileName: photo.FileName, ContentType: mime, ContentBase64: Buffer.from(bytes).toString('base64'),\n    SourceUrl: photo.SourceUrl, SyncedAtUtc: new Date(downloadedAtUtc).toISOString(),\n  };\n}\n\nreturn $input.all().flatMap((item,index) => preparePhotoRequest(item.json).map(photo => ({ json: photo, pairedItem: { item: index } })));"
+      }
+    },
+    {
+      "id": "ci-sono-fotografie",
+      "name": "Ci sono fotografie",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "Ci sono fotografie",
+              "leftValue": "={{ $json.Mode === \"photo\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "scarica-da-trello-con-autorizzazione",
+      "name": "Scarica da Trello con autorizzazione",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -60
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.SourceUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false,
+              "maxRedirects": 0
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "fullResponse": true,
+              "neverError": true,
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "controlla-risposta-trello",
+      "name": "Controlla risposta Trello",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -60
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const MAX_PHOTO_BYTES = 26214400;\nconst MAX_PHOTOS_PER_REQUEST = 100;\nconst MAX_REQUEST_BYTES = 209715200;\nfunction photoError(request, message) {\n  return { CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'error', Error: message };\n}\nfunction preparePhotoRequest(request) {\n  try {\n    if (!/^[a-f0-9]{24}$/.test(request.CardId) || typeof request.RequestedAtUtc !== 'string' || Number.isNaN(Date.parse(request.RequestedAtUtc)))\n      throw new Error('Richiesta fotografie non valida.');\n    const expected = JSON.parse(request.ExpectedAttachmentIdsJson);\n    if (!Array.isArray(expected) || expected.some(id => !/^[a-f0-9]{24}$/.test(id)) || new Set(expected).size !== expected.length)\n      throw new Error('Elenco delle fotografie richieste non valido.');\n    if (expected.length > MAX_PHOTOS_PER_REQUEST) throw new Error('La scheda supera il limite di 100 fotografie per richiesta.');\n    if (!expected.length) return [{ CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'empty', Error: '' }];\n    const payload = JSON.parse(request.PayloadJson);\n    if (!Array.isArray(payload.attachments)) throw new Error('Metadati degli allegati non disponibili. Sincronizzare la scheda Trello.');\n    const attachments = new Map(payload.attachments.map(attachment => [attachment.id, attachment]));\n    const photos = expected.map(id => {\n      const attachment = attachments.get(id);\n      if (!attachment || attachment.isUpload !== true) throw new Error('Una fotografia richiesta non è più disponibile negli allegati Trello.');\n      let fileName = attachment.fileName;\n      if (!fileName && typeof attachment.url === 'string') {\n        try {\n          const source = new URL(attachment.url);\n          fileName = decodeURIComponent(source.pathname.split('/').at(-1));\n        } catch { /* Legacy metadata can still contain the original name. */ }\n      }\n      if (!fileName) fileName = attachment.name;\n      if (typeof fileName !== 'string' || !fileName || fileName.includes('/') || fileName.includes('\\\\') || /[\\u0000-\\u001f]/.test(fileName))\n        throw new Error('Nome del file fotografico non valido.');\n      let mime = typeof attachment.mimeType === 'string' ? attachment.mimeType.toLowerCase().split(';')[0].trim() : '';\n      if (mime === 'image/jpg') mime = 'image/jpeg';\n      const inferred = ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' })[fileName.split('.').at(-1).toLowerCase()];\n      const contentType = mime || inferred;\n      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp'].includes(contentType))\n        throw new Error('Una fotografia usa un formato non supportato. Usare JPEG, PNG, WebP, GIF o BMP.');\n      if (!Number.isSafeInteger(attachment.bytes) || attachment.bytes <= 0 || attachment.bytes > MAX_PHOTO_BYTES)\n        throw new Error('Dimensione della fotografia non valida o superiore a 25 MB.');\n      return {\n        CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: id,\n        FileName: fileName, ContentType: contentType, ExpectedBytes: attachment.bytes,\n        SourceUrl: 'https://api.trello.com/1/cards/' + request.CardId + '/attachments/' + id + '/download/' + encodeURIComponent(fileName),\n      };\n    });\n    if (photos.reduce((bytes, photo) => bytes + photo.ExpectedBytes, 0) > MAX_REQUEST_BYTES)\n      throw new Error('Le fotografie della scheda superano il limite di 200 MB per richiesta.');\n    return photos;\n  } catch (error) {\n    return [photoError(request, error instanceof SyntaxError ? 'Metadati delle fotografie non leggibili. Sincronizzare la scheda Trello.' : error.message)];\n  }\n}\nfunction classifyPhotoResponse(photo, response, hasBinary) {\n  const status = Number(response?.statusCode);\n  if (status === 200 && hasBinary) return { ...photo, statusCode: status, SignedUrl: '', Error: '' };\n  if (status !== 302 && status !== 303 && status !== 307)\n    return photoError(photo, 'Download Trello non riuscito. Verificare la credenziale delle fotografie.');\n  const headers = response.headers || {};\n  const key = Object.keys(headers).find(name => name.toLowerCase() === 'location');\n  try {\n    const signed = new URL(headers[key]);\n    // Only the signed storage URL returned by authenticated Trello is downloaded without credentials.\n    if (signed.protocol !== 'https:' || signed.username || signed.password || (signed.port && signed.port !== '443') ||\n        !signed.hostname.toLowerCase().endsWith('.amazonaws.com')) throw new Error('Unexpected storage host');\n    return { ...photo, SignedUrl: signed.href, Error: '' };\n  } catch {\n    return photoError(photo, 'Trello ha restituito un collegamento di download non valido.');\n  }\n}\nfunction imageMime(bytes) {\n  if (bytes.length >= 8 && bytes[0] === 0x89 && Buffer.from(bytes.subarray(1, 4)).toString('ascii') === 'PNG' &&\n      bytes[4] === 13 && bytes[5] === 10 && bytes[6] === 26 && bytes[7] === 10) return 'image/png';\n  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';\n  if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(Buffer.from(bytes.subarray(0, 6)).toString('ascii'))) return 'image/gif';\n  if (bytes.length >= 12 && Buffer.from(bytes.subarray(0, 4)).toString('ascii') === 'RIFF' && Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP') return 'image/webp';\n  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return 'image/bmp';\n  return '';\n}\nfunction encodePhoto(photo, response, bytes, downloadedAtUtc) {\n  if (photo.Error) return photoError(photo, photo.Error);\n  if (Number(response?.statusCode) !== 200 || !bytes || !bytes.length || bytes.length > MAX_PHOTO_BYTES || bytes.length !== photo.ExpectedBytes)\n    return photoError(photo, 'Fotografia incompleta o non scaricabile. La scheda lavoro non può essere stampata con fotografie mancanti.');\n  const mime = imageMime(bytes);\n  if (!mime || mime !== photo.ContentType)\n    return photoError(photo, 'Il contenuto scaricato non è una fotografia valida nel formato previsto.');\n  return {\n    CardId: photo.CardId, RequestedAtUtc: photo.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: photo.AttachmentId,\n    FileName: photo.FileName, ContentType: mime, ContentBase64: Buffer.from(bytes).toString('base64'),\n    SourceUrl: photo.SourceUrl, SyncedAtUtc: new Date(downloadedAtUtc).toISOString(),\n  };\n}\n\nreturn $input.all().map((item,index) => ({ json: classifyPhotoResponse($('Ci sono fotografie').itemMatching(index).json, item.json, Boolean(item.binary?.data)),\n  ...(item.binary ? { binary: item.binary } : {}), pairedItem: { item: index } }));"
+      }
+    },
+    {
+      "id": "serve-download-firmato",
+      "name": "Serve download firmato",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        -60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "Serve download firmato",
+              "leftValue": "={{ Boolean($json.SignedUrl) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "scarica-fotografia-senza-credenziali",
+      "name": "Scarica fotografia senza credenziali",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        -180
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.SignedUrl }}",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false,
+              "maxRedirects": 0
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "fullResponse": true,
+              "neverError": true,
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "verifica-fotografia-da-storage",
+      "name": "Verifica fotografia da storage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const MAX_PHOTO_BYTES = 26214400;\nconst MAX_PHOTOS_PER_REQUEST = 100;\nconst MAX_REQUEST_BYTES = 209715200;\nfunction photoError(request, message) {\n  return { CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'error', Error: message };\n}\nfunction preparePhotoRequest(request) {\n  try {\n    if (!/^[a-f0-9]{24}$/.test(request.CardId) || typeof request.RequestedAtUtc !== 'string' || Number.isNaN(Date.parse(request.RequestedAtUtc)))\n      throw new Error('Richiesta fotografie non valida.');\n    const expected = JSON.parse(request.ExpectedAttachmentIdsJson);\n    if (!Array.isArray(expected) || expected.some(id => !/^[a-f0-9]{24}$/.test(id)) || new Set(expected).size !== expected.length)\n      throw new Error('Elenco delle fotografie richieste non valido.');\n    if (expected.length > MAX_PHOTOS_PER_REQUEST) throw new Error('La scheda supera il limite di 100 fotografie per richiesta.');\n    if (!expected.length) return [{ CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'empty', Error: '' }];\n    const payload = JSON.parse(request.PayloadJson);\n    if (!Array.isArray(payload.attachments)) throw new Error('Metadati degli allegati non disponibili. Sincronizzare la scheda Trello.');\n    const attachments = new Map(payload.attachments.map(attachment => [attachment.id, attachment]));\n    const photos = expected.map(id => {\n      const attachment = attachments.get(id);\n      if (!attachment || attachment.isUpload !== true) throw new Error('Una fotografia richiesta non è più disponibile negli allegati Trello.');\n      let fileName = attachment.fileName;\n      if (!fileName && typeof attachment.url === 'string') {\n        try {\n          const source = new URL(attachment.url);\n          fileName = decodeURIComponent(source.pathname.split('/').at(-1));\n        } catch { /* Legacy metadata can still contain the original name. */ }\n      }\n      if (!fileName) fileName = attachment.name;\n      if (typeof fileName !== 'string' || !fileName || fileName.includes('/') || fileName.includes('\\\\') || /[\\u0000-\\u001f]/.test(fileName))\n        throw new Error('Nome del file fotografico non valido.');\n      let mime = typeof attachment.mimeType === 'string' ? attachment.mimeType.toLowerCase().split(';')[0].trim() : '';\n      if (mime === 'image/jpg') mime = 'image/jpeg';\n      const inferred = ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' })[fileName.split('.').at(-1).toLowerCase()];\n      const contentType = mime || inferred;\n      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp'].includes(contentType))\n        throw new Error('Una fotografia usa un formato non supportato. Usare JPEG, PNG, WebP, GIF o BMP.');\n      if (!Number.isSafeInteger(attachment.bytes) || attachment.bytes <= 0 || attachment.bytes > MAX_PHOTO_BYTES)\n        throw new Error('Dimensione della fotografia non valida o superiore a 25 MB.');\n      return {\n        CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: id,\n        FileName: fileName, ContentType: contentType, ExpectedBytes: attachment.bytes,\n        SourceUrl: 'https://api.trello.com/1/cards/' + request.CardId + '/attachments/' + id + '/download/' + encodeURIComponent(fileName),\n      };\n    });\n    if (photos.reduce((bytes, photo) => bytes + photo.ExpectedBytes, 0) > MAX_REQUEST_BYTES)\n      throw new Error('Le fotografie della scheda superano il limite di 200 MB per richiesta.');\n    return photos;\n  } catch (error) {\n    return [photoError(request, error instanceof SyntaxError ? 'Metadati delle fotografie non leggibili. Sincronizzare la scheda Trello.' : error.message)];\n  }\n}\nfunction classifyPhotoResponse(photo, response, hasBinary) {\n  const status = Number(response?.statusCode);\n  if (status === 200 && hasBinary) return { ...photo, statusCode: status, SignedUrl: '', Error: '' };\n  if (status !== 302 && status !== 303 && status !== 307)\n    return photoError(photo, 'Download Trello non riuscito. Verificare la credenziale delle fotografie.');\n  const headers = response.headers || {};\n  const key = Object.keys(headers).find(name => name.toLowerCase() === 'location');\n  try {\n    const signed = new URL(headers[key]);\n    // Only the signed storage URL returned by authenticated Trello is downloaded without credentials.\n    if (signed.protocol !== 'https:' || signed.username || signed.password || (signed.port && signed.port !== '443') ||\n        !signed.hostname.toLowerCase().endsWith('.amazonaws.com')) throw new Error('Unexpected storage host');\n    return { ...photo, SignedUrl: signed.href, Error: '' };\n  } catch {\n    return photoError(photo, 'Trello ha restituito un collegamento di download non valido.');\n  }\n}\nfunction imageMime(bytes) {\n  if (bytes.length >= 8 && bytes[0] === 0x89 && Buffer.from(bytes.subarray(1, 4)).toString('ascii') === 'PNG' &&\n      bytes[4] === 13 && bytes[5] === 10 && bytes[6] === 26 && bytes[7] === 10) return 'image/png';\n  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';\n  if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(Buffer.from(bytes.subarray(0, 6)).toString('ascii'))) return 'image/gif';\n  if (bytes.length >= 12 && Buffer.from(bytes.subarray(0, 4)).toString('ascii') === 'RIFF' && Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP') return 'image/webp';\n  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return 'image/bmp';\n  return '';\n}\nfunction encodePhoto(photo, response, bytes, downloadedAtUtc) {\n  if (photo.Error) return photoError(photo, photo.Error);\n  if (Number(response?.statusCode) !== 200 || !bytes || !bytes.length || bytes.length > MAX_PHOTO_BYTES || bytes.length !== photo.ExpectedBytes)\n    return photoError(photo, 'Fotografia incompleta o non scaricabile. La scheda lavoro non può essere stampata con fotografie mancanti.');\n  const mime = imageMime(bytes);\n  if (!mime || mime !== photo.ContentType)\n    return photoError(photo, 'Il contenuto scaricato non è una fotografia valida nel formato previsto.');\n  return {\n    CardId: photo.CardId, RequestedAtUtc: photo.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: photo.AttachmentId,\n    FileName: photo.FileName, ContentType: mime, ContentBase64: Buffer.from(bytes).toString('base64'),\n    SourceUrl: photo.SourceUrl, SyncedAtUtc: new Date(downloadedAtUtc).toISOString(),\n  };\n}\n\nconst result = [];\nfor (const [index, item] of $input.all().entries()) {\n  const photo = $('Serve download firmato').itemMatching(index).json;\n  try {\n    const bytes = item.binary?.data ? await this.helpers.getBinaryDataBuffer(index, 'data') : null;\n    result.push({ json: encodePhoto(photo, item.json, bytes, new Date().toISOString()), pairedItem: { item: index } });\n  } catch {\n    result.push({ json: photoError(photo, 'Impossibile leggere la fotografia scaricata.'), pairedItem: { item: index } });\n  }\n}\nreturn result;"
+      }
+    },
+    {
+      "id": "verifica-fotografia-diretta",
+      "name": "Verifica fotografia diretta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const MAX_PHOTO_BYTES = 26214400;\nconst MAX_PHOTOS_PER_REQUEST = 100;\nconst MAX_REQUEST_BYTES = 209715200;\nfunction photoError(request, message) {\n  return { CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'error', Error: message };\n}\nfunction preparePhotoRequest(request) {\n  try {\n    if (!/^[a-f0-9]{24}$/.test(request.CardId) || typeof request.RequestedAtUtc !== 'string' || Number.isNaN(Date.parse(request.RequestedAtUtc)))\n      throw new Error('Richiesta fotografie non valida.');\n    const expected = JSON.parse(request.ExpectedAttachmentIdsJson);\n    if (!Array.isArray(expected) || expected.some(id => !/^[a-f0-9]{24}$/.test(id)) || new Set(expected).size !== expected.length)\n      throw new Error('Elenco delle fotografie richieste non valido.');\n    if (expected.length > MAX_PHOTOS_PER_REQUEST) throw new Error('La scheda supera il limite di 100 fotografie per richiesta.');\n    if (!expected.length) return [{ CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'empty', Error: '' }];\n    const payload = JSON.parse(request.PayloadJson);\n    if (!Array.isArray(payload.attachments)) throw new Error('Metadati degli allegati non disponibili. Sincronizzare la scheda Trello.');\n    const attachments = new Map(payload.attachments.map(attachment => [attachment.id, attachment]));\n    const photos = expected.map(id => {\n      const attachment = attachments.get(id);\n      if (!attachment || attachment.isUpload !== true) throw new Error('Una fotografia richiesta non è più disponibile negli allegati Trello.');\n      let fileName = attachment.fileName;\n      if (!fileName && typeof attachment.url === 'string') {\n        try {\n          const source = new URL(attachment.url);\n          fileName = decodeURIComponent(source.pathname.split('/').at(-1));\n        } catch { /* Legacy metadata can still contain the original name. */ }\n      }\n      if (!fileName) fileName = attachment.name;\n      if (typeof fileName !== 'string' || !fileName || fileName.includes('/') || fileName.includes('\\\\') || /[\\u0000-\\u001f]/.test(fileName))\n        throw new Error('Nome del file fotografico non valido.');\n      let mime = typeof attachment.mimeType === 'string' ? attachment.mimeType.toLowerCase().split(';')[0].trim() : '';\n      if (mime === 'image/jpg') mime = 'image/jpeg';\n      const inferred = ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' })[fileName.split('.').at(-1).toLowerCase()];\n      const contentType = mime || inferred;\n      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp'].includes(contentType))\n        throw new Error('Una fotografia usa un formato non supportato. Usare JPEG, PNG, WebP, GIF o BMP.');\n      if (!Number.isSafeInteger(attachment.bytes) || attachment.bytes <= 0 || attachment.bytes > MAX_PHOTO_BYTES)\n        throw new Error('Dimensione della fotografia non valida o superiore a 25 MB.');\n      return {\n        CardId: request.CardId, RequestedAtUtc: request.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: id,\n        FileName: fileName, ContentType: contentType, ExpectedBytes: attachment.bytes,\n        SourceUrl: 'https://api.trello.com/1/cards/' + request.CardId + '/attachments/' + id + '/download/' + encodeURIComponent(fileName),\n      };\n    });\n    if (photos.reduce((bytes, photo) => bytes + photo.ExpectedBytes, 0) > MAX_REQUEST_BYTES)\n      throw new Error('Le fotografie della scheda superano il limite di 200 MB per richiesta.');\n    return photos;\n  } catch (error) {\n    return [photoError(request, error instanceof SyntaxError ? 'Metadati delle fotografie non leggibili. Sincronizzare la scheda Trello.' : error.message)];\n  }\n}\nfunction classifyPhotoResponse(photo, response, hasBinary) {\n  const status = Number(response?.statusCode);\n  if (status === 200 && hasBinary) return { ...photo, statusCode: status, SignedUrl: '', Error: '' };\n  if (status !== 302 && status !== 303 && status !== 307)\n    return photoError(photo, 'Download Trello non riuscito. Verificare la credenziale delle fotografie.');\n  const headers = response.headers || {};\n  const key = Object.keys(headers).find(name => name.toLowerCase() === 'location');\n  try {\n    const signed = new URL(headers[key]);\n    // Only the signed storage URL returned by authenticated Trello is downloaded without credentials.\n    if (signed.protocol !== 'https:' || signed.username || signed.password || (signed.port && signed.port !== '443') ||\n        !signed.hostname.toLowerCase().endsWith('.amazonaws.com')) throw new Error('Unexpected storage host');\n    return { ...photo, SignedUrl: signed.href, Error: '' };\n  } catch {\n    return photoError(photo, 'Trello ha restituito un collegamento di download non valido.');\n  }\n}\nfunction imageMime(bytes) {\n  if (bytes.length >= 8 && bytes[0] === 0x89 && Buffer.from(bytes.subarray(1, 4)).toString('ascii') === 'PNG' &&\n      bytes[4] === 13 && bytes[5] === 10 && bytes[6] === 26 && bytes[7] === 10) return 'image/png';\n  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';\n  if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(Buffer.from(bytes.subarray(0, 6)).toString('ascii'))) return 'image/gif';\n  if (bytes.length >= 12 && Buffer.from(bytes.subarray(0, 4)).toString('ascii') === 'RIFF' && Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP') return 'image/webp';\n  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return 'image/bmp';\n  return '';\n}\nfunction encodePhoto(photo, response, bytes, downloadedAtUtc) {\n  if (photo.Error) return photoError(photo, photo.Error);\n  if (Number(response?.statusCode) !== 200 || !bytes || !bytes.length || bytes.length > MAX_PHOTO_BYTES || bytes.length !== photo.ExpectedBytes)\n    return photoError(photo, 'Fotografia incompleta o non scaricabile. La scheda lavoro non può essere stampata con fotografie mancanti.');\n  const mime = imageMime(bytes);\n  if (!mime || mime !== photo.ContentType)\n    return photoError(photo, 'Il contenuto scaricato non è una fotografia valida nel formato previsto.');\n  return {\n    CardId: photo.CardId, RequestedAtUtc: photo.RequestedAtUtc, Mode: 'photo', Error: '', AttachmentId: photo.AttachmentId,\n    FileName: photo.FileName, ContentType: mime, ContentBase64: Buffer.from(bytes).toString('base64'),\n    SourceUrl: photo.SourceUrl, SyncedAtUtc: new Date(downloadedAtUtc).toISOString(),\n  };\n}\n\nconst result = [];\nfor (const [index, item] of $input.all().entries()) {\n  const photo = $('Serve download firmato').itemMatching(index).json;\n  try {\n    const bytes = item.binary?.data ? await this.helpers.getBinaryDataBuffer(index, 'data') : null;\n    result.push({ json: encodePhoto(photo, item.json, bytes, new Date().toISOString()), pairedItem: { item: index } });\n  } catch {\n    result.push({ json: photoError(photo, 'Impossibile leggere la fotografia scaricata.'), pairedItem: { item: index } });\n  }\n}\nreturn result;"
+      }
+    },
+    {
+      "id": "salva-foto-e-stato-richiesta",
+      "name": "Salva foto e stato richiesta",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2160,
+        80
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- One bound JSON parameter. An obsolete worker cannot overwrite a replacement request.\nWITH input AS (SELECT $1::jsonb AS data),\nactive AS (\n    SELECT request.\"CardId\"\n    FROM public.\"TrelloPhotoRequests\" AS request CROSS JOIN input\n    WHERE request.\"CardId\" = data->>'CardId' AND request.\"Status\" = 'processing'\n      AND request.\"RequestedAtUtc\" = (data->>'RequestedAtUtc')::timestamptz\n    FOR UPDATE OF request\n),\nfailed AS (\n    UPDATE public.\"TrelloPhotoRequests\" AS request\n    SET \"Status\" = 'failed', \"CompletedAtUtc\" = NULL, \"Error\" = input.data->>'Error'\n    FROM input\n    WHERE request.\"CardId\" = input.data->>'CardId'\n      AND request.\"RequestedAtUtc\" = (input.data->>'RequestedAtUtc')::timestamptz\n      AND request.\"Status\" = 'processing' AND COALESCE(input.data->>'Error', '') <> ''\n      AND request.\"CardId\" IN (SELECT \"CardId\" FROM active)\n    RETURNING request.\"CardId\"\n), stored AS (\n    INSERT INTO public.\"TrelloPhotos\" AS saved\n        (\"CardId\", \"AttachmentId\", \"FileName\", \"ContentType\", \"ContentBase64\", \"SourceUrl\", \"SyncedAtUtc\")\n    SELECT data->>'CardId', data->>'AttachmentId', data->>'FileName', data->>'ContentType',\n        data->>'ContentBase64', data->>'SourceUrl', GREATEST(clock_timestamp(), (data->>'RequestedAtUtc')::timestamptz)\n    FROM input\n    WHERE data->>'Mode' = 'photo' AND COALESCE(data->>'Error', '') = ''\n      AND data->>'CardId' IN (SELECT \"CardId\" FROM active)\n      AND EXISTS (SELECT 1 FROM public.\"TrelloPhotoRequests\" AS request\n          WHERE request.\"CardId\" = data->>'CardId' AND request.\"Status\" = 'processing'\n            AND request.\"RequestedAtUtc\" = (data->>'RequestedAtUtc')::timestamptz\n            AND request.\"ExpectedAttachmentIdsJson\"::jsonb ? (data->>'AttachmentId'))\n    ON CONFLICT (\"CardId\", \"AttachmentId\") DO UPDATE SET\n        \"FileName\" = EXCLUDED.\"FileName\", \"ContentType\" = EXCLUDED.\"ContentType\",\n        \"ContentBase64\" = EXCLUDED.\"ContentBase64\", \"SourceUrl\" = EXCLUDED.\"SourceUrl\", \"SyncedAtUtc\" = EXCLUDED.\"SyncedAtUtc\"\n    WHERE saved.\"SyncedAtUtc\" <= EXCLUDED.\"SyncedAtUtc\"\n    RETURNING \"CardId\", \"AttachmentId\", \"SyncedAtUtc\"\n), completed AS (\nUPDATE public.\"TrelloPhotoRequests\" AS request\nSET \"Status\" = 'completed', \"CompletedAtUtc\" = now(), \"Error\" = ''\nFROM input\nWHERE request.\"CardId\" = input.data->>'CardId' AND request.\"Status\" = 'processing'\n  AND request.\"CardId\" IN (SELECT \"CardId\" FROM active)\n  AND request.\"RequestedAtUtc\" = (input.data->>'RequestedAtUtc')::timestamptz\n  AND COALESCE(input.data->>'Error', '') = ''\n  AND NOT EXISTS (\n      SELECT 1 FROM jsonb_array_elements_text(request.\"ExpectedAttachmentIdsJson\"::jsonb) AS expected(id)\n      WHERE NOT EXISTS (\n          SELECT 1 FROM public.\"TrelloPhotos\" AS photo\n          WHERE photo.\"CardId\" = request.\"CardId\" AND photo.\"AttachmentId\" = expected.id AND photo.\"SyncedAtUtc\" >= request.\"RequestedAtUtc\"\n          UNION ALL\n          SELECT 1 FROM stored WHERE stored.\"CardId\" = request.\"CardId\" AND stored.\"AttachmentId\" = expected.id AND stored.\"SyncedAtUtc\" >= request.\"RequestedAtUtc\"\n      )\n  )\nRETURNING request.\"CardId\", request.\"Status\"\n)\nSELECT \"CardId\", \"Status\" FROM completed\nUNION ALL SELECT \"CardId\", 'failed' AS \"Status\" FROM failed\nUNION ALL SELECT \"CardId\", 'processing' AS \"Status\" FROM stored\n    WHERE NOT EXISTS (SELECT 1 FROM completed);\n",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json)] }}",
+          "queryBatching": "transaction"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "istruzioni-fotografie",
+      "name": "Istruzioni fotografie",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -560
+      ],
+      "parameters": {
+        "content": "## Fotografie della scheda lavoro\nUna richiesta nasce solo dalla scheda Trello scelta manualmente nel preventivo.\n\n1. Applicare photos-schema.sql.\n2. Scegliere Postgres nei due nodi database.\n3. Nel solo nodo Scarica da Trello con autorizzazione scegliere la credenziale Header Auth per Trello.\n4. Nome header: Authorization. Valore OAuth con API key e token Trello, inseriti direttamente nella credenziale n8n. Nessun segreto nel workflow.\n5. Eseguire la prova con una richiesta reale, poi pubblicare.\n\nIl download autenticato non segue redirect: la fotografia eventualmente firmata viene scaricata senza credenziali.\nNon modifica Trello, clienti, preventivi o associazioni. Non scarica tutto l’archivio.\nLe richieste incomplete falliscono: nessuna stampa con foto mancanti viene dichiarata completa.",
+        "width": 780,
+        "height": 470
+      }
+    }
+  ],
+  "connections": {
+    "Avvio manuale": {
+      "main": [
+        [
+          {
+            "node": "Prendi una richiesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ogni minuto": {
+      "main": [
+        [
+          {
+            "node": "Prendi una richiesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prendi una richiesta": {
+      "main": [
+        [
+          {
+            "node": "Prepara fotografie richieste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara fotografie richieste": {
+      "main": [
+        [
+          {
+            "node": "Ci sono fotografie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ci sono fotografie": {
+      "main": [
+        [
+          {
+            "node": "Scarica da Trello con autorizzazione",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salva foto e stato richiesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scarica da Trello con autorizzazione": {
+      "main": [
+        [
+          {
+            "node": "Controlla risposta Trello",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Controlla risposta Trello": {
+      "main": [
+        [
+          {
+            "node": "Serve download firmato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serve download firmato": {
+      "main": [
+        [
+          {
+            "node": "Scarica fotografia senza credenziali",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verifica fotografia diretta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scarica fotografia senza credenziali": {
+      "main": [
+        [
+          {
+            "node": "Verifica fotografia da storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifica fotografia da storage": {
+      "main": [
+        [
+          {
+            "node": "Salva foto e stato richiesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifica fotografia diretta": {
+      "main": [
+        [
+          {
+            "node": "Salva foto e stato richiesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome",
+    "executionTimeout": 900,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -10,7 +10,8 @@ public static class WorkSheetService
         IEnumerable<Customer> customers,
         WorkSheetOptions? options = null,
         TrelloCard? trelloCard = null,
-        bool trelloLookupFailed = false)
+        bool trelloLookupFailed = false,
+        IReadOnlyList<TrelloWorkSheetPhoto>? trelloPhotos = null)
     {
         var catalog = laborCatalog.ToList();
         var contacts = customers.ToList();
@@ -27,7 +28,7 @@ public static class WorkSheetService
             ContactPhone = FirstText(reference?.Phone, customer?.Phone),
             CustomerNotes = quote.CustomerNotes ?? string.Empty,
             Notes = quote.Notes ?? string.Empty,
-            Trello = TrelloWorkSheetService.CreateDetails(quote, trelloCard, trelloLookupFailed),
+            Trello = TrelloWorkSheetService.CreateDetails(quote, trelloCard, trelloLookupFailed, trelloPhotos),
             EmployeeNames = options?.EmployeeNames.Where(name => !string.IsNullOrWhiteSpace(name))
                 .Select(name => name.Trim()).ToArray() ?? [],
             InterventionDate = options?.InterventionDate?.Date,

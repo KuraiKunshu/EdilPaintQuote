@@ -7,13 +7,13 @@ namespace EdilPaintPreventibiviGen.Tests;
 public sealed class SupplierOrderQueueTests
 {
     [Fact]
-    public void ConfirmedJobWithoutAnyOrderDetailsIsShownAsPendingWithoutWritingInventedMetadata()
+    public void AlreadyConfirmedJobWithoutOrderDetailsDoesNotBecomePendingOnRead()
     {
         var quote = new QuoteHistorySummary { Status = QuoteStatus.Confermato };
-        Assert.True(SupplierOrderQueue.NeedsOrdering(quote));
-        Assert.Equal("Da ordinare", SupplierOrderQueue.StatusDisplay(quote));
-        Assert.Equal("Da ordinare", SupplierOrderQueue.GroupName(quote, true));
-        Assert.Equal("Da ordinare", SupplierOrderQueue.GroupName(quote, false));
+        Assert.False(SupplierOrderQueue.NeedsOrdering(quote));
+        Assert.NotEqual("Da ordinare", SupplierOrderQueue.StatusDisplay(quote));
+        Assert.NotEqual("Da ordinare", SupplierOrderQueue.GroupName(quote, true));
+        Assert.NotEqual("Da ordinare", SupplierOrderQueue.GroupName(quote, false));
         Assert.Equal("", quote.MaterialStatus);
         Assert.Equal("", quote.SupplierName);
         Assert.Null(quote.MaterialOrderDate);
@@ -23,6 +23,8 @@ public sealed class SupplierOrderQueueTests
     public void ChoosingASupplierAloneDoesNotMarkMaterialsAsAlreadyOrdered()
     {
         var quote = new QuoteHistorySummary { Status = QuoteStatus.Confermato, SupplierName = "Alfa" };
+        quote.MaterialStatus = SupplierOrderQueue.MaterialStatusAfterStatusChange(QuoteStatus.Spedito, quote.Status,
+            quote.MaterialsOrderedByCustomer, quote.MaterialOrderDate, quote.ExpectedDeliveryDate, quote.MaterialStatus);
         Assert.True(SupplierOrderQueue.NeedsOrdering(quote));
         quote.MaterialStatus = "Ordinato";
         Assert.False(SupplierOrderQueue.NeedsOrdering(quote));
@@ -66,8 +68,8 @@ public sealed class SupplierOrderQueueTests
     public void PendingSectionComesFirstAndRespectsTheSelectedSortRegardlessOfSupplierGrouping(bool grouped)
     {
         var ordered = new QuoteHistorySummary { QuoteNumber = "O", Status = QuoteStatus.Confermato, SupplierName = "Alfa", MaterialStatus = "Ordinato" };
-        var pendingZ = new QuoteHistorySummary { QuoteNumber = "PZ", Status = QuoteStatus.Confermato, CustomerName = "Zeta", SupplierName = "A" };
-        var pendingA = new QuoteHistorySummary { QuoteNumber = "PA", Status = QuoteStatus.Confermato, CustomerName = "Alfa", SupplierName = "Z" };
+        var pendingZ = new QuoteHistorySummary { QuoteNumber = "PZ", Status = QuoteStatus.Confermato, CustomerName = "Zeta", SupplierName = "A", MaterialStatus = "Da ordinare" };
+        var pendingA = new QuoteHistorySummary { QuoteNumber = "PA", Status = QuoteStatus.Confermato, CustomerName = "Alfa", SupplierName = "Z", MaterialStatus = "Da ordinare" };
         var rows = SupplierOrderQueue.Sort([ordered, pendingZ, pendingA], SupplierOrderSortMode.CustomerAscending, grouped);
         Assert.Equal(new[] { "PA", "PZ", "O" }, rows.Select(row => row.QuoteNumber));
     }

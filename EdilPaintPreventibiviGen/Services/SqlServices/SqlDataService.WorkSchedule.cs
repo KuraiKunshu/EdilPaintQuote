@@ -343,7 +343,9 @@ public partial class SqlDataService
         entry.ExpectedDeliveryDate = quote.ExpectedDeliveryDate;
         entry.OrderStatus = quote.Status;
         entry.IsOrderDeleted = quote.IsDeleted;
-        entry.IsOrderActive = SupplierOrderEligibility.IsActive(quote);
+        // A visit already planned by an operator keeps its crew reserved, even if an old quote has no material fields.
+        entry.IsOrderActive = !quote.IsDeleted &&
+            (quote.Status == QuoteStatus.Confermato || SupplierOrderEligibility.IsActive(quote));
     }
 
     internal static WorkScheduleSettings ScheduleSettingsToModel(WorkScheduleSettingsEntity entity) => new()

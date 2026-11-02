@@ -16,6 +16,7 @@ public sealed class AppSettingsService
 	public RealProfitSettingsModel RealProfit { get; }
 	public PdfStorageSettingsModel PdfStorage { get; }
 	public PdfTemplateSettingsModel PdfTemplate { get; }
+	public WorkSheetSettingsModel WorkSheet { get; }
 	public DatabaseSettingsModel Database { get; }
 	public MailSettingsModel Mail { get; }
 	public BusinessSettingsModel Business { get; }
@@ -34,6 +35,8 @@ public sealed class AppSettingsService
 		PdfStorage = configuration.GetSection("PdfStorage").Get<PdfStorageSettingsModel>() ?? new PdfStorageSettingsModel();
 		PdfTemplate = configuration.GetSection("PdfTemplate").Get<PdfTemplateSettingsModel>() ?? new PdfTemplateSettingsModel();
 		PdfTemplate.Normalize();
+		WorkSheet = configuration.GetSection("WorkSheet").Get<WorkSheetSettingsModel>() ?? new();
+		WorkSheet.Normalize();
 		Database = LoadDatabaseSettings(configuration);
 		Mail = LoadMailSettings(configuration);
 		Business = configuration.GetSection("Business").Get<BusinessSettingsModel>() ?? new();
@@ -67,6 +70,8 @@ public sealed class AppSettingsService
 		root["RealProfit"] = JsonSerializer.SerializeToNode(RealProfit, jsonOptions);
 		root["PdfStorage"] = JsonSerializer.SerializeToNode(PdfStorage, jsonOptions);
 		root["PdfTemplate"] = JsonSerializer.SerializeToNode(PdfTemplate, jsonOptions);
+		WorkSheet.Normalize();
+		root["WorkSheet"] = JsonSerializer.SerializeToNode(WorkSheet, jsonOptions);
 		root["Mail"] = new JsonObject
 		{
 			["Enabled"] = Mail.Enabled,

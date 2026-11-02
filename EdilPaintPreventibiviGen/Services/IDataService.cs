@@ -10,6 +10,9 @@ public interface IDataService
     // Read-only Trello mirror. Association is chosen explicitly in the quote editor.
     Task<List<TrelloCard>> GetTrelloCardsAsync(CancellationToken cancellationToken = default);
     Task<TrelloCard?> GetTrelloCardAsync(string cardId, CancellationToken cancellationToken = default);
+    Task<TrelloPhotoBatch> GetTrelloPhotosAsync(string cardId, CancellationToken cancellationToken = default);
+    Task RequestTrelloPhotosAsync(string cardId, IReadOnlyList<string> expectedAttachmentIds,
+        CancellationToken cancellationToken = default);
     Task UpdateQuoteTrelloAssociationAsync(string quoteNumber, string trelloCardId,
         string trelloCardSnapshotJson, CancellationToken cancellationToken = default);
     Task<QuoteMetadata> UpdateQuoteTrelloAssociationAsync(string quoteNumber, string trelloCardId,

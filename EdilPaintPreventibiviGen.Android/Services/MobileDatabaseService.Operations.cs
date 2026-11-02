@@ -14,9 +14,18 @@ public sealed partial class MobileDatabaseService
         return $"""
             not {prefix}"IsDeleted"
             and {prefix}"Status" not in (@finished, @rejected, @archived)
-            and ({prefix}"MaterialsOrderedByCustomer" or {prefix}"Status" = @confirmed)
+            and ({prefix}"MaterialsOrderedByCustomer" or ({prefix}"Status" = @confirmed
+                and (trim({prefix}"SupplierName") <> '' or {prefix}"MaterialOrderDate" is not null
+                    or {prefix}"ExpectedDeliveryDate" is not null or trim({prefix}"MaterialStatus") <> '')))
             """;
     }
+
+    internal const string PendingOrderTransitionCondition = """
+        "Status" <> @confirmed and @status = @confirmed
+        and not "MaterialsOrderedByCustomer"
+        and "MaterialOrderDate" is null and "ExpectedDeliveryDate" is null
+        and trim("MaterialStatus") = ''
+        """;
 
     public Task<DashboardSnapshot> GetDashboardAsync(
         string connectionString,
@@ -240,8 +249,16 @@ public sealed partial class MobileDatabaseService
             connectionString,
             quoteNumber,
             expectedRevision,
-            "\"Status\" = @status",
-            command => command.Parameters.AddWithValue("status", (int)status),
+            $"""
+            "MaterialStatus" = case when {PendingOrderTransitionCondition} then @pending else "MaterialStatus" end,
+            "Status" = @status
+            """,
+            command =>
+            {
+                command.Parameters.AddWithValue("status", (int)status);
+                command.Parameters.AddWithValue("confirmed", (int)QuoteStatus.Confermato);
+                command.Parameters.AddWithValue("pending", "Da ordinare");
+            },
             "stato",
             $"Stato aggiornato: {status}",
             cancellationToken);
