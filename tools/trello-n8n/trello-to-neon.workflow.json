@@ -1,0 +1,593 @@
+{
+  "name": "EdilPaint — Trello nel database (solo sincronizzazione)",
+  "nodes": [
+    {
+      "id": "avvio-manuale",
+      "name": "Avvio manuale",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ogni-15-minuti",
+      "name": "Ogni 15 minuti",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "configurazione",
+      "name": "Configurazione",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Aggiungere qui soltanto gli ID delle bacheche da leggere. Nessuna associazione.\nconst boardIds = ['68eb83dcac50df446b956713']; // Sopralluoghi\nconst forceCommentsRefresh = false; // true solo per una rilettura straordinaria\nif (!boardIds.length || boardIds.some(id => !/^[a-f0-9]{24}$/.test(id))) throw new Error('Configurare ID completi delle bacheche Trello.');\nreturn [{ json: { boardIds: [...new Set(boardIds)], syncStartedAtUtc: new Date().toISOString(), forceCommentsRefresh } }];"
+      }
+    },
+    {
+      "id": "leggi-copia-esistente",
+      "name": "Leggi copia esistente",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(json_build_object('Id', \"Id\", 'PayloadJson', \"PayloadJson\")), '[]'::json) AS existing FROM public.\"TrelloCards\" WHERE \"BoardId\" IN (SELECT jsonb_array_elements_text($1::jsonb));",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($(\"Configurazione\").first().json.boardIds)] }}"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "bacheche-da-leggere",
+      "name": "Bacheche da leggere",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $('Configurazione').first().json.boardIds.map(boardId => ({ json: { boardId } }));"
+      }
+    },
+    {
+      "id": "leggi-bacheche",
+      "name": "Leggi bacheche",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.trello.com/1/boards/' + $json.boardId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "trelloApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "all"
+            },
+            {
+              "name": "lists",
+              "value": "all"
+            },
+            {
+              "name": "list_fields",
+              "value": "all"
+            },
+            {
+              "name": "customFields",
+              "value": "true"
+            },
+            {
+              "name": "members",
+              "value": "all"
+            },
+            {
+              "name": "member_fields",
+              "value": "all"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "fullResponse": false,
+              "neverError": false
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "leggi-tutte-le-schede",
+      "name": "Leggi tutte le schede",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.trello.com/1/boards/' + $json.id + '/cards/all' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "trelloApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "all"
+            },
+            {
+              "name": "limit",
+              "value": "1000"
+            },
+            {
+              "name": "sort",
+              "value": "-id"
+            },
+            {
+              "name": "attachments",
+              "value": "true"
+            },
+            {
+              "name": "attachment_fields",
+              "value": "all"
+            },
+            {
+              "name": "customFieldItems",
+              "value": "true"
+            },
+            {
+              "name": "checklists",
+              "value": "all"
+            },
+            {
+              "name": "checklist_fields",
+              "value": "all"
+            },
+            {
+              "name": "checkItemStates",
+              "value": "true"
+            },
+            {
+              "name": "members",
+              "value": "true"
+            },
+            {
+              "name": "member_fields",
+              "value": "all"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "fullResponse": true,
+              "neverError": false
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "before",
+                    "value": "={{ $pageCount === 0 ? $('Configurazione').first().json.syncStartedAtUtc : $response.body[$response.body.length - 1].id }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ Array.isArray($response.body) && $response.body.length < 1000 }}",
+              "limitPagesFetched": true,
+              "maxRequests": 200,
+              "requestInterval": 500
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "prepara-schede",
+      "name": "Prepara schede",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const PAGE_SIZE = 1000;\nconst MAX_PAGES = 200;\nconst COMMENTS_REFRESH_MS = 86400000;\nfunction canonical(value) {\n  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';\n  if (value !== null && typeof value === 'object') {\n    return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';\n  }\n  return JSON.stringify(value);\n}\nfunction asArray(value, description) {\n  if (!Array.isArray(value)) throw new Error(description + ': risposta non valida; sincronizzazione interrotta senza cancellazioni.');\n  return value;\n}\nfunction iso(value) {\n  if (value === null || value === undefined || value === '') return null;\n  const parsed = new Date(value);\n  if (Number.isNaN(parsed.valueOf())) throw new Error('Data Trello non valida: ' + value);\n  return parsed.toISOString();\n}\nfunction withoutSync(payload) {\n  const source = { ...payload };\n  delete source.actions;\n  delete source._sync;\n  return source;\n}\nfunction validatePages(pages, description) {\n  const seen = new Set();\n  const output = [];\n  for (const page of pages) {\n    asArray(page, description);\n    for (const item of page) {\n      if (!item || typeof item.id !== 'string' || !item.id) throw new Error(description + ': ID mancante.');\n      if (seen.has(item.id)) throw new Error(description + ': pagina ripetuta o dati cambiati durante la lettura. Ripetere la sincronizzazione.');\n      seen.add(item.id);\n      output.push(item);\n    }\n  }\n  if (pages.length >= MAX_PAGES && pages.at(-1)?.length === PAGE_SIZE) {\n    throw new Error(description + ': raggiunto limite di paginazione. Aumentare MAX_PAGES prima di proseguire.');\n  }\n  return output;\n}\nfunction prepareCard(card, board, existing, config) {\n  if (!card.id || card.idBoard !== board.id) throw new Error('Scheda senza ID o appartenente a una bacheca differente.');\n  if (typeof card.name !== 'string' || typeof card.closed !== 'boolean') throw new Error('Titolo o stato della scheda mancanti.');\n  const list = asArray(board.lists, 'Liste bacheca').find(item => item.id === card.idList);\n  if (!list) throw new Error('Lista della scheda non presente nei metadati; ripetere la sincronizzazione.');\n  for (const checklist of asArray(card.checklists, 'Checklist scheda')) asArray(checklist.checkItems, 'Voci checklist');\n  asArray(card.customFieldItems, 'Campi personalizzati scheda');\n  asArray(card.attachments, 'Allegati scheda');\n  const definitions = asArray(board.customFields, 'Definizioni campi personalizzati');\n  const boardMembers = asArray(board.members, 'Membri bacheca');\n  const payload = {\n    ...card,\n    board: { id: board.id, name: board.name, url: board.url, closed: board.closed },\n    list: { id: list.id, name: list.name, closed: list.closed },\n    customFields: definitions,\n    members: Array.isArray(card.members) ? card.members : boardMembers.filter(member => (card.idMembers || []).includes(member.id)),\n  };\n  let previous = null;\n  try { previous = existing ? JSON.parse(existing.PayloadJson) : null; } catch { /* Repair malformed mirror with a complete read. */ }\n  const unchanged = previous && canonical(withoutSync(previous)) === canonical(withoutSync(payload));\n  const checkedAt = previous?._sync?.commentsFetchedAtUtc;\n  const checkedTime = checkedAt ? new Date(checkedAt).valueOf() : NaN;\n  const elapsed = new Date(config.syncStartedAtUtc).valueOf() - checkedTime;\n  const zeroComments = card.badges && card.badges.comments === 0;\n  const needsComments = !zeroComments && (config.forceCommentsRefresh || !unchanged || !Array.isArray(previous?.actions) || !Number.isFinite(checkedTime) || elapsed >= COMMENTS_REFRESH_MS);\n  return {\n    sourcePayload: withoutSync(payload),\n    cachedActions: zeroComments ? [] : (Array.isArray(previous?.actions) ? previous.actions : []),\n    commentsFetchedAtUtc: zeroComments ? config.syncStartedAtUtc : checkedAt,\n    needsComments: Boolean(needsComments),\n    syncStartedAtUtc: config.syncStartedAtUtc,\n  };\n}\nfunction finishCard(prepared, comments) {\n  const source = prepared.sourcePayload;\n  const actions = comments === undefined ? prepared.cachedActions : comments;\n  asArray(actions, 'Commenti scheda');\n  const payload = {\n    ...source,\n    actions,\n    _sync: {\n      version: 1,\n      commentsFetchedAtUtc: comments === undefined ? prepared.commentsFetchedAtUtc : prepared.syncStartedAtUtc,\n      binariesDownloaded: false,\n    },\n  };\n  const url = source.url || source.shortUrl || '';\n  if (!/^https:\\/\\/trello\\.com\\/c\\/[A-Za-z0-9]+(?:\\/|$)/.test(url)) throw new Error('URL scheda Trello non valido.');\n  return {\n    Id: source.id,\n    BoardId: source.idBoard,\n    BoardName: source.board.name || '',\n    ListId: source.idList,\n    ListName: source.list.name || '',\n    Name: source.name || '',\n    Description: source.desc || '',\n    Url: url,\n    IsArchived: Boolean(source.closed),\n    IsDeleted: false,\n    DueUtc: iso(source.due),\n    LastActivityUtc: iso(source.dateLastActivity),\n    SyncedAtUtc: iso(prepared.syncStartedAtUtc),\n    PayloadJson: JSON.stringify(payload),\n  };\n}\n\nconst config = $('Configurazione').first().json;\nconst existingRows = asArray($('Leggi copia esistente').first().json.existing, 'Copia database');\nconst existing = new Map(existingRows.map(row => [row.Id, row]));\nconst groups = new Map();\nfor (const [index, item] of $input.all().entries()) {\n  const board = $('Leggi bacheche').itemMatching(index).json;\n  if (!groups.has(board.id)) groups.set(board.id, { board, pages: [] });\n  groups.get(board.id).pages.push(asArray(item.json.body, 'Schede bacheca'));\n}\nconst result = [];\nfor (const { board, pages } of groups.values()) {\n  for (const card of validatePages(pages, 'Schede bacheca ' + board.id)) {\n    result.push({ json: prepareCard(card, board, existing.get(card.id), config) });\n  }\n}\nreturn result;"
+      }
+    },
+    {
+      "id": "rileggere-commenti",
+      "name": "Rileggere commenti",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "read-comments",
+              "leftValue": "={{ $json.needsComments }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "leggi-commenti-completi",
+      "name": "Leggi commenti completi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        -40
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.trello.com/1/cards/' + $json.sourcePayload.id + '/actions' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "trelloApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filter",
+              "value": "commentCard,copyCommentCard"
+            },
+            {
+              "name": "limit",
+              "value": "1000"
+            },
+            {
+              "name": "fields",
+              "value": "all"
+            },
+            {
+              "name": "memberCreator",
+              "value": "true"
+            },
+            {
+              "name": "memberCreator_fields",
+              "value": "all"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "fullResponse": true,
+              "neverError": false
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "before",
+                    "value": "={{ $pageCount === 0 ? $('Configurazione').first().json.syncStartedAtUtc : $response.body[$response.body.length - 1].id }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ Array.isArray($response.body) && $response.body.length < 1000 }}",
+              "limitPagesFetched": true,
+              "maxRequests": 200,
+              "requestInterval": 500
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "schede-con-commenti-aggiornati",
+      "name": "Schede con commenti aggiornati",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        -40
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const PAGE_SIZE = 1000;\nconst MAX_PAGES = 200;\nconst COMMENTS_REFRESH_MS = 86400000;\nfunction canonical(value) {\n  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';\n  if (value !== null && typeof value === 'object') {\n    return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';\n  }\n  return JSON.stringify(value);\n}\nfunction asArray(value, description) {\n  if (!Array.isArray(value)) throw new Error(description + ': risposta non valida; sincronizzazione interrotta senza cancellazioni.');\n  return value;\n}\nfunction iso(value) {\n  if (value === null || value === undefined || value === '') return null;\n  const parsed = new Date(value);\n  if (Number.isNaN(parsed.valueOf())) throw new Error('Data Trello non valida: ' + value);\n  return parsed.toISOString();\n}\nfunction withoutSync(payload) {\n  const source = { ...payload };\n  delete source.actions;\n  delete source._sync;\n  return source;\n}\nfunction validatePages(pages, description) {\n  const seen = new Set();\n  const output = [];\n  for (const page of pages) {\n    asArray(page, description);\n    for (const item of page) {\n      if (!item || typeof item.id !== 'string' || !item.id) throw new Error(description + ': ID mancante.');\n      if (seen.has(item.id)) throw new Error(description + ': pagina ripetuta o dati cambiati durante la lettura. Ripetere la sincronizzazione.');\n      seen.add(item.id);\n      output.push(item);\n    }\n  }\n  if (pages.length >= MAX_PAGES && pages.at(-1)?.length === PAGE_SIZE) {\n    throw new Error(description + ': raggiunto limite di paginazione. Aumentare MAX_PAGES prima di proseguire.');\n  }\n  return output;\n}\nfunction prepareCard(card, board, existing, config) {\n  if (!card.id || card.idBoard !== board.id) throw new Error('Scheda senza ID o appartenente a una bacheca differente.');\n  if (typeof card.name !== 'string' || typeof card.closed !== 'boolean') throw new Error('Titolo o stato della scheda mancanti.');\n  const list = asArray(board.lists, 'Liste bacheca').find(item => item.id === card.idList);\n  if (!list) throw new Error('Lista della scheda non presente nei metadati; ripetere la sincronizzazione.');\n  for (const checklist of asArray(card.checklists, 'Checklist scheda')) asArray(checklist.checkItems, 'Voci checklist');\n  asArray(card.customFieldItems, 'Campi personalizzati scheda');\n  asArray(card.attachments, 'Allegati scheda');\n  const definitions = asArray(board.customFields, 'Definizioni campi personalizzati');\n  const boardMembers = asArray(board.members, 'Membri bacheca');\n  const payload = {\n    ...card,\n    board: { id: board.id, name: board.name, url: board.url, closed: board.closed },\n    list: { id: list.id, name: list.name, closed: list.closed },\n    customFields: definitions,\n    members: Array.isArray(card.members) ? card.members : boardMembers.filter(member => (card.idMembers || []).includes(member.id)),\n  };\n  let previous = null;\n  try { previous = existing ? JSON.parse(existing.PayloadJson) : null; } catch { /* Repair malformed mirror with a complete read. */ }\n  const unchanged = previous && canonical(withoutSync(previous)) === canonical(withoutSync(payload));\n  const checkedAt = previous?._sync?.commentsFetchedAtUtc;\n  const checkedTime = checkedAt ? new Date(checkedAt).valueOf() : NaN;\n  const elapsed = new Date(config.syncStartedAtUtc).valueOf() - checkedTime;\n  const zeroComments = card.badges && card.badges.comments === 0;\n  const needsComments = !zeroComments && (config.forceCommentsRefresh || !unchanged || !Array.isArray(previous?.actions) || !Number.isFinite(checkedTime) || elapsed >= COMMENTS_REFRESH_MS);\n  return {\n    sourcePayload: withoutSync(payload),\n    cachedActions: zeroComments ? [] : (Array.isArray(previous?.actions) ? previous.actions : []),\n    commentsFetchedAtUtc: zeroComments ? config.syncStartedAtUtc : checkedAt,\n    needsComments: Boolean(needsComments),\n    syncStartedAtUtc: config.syncStartedAtUtc,\n  };\n}\nfunction finishCard(prepared, comments) {\n  const source = prepared.sourcePayload;\n  const actions = comments === undefined ? prepared.cachedActions : comments;\n  asArray(actions, 'Commenti scheda');\n  const payload = {\n    ...source,\n    actions,\n    _sync: {\n      version: 1,\n      commentsFetchedAtUtc: comments === undefined ? prepared.commentsFetchedAtUtc : prepared.syncStartedAtUtc,\n      binariesDownloaded: false,\n    },\n  };\n  const url = source.url || source.shortUrl || '';\n  if (!/^https:\\/\\/trello\\.com\\/c\\/[A-Za-z0-9]+(?:\\/|$)/.test(url)) throw new Error('URL scheda Trello non valido.');\n  return {\n    Id: source.id,\n    BoardId: source.idBoard,\n    BoardName: source.board.name || '',\n    ListId: source.idList,\n    ListName: source.list.name || '',\n    Name: source.name || '',\n    Description: source.desc || '',\n    Url: url,\n    IsArchived: Boolean(source.closed),\n    IsDeleted: false,\n    DueUtc: iso(source.due),\n    LastActivityUtc: iso(source.dateLastActivity),\n    SyncedAtUtc: iso(prepared.syncStartedAtUtc),\n    PayloadJson: JSON.stringify(payload),\n  };\n}\n\nconst groups = new Map();\nfor (const [index, item] of $input.all().entries()) {\n  const prepared = $('Rileggere commenti').itemMatching(index).json;\n  const id = prepared.sourcePayload.id;\n  if (!groups.has(id)) groups.set(id, { prepared, pages: [] });\n  groups.get(id).pages.push(asArray(item.json.body, 'Commenti scheda'));\n}\nreturn [...groups.values()].map(({ prepared, pages }) => ({ json: finishCard(prepared, validatePages(pages, 'Commenti scheda ' + prepared.sourcePayload.id)) }));"
+      }
+    },
+    {
+      "id": "schede-con-commenti-conservati",
+      "name": "Schede con commenti conservati",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        240
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const PAGE_SIZE = 1000;\nconst MAX_PAGES = 200;\nconst COMMENTS_REFRESH_MS = 86400000;\nfunction canonical(value) {\n  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';\n  if (value !== null && typeof value === 'object') {\n    return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';\n  }\n  return JSON.stringify(value);\n}\nfunction asArray(value, description) {\n  if (!Array.isArray(value)) throw new Error(description + ': risposta non valida; sincronizzazione interrotta senza cancellazioni.');\n  return value;\n}\nfunction iso(value) {\n  if (value === null || value === undefined || value === '') return null;\n  const parsed = new Date(value);\n  if (Number.isNaN(parsed.valueOf())) throw new Error('Data Trello non valida: ' + value);\n  return parsed.toISOString();\n}\nfunction withoutSync(payload) {\n  const source = { ...payload };\n  delete source.actions;\n  delete source._sync;\n  return source;\n}\nfunction validatePages(pages, description) {\n  const seen = new Set();\n  const output = [];\n  for (const page of pages) {\n    asArray(page, description);\n    for (const item of page) {\n      if (!item || typeof item.id !== 'string' || !item.id) throw new Error(description + ': ID mancante.');\n      if (seen.has(item.id)) throw new Error(description + ': pagina ripetuta o dati cambiati durante la lettura. Ripetere la sincronizzazione.');\n      seen.add(item.id);\n      output.push(item);\n    }\n  }\n  if (pages.length >= MAX_PAGES && pages.at(-1)?.length === PAGE_SIZE) {\n    throw new Error(description + ': raggiunto limite di paginazione. Aumentare MAX_PAGES prima di proseguire.');\n  }\n  return output;\n}\nfunction prepareCard(card, board, existing, config) {\n  if (!card.id || card.idBoard !== board.id) throw new Error('Scheda senza ID o appartenente a una bacheca differente.');\n  if (typeof card.name !== 'string' || typeof card.closed !== 'boolean') throw new Error('Titolo o stato della scheda mancanti.');\n  const list = asArray(board.lists, 'Liste bacheca').find(item => item.id === card.idList);\n  if (!list) throw new Error('Lista della scheda non presente nei metadati; ripetere la sincronizzazione.');\n  for (const checklist of asArray(card.checklists, 'Checklist scheda')) asArray(checklist.checkItems, 'Voci checklist');\n  asArray(card.customFieldItems, 'Campi personalizzati scheda');\n  asArray(card.attachments, 'Allegati scheda');\n  const definitions = asArray(board.customFields, 'Definizioni campi personalizzati');\n  const boardMembers = asArray(board.members, 'Membri bacheca');\n  const payload = {\n    ...card,\n    board: { id: board.id, name: board.name, url: board.url, closed: board.closed },\n    list: { id: list.id, name: list.name, closed: list.closed },\n    customFields: definitions,\n    members: Array.isArray(card.members) ? card.members : boardMembers.filter(member => (card.idMembers || []).includes(member.id)),\n  };\n  let previous = null;\n  try { previous = existing ? JSON.parse(existing.PayloadJson) : null; } catch { /* Repair malformed mirror with a complete read. */ }\n  const unchanged = previous && canonical(withoutSync(previous)) === canonical(withoutSync(payload));\n  const checkedAt = previous?._sync?.commentsFetchedAtUtc;\n  const checkedTime = checkedAt ? new Date(checkedAt).valueOf() : NaN;\n  const elapsed = new Date(config.syncStartedAtUtc).valueOf() - checkedTime;\n  const zeroComments = card.badges && card.badges.comments === 0;\n  const needsComments = !zeroComments && (config.forceCommentsRefresh || !unchanged || !Array.isArray(previous?.actions) || !Number.isFinite(checkedTime) || elapsed >= COMMENTS_REFRESH_MS);\n  return {\n    sourcePayload: withoutSync(payload),\n    cachedActions: zeroComments ? [] : (Array.isArray(previous?.actions) ? previous.actions : []),\n    commentsFetchedAtUtc: zeroComments ? config.syncStartedAtUtc : checkedAt,\n    needsComments: Boolean(needsComments),\n    syncStartedAtUtc: config.syncStartedAtUtc,\n  };\n}\nfunction finishCard(prepared, comments) {\n  const source = prepared.sourcePayload;\n  const actions = comments === undefined ? prepared.cachedActions : comments;\n  asArray(actions, 'Commenti scheda');\n  const payload = {\n    ...source,\n    actions,\n    _sync: {\n      version: 1,\n      commentsFetchedAtUtc: comments === undefined ? prepared.commentsFetchedAtUtc : prepared.syncStartedAtUtc,\n      binariesDownloaded: false,\n    },\n  };\n  const url = source.url || source.shortUrl || '';\n  if (!/^https:\\/\\/trello\\.com\\/c\\/[A-Za-z0-9]+(?:\\/|$)/.test(url)) throw new Error('URL scheda Trello non valido.');\n  return {\n    Id: source.id,\n    BoardId: source.idBoard,\n    BoardName: source.board.name || '',\n    ListId: source.idList,\n    ListName: source.list.name || '',\n    Name: source.name || '',\n    Description: source.desc || '',\n    Url: url,\n    IsArchived: Boolean(source.closed),\n    IsDeleted: false,\n    DueUtc: iso(source.due),\n    LastActivityUtc: iso(source.dateLastActivity),\n    SyncedAtUtc: iso(prepared.syncStartedAtUtc),\n    PayloadJson: JSON.stringify(payload),\n  };\n}\nreturn $input.all().map(item => ({ json: finishCard(item.json) }));"
+      }
+    },
+    {
+      "id": "aggiorna-solo-archivio-trello",
+      "name": "Aggiorna solo archivio Trello",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2400,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Bind a single JSON document as $1. Card text is never interpolated into SQL.\nWITH incoming AS (SELECT $1::jsonb AS data)\nINSERT INTO public.\"TrelloCards\" AS saved (\n    \"Id\", \"BoardId\", \"BoardName\", \"ListId\", \"ListName\", \"Name\", \"Description\", \"Url\",\n    \"IsArchived\", \"IsDeleted\", \"DueUtc\", \"LastActivityUtc\", \"SyncedAtUtc\", \"PayloadJson\"\n)\nSELECT\n    data->>'Id', data->>'BoardId', data->>'BoardName', data->>'ListId', data->>'ListName',\n    data->>'Name', data->>'Description', data->>'Url',\n    (data->>'IsArchived')::boolean, false,\n    (data->>'DueUtc')::timestamptz, (data->>'LastActivityUtc')::timestamptz,\n    (data->>'SyncedAtUtc')::timestamptz, data->>'PayloadJson'\nFROM incoming\nON CONFLICT (\"Id\") DO UPDATE SET\n    \"BoardId\" = EXCLUDED.\"BoardId\", \"BoardName\" = EXCLUDED.\"BoardName\",\n    \"ListId\" = EXCLUDED.\"ListId\", \"ListName\" = EXCLUDED.\"ListName\",\n    \"Name\" = EXCLUDED.\"Name\", \"Description\" = EXCLUDED.\"Description\", \"Url\" = EXCLUDED.\"Url\",\n    \"IsArchived\" = EXCLUDED.\"IsArchived\", \"IsDeleted\" = EXCLUDED.\"IsDeleted\",\n    \"DueUtc\" = EXCLUDED.\"DueUtc\", \"LastActivityUtc\" = EXCLUDED.\"LastActivityUtc\",\n    \"SyncedAtUtc\" = EXCLUDED.\"SyncedAtUtc\", \"PayloadJson\" = EXCLUDED.\"PayloadJson\"\nWHERE saved.\"SyncedAtUtc\" <= EXCLUDED.\"SyncedAtUtc\"\n  AND COALESCE(saved.\"LastActivityUtc\", '-infinity'::timestamptz)\n      <= COALESCE(EXCLUDED.\"LastActivityUtc\", '-infinity'::timestamptz)\nRETURNING \"Id\", \"SyncedAtUtc\";\n",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json)] }}",
+          "queryBatching": "transaction"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "istruzioni",
+      "name": "Istruzioni",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -500
+      ],
+      "parameters": {
+        "content": "## EdilPaint — Trello → NeonDB\n**Nessuna associazione automatica.**\n\n1. Creare TrelloCards con schema.sql oppure avviare il programma aggiornato.\n2. Selezionare la credenziale Trello nei 3 nodi HTTP.\n3. Selezionare la credenziale PostgreSQL nei 2 nodi database.\n4. Controllare gli ID nel nodo Configurazione.\n5. Eseguire manualmente, confrontare conteggi e solo poi pubblicare/attivare.\n\nLegge anche schede archiviate. Non scarica file. Non scrive su Trello, clienti o preventivi.\nCommenti nuovi/modificati riletti subito; controllo completo ogni24h. Errori interrompono il ramo senza cancellazioni.\nDocumentazione: docs/trello-preventivi.md",
+        "height": 430,
+        "width": 680
+      }
+    }
+  ],
+  "connections": {
+    "Avvio manuale": {
+      "main": [
+        [
+          {
+            "node": "Configurazione",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ogni 15 minuti": {
+      "main": [
+        [
+          {
+            "node": "Configurazione",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configurazione": {
+      "main": [
+        [
+          {
+            "node": "Leggi copia esistente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi copia esistente": {
+      "main": [
+        [
+          {
+            "node": "Bacheche da leggere",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bacheche da leggere": {
+      "main": [
+        [
+          {
+            "node": "Leggi bacheche",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi bacheche": {
+      "main": [
+        [
+          {
+            "node": "Leggi tutte le schede",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi tutte le schede": {
+      "main": [
+        [
+          {
+            "node": "Prepara schede",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara schede": {
+      "main": [
+        [
+          {
+            "node": "Rileggere commenti",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rileggere commenti": {
+      "main": [
+        [
+          {
+            "node": "Leggi commenti completi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Schede con commenti conservati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi commenti completi": {
+      "main": [
+        [
+          {
+            "node": "Schede con commenti aggiornati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schede con commenti aggiornati": {
+      "main": [
+        [
+          {
+            "node": "Aggiorna solo archivio Trello",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schede con commenti conservati": {
+      "main": [
+        [
+          {
+            "node": "Aggiorna solo archivio Trello",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome",
+    "executionTimeout": 1800,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "tags": []
+}

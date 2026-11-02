@@ -110,7 +110,7 @@ public static class WorkScheduleActions
             var catalog = await App.DataService.GetLaborCatalogAsync().WaitAsync(token);
             var customers = await App.DataService.GetCustomersAsync(token);
             var company = await App.DataService.GetCompanyAsync().WaitAsync(token) ?? new Company();
-            var context = WorkSheetService.CreateContext(quote, catalog, customers, CreateWorkSheetOptions(entry));
+            var context = await TrelloWorkSheetService.CreateContextAsync(App.DataService, quote, catalog, customers, CreateWorkSheetOptions(entry), token);
             context.IsOfflineSnapshot = !currentSchedule || App.DataService is FallbackDataService { IsOfflineMode: true };
             if (context.IsOfflineSnapshot && MessageBox.Show(owner,
                     "La programmazione non è aggiornata dal database. La scheda userà i dati disponibili su questo PC. Continuare?",

@@ -101,6 +101,8 @@ public partial class PdfService
                 WorkSheetNotes(column, "NOTE", context.CustomerNotes);
                 WorkSheetNotes(column, "NOTE INTERNE", context.Notes);
 
+                if (context.Trello is { } trello) WorkSheetTrello(column, trello);
+
                 if (context.Materials.Count > 0)
                 {
                     column.Item().EnsureSpace(105).Column(materialInfo =>
@@ -158,6 +160,43 @@ public partial class PdfService
     {
         column.Item().PaddingTop(5).Text(label).FontSize(8).FontColor(WorkSheetPalette.GreyDarken1);
         column.Item().Text(value).FontSize(11).SemiBold();
+    }
+
+    private static void WorkSheetTrello(ColumnDescriptor column, TrelloWorkSheetDetails trello)
+    {
+        column.Item().Column(content =>
+        {
+            content.Spacing(4);
+            content.Item().EnsureSpace(65).Column(header =>
+            {
+                Section(header, "SOPRALLUOGO / SCHEDA TRELLO");
+                header.Item().PaddingTop(6).Text(trello.Name).FontSize(12).Bold();
+                string source = string.Join(" / ", new[] { trello.BoardName, trello.ListName }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                if (source.Length > 0) header.Item().Text(source).FontSize(9).FontColor(WorkSheetPalette.GreyDarken1);
+            });
+            if (trello.Url.Length > 0)
+                content.Item().Hyperlink(trello.Url).Text(trello.Url).FontSize(9).FontColor(WorkSheetPalette.BlueDarken1);
+            content.Item().Text($"ID scheda: {trello.CardId}").FontSize(8).FontColor(WorkSheetPalette.GreyDarken1);
+            if (trello.DueUtc is { } due)
+                content.Item().Text($"Appuntamento / scadenza Trello: {due.ToLocalTime():dd/MM/yyyy HH:mm}").SemiBold();
+            if (trello.SyncedAtUtc is { } synced)
+                content.Item().Text($"Dati sincronizzati il {synced.ToLocalTime():dd/MM/yyyy HH:mm}").FontSize(8).FontColor(WorkSheetPalette.GreyDarken1);
+            if (trello.Warning.Length > 0)
+                content.Item().Text(trello.Warning).FontSize(9).Bold().FontColor(WorkSheetPalette.OrangeMedium);
+            foreach (var field in trello.Fields)
+                content.Item().Text(text => { text.Span(field.Name + ": ").SemiBold(); text.Span(field.Value); });
+            WorkSheetNotes(content, "DESCRIZIONE DEL SOPRALLUOGO", trello.Description);
+            foreach (var checklist in trello.Checklists)
+            {
+                content.Item().EnsureSpace(40).Text(checklist.Name).SemiBold();
+                foreach (var check in checklist.Items)
+                    content.Item().Row(row =>
+                {
+                    row.ConstantItem(22).Text(check.IsComplete ? "[x]" : "[ ]").FontSize(10);
+                    row.RelativeItem().Text(check.Name).FontSize(10);
+                });
+            }
+        });
     }
 
     private static void WorkSheetNotes(ColumnDescriptor column, string title, string content)

@@ -90,6 +90,12 @@ internal static class QuoteSyncHashService
                 commonSuffix)
             : string.Join("|", commonPrefix, commonSuffix);
 
+        // Preserve hashes of existing unlinked quotes. A manually selected card is
+        // part of quote content; later Trello synchronization only changes its mirror.
+        if (includeCustomerIdentity &&
+            (!string.IsNullOrEmpty(entry.TrelloCardId) || !string.IsNullOrEmpty(entry.TrelloCardSnapshotJson)))
+            data += "|trello-manual-v1:" + JsonSerializer.Serialize(new[] { entry.TrelloCardId, entry.TrelloCardSnapshotJson });
+
         var bytes = Encoding.UTF8.GetBytes(data);
         var hash = SHA256.HashData(bytes);
         return Convert.ToBase64String(hash);

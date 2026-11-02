@@ -72,6 +72,8 @@ public partial class MainViewModel
         var entry = new QuoteHistoryEntry
         {
             QuoteNumber = QuoteNumber,
+            TrelloCardId = TrelloCardId,
+            TrelloCardSnapshotJson = TrelloCardSnapshotJson,
             Date = quoteDate ?? DateTime.Now,
             CustomerName = SelectedCustomer?.BusinessName ?? _unresolvedCustomerName,
             CustomerSyncId = SelectedCustomer?.SyncId ?? Guid.Empty,
@@ -158,6 +160,8 @@ public partial class MainViewModel
                     entry.BaseRevision = existingEntry.BaseRevision;
 
                 existingEntry.CustomerName = entry.CustomerName;
+                existingEntry.TrelloCardId = entry.TrelloCardId;
+                existingEntry.TrelloCardSnapshotJson = entry.TrelloCardSnapshotJson;
                 existingEntry.CustomerSyncId = entry.CustomerSyncId;
                 existingEntry.ReferenceName = entry.ReferenceName;
                 existingEntry.ReferenceCustomerSyncId = entry.ReferenceCustomerSyncId;
@@ -431,6 +435,8 @@ public partial class MainViewModel
         return new QuoteHistoryEntry
         {
             QuoteNumber = entry.QuoteNumber,
+            TrelloCardId = entry.TrelloCardId,
+            TrelloCardSnapshotJson = entry.TrelloCardSnapshotJson,
             Date = entry.Date,
             CustomerName = entry.CustomerName,
             CustomerSyncId = entry.CustomerSyncId,

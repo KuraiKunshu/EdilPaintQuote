@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<QuoteMaterialEntity> QuoteMaterials => Set<QuoteMaterialEntity>();
     public DbSet<QuoteLaborEntity> QuoteLabors => Set<QuoteLaborEntity>();
     public DbSet<QuoteAttachmentEntity> QuoteAttachments => Set<QuoteAttachmentEntity>();
+    public DbSet<TrelloCard> TrelloCards => Set<TrelloCard>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
@@ -28,6 +29,22 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<TrelloCard>(entity =>
+        {
+            entity.ToTable("TrelloCards");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64).ValueGeneratedNever();
+            entity.Property(x => x.BoardId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ListId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => x.BoardId);
+            entity.Property(x => x.BoardName).IsRequired();
+            entity.Property(x => x.ListName).IsRequired();
+            entity.Property(x => x.Name).IsRequired();
+            entity.Property(x => x.Description).IsRequired();
+            entity.Property(x => x.Url).IsRequired();
+            entity.Property(x => x.PayloadJson).IsRequired();
+        });
 
         modelBuilder.Entity<AutomaticMaterialSettingsEntity>(entity =>
         {
@@ -150,6 +167,8 @@ public class AppDbContext : DbContext
             entity.Property(x => x.QuoteNumber).HasMaxLength(50).IsRequired();
             entity.Property(x => x.Revision).IsConcurrencyToken();
             entity.Property(x => x.SiteName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.TrelloCardId).HasMaxLength(64).HasDefaultValue("").IsRequired();
+            entity.Property(x => x.TrelloCardSnapshotJson).HasDefaultValue("").IsRequired();
             entity.Property(x => x.BillingCustomerName).HasMaxLength(250).IsRequired();
             entity.Property(x => x.PdfPath).HasMaxLength(1000);
             entity.Property(x => x.IvaType).HasMaxLength(50).IsRequired();

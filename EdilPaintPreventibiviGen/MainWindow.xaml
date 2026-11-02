@@ -580,6 +580,27 @@
 
         <!-- ═══════════════════════════ PANNELLO COLLABORAZIONE ═══════════════════════════ -->
         <Border DockPanel.Dock="Top"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="12,9" Margin="0,6,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TrelloCardTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding TrelloCardAssociationDetails}" FontSize="11"
+                               Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Scegli scheda Trello" Padding="12,7" Click="OnSelectTrelloCardClick"/>
+                    <Button Content="Apri Trello" Padding="12,7" Margin="8,0,0,0" Click="OnOpenTrelloCardClick"
+                            IsEnabled="{Binding HasTrelloCardAssociation}"/>
+                    <Button Content="Rimuovi associazione" Padding="12,7" Margin="8,0,0,0" Click="OnRemoveTrelloCardClick"
+                            IsEnabled="{Binding HasTrelloCardAssociation}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border DockPanel.Dock="Top"
                 Visibility="{Binding IsJointVenture, Converter={StaticResource BoolToVis}}"
                 Background="{StaticResource WarningPanelBackgroundBrush}"
                 BorderBrush="{StaticResource WarningPanelBorderBrush}"

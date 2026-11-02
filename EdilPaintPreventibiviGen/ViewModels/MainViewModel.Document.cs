@@ -23,6 +23,7 @@ public partial class MainViewModel
     #region Document Logic
     public void ResetQuote()
     {
+        ClearTrelloCardAssociation();
         Materials.Clear();
         Labors.Clear();
         AttachedImages.Clear();
@@ -473,7 +474,10 @@ public partial class MainViewModel
         _isDraftQuoteNumberAllocated = isEdit;
         _sharedDraftCreatedByAutosave = false;
         if (isEdit)
+        {
             QuoteNumber = entry.QuoteNumber;
+            RestoreTrelloCardAssociation(entry.TrelloCardId, entry.TrelloCardSnapshotJson);
+        }
 
         // Collaborazione
         _isJointVenture = entry.IsJointVenture;

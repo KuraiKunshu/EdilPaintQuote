@@ -1160,6 +1160,15 @@ public partial class HistoryView : UserControl, IDisposable
         menu.Items.Add(CreateMenuItem("Invia / registra invio", async () => await SendQuoteAsync(entry)));
         if (App.AppSettings.Business.EnableInstallationCertificate) menu.Items.Add(CreateMenuItem("Genera certificato corretta posa", async () => await GenerateInstallationCertificateAsync(entry)));
         menu.Items.Add(CreateMenuItem("Genera scheda lavoro", async () => await GenerateWorkSheetAsync(entry)));
+        menu.Items.Add(CreateMenuItem("Associa / cambia scheda Trello", async () =>
+        {
+            try { await TrelloAssociationActions.ManageAsync(entry.QuoteNumber, HostWindow, AppShutdownManager.ShutdownToken); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                MessageBox.Show(HostWindow, ex.Message, "Associazione Trello", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }));
         menu.Items.Add(CreateMenuItem("Costi e guadagno", async () => await OpenRealProfitCalculatorAsync(entry)));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Elimina preventivo", async () => await DeletePastQuoteAsync(entry)));

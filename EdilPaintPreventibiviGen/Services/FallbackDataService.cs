@@ -14,7 +14,7 @@ namespace EdilPaintPreventibiviGen.Services;
 /// <summary>
 /// DataService con fallback automatico su JSON locale se il database non è disponibile
 /// </summary>
-public class FallbackDataService : IDataService
+public partial class FallbackDataService : IDataService
 {
     private readonly SqlDataService _sqlService;
     private readonly LocalJsonStoreService _localStore;
@@ -907,6 +907,8 @@ public class FallbackDataService : IDataService
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             CustomerNotes = entry.CustomerNotes,
+            TrelloCardId = entry.TrelloCardId,
+            TrelloCardSnapshotJson = entry.TrelloCardSnapshotJson,
             IvaType = entry.IvaType,
             Notes = entry.Notes,
             Imponibile = entry.Imponibile,

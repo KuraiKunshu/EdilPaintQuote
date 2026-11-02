@@ -6,6 +6,14 @@ public interface IDataService
 {
     Task InitializeAsync(CancellationToken cancellationToken = default);
     bool CanSynchronize { get; }
+
+    // Read-only Trello mirror. Association is chosen explicitly in the quote editor.
+    Task<List<TrelloCard>> GetTrelloCardsAsync(CancellationToken cancellationToken = default);
+    Task<TrelloCard?> GetTrelloCardAsync(string cardId, CancellationToken cancellationToken = default);
+    Task UpdateQuoteTrelloAssociationAsync(string quoteNumber, string trelloCardId,
+        string trelloCardSnapshotJson, CancellationToken cancellationToken = default);
+    Task<QuoteMetadata> UpdateQuoteTrelloAssociationAsync(string quoteNumber, string trelloCardId,
+        string trelloCardSnapshotJson, long expectedRevision, CancellationToken cancellationToken = default);
     
     // Customers
     Task<List<Customer>> GetCustomersAsync(CancellationToken cancellationToken = default);

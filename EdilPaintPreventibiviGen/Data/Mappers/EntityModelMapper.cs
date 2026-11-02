@@ -171,6 +171,8 @@ public static class EntityModelMapper
             PdfPath = entity.PdfPath,
             PaymentTerms = entity.PaymentTerms,
             CustomerNotes = entity.CustomerNotes,
+            TrelloCardId = entity.TrelloCardId,
+            TrelloCardSnapshotJson = entity.TrelloCardSnapshotJson,
             IvaType = entity.IvaType,
             Notes = entity.Notes,
             Imponibile = entity.Imponibile,

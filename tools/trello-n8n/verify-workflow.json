@@ -1,0 +1,160 @@
+{
+  "name": "EdilPaint — Verifica Trello e database",
+  "active": false,
+  "nodes": [
+    {
+      "id": "verify-start",
+      "name": "Avvio manuale",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "verify-trello",
+      "name": "Leggi contatori Trello",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.trello.com/1/boards/68eb83dcac50df446b956713/cards/all",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "trelloApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "id,closed,badges"
+            },
+            {
+              "name": "limit",
+              "value": "1000"
+            },
+            {
+              "name": "sort",
+              "value": "-id"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "fullResponse": true,
+              "neverError": false
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "before",
+                    "value": "={{ $pageCount === 0 ? $now.toISO() : $response.body[$response.body.length - 1].id }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ Array.isArray($response.body) && $response.body.length < 1000 }}",
+              "limitPagesFetched": true,
+              "maxRequests": 200,
+              "requestInterval": 500
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "verify-source",
+      "name": "Riepilogo sorgente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const PAGE_SIZE = 1000;\nconst MAX_PAGES = 200;\nconst pages = $input.all().map(item => item.json.body);\nconst cards = [];\nconst seen = new Set();\nfor (const page of pages) {\n  if (!Array.isArray(page)) throw new Error('Trello non ha restituito un elenco di schede: verifica interrotta.');\n  for (const card of page) {\n    if (!card || typeof card.id !== 'string' || typeof card.closed !== 'boolean' || !card.badges) throw new Error('Scheda o contatori Trello incompleti.');\n    if (seen.has(card.id)) throw new Error('Pagina ripetuta o schede cambiate durante la lettura: ripetere la verifica.');\n    for (const key of ['checkItems','attachments','comments']) {\n      if (!Number.isInteger(card.badges[key]) || card.badges[key] < 0) throw new Error('Contatore Trello mancante o non valido: ' + key);\n    }\n    seen.add(card.id);\n    cards.push({ id: card.id, closed: card.closed, badges: { checkItems: card.badges.checkItems, attachments: card.badges.attachments, comments: card.badges.comments } });\n  }\n}\nif (pages.length >= MAX_PAGES && pages.at(-1)?.length === PAGE_SIZE) throw new Error('Limite paginazione raggiunto: aumentare il limite prima della verifica.');\nreturn [{ json: { boardId: '68eb83dcac50df446b956713', cards, sourceCardCount: cards.length,\n  sourceActiveCount: cards.filter(card => !card.closed).length,\n  sourceArchivedCount: cards.filter(card => card.closed).length,\n  sourceCheckItems: cards.reduce((sum,card) => sum + card.badges.checkItems, 0),\n  sourceAttachments: cards.reduce((sum,card) => sum + card.badges.attachments, 0),\n  sourceComments: cards.reduce((sum,card) => sum + card.badges.comments, 0) } }];"
+      }
+    },
+    {
+      "id": "verify-database",
+      "name": "Confronta senza modificare",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        780,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input AS (SELECT $1::jsonb AS data),\nsource AS (\n    SELECT card->>'id' AS id, (card->>'closed')::boolean AS archived,\n           (card->'badges'->>'checkItems')::integer AS check_items,\n           (card->'badges'->>'attachments')::integer AS attachments,\n           (card->'badges'->>'comments')::integer AS comments\n    FROM input CROSS JOIN LATERAL jsonb_array_elements(data->'cards') AS card\n), mirror AS (\n    SELECT \"Id\" AS id, \"IsArchived\" AS archived, \"IsDeleted\" AS deleted,\n           \"SyncedAtUtc\" AS synced_at, \"PayloadJson\"::jsonb AS payload\n    FROM public.\"TrelloCards\"\n    WHERE \"BoardId\" = (SELECT data->>'boardId' FROM input)\n), mirror_counts AS (\n    SELECT mirror.*,\n           (SELECT count(*) FROM jsonb_array_elements(COALESCE(payload->'checklists', '[]'::jsonb)) AS checklist\n                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(checklist->'checkItems', '[]'::jsonb))) AS check_items,\n           jsonb_array_length(COALESCE(payload->'attachments', '[]'::jsonb)) AS attachments,\n           jsonb_array_length(COALESCE(payload->'actions', '[]'::jsonb)) AS comments\n    FROM mirror\n), comparison AS (\n    SELECT source.id AS source_id, mirror_counts.id AS mirror_id,\n           source.archived AS source_archived, mirror_counts.archived AS mirror_archived,\n           mirror_counts.deleted AS mirror_deleted,\n           source.check_items AS source_check_items, mirror_counts.check_items AS mirror_check_items,\n           source.attachments AS source_attachments, mirror_counts.attachments AS mirror_attachments,\n           source.comments AS source_comments, mirror_counts.comments AS mirror_comments\n    FROM source FULL OUTER JOIN mirror_counts ON source.id = mirror_counts.id\n)\nSELECT\n    (SELECT data->>'boardId' FROM input) AS \"BoardId\",\n    (SELECT count(*) FROM source) AS \"SourceCards\",\n    (SELECT count(*) FROM source WHERE NOT archived) AS \"SourceActive\",\n    (SELECT count(*) FROM source WHERE archived) AS \"SourceArchived\",\n    (SELECT count(*) FROM mirror) AS \"DatabaseCards\",\n    (SELECT count(*) FROM mirror WHERE NOT archived AND NOT deleted) AS \"DatabaseActive\",\n    (SELECT count(*) FROM mirror WHERE archived) AS \"DatabaseArchived\",\n    (SELECT COALESCE(sum(check_items),0) FROM source) AS \"SourceCheckItems\",\n    (SELECT COALESCE(sum(check_items),0) FROM mirror_counts) AS \"DatabaseCheckItems\",\n    (SELECT COALESCE(sum(attachments),0) FROM source) AS \"SourceAttachments\",\n    (SELECT COALESCE(sum(attachments),0) FROM mirror_counts) AS \"DatabaseAttachments\",\n    (SELECT COALESCE(sum(comments),0) FROM source) AS \"SourceComments\",\n    (SELECT COALESCE(sum(comments),0) FROM mirror_counts) AS \"DatabaseComments\",\n    count(*) FILTER (WHERE source_id IS NOT NULL AND mirror_id IS NULL) AS \"MissingCards\",\n    COALESCE(jsonb_agg(source_id) FILTER (WHERE source_id IS NOT NULL AND mirror_id IS NULL),'[]'::jsonb) AS \"MissingCardIds\",\n    count(*) FILTER (WHERE source_id IS NULL AND mirror_id IS NOT NULL) AS \"ExtraCards\",\n    COALESCE(jsonb_agg(mirror_id) FILTER (WHERE source_id IS NULL AND mirror_id IS NOT NULL),'[]'::jsonb) AS \"ExtraCardIds\",\n    count(*) FILTER (WHERE source_id IS NOT NULL AND mirror_id IS NOT NULL AND (source_archived IS DISTINCT FROM mirror_archived OR mirror_deleted)) AS \"ArchiveMismatches\",\n    count(*) FILTER (WHERE source_id IS NOT NULL AND mirror_id IS NOT NULL AND source_check_items IS DISTINCT FROM mirror_check_items) AS \"ChecklistMismatches\",\n    count(*) FILTER (WHERE source_id IS NOT NULL AND mirror_id IS NOT NULL AND source_attachments IS DISTINCT FROM mirror_attachments) AS \"AttachmentMismatches\",\n    count(*) FILTER (WHERE source_id IS NOT NULL AND mirror_id IS NOT NULL AND source_comments IS DISTINCT FROM mirror_comments) AS \"CommentMismatches\",\n    COALESCE(jsonb_agg(jsonb_build_object('Id',source_id,'SourceCheckItems',source_check_items,'DatabaseCheckItems',mirror_check_items,'SourceAttachments',source_attachments,'DatabaseAttachments',mirror_attachments,'SourceComments',source_comments,'DatabaseComments',mirror_comments,'SourceArchived',source_archived,'DatabaseArchived',mirror_archived))\n        FILTER (WHERE source_id IS NOT NULL AND mirror_id IS NOT NULL AND (source_archived IS DISTINCT FROM mirror_archived OR mirror_deleted OR source_check_items IS DISTINCT FROM mirror_check_items OR source_attachments IS DISTINCT FROM mirror_attachments OR source_comments IS DISTINCT FROM mirror_comments)), '[]'::jsonb) AS \"Mismatches\",\n    (SELECT count(*) FROM public.\"Quotes\" WHERE COALESCE(btrim(\"TrelloCardId\"),'') <> '') AS \"QuotesWithManualTrelloAssociation\",\n    (SELECT min(synced_at) FROM mirror) AS \"OldestSyncUtc\",\n    (SELECT max(synced_at) FROM mirror) AS \"NewestSyncUtc\",\n    now() AS \"VerifiedAtUtc\"\nFROM comparison;",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json)] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Avvio manuale": {
+      "main": [
+        [
+          {
+            "node": "Leggi contatori Trello",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi contatori Trello": {
+      "main": [
+        [
+          {
+            "node": "Riepilogo sorgente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Riepilogo sorgente": {
+      "main": [
+        [
+          {
+            "node": "Confronta senza modificare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome",
+    "executionTimeout": 300,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "tags": []
+}

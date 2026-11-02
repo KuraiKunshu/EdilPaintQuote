@@ -105,6 +105,8 @@ public partial class SqlDataService
                     : Guid.Empty,
                 x.PaymentTerms,
                 x.CustomerNotes,
+                x.TrelloCardId,
+                x.TrelloCardSnapshotJson,
                 x.IvaType,
                 x.Notes,
                 x.Imponibile,
@@ -183,6 +185,8 @@ public partial class SqlDataService
                 BillingCustomerSyncId = x.BillingCustomerSyncId,
                 PaymentTerms = x.PaymentTerms,
                 CustomerNotes = x.CustomerNotes,
+                TrelloCardId = x.TrelloCardId,
+                TrelloCardSnapshotJson = x.TrelloCardSnapshotJson,
                 IvaType = x.IvaType,
                 Notes = x.Notes,
                 Imponibile = x.Imponibile,
@@ -308,6 +312,8 @@ public partial class SqlDataService
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             CustomerNotes = x.CustomerNotes,
+            TrelloCardId = x.TrelloCardId,
+            TrelloCardSnapshotJson = x.TrelloCardSnapshotJson,
             IvaType = x.IvaType,
             Notes = x.Notes,
             Imponibile = x.Imponibile,
@@ -413,6 +419,8 @@ public partial class SqlDataService
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             CustomerNotes = x.CustomerNotes,
+            TrelloCardId = x.TrelloCardId,
+            TrelloCardSnapshotJson = x.TrelloCardSnapshotJson,
             IvaType = x.IvaType,
             Notes = x.Notes,
             Imponibile = x.Imponibile,
@@ -505,6 +513,8 @@ public partial class SqlDataService
             PdfPath = x.PdfPath,
             PaymentTerms = x.PaymentTerms,
             CustomerNotes = x.CustomerNotes,
+            TrelloCardId = x.TrelloCardId,
+            TrelloCardSnapshotJson = x.TrelloCardSnapshotJson,
             IvaType = x.IvaType,
             Notes = x.Notes,
             Imponibile = x.Imponibile,
@@ -910,6 +920,8 @@ public partial class SqlDataService
             PdfPath = q.PdfPath,
             PaymentTerms = q.PaymentTerms,
             CustomerNotes = q.CustomerNotes,
+            TrelloCardId = q.TrelloCardId,
+            TrelloCardSnapshotJson = q.TrelloCardSnapshotJson,
             IvaType = q.IvaType,
             Notes = q.Notes,
             Imponibile = q.Imponibile,
@@ -1167,6 +1179,8 @@ public partial class SqlDataService
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             CustomerNotes = entry.CustomerNotes,
+            TrelloCardId = entry.TrelloCardId,
+            TrelloCardSnapshotJson = entry.TrelloCardSnapshotJson,
             IvaType = entry.IvaType,
             Notes = entry.Notes,
             Imponibile = entry.Imponibile,
@@ -1298,6 +1312,8 @@ public partial class SqlDataService
                     existing.PdfPath = quote.PdfPath;
                     existing.PaymentTerms = quote.PaymentTerms;
                     existing.CustomerNotes = quote.CustomerNotes;
+                    existing.TrelloCardId = quote.TrelloCardId;
+                    existing.TrelloCardSnapshotJson = quote.TrelloCardSnapshotJson;
                     existing.IvaType = quote.IvaType;
                     existing.Notes = quote.Notes;
                     existing.Imponibile = quote.Imponibile;
@@ -1402,6 +1418,8 @@ public partial class SqlDataService
                         PdfPath = quote.PdfPath,
                         PaymentTerms = quote.PaymentTerms,
                         CustomerNotes = quote.CustomerNotes,
+                        TrelloCardId = quote.TrelloCardId,
+                        TrelloCardSnapshotJson = quote.TrelloCardSnapshotJson,
                         IvaType = quote.IvaType,
                         Notes = quote.Notes,
                         Imponibile = quote.Imponibile,

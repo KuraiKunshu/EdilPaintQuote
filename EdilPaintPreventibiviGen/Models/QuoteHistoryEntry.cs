@@ -66,6 +66,9 @@ public class QuoteHistoryEntry
 	public string PdfPath { get; set; } = string.Empty;
 	public string PaymentTerms { get; set; } = string.Empty;
 	public string CustomerNotes { get; set; } = string.Empty;
+	// Internal manual association; never mapped into the commercial PDF context.
+	public string TrelloCardId { get; set; } = string.Empty;
+	public string TrelloCardSnapshotJson { get; set; } = string.Empty;
 	public string IvaType { get; set; } = "esclusa";
 	public string Notes { get; set; } = string.Empty;
 	public List<Item> Materials { get; set; } = new();

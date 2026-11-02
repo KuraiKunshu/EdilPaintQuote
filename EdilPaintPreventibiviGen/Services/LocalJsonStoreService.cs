@@ -12,7 +12,7 @@ using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
 
-public class LocalJsonStoreService
+public partial class LocalJsonStoreService
 {
     private readonly string _historyPath;
     private readonly string _customersPath;
@@ -20,6 +20,8 @@ public class LocalJsonStoreService
     private readonly string _laborCatalogPath;
     private readonly string _personalMaterialsPath;
     private readonly string _conflictsPath;
+    private readonly string _trelloCardsPath;
+    private readonly SemaphoreSlim _trelloCardsSemaphore = new(1, 1);
     private readonly SemaphoreSlim _historySemaphore = new(1, 1);
     private readonly SemaphoreSlim _customersSemaphore = new(1, 1);
     private readonly SemaphoreSlim _companySemaphore = new(1, 1);
@@ -39,6 +41,7 @@ public class LocalJsonStoreService
         _laborCatalogPath = Path.Combine(assetsPath, "dati_lavori.json");
         _personalMaterialsPath = Path.Combine(assetsPath, "materiali_personali.json");
         _conflictsPath = Path.Combine(assetsPath, "Conflicts");
+        _trelloCardsPath = Path.Combine(assetsPath, "trello-cards.json");
 
         Directory.CreateDirectory(assetsPath);
         Directory.CreateDirectory(_conflictsPath);
@@ -963,6 +966,8 @@ public class LocalJsonStoreService
             PdfPath = entry.PdfPath,
             PaymentTerms = entry.PaymentTerms,
             CustomerNotes = entry.CustomerNotes,
+            TrelloCardId = entry.TrelloCardId,
+            TrelloCardSnapshotJson = entry.TrelloCardSnapshotJson,
             IvaType = entry.IvaType,
             Notes = entry.Notes,
             Materials = entry.Materials,

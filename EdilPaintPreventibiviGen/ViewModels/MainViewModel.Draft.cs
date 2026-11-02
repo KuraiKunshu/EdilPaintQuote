@@ -366,6 +366,7 @@ public partial class MainViewModel
     public void ApplyDraft(QuoteHistoryEntry draft)
     {
         ResetQuote();
+        RestoreTrelloCardAssociation(draft.TrelloCardId, draft.TrelloCardSnapshotJson);
 
         QuoteNumber = string.IsNullOrWhiteSpace(draft.QuoteNumber)
             ? _companyData.Counter.ToString()
@@ -476,6 +477,8 @@ public partial class MainViewModel
         return new QuoteHistoryEntry
         {
             QuoteNumber = QuoteNumber,
+            TrelloCardId = TrelloCardId,
+            TrelloCardSnapshotJson = TrelloCardSnapshotJson,
             Date = _loadedQuoteDate ?? DateTime.Now,
             CustomerName = SelectedCustomer?.BusinessName ?? _unresolvedCustomerName,
             CustomerSyncId = SelectedCustomer?.SyncId ?? Guid.Empty,
@@ -727,6 +730,7 @@ public partial class MainViewModel
     private bool HasDraftContent()
     {
         return SelectedCustomer != null ||
+               HasTrelloCardAssociation ||
                !string.IsNullOrWhiteSpace(_unresolvedCustomerName) ||
                SelectedSecondCustomer != null ||
                !string.IsNullOrWhiteSpace(_unresolvedReferenceCustomerName) ||

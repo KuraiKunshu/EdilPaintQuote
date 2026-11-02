@@ -232,6 +232,8 @@ public sealed class LocalDraftService
         PdfPath = draft.PdfPath,
         PaymentTerms = draft.PaymentTerms,
         CustomerNotes = draft.CustomerNotes,
+        TrelloCardId = draft.TrelloCardId,
+        TrelloCardSnapshotJson = draft.TrelloCardSnapshotJson,
         IvaType = draft.IvaType,
         Notes = draft.Notes,
         Materials = draft.Materials,
@@ -359,6 +361,8 @@ public sealed class LocalDraftService
             draft.BillingCustomerSyncId,
             draft.PaymentTerms,
             draft.CustomerNotes,
+            draft.TrelloCardId,
+            draft.TrelloCardSnapshotJson,
             draft.IvaType,
             Materials = draft.Materials.Select(item => new
             {

@@ -620,9 +620,17 @@ public class SyncService
              localQuote.BillingCustomerSyncId != databaseQuote.BillingCustomerSyncId);
 
         return hasCustomerIdentityChange ||
+               HasExplicitPendingTrelloAssociationChange(localQuote, databaseQuote) ||
                HasExplicitPendingCatalogIdentityChange(localQuote.Materials, databaseQuote.Materials) ||
                HasExplicitPendingCatalogIdentityChange(localQuote.Labors, databaseQuote.Labors);
     }
+
+    internal static bool HasExplicitPendingTrelloAssociationChange(
+        QuoteHistoryEntry localQuote,
+        QuoteHistoryEntry databaseQuote) =>
+        localQuote.HasPendingDatabaseWrite &&
+        (!string.Equals(localQuote.TrelloCardId, databaseQuote.TrelloCardId, StringComparison.Ordinal) ||
+         !string.Equals(localQuote.TrelloCardSnapshotJson, databaseQuote.TrelloCardSnapshotJson, StringComparison.Ordinal));
 
     private static bool HasExplicitPendingCatalogIdentityChange(
         IEnumerable<Item> localItems,
