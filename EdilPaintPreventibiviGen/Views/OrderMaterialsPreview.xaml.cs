@@ -9,15 +9,22 @@ namespace EdilPaintPreventibiviGen.Views;
 public partial class OrderMaterialsPreview : UserControl
 {
     private CancellationTokenSource? _loadCancellation;
+    private CancellationTokenSource? _copyCancellation;
 
     public OrderMaterialsPreview()
     {
         InitializeComponent();
         Loaded += OnLoadMaterials;
-        Unloaded += OnCancelLoad;
+        Unloaded += (_, _) =>
+        {
+            CancelLoad();
+            _copyCancellation?.Cancel();
+        };
         DataContextChanged += async (_, _) =>
         {
             CancelLoad();
+            _copyCancellation?.Cancel();
+            CopyMessage.Text = "";
             await LoadMaterialsAsync();
         };
     }
@@ -47,10 +54,7 @@ public partial class OrderMaterialsPreview : UserControl
                 return;
             }
 
-            var materials = quote.Materials
-                .Where(material => !string.IsNullOrWhiteSpace(material.Name))
-                .OrderBy(material => material.SortOrder)
-                .ToList();
+            var materials = SupplierOrderSummaryText.GetMaterials(quote).ToList();
             MaterialRows.ItemsSource = materials;
             if (materials.Count == 0)
                 LoadMessage.Text = "Nessun materiale nel preventivo.";
@@ -80,5 +84,45 @@ public partial class OrderMaterialsPreview : UserControl
         var cancellation = _loadCancellation;
         _loadCancellation = null;
         cancellation?.Cancel();
+    }
+
+    private async void OnCopySummaryClick(object sender, RoutedEventArgs e)
+    {
+        if (_copyCancellation != null || DataContext is not QuoteHistorySummary order ||
+            string.IsNullOrWhiteSpace(order.QuoteNumber)) return;
+
+        using var cancellation = AppShutdownManager.CreateLinkedTokenSource();
+        _copyCancellation = cancellation;
+        var token = cancellation.Token;
+        CopySummaryButton.IsEnabled = false;
+        CopyMessage.Text = "Preparazione del riepilogo…";
+        try
+        {
+            var quote = await App.DataService.GetQuoteByNumberAsync(order.QuoteNumber, token, includeAttachments: false);
+            token.ThrowIfCancellationRequested();
+            if (quote == null)
+            {
+                CopyMessage.Text = "Preventivo non trovato.";
+                return;
+            }
+
+            Clipboard.SetDataObject(SupplierOrderSummaryText.Format(order, quote), copy: true);
+            CopyMessage.Text = "Riepilogo copiato.";
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Ordini] Copia riepilogo {order.QuoteNumber}: {ex.Message}");
+            if (!token.IsCancellationRequested)
+                CopyMessage.Text = "Copia non riuscita. Riprova.";
+        }
+        finally
+        {
+            if (token.IsCancellationRequested) CopyMessage.Text = "";
+            _copyCancellation = null;
+            CopySummaryButton.IsEnabled = true;
+        }
     }
 }
