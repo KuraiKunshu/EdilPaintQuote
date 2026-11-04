@@ -4,7 +4,7 @@
     <StackPanel>
         <Button x:Name="CopySummaryButton" Content="Copia riepilogo" Click="OnCopySummaryClick"
                 HorizontalAlignment="Left" Padding="10,5" Cursor="Hand" Margin="0,0,0,6"
-                ToolTip="Copia cliente, riferimento, stato materiali, elenco e note, comprese quelle interne."/>
+                ToolTip="Copia il messaggio per la squadra con indirizzo, telefono, materiali e note, comprese quelle interne."/>
         <TextBlock x:Name="CopyMessage" FontSize="12" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"
                    Foreground="{StaticResource MutedTextBrush}">
             <TextBlock.Style>

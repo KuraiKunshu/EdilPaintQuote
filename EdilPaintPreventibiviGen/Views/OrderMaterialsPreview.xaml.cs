@@ -106,7 +106,9 @@ public partial class OrderMaterialsPreview : UserControl
                 return;
             }
 
-            Clipboard.SetDataObject(SupplierOrderSummaryText.Format(order, quote), copy: true);
+            var customers = await App.DataService.GetCustomersAsync(token);
+            token.ThrowIfCancellationRequested();
+            Clipboard.SetDataObject(SupplierOrderSummaryText.Format(order, quote, customers), copy: true);
             CopyMessage.Text = "Riepilogo copiato.";
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

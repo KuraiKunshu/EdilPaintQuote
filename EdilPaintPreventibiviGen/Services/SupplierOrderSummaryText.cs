@@ -8,26 +8,55 @@ internal static class SupplierOrderSummaryText
         .Where(material => !string.IsNullOrWhiteSpace(material.Name))
         .OrderBy(material => material.SortOrder);
 
-    public static string Format(QuoteHistorySummary order, QuoteHistoryEntry quote)
+    public static string Format(QuoteHistorySummary order, QuoteHistoryEntry quote, IEnumerable<Customer> customers)
     {
-        var names = new[] { order.CustomerName, order.ReferenceName }
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Select(name => name.Trim());
+        string customerName = string.IsNullOrWhiteSpace(quote.CustomerName) ? order.CustomerName : quote.CustomerName;
+        string referenceName = string.IsNullOrWhiteSpace(quote.ReferenceName) ? order.ReferenceName : quote.ReferenceName;
+        Customer? customer = FindCustomer(quote.CustomerSyncId, customerName, customers);
+        var lines = new List<string>
+        {
+            $"Cliente: {(string.IsNullOrWhiteSpace(customerName) ? "Non indicato" : customerName.Trim())}"
+        };
+        if (!string.IsNullOrWhiteSpace(referenceName))
+            lines.Add($"Riferimento: {referenceName.Trim()}");
+        if (!string.IsNullOrWhiteSpace(quote.SiteName))
+            lines.Add($"Indirizzo cantiere: {quote.SiteName.Trim()}");
+        else if (!string.IsNullOrWhiteSpace(customer?.Address))
+            lines.Add($"Indirizzo cliente: {customer.Address.Trim()}");
+        if (!string.IsNullOrWhiteSpace(customer?.Phone))
+            lines.Add($"Telefono cliente: {customer.Phone.Trim()}");
+
         string status = SupplierOrderQueue.StatusDisplay(order);
         var materials = GetMaterials(quote)
-            .Select(material => $"- {material.Name.Trim()} — {material.QuantityDisplay}");
-        string newLine = Environment.NewLine;
+            .Select(material => $"{material.QuantityDisplay} — {material.Name.Trim()}");
+        lines.Add("");
+        lines.Add($"Stato materiale: {(status == "-" ? "Da impostare" : status)}");
+        lines.Add("Materiali:");
+        lines.AddRange(materials.DefaultIfEmpty("Nessun materiale nel preventivo."));
 
-        return string.Join(newLine,
-            string.Join(newLine, names.DefaultIfEmpty("Cliente non indicato")),
-            "",
-            $"Stato materiale: {(status == "-" ? "Da impostare" : status)}",
-            "Materiali:",
-            string.Join(newLine, materials.DefaultIfEmpty("Nessun materiale nel preventivo.")),
-            "",
-            "Note:",
-            quote.CustomerNotes?.Trim() ?? "",
-            "Note interne:",
-            quote.Notes?.Trim() ?? "").TrimEnd();
+        AddNotes("Note:", quote.CustomerNotes);
+        AddNotes("Note interne:", quote.Notes);
+        return string.Join(Environment.NewLine, lines);
+
+        void AddNotes(string heading, string? notes)
+        {
+            if (string.IsNullOrWhiteSpace(notes)) return;
+            lines.Add("");
+            lines.Add(heading);
+            lines.Add(notes.Trim());
+        }
+    }
+
+    private static Customer? FindCustomer(Guid syncId, string name, IEnumerable<Customer> customers)
+    {
+        if (syncId != Guid.Empty)
+            return customers.FirstOrDefault(customer => customer.SyncId == syncId);
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        var matches = customers.Where(customer =>
+            string.Equals(customer.BusinessName?.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Take(2).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
     }
 }
