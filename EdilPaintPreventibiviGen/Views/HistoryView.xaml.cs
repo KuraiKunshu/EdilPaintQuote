@@ -997,26 +997,28 @@ public partial class HistoryView : UserControl, IDisposable
         {
             if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
 
-            var fullEntry = await _historyService.GetQuoteByNumberAsync(entry.QuoteNumber)
+            var token = AppShutdownManager.ShutdownToken;
+            var fullEntry = await App.DataService.GetQuoteByNumberAsync(entry.QuoteNumber, token, includeAttachments: false)
                 ?? throw new InvalidOperationException("Preventivo non trovato nello storico.");
-            var materials = fullEntry.Materials
-                .Where(material => !string.IsNullOrWhiteSpace(material.Name) && material.Quantity > 0)
-                .OrderBy(material => material.SortOrder)
-                .ToList();
-            if (materials.Count == 0)
+            var selection = new InstallationCertificateSelection(fullEntry.Materials);
+            if (selection.Materials.Count == 0)
                 throw new InvalidOperationException("Il preventivo non contiene materiali da inserire nel certificato.");
+            var customers = await App.DataService.GetCustomersAsync(token);
+            token.ThrowIfCancellationRequested();
 
             if (!_backgroundRefresh) Mouse.OverrideCursor = null;
-            var inputWindow = new InstallationCertificateWindow(entry, materials) { Owner = HostWindow };
+            var inputWindow = new InstallationCertificateWindow(fullEntry, selection, customers) { Owner = HostWindow };
             if (inputWindow.ShowDialog() != true)
                 return;
 
             if (!_backgroundRefresh) Mouse.OverrideCursor = Cursors.Wait;
             var company = await App.DataService.GetCompanyAsync() ?? new Company();
+            var recipient = inputWindow.Recipient;
             string expectedPath = StoragePathService.Instance.BuildInstallationCertificatePdfPath(
                 fullEntry.CustomerName,
                 fullEntry.QuoteNumber,
-                string.IsNullOrWhiteSpace(fullEntry.ReferenceName) ? null : fullEntry.ReferenceName);
+                fullEntry.ReferenceName,
+                string.IsNullOrWhiteSpace(recipient.ReferenceName) ? recipient.Name : null);
 
             string tempRoot = App.AppSettings.App.GetEffectiveTempPath();
             Directory.CreateDirectory(tempRoot);
@@ -1028,12 +1030,12 @@ public partial class HistoryView : UserControl, IDisposable
             {
                 QuoteNumber = fullEntry.QuoteNumber,
                 CompletionDate = inputWindow.CompletionDate,
-                WorkSite = ResolveCertificateWorkSite(fullEntry, inputWindow.WorkSite),
-                CustomerName = fullEntry.CustomerName,
-                ReferenceName = fullEntry.ReferenceName,
+                WorkSite = inputWindow.WorkSite,
+                RecipientName = recipient.Name,
+                RecipientAddress = inputWindow.RecipientAddress,
+                ReferenceName = recipient.ReferenceName,
                 SelectedLogo = ResolveLogoForPdf(company),
                 Materials = inputWindow.SelectedMaterials.ToList(),
-                AllCustomers = _vm.AllCustomers.ToList(),
                 PdfTemplateName = App.AppSettings.PdfTemplate.ActiveTemplate,
                 FooterText = App.AppSettings.PdfTemplate.FooterText
             };
@@ -1064,6 +1066,7 @@ public partial class HistoryView : UserControl, IDisposable
 
             OpenFolderAndSelectFile(pathToOpen);
         }
+        catch (OperationCanceledException) when (AppShutdownManager.IsShutdownRequested) { }
         catch (Exception ex)
         {
             MessageBox.Show(
@@ -1077,31 +1080,6 @@ public partial class HistoryView : UserControl, IDisposable
             _isGeneratingInstallationCertificate = false;
             if (!_backgroundRefresh) Mouse.OverrideCursor = null;
         }
-    }
-
-    private string ResolveCertificateWorkSite(QuoteHistoryEntry entry, string enteredWorkSite)
-    {
-        if (!string.IsNullOrWhiteSpace(enteredWorkSite))
-            return enteredWorkSite.Trim();
-
-        if (!string.IsNullOrWhiteSpace(entry.SiteName))
-            return entry.SiteName.Trim();
-
-        string addressOwner = !string.IsNullOrWhiteSpace(entry.ReferenceName)
-            ? entry.ReferenceName
-            : entry.CustomerName;
-        string address = _vm.AllCustomers.FirstOrDefault(customer =>
-                string.Equals(customer.BusinessName?.Trim(), addressOwner.Trim(), StringComparison.OrdinalIgnoreCase))
-            ?.Address?.Trim() ?? string.Empty;
-
-        if (!string.IsNullOrWhiteSpace(address))
-            return address;
-
-        string subject = !string.IsNullOrWhiteSpace(entry.ReferenceName)
-                ? $"il riferimento '{entry.ReferenceName}'"
-                : $"il cliente '{entry.CustomerName}'";
-        throw new InvalidOperationException(
-            $"Il campo 'Cantiere presso' e' vuoto e {subject} non ha un indirizzo salvato.");
     }
 
     private static void OpenFolderAndSelectFile(string filePath)

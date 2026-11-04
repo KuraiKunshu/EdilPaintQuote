@@ -187,10 +187,38 @@ public class MobileOperationsTests
     [Fact]
     public void CertificateContainsQuantitiesButNoPrices()
     {
-        var quote = new QuoteDetail { Materials = [new() { Name = "Finestra", Quantity = 4, UnitPrice = 1234.56 }] };
-        string text = string.Join("\n", MobileDocumentContent.InstallationCertificate(quote, new("EdilPaint", ""), "Cantiere", new(2026, 9, 1)).Select(x => x.Text));
+        var quote = new QuoteDetail { CustomerName = "Cliente A", Materials = [new() { Name = "Finestra", Quantity = 4, UnitPrice = 1234.56 }] };
+        string text = string.Join("\n", MobileDocumentContent.InstallationCertificate(
+            quote, new("EdilPaint", ""), quote.CustomerName, "", "Via del Cantiere", new(2026, 9, 1)).Select(x => x.Text));
         Assert.Contains("N.4 Finestra", text);
         Assert.DoesNotContain("1234", text);
         Assert.Contains("01/09/2026", text);
+        Assert.Contains("Intestatario: Cliente A", text);
+        Assert.Contains("Cantiere: Via del Cantiere", text);
+    }
+
+    [Fact]
+    public void CertificateShowsOnlyTheChosenReferenceAndItsAddress()
+    {
+        var quote = new QuoteDetail
+        {
+            QuoteNumber = "123",
+            CustomerName = "Cliente A",
+            CustomerAddress = "Via del Cliente 9",
+            ReferenceName = "Condominio B",
+            ReferenceAddress = "Via del Riferimento 6",
+            Materials = [new() { Name = "Finestra", Quantity = 2 }]
+        };
+
+        string text = string.Join("\n", MobileDocumentContent.InstallationCertificate(
+            quote, new("EdilPaint", ""), quote.ReferenceName, quote.ReferenceAddress, "", new(2026, 9, 1)).Select(x => x.Text));
+
+        Assert.Contains("Preventivo 123", text);
+        Assert.Contains("Intestatario: Condominio B", text);
+        Assert.Contains("Indirizzo intestatario: Via del Riferimento 6", text);
+        Assert.Contains("all'indirizzo sopra indicato", text);
+        Assert.DoesNotContain(quote.CustomerName, text);
+        Assert.DoesNotContain(quote.CustomerAddress, text);
+        Assert.DoesNotContain("Cantiere:", text);
     }
 }

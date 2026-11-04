@@ -131,17 +131,18 @@ public class StoragePathService
     public string BuildInstallationCertificatePdfPath(
         string customerName,
         string quoteNumber,
-        string? referenceName = null)
+        string? referenceName = null,
+        string? recipientName = null)
     {
         string folder = BuildCustomerPdfFolder(customerName, referenceName);
         var fileNameParts = new List<string>
         {
             "Certificato",
             SanitizeFolderName(quoteNumber),
-            SanitizeFolderName(customerName)
+            SanitizeFolderName(recipientName ?? customerName)
         };
 
-        if (!string.IsNullOrWhiteSpace(referenceName))
+        if (recipientName == null && !string.IsNullOrWhiteSpace(referenceName))
             fileNameParts.Add(SanitizeFolderName(referenceName));
 
         return Path.Combine(folder, string.Join("_", fileNameParts) + ".pdf");

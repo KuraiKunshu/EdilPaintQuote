@@ -508,8 +508,6 @@ public partial class PdfService
 
         QuestPDF.Settings.License = LicenseType.Community;
         var templateStyle = PdfTemplateStyle.Resolve(ctx.PdfTemplateName);
-        var customer = ctx.AllCustomers.FirstOrDefault(c =>
-            string.Equals(c.BusinessName, ctx.CustomerName, StringComparison.OrdinalIgnoreCase));
         string assetsPath = ResolveAssetsDirectory();
         string logoPath = CompanyBrandingService.ResolveLogo(company, ctx.SelectedLogo, assetsPath);
         string stampPath = ResolveStampPath(assetsPath);
@@ -570,12 +568,12 @@ public partial class PdfService
                             info.RelativeItem().Column(clientInfo =>
                             {
                                 clientInfo.Spacing(5);
-                                clientInfo.Item().Text("COMMITTENTE")
+                                clientInfo.Item().Text("INTESTATARIO")
                                     .FontSize(8).SemiBold().FontColor(PdfPalette.GreyDarken1);
-                                clientInfo.Item().Text(ctx.CustomerName)
+                                clientInfo.Item().Text(ctx.RecipientName)
                                     .FontSize(11).Bold().FontColor(PdfPalette.GreyDarken3);
-                                if (!string.IsNullOrWhiteSpace(customer?.Address))
-                                    clientInfo.Item().Text(customer.Address).FontSize(9);
+                                if (!string.IsNullOrWhiteSpace(ctx.RecipientAddress))
+                                    clientInfo.Item().Text(ctx.RecipientAddress).FontSize(9);
                                 if (!string.IsNullOrWhiteSpace(ctx.ReferenceName))
                                 {
                                     clientInfo.Item().PaddingTop(5).Text("RIFERIMENTO")

@@ -18,6 +18,7 @@ public sealed class QuoteDetail
     public Guid ReferenceCustomerSyncId { get; init; }
     public string ReferenceName { get; init; } = string.Empty;
     public string ReferenceEmail { get; init; } = string.Empty;
+    public string ReferenceAddress { get; init; } = string.Empty;
     public int? BillingCustomerId { get; init; }
     public Guid BillingCustomerSyncId { get; init; }
     public string BillingCustomerName { get; init; } = string.Empty;

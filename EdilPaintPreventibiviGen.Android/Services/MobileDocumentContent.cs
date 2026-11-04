@@ -94,18 +94,23 @@ public static class MobileDocumentContent
         return lines;
     }
 
-    public static IReadOnlyList<DocumentLine> InstallationCertificate(QuoteDetail quote, CompanyContact company, string site, DateTime completed)
+    public static IReadOnlyList<DocumentLine> InstallationCertificate(
+        QuoteDetail quote, CompanyContact company, string recipientName, string recipientAddress, string site, DateTime completed)
     {
         var lines = new List<DocumentLine>
         {
             new(company.Name, true), new(company.Address), new($"P. IVA {company.VatNumber} - {company.Email}"),
-            new("CERTIFICATO DI POSA IN OPERA", true), new($"Preventivo {quote.QuoteNumber} - {quote.CustomerName}"),
-            new($"Cantiere: {site}"), new($"Data completamento: {completed:dd/MM/yyyy}"),
-            new("DICHIARA E CERTIFICA", true),
-            new($"La sottoscritta impresa {company.Name}, con riferimento ai lavori eseguiti presso il cantiere sopra indicato, certifica che i materiali elencati nel presente documento sono stati posati in opera a regola d'arte, nel rispetto delle indicazioni dei produttori e delle norme tecniche applicabili."),
-            new("Per mantenere la buona funzionalita dei prodotti, si consiglia di eseguire la manutenzione periodica, come indicato sulle istruzioni d'uso e manutenzione del prodotto."),
-            new("MATERIALI POSATI", true)
+            new("CERTIFICATO DI POSA IN OPERA", true), new($"Preventivo {quote.QuoteNumber}"),
+            new($"Intestatario: {recipientName}")
         };
+        if (!string.IsNullOrWhiteSpace(recipientAddress)) lines.Add(new($"Indirizzo intestatario: {recipientAddress}"));
+        if (!string.IsNullOrWhiteSpace(site)) lines.Add(new($"Cantiere: {site}"));
+        string location = string.IsNullOrWhiteSpace(site) ? "all'indirizzo sopra indicato" : "presso il cantiere sopra indicato";
+        lines.Add(new($"Data completamento: {completed:dd/MM/yyyy}"));
+        lines.Add(new("DICHIARA E CERTIFICA", true));
+        lines.Add(new($"La sottoscritta impresa {company.Name}, con riferimento ai lavori eseguiti {location}, certifica che i materiali elencati nel presente documento sono stati posati in opera a regola d'arte, nel rispetto delle indicazioni dei produttori e delle norme tecniche applicabili."));
+        lines.Add(new("Per mantenere la buona funzionalita dei prodotti, si consiglia di eseguire la manutenzione periodica, come indicato sulle istruzioni d'uso e manutenzione del prodotto."));
+        lines.Add(new("MATERIALI POSATI", true));
         foreach (var material in quote.Materials.OrderBy(x => x.SortOrder))
         {
             lines.Add(new($"{QuantityValue.OrderDisplay(material.Quantity, material.UnitOfMeasure)} {material.Name}", true));

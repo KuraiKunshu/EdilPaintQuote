@@ -162,7 +162,8 @@ public sealed partial class MobileDatabaseService
                     coalesce(c."Email", ''),
                     coalesce(r."Email", ''),
                     coalesce(b."Email", ''),
-                    coalesce(c."Address", '')
+                    coalesce(c."Address", ''),
+                    coalesce(r."Address", '')
                 from "Quotes" q
                 left join "Customers" c on c."Id" = q."CustomerId"
                 left join "Customers" r on r."Id" = q."ReferenceCustomerId"
@@ -226,7 +227,8 @@ public sealed partial class MobileDatabaseService
                 CustomerEmail = reader.GetString(43),
                 ReferenceEmail = reader.GetString(44),
                 BillingCustomerEmail = reader.GetString(45),
-                CustomerAddress = reader.GetString(46)
+                CustomerAddress = reader.GetString(46),
+                ReferenceAddress = reader.GetString(47)
             };
         }
 

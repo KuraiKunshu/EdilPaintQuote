@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using EdilPaintPreventibiviGen.Models;
 
@@ -9,23 +10,29 @@ public partial class InstallationCertificateWindow : Window
 {
     public DateTime CompletionDate { get; private set; } = DateTime.Today;
     public string WorkSite { get; private set; } = string.Empty;
+    public string RecipientAddress { get; private set; } = string.Empty;
+    internal InstallationCertificateRecipient Recipient => (InstallationCertificateRecipient)RecipientChoice.SelectedItem;
     public IReadOnlyList<Item> SelectedMaterials { get; private set; } = [];
     public InstallationCertificateSelection Selection { get; }
+    private readonly string _savedWorkSite;
 
-    public InstallationCertificateWindow(QuoteHistorySummary summary, IEnumerable<Item> materials)
+    internal InstallationCertificateWindow(QuoteHistoryEntry quote, InstallationCertificateSelection selection, IEnumerable<Customer> customers)
     {
-        Selection = new InstallationCertificateSelection(materials);
+        Selection = selection;
+        _savedWorkSite = quote.SiteName?.Trim() ?? string.Empty;
         InitializeComponent();
         EdilPaintPreventibiviGen.Helpers.WindowResizeBehavior.PreventMaximizedState(this);
         MaterialChoices.ItemsSource = Selection.Materials;
+        RecipientChoice.ItemsSource = InstallationCertificateRecipient.CreateOptions(quote, customers);
+        RecipientChoice.SelectedIndex = 0;
 
-        TxtTitle.Text = $"Certificato preventivo n. {summary.QuoteNumber}";
-        TxtSubtitle.Text = string.IsNullOrWhiteSpace(summary.ReferenceName)
-            ? summary.CustomerName
-            : $"{summary.CustomerName} - Rif. {summary.ReferenceName}";
+        TxtTitle.Text = $"Certificato preventivo n. {quote.QuoteNumber}";
+        TxtSubtitle.Text = string.IsNullOrWhiteSpace(quote.ReferenceName)
+            ? quote.CustomerName
+            : $"{quote.CustomerName} - Rif. {quote.ReferenceName}";
         DpCompletionDate.SelectedDate = DateTime.Today;
 
-        Loaded += (_, _) => TxtWorkSite.Focus();
+        Loaded += (_, _) => RecipientChoice.Focus();
         PreviewKeyDown += OnPreviewKeyDown;
     }
 
@@ -36,6 +43,19 @@ public partial class InstallationCertificateWindow : Window
             MessageBox.Show("Seleziona una data di fine lavori valida.",
                 "Certificato corretta posa", MessageBoxButton.OK, MessageBoxImage.Information);
             DpCompletionDate.Focus();
+            return;
+        }
+
+        string recipientAddress = TxtRecipientAddress.Text.Trim();
+        string workSite = TxtWorkSite.Text.Trim();
+        if (workSite.Length == 0)
+            workSite = _savedWorkSite.Length > 0 ? _savedWorkSite
+                : Recipient.ReferenceName.Length > 0 ? Recipient.WorkSiteFallback : recipientAddress;
+        if (workSite.Length == 0)
+        {
+            MessageBox.Show(this, "Indica il cantiere presso cui sono stati eseguiti i lavori.",
+                "Certificato corretta posa", MessageBoxButton.OK, MessageBoxImage.Information);
+            TxtWorkSite.Focus();
             return;
         }
 
@@ -52,8 +72,15 @@ public partial class InstallationCertificateWindow : Window
         }
 
         CompletionDate = completionDate;
-        WorkSite = TxtWorkSite.Text.Trim();
+        WorkSite = workSite;
+        RecipientAddress = recipientAddress;
         DialogResult = true;
+    }
+
+    private void OnRecipientChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RecipientChoice.SelectedItem is InstallationCertificateRecipient recipient)
+            TxtRecipientAddress.Text = recipient.Address;
     }
 
     private bool TryReadCompletionDate(out DateTime completionDate)
