@@ -35,9 +35,7 @@
             <Setter Property="Margin" Value="0,0,0,5"/>
         </Style>
         <Style x:Key="OrderCardStyle" TargetType="Button">
-            <Setter Property="Width" Value="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=views:SupplierOrdersView}}"/>
             <Setter Property="MinHeight" Value="220"/>
-            <Setter Property="Margin" Value="0,0,12,12"/>
             <Setter Property="Padding" Value="16"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
@@ -54,7 +52,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="CardBorder" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}" CornerRadius="6">
+                                Padding="{TemplateBinding Padding}" CornerRadius="6,6,0,0">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
@@ -208,55 +206,62 @@
                     </ItemsControl.GroupStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Button Style="{StaticResource OrderCardStyle}" Click="OnOpenOrderClick" MouseDoubleClick="OnOrderDoubleClick">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" MinHeight="84"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <StackPanel VerticalAlignment="Top" ToolTip="{Binding OrderSiteTitle}">
-                                        <TextBlock Text="{Binding CustomerName}" FontSize="17" FontWeight="Bold" TextWrapping="Wrap"/>
-                                        <TextBlock FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,0">
-                                            <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding ReferenceName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
-                                            <Run Text="Rif. "/><Run Text="{Binding ReferenceName, Mode=OneWay}"/>
-                                        </TextBlock>
-                                        <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}">
-                                            <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding SiteName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
-                                            <Run Text="Cantiere: "/><Run Text="{Binding SiteName, Mode=OneWay}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                    <Border Grid.Row="1" Style="{StaticResource MaterialStatusBadgeStyle}" Margin="0,10,0,14">
-                                        <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="42" TextTrimming="CharacterEllipsis">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="-">
-                                                            <Setter Property="Text" Value="Da impostare"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </Border>
-                                    <StackPanel Grid.Row="2">
-                                        <TextBlock Text="Data ordine" FontSize="13"/>
-                                        <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="{Binding MaterialOrderDateDisplay}"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding MaterialOrderDateDisplay}" Value="-">
-                                                            <Setter Property="Text" Value="Non indicata"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </Grid>
-                            </Button>
+                            <StackPanel Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=views:SupplierOrdersView}}"
+                                        VerticalAlignment="Top" Margin="0,0,12,12">
+                                <Button Style="{StaticResource OrderCardStyle}" Click="OnOpenOrderClick" MouseDoubleClick="OnOrderDoubleClick">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" MinHeight="84"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <StackPanel VerticalAlignment="Top" ToolTip="{Binding OrderSiteTitle}">
+                                            <TextBlock Text="{Binding CustomerName}" FontSize="17" FontWeight="Bold" TextWrapping="Wrap"/>
+                                            <TextBlock FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,0">
+                                                <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding ReferenceName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                                <Run Text="Rif. "/><Run Text="{Binding ReferenceName, Mode=OneWay}"/>
+                                            </TextBlock>
+                                            <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}">
+                                                <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding SiteName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                                <Run Text="Cantiere: "/><Run Text="{Binding SiteName, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <Border Grid.Row="1" Style="{StaticResource MaterialStatusBadgeStyle}" Margin="0,10,0,14">
+                                            <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="42" TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Converter={StaticResource SupplierOrderQueueConverter}, ConverterParameter=Status}" Value="-">
+                                                                <Setter Property="Text" Value="Da impostare"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                        <StackPanel Grid.Row="2">
+                                            <TextBlock Text="Data ordine" FontSize="13"/>
+                                            <TextBlock FontSize="16" FontWeight="SemiBold" Margin="0,4,0,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="{Binding MaterialOrderDateDisplay}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding MaterialOrderDateDisplay}" Value="-">
+                                                                <Setter Property="Text" Value="Non indicata"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                                <Border Background="{StaticResource WhiteBrush}" BorderBrush="{StaticResource ModalFieldBorderBrush}"
+                                        BorderThickness="1,0,1,1" CornerRadius="0,0,6,6" Padding="12,8">
+                                    <views:OrderMaterialsPreview FontSize="13"/>
+                                </Border>
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

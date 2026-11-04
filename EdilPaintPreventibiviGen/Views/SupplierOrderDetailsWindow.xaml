@@ -75,6 +75,7 @@
                         <ComboBox x:Name="CmbMaterialStatus" IsEditable="True" MinHeight="44" FontSize="17"
                                   Padding="8,5" Text="{Binding MaterialStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   AutomationProperties.Name="Stato dei materiali dell’ordine"/>
+                        <views:OrderMaterialsPreview Margin="0,10,0,0"/>
 
                         <TextBlock Text="Fornitore" Style="{StaticResource FieldLabelStyle}" Margin="0,20,0,7"/>
                         <Grid>

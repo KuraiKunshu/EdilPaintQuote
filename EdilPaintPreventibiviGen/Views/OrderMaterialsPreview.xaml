@@ -1,0 +1,26 @@
+<UserControl x:Class="EdilPaintPreventibiviGen.Views.OrderMaterialsPreview"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Expander x:Name="MaterialsExpander"
+              HorizontalContentAlignment="Stretch" Expanded="OnLoadMaterials" Collapsed="OnCancelLoad">
+        <Expander.Header>
+            <TextBlock Text="Materiali del preventivo" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        </Expander.Header>
+        <StackPanel Margin="0,8,0,0">
+            <TextBlock x:Name="LoadMessage" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+            <ItemsControl x:Name="MaterialRows">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="0,1,0,0" Padding="0,7">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding QuantityDisplay}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource MutedTextBrush}"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Expander>
+</UserControl>
