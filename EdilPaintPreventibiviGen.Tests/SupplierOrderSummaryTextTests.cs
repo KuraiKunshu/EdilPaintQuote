@@ -112,6 +112,59 @@ public sealed class SupplierOrderSummaryTextTests
                 [new Customer { BusinessName = "Impresa Rossi", Phone = "030 123456" }]));
     }
 
+    [Fact]
+    public void CalendarSummaryIncludesOrderedLaborsWithQuantitiesAndDescriptionsWithoutPrices()
+    {
+        var quote = new QuoteHistoryEntry
+        {
+            Labors =
+            [
+                new Item { Name = "Sigillatura", Quantity = 10000.5m, UnitOfMeasure = "m", UnitPrice = 12345, SortOrder = 2 },
+                new Item { Name = "Posa finestra", Quantity = 2, Description = "Primo piano\nAccesso dal balcone", SortOrder = 1 },
+                new Item { Name = " " }
+            ]
+        };
+
+        string message = SupplierOrderSummaryText.Format(new WorkScheduleEntry(), quote, []);
+
+        Assert.Contains("""
+            Lavorazioni:
+            2 pz — Posa finestra
+              Primo piano
+              Accesso dal balcone
+            10000,5 m — Sigillatura
+            """.ReplaceLineEndings(), message);
+        Assert.DoesNotContain("12345", message);
+    }
+
+    [Fact]
+    public void CustomTemplateControlsFieldOrderAndKeepsPlaceholderTextInsideNotesLiteral()
+    {
+        var entry = new WorkScheduleEntry
+        {
+            Employees = [new() { FirstName = "Anna", LastName = "Verdi" }], Notes = "Verificare {CustomerName}"
+        };
+        var quote = new QuoteHistoryEntry { QuoteNumber = "1234", CustomerName = "Impresa Rossi" };
+
+        string message = SupplierOrderSummaryText.Format(entry, quote, [], """
+            Ciao {Crew}
+            Ordine {QuoteNumber} per {CustomerName}
+            {LaborDetails}
+
+
+            ATTENZIONE: {InterventionNotesText}
+            {SegnapostoSconosciuto}
+            """);
+
+        Assert.Equal("""
+            Ciao Anna Verdi
+            Ordine 1234 per Impresa Rossi
+
+            ATTENZIONE: Verificare {CustomerName}
+            {SegnapostoSconosciuto}
+            """.ReplaceLineEndings(), message);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

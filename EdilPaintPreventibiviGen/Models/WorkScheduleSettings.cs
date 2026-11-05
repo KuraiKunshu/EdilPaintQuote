@@ -8,6 +8,23 @@ public enum WorkScheduleEntryStatus { Planned, Completed }
 
 public sealed class WorkScheduleSettings
 {
+    public const int MaxInterventionMessageTemplateLength = 20_000;
+    public const string DefaultInterventionMessageTemplate = """
+        {ContactDetails}
+
+        {InterventionDetails}
+
+        {MaterialDetails}
+
+        {LaborDetails}
+
+        {Notes}
+
+        {InternalNotes}
+
+        {InterventionNotes}
+        """;
+
     public long Revision { get; set; }
     public int FullDayStartMinutes { get; set; } = 8 * 60;
     public int FullDayEndMinutes { get; set; } = 17 * 60;
@@ -16,6 +33,7 @@ public sealed class WorkScheduleSettings
     public int AfternoonStartMinutes { get; set; } = 13 * 60;
     public int AfternoonEndMinutes { get; set; } = 17 * 60;
     public bool UseEmployeeAbbreviations { get; set; } = true;
+    public string InterventionMessageTemplate { get; set; } = DefaultInterventionMessageTemplate;
 
     public WorkScheduleSettings CreateValidatedCopy()
     {
@@ -25,7 +43,12 @@ public sealed class WorkScheduleSettings
         if (MorningStartMinutes < FullDayStartMinutes || AfternoonEndMinutes > FullDayEndMinutes ||
             MorningEndMinutes > AfternoonStartMinutes)
             throw new InvalidOperationException("Mattina e pomeriggio devono rientrare nella giornata intera e non sovrapporsi.");
-        return (WorkScheduleSettings)MemberwiseClone();
+        var copy = (WorkScheduleSettings)MemberwiseClone();
+        copy.InterventionMessageTemplate = string.IsNullOrWhiteSpace(InterventionMessageTemplate)
+            ? DefaultInterventionMessageTemplate : InterventionMessageTemplate;
+        if (copy.InterventionMessageTemplate.Length > MaxInterventionMessageTemplateLength)
+            throw new InvalidOperationException("Il fac-simile del riepilogo intervento può contenere al massimo 20.000 caratteri.");
+        return copy;
     }
 
     public (int Start, int End) GetRange(WorkScheduleSlotKind kind) => kind switch

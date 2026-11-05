@@ -84,7 +84,8 @@ public partial class SqlDataService
                     throw ScheduleSettingsConflict();
                 var before = ScheduleSettingsToModel(stored);
                 bool timesChanged = ScheduleTimesChanged(before, requested);
-                if (!timesChanged && before.UseEmployeeAbbreviations == requested.UseEmployeeAbbreviations)
+                if (!timesChanged && before.UseEmployeeAbbreviations == requested.UseEmployeeAbbreviations &&
+                    string.Equals(before.InterventionMessageTemplate, requested.InterventionMessageTemplate, StringComparison.Ordinal))
                     return before;
                 var updated = requested.CreateValidatedCopy();
                 updated.Revision = checked(stored.Revision + 1);
@@ -348,14 +349,15 @@ public partial class SqlDataService
             (quote.Status == QuoteStatus.Confermato || SupplierOrderEligibility.IsActive(quote));
     }
 
-    internal static WorkScheduleSettings ScheduleSettingsToModel(WorkScheduleSettingsEntity entity) => new()
+    internal static WorkScheduleSettings ScheduleSettingsToModel(WorkScheduleSettingsEntity entity) => new WorkScheduleSettings
     {
         Revision = entity.Revision,
         FullDayStartMinutes = entity.FullDayStartMinutes, FullDayEndMinutes = entity.FullDayEndMinutes,
         MorningStartMinutes = entity.MorningStartMinutes, MorningEndMinutes = entity.MorningEndMinutes,
         AfternoonStartMinutes = entity.AfternoonStartMinutes, AfternoonEndMinutes = entity.AfternoonEndMinutes,
-        UseEmployeeAbbreviations = entity.UseEmployeeAbbreviations
-    };
+        UseEmployeeAbbreviations = entity.UseEmployeeAbbreviations,
+        InterventionMessageTemplate = entity.InterventionMessageTemplate
+    }.CreateValidatedCopy();
 
     private static void CopyScheduleSettings(WorkScheduleSettings settings, WorkScheduleSettingsEntity entity)
     {
@@ -367,6 +369,7 @@ public partial class SqlDataService
         entity.AfternoonStartMinutes = settings.AfternoonStartMinutes;
         entity.AfternoonEndMinutes = settings.AfternoonEndMinutes;
         entity.UseEmployeeAbbreviations = settings.UseEmployeeAbbreviations;
+        entity.InterventionMessageTemplate = settings.InterventionMessageTemplate;
     }
 
     private static bool ScheduleTimesChanged(WorkScheduleSettings before, WorkScheduleSettings after) =>
@@ -375,5 +378,5 @@ public partial class SqlDataService
         before.AfternoonStartMinutes != after.AfternoonStartMinutes || before.AfternoonEndMinutes != after.AfternoonEndMinutes;
 
     private static InvalidOperationException ScheduleSettingsConflict(Exception? inner = null) => new(
-        "Gli orari del calendario sono stati modificati da un altro PC. Ricarica le impostazioni prima di salvarle.", inner);
+        "Le impostazioni del calendario sono state modificate da un altro PC. Ricaricale prima di salvarle.", inner);
 }

@@ -24,8 +24,11 @@ public sealed class WorkScheduleServiceTests : IDisposable
         Assert.Single(latest.Entries);
         var settings = (await first.GetSettingsAsync()).Settings;
         settings.UseEmployeeAbbreviations = false;
+        settings.InterventionMessageTemplate = "Squadra {Crew}\n{Labors}";
         await first.SaveSettingsAsync(settings);
-        Assert.False((await second.GetLatestAsync(_monday, _monday.AddDays(7))).Settings.UseEmployeeAbbreviations);
+        var updated = await second.GetLatestAsync(_monday, _monday.AddDays(7));
+        Assert.False(updated.Settings.UseEmployeeAbbreviations);
+        Assert.Equal(settings.InterventionMessageTemplate, updated.Settings.InterventionMessageTemplate);
         var entry = latest.Entries.Single();
         await second.DeleteEntryAsync(entry.Id, entry.Revision);
         Assert.Empty((await first.GetLatestAsync(_monday, _monday.AddDays(7))).Entries);
@@ -49,6 +52,28 @@ public sealed class WorkScheduleServiceTests : IDisposable
         await Assert.ThrowsAsync<IOException>(() => restarted.DeleteEntryAsync(cached.Entries[0].Id, cached.Entries[0].Revision));
         Assert.Single(restarted.CachedSnapshot(_monday, _monday.AddDays(7)).Entries);
         Assert.False(restarted.CachedSnapshot(_monday.AddDays(7), _monday.AddDays(14)).HasCachedData);
+    }
+
+    [Fact]
+    public async Task SharedMessageTemplateSurvivesAnOfflineRestartWithoutChangingInterventions()
+    {
+        var first = Pc("first");
+        var saved = Assert.Single(await first.SaveEntriesAsync([Entry(_monday)]));
+        var settings = (await first.GetSettingsAsync()).Settings;
+        settings.InterventionMessageTemplate = "{Crew}\nLavori da eseguire\n{Labors}";
+        await first.SaveSettingsAsync(settings);
+        await Pc("second").GetLatestAsync(_monday, _monday.AddDays(7));
+
+        _database.Unavailable = true;
+        var restarted = Pc("second");
+        var snapshot = await restarted.GetLatestAsync(_monday, _monday.AddDays(7));
+
+        Assert.False(snapshot.IsCurrent);
+        Assert.Equal(settings.InterventionMessageTemplate, snapshot.Settings.InterventionMessageTemplate);
+        Assert.Equal(settings.InterventionMessageTemplate, (await restarted.GetSettingsAsync()).Settings.InterventionMessageTemplate);
+        Assert.Equal(saved.Revision, Assert.Single(snapshot.Entries).Revision);
+        Assert.Equal(saved.StartMinutes, snapshot.Entries[0].StartMinutes);
+        Assert.Equal(saved.EndMinutes, snapshot.Entries[0].EndMinutes);
     }
 
     [Fact]

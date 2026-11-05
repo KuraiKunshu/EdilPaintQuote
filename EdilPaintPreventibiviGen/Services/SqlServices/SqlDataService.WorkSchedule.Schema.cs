@@ -27,8 +27,10 @@ public partial class SqlDataService
             "MorningEndMinutes" integer NOT NULL,
             "AfternoonStartMinutes" integer NOT NULL,
             "AfternoonEndMinutes" integer NOT NULL,
-            "UseEmployeeAbbreviations" boolean NOT NULL
+            "UseEmployeeAbbreviations" boolean NOT NULL,
+            "InterventionMessageTemplate" text NOT NULL DEFAULT ''
         );
+        ALTER TABLE "WorkScheduleSettings" ADD COLUMN IF NOT EXISTS "InterventionMessageTemplate" text NOT NULL DEFAULT '';
         CREATE TABLE IF NOT EXISTS "WorkScheduleEntries" (
             "Id" uuid NOT NULL PRIMARY KEY,
             "QuoteId" integer NULL REFERENCES "Quotes" ("Id") ON DELETE RESTRICT,
@@ -77,8 +79,11 @@ public partial class SqlDataService
                 [MorningEndMinutes] int NOT NULL,
                 [AfternoonStartMinutes] int NOT NULL,
                 [AfternoonEndMinutes] int NOT NULL,
-                [UseEmployeeAbbreviations] bit NOT NULL
+                [UseEmployeeAbbreviations] bit NOT NULL,
+                [InterventionMessageTemplate] nvarchar(max) NOT NULL DEFAULT N''
             );
+        IF COL_LENGTH(N'dbo.WorkScheduleSettings', N'InterventionMessageTemplate') IS NULL
+            ALTER TABLE [dbo].[WorkScheduleSettings] ADD [InterventionMessageTemplate] nvarchar(max) NOT NULL DEFAULT N'' WITH VALUES;
         IF OBJECT_ID(N'[dbo].[WorkScheduleEntries]', N'U') IS NULL
             CREATE TABLE [dbo].[WorkScheduleEntries] (
                 [Id] uniqueidentifier NOT NULL PRIMARY KEY,

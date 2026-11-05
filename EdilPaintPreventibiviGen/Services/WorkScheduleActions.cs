@@ -92,8 +92,11 @@ public static class WorkScheduleActions
         var quote = await App.DataService.GetQuoteByNumberAsync(intervention.QuoteNumber, token, includeAttachments: false)
             ?? throw new InvalidOperationException("Ordine non trovato nello storico.");
         var customers = await App.DataService.GetCustomersAsync(token);
+        var settings = App.WorkSchedule == null ? new WorkScheduleSettings()
+            : (await App.WorkSchedule.GetSettingsAsync(token)).Settings;
         token.ThrowIfCancellationRequested();
-        Clipboard.SetDataObject(SupplierOrderSummaryText.Format(intervention, quote, customers), copy: true);
+        Clipboard.SetDataObject(SupplierOrderSummaryText.Format(intervention, quote, customers,
+            settings.InterventionMessageTemplate), copy: true);
     }
 
     public static async Task GenerateWorkSheetAsync(WorkScheduleEntry selectedEntry, Window owner, CancellationToken token = default)

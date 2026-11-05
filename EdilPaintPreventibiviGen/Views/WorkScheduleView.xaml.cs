@@ -166,52 +166,46 @@ public partial class WorkScheduleView : UserControl, IDisposable
             .Select(entry => new WorkScheduleCard(entry, snapshot.Settings.UseEmployeeAbbreviations, this,
                 conflictsByEntry.GetValueOrDefault(entry.Id, string.Empty), snapshot.IsCurrent, entry.QuoteNumber == _selectedQuoteNumber))
             .ToList();
-        var days = BuildDays(cards);
-        ItemsAgenda.ItemsSource = days;
-
-        if (ChkGroupByCrew.IsChecked == true && cards.Count > 0)
+        var days = Enumerable.Range(0, 7).Select(offset =>
         {
-            var cardsById = cards.ToDictionary(card => card.Entry.Id);
-            var groups = WorkScheduleCrewGrouping.Group(cards.Select(card => card.Entry))
+            var date = _weekStart.AddDays(offset);
+            var entries = cards.Where(card => card.Entry.Date.Date == date).ToList();
+            var culture = CultureInfo.GetCultureInfo("it-IT");
+            return new WorkScheduleDay
+            {
+                Date = date,
+                WeekDay = culture.TextInfo.ToTitleCase(date.ToString("dddd", culture)),
+                DayLabel = date.ToString("dd MMM", culture),
+                Entries = entries,
+                Groups = BuildGroups(date, entries),
+                CountLabel = DayCountLabel(entries),
+                Background = (Brush)FindResource(date == DateTime.Today ? "SelectedTabBrush" : "SectionPanelBackgroundBrush"),
+                CanEdit = snapshot.IsCurrent,
+                EmptyVisibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed
+            };
+        }).ToList();
+        ItemsDays.ItemsSource = ItemsAgenda.ItemsSource = days;
+
+        IReadOnlyList<WorkScheduleDayGroup> BuildGroups(DateTime date, List<WorkScheduleCard> entries)
+        {
+            if (ChkGroupByCrew.IsChecked != true)
+                return [new WorkScheduleDayGroup(date, string.Empty, entries)];
+
+            var cardsById = entries.ToDictionary(card => card.Entry.Id);
+            var groups = WorkScheduleCrewGrouping.Group(entries.Select(card => card.Entry))
                 .Select(group =>
                 {
                     var first = group.First();
                     var crew = first.EmployeeIds.ToArray();
                     string title = crew.Length == 0 ? "Squadra da assegnare" : $"Squadra · {cardsById[first.Id].Crew}";
-                    return new WorkScheduleWeekGroup(title, BuildDays(group.Select(entry => cardsById[entry.Id]).ToList(), crew), crew.Length == 0);
+                    return new WorkScheduleDayGroup(date, title, group.Select(entry => cardsById[entry.Id]).ToList(), crew, snapshot.IsCurrent);
                 })
-                .OrderBy(group => group.IsUnassigned)
+                .OrderBy(group => group.CrewIds?.Count == 0)
                 .ThenBy(group => group.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
-            var absencesInWeek = cards.Where(card => card.Entry.Kind == WorkScheduleEntryKind.Absence).ToList();
-            if (absencesInWeek.Count > 0)
-                groups.Add(new WorkScheduleWeekGroup("Assenze e indisponibilità", BuildDays(absencesInWeek, showAdd: false)));
-            ItemsDays.ItemsSource = groups;
-        }
-        else
-            ItemsDays.ItemsSource = new[] { new WorkScheduleWeekGroup(string.Empty, days) };
-
-        IReadOnlyList<WorkScheduleDay> BuildDays(IReadOnlyList<WorkScheduleCard> source, IReadOnlyList<Guid>? crew = null, bool showAdd = true)
-        {
-            return Enumerable.Range(0, 7).Select(offset =>
-            {
-                var date = _weekStart.AddDays(offset);
-                var entries = source.Where(card => card.Entry.Date.Date == date).ToList();
-                var culture = CultureInfo.GetCultureInfo("it-IT");
-                return new WorkScheduleDay
-                {
-                    Date = date,
-                    WeekDay = culture.TextInfo.ToTitleCase(date.ToString("dddd", culture)),
-                    DayLabel = date.ToString("dd MMM", culture),
-                    Entries = entries,
-                    CrewIds = crew,
-                    CountLabel = DayCountLabel(entries),
-                    Background = (Brush)FindResource(date == DateTime.Today ? "SelectedTabBrush" : "SectionPanelBackgroundBrush"),
-                    CanEdit = snapshot.IsCurrent,
-                    AddVisibility = showAdd ? Visibility.Visible : Visibility.Collapsed,
-                    CardCrewVisibility = crew == null ? Visibility.Visible : Visibility.Collapsed,
-                    EmptyVisibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed
-                };
-            }).ToList();
+            var absencesInDay = entries.Where(card => card.Entry.Kind == WorkScheduleEntryKind.Absence).ToList();
+            if (absencesInDay.Count > 0)
+                groups.Add(new WorkScheduleDayGroup(date, "Assenze e indisponibilità", absencesInDay));
+            return groups;
         }
 
         RefreshOrders();
@@ -429,7 +423,8 @@ public partial class WorkScheduleView : UserControl, IDisposable
     private async void OnAbsenceClick(object sender, RoutedEventArgs e) => await OpenEditorAsync(absence: true);
     private async void OnAddForDayClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: WorkScheduleDay day }) await OpenEditorAsync(date: day.Date, crew: day.CrewIds);
+        if (sender is Button { Tag: WorkScheduleDay day }) await OpenEditorAsync(date: day.Date);
+        else if (sender is Button { Tag: WorkScheduleDayGroup group }) await OpenEditorAsync(date: group.Date, crew: group.CrewIds);
     }
     private async void OnEntryClick(object sender, RoutedEventArgs e)
     {
@@ -587,17 +582,18 @@ public partial class WorkScheduleView : UserControl, IDisposable
         public string DayLabel { get; init; } = string.Empty;
         public string CountLabel { get; init; } = string.Empty;
         public List<WorkScheduleCard> Entries { get; init; } = [];
-        public IReadOnlyList<Guid>? CrewIds { get; init; }
+        public IReadOnlyList<WorkScheduleDayGroup> Groups { get; init; } = [];
         public Brush Background { get; init; } = Brushes.White;
         public bool CanEdit { get; init; }
-        public Visibility AddVisibility { get; init; }
-        public Visibility CardCrewVisibility { get; init; }
         public Visibility EmptyVisibility { get; init; }
     }
 
-    private sealed record WorkScheduleWeekGroup(string Title, IReadOnlyList<WorkScheduleDay> Days, bool IsUnassigned = false)
+    private sealed record WorkScheduleDayGroup(DateTime Date, string Title, IReadOnlyList<WorkScheduleCard> Entries,
+        IReadOnlyList<Guid>? CrewIds = null, bool CanEdit = false)
     {
         public Visibility TitleVisibility => Title.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility AddVisibility => CrewIds != null ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility CardCrewVisibility => CrewIds == null ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private sealed record EmployeeFilterOption(Guid? Id, string Label);

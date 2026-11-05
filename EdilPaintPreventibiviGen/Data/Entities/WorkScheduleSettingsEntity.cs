@@ -11,4 +11,5 @@ public sealed class WorkScheduleSettingsEntity
     public int AfternoonStartMinutes { get; set; } = 13 * 60;
     public int AfternoonEndMinutes { get; set; } = 17 * 60;
     public bool UseEmployeeAbbreviations { get; set; } = true;
+    public string InterventionMessageTemplate { get; set; } = string.Empty;
 }

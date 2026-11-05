@@ -1,4 +1,6 @@
+using EdilPaintPreventibiviGen.Data.Entities;
 using EdilPaintPreventibiviGen.Models;
+using EdilPaintPreventibiviGen.Services;
 using Xunit;
 
 namespace EdilPaintPreventibiviGen.Tests;
@@ -13,6 +15,7 @@ public sealed class WorkScheduleSettingsTests
         Assert.Equal((480, 720), settings.GetRange(WorkScheduleSlotKind.Morning));
         Assert.Equal((780, 1020), settings.GetRange(WorkScheduleSlotKind.Afternoon));
         Assert.True(settings.UseEmployeeAbbreviations);
+        Assert.Equal(WorkScheduleSettings.DefaultInterventionMessageTemplate, settings.InterventionMessageTemplate);
     }
 
     [Theory]
@@ -60,11 +63,15 @@ public sealed class WorkScheduleSettingsTests
     [Fact]
     public void ValidatedCopyPreservesSharedRevisionAndDisplayChoice()
     {
-        var original = new WorkScheduleSettings { Revision = 12, UseEmployeeAbbreviations = false };
+        var original = new WorkScheduleSettings
+        {
+            Revision = 12, UseEmployeeAbbreviations = false, InterventionMessageTemplate = "Squadra {Crew}\n{Labors}"
+        };
         var copy = original.CreateValidatedCopy();
         Assert.NotSame(original, copy);
         Assert.Equal(12, copy.Revision);
         Assert.False(copy.UseEmployeeAbbreviations);
+        Assert.Equal(original.InterventionMessageTemplate, copy.InterventionMessageTemplate);
         copy.MorningEndMinutes = 11 * 60;
         Assert.Equal(12 * 60, original.MorningEndMinutes);
     }
@@ -72,4 +79,35 @@ public sealed class WorkScheduleSettingsTests
     [Fact]
     public void CustomInterventionsRequireTheirOwnTimeRange()
         => Assert.Throws<InvalidOperationException>(() => new WorkScheduleSettings().GetRange(WorkScheduleSlotKind.Custom));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" \r\n ")]
+    public void EmptyTemplatesFromOlderSettingsOrDatabaseRowsUseTheDefault(string? template)
+    {
+        var original = new WorkScheduleSettings { InterventionMessageTemplate = template! };
+        Assert.Equal(WorkScheduleSettings.DefaultInterventionMessageTemplate,
+            original.CreateValidatedCopy().InterventionMessageTemplate);
+        Assert.Equal(template, original.InterventionMessageTemplate);
+
+        var restored = SqlDataService.ScheduleSettingsToModel(new WorkScheduleSettingsEntity
+        {
+            Revision = 8, InterventionMessageTemplate = template!
+        });
+        Assert.Equal(8, restored.Revision);
+        Assert.Equal(WorkScheduleSettings.DefaultInterventionMessageTemplate, restored.InterventionMessageTemplate);
+    }
+
+    [Fact]
+    public void TemplatesHaveAnExplicitUpperBoundBeforeBeingSaved()
+    {
+        var settings = new WorkScheduleSettings
+        {
+            InterventionMessageTemplate = new string('a', WorkScheduleSettings.MaxInterventionMessageTemplateLength)
+        };
+        Assert.Equal(settings.InterventionMessageTemplate, settings.CreateValidatedCopy().InterventionMessageTemplate);
+        settings.InterventionMessageTemplate += "a";
+        Assert.Throws<InvalidOperationException>(() => settings.CreateValidatedCopy());
+    }
 }

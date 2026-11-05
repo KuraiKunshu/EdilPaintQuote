@@ -532,6 +532,8 @@ public sealed class WorkScheduleRulesTests
             x.PrincipalEntityType.ClrType == typeof(EmployeeEntity)).DeleteBehavior);
         var settings = db.Model.FindEntityType(typeof(WorkScheduleSettingsEntity))!;
         Assert.True(settings.FindProperty(nameof(WorkScheduleSettingsEntity.Revision))!.IsConcurrencyToken);
+        Assert.False(settings.FindProperty(nameof(WorkScheduleSettingsEntity.InterventionMessageTemplate))!.IsNullable);
+        Assert.Equal(string.Empty, settings.FindProperty(nameof(WorkScheduleSettingsEntity.InterventionMessageTemplate))!.GetDefaultValue());
         string script = db.Database.GenerateCreateScript();
         Assert.Contains("WorkScheduleAssignments", script);
         Assert.Contains("SettingsRevision", script);
@@ -562,6 +564,9 @@ public sealed class WorkScheduleRulesTests
         Assert.Contains("WorkScheduleSettings", schema);
         Assert.Contains("WorkScheduleEntries", schema);
         Assert.Contains("WorkScheduleAssignments", schema);
+        Assert.Contains(postgres
+            ? "ADD COLUMN IF NOT EXISTS \"InterventionMessageTemplate\" text NOT NULL DEFAULT ''"
+            : "IF COL_LENGTH(N'dbo.WorkScheduleSettings', N'InterventionMessageTemplate') IS NULL", schema);
         Assert.Equal("EdilPaint.SharedStaffPlanning", WorkScheduleDatabaseLock.Resource);
     }
 

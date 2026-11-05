@@ -86,6 +86,7 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
             entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.InterventionMessageTemplate).IsRequired().HasDefaultValue(string.Empty);
         });
 
         modelBuilder.Entity<WorkScheduleEntryEntity>(entity =>

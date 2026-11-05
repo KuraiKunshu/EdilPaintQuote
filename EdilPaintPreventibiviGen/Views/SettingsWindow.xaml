@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:models="clr-namespace:EdilPaintPreventibiviGen.Models"
         Title="Impostazioni"
         Width="1000"
         Height="780"
@@ -877,12 +878,12 @@
                         <TabItem x:Name="TabCalendarSettings" Header="_Calendario">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
                                 <StackPanel Margin="18,16,18,6">
-                                    <TextBlock Text="Orari del calendario" Style="{StaticResource PageTitleStyle}"/>
-                                    <TextBlock Text="Orari e visualizzazione della squadra sono condivisi tra tutti i PC. Usa il formato 08:00."
+                                    <TextBlock Text="Calendario lavori" Style="{StaticResource PageTitleStyle}"/>
+                                    <TextBlock Text="Orari, visualizzazione della squadra e fac-simile del riepilogo sono condivisi tra tutti i PC. Usa il formato 08:00 per gli orari."
                                                Style="{StaticResource PageSubtitleStyle}" TextWrapping="Wrap"/>
                                     <TextBlock x:Name="TxtCalendarSyncStatus" TextWrapping="Wrap" Margin="0,12,0,12"
                                                Foreground="{StaticResource MutedTextBrush}"/>
-                                    <Button x:Name="BtnRefreshCalendarSettings" Content="Ricarica orari" HorizontalAlignment="Left"
+                                    <Button x:Name="BtnRefreshCalendarSettings" Content="Ricarica impostazioni calendario" HorizontalAlignment="Left"
                                             Margin="0,0,0,16" Style="{StaticResource SecondaryActionButtonStyle}" Click="OnRefreshCalendarSettingsClick"/>
                                     <Border Style="{StaticResource SectionStyle}">
                                         <StackPanel x:Name="CalendarSettingsEditor">
@@ -910,6 +911,28 @@
                                             </Grid>
                                             <CheckBox x:Name="ChkCalendarUseAbbreviations" Content="Mostra le sigle dei dipendenti nel calendario" Margin="0,16,0,8"/>
                                             <TextBlock Text="Se una persona non ha una sigla, viene mostrato il suo nome." TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                            <TextBlock Text="Riepilogo da copiare per la squadra" Style="{StaticResource SectionTitleStyle}" Margin="0,24,0,8"/>
+                                            <TextBlock Text="Personalizza il messaggio copiato dagli interventi del calendario. Sposta i segnaposto per cambiare l’ordine delle informazioni oppure aggiungi il testo che usi abitualmente."
+                                                       TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10"/>
+                                            <TextBox x:Name="TxtInterventionMessageTemplate" MinHeight="190" MaxHeight="340"
+                                                     MaxLength="{x:Static models:WorkScheduleSettings.MaxInterventionMessageTemplateLength}"
+                                                     AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"
+                                                     VerticalScrollBarVisibility="Auto" TextChanged="OnInterventionMessageTemplateChanged"
+                                                     AutomationProperties.Name="Fac-simile messaggio alla squadra"/>
+                                            <TextBlock Style="{StaticResource HintStyle}"
+                                                       Text="Blocchi completi: {ContactDetails}, {InterventionDetails}, {MaterialDetails}, {LaborDetails}, {Notes}, {InternalNotes}, {InterventionNotes}. I blocchi comprendono titoli e dati."/>
+                                            <Expander Header="Segnaposto per i singoli dati" Margin="0,10,0,0" HorizontalContentAlignment="Stretch">
+                                                <TextBlock Text="{}{CustomerName}, {ReferenceName}, {Address}, {Phone}, {InterventionDate}, {InterventionTime}, {Crew}, {MaterialStatus}, {Materials}, {Labors}, {QuoteNumber}, {CustomerNotes}, {InternalNotesText}, {InterventionNotesText}."
+                                                           TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0"/>
+                                            </Expander>
+                                            <Button Content="Ripristina fac-simile" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                    Style="{StaticResource SecondaryActionButtonStyle}" Click="OnResetInterventionMessageClick"/>
+                                            <Expander Header="Anteprima con dati di esempio" IsExpanded="True" Margin="0,16,0,0" HorizontalContentAlignment="Stretch">
+                                                <TextBox x:Name="TxtInterventionMessagePreview" IsReadOnly="True" MinHeight="160" MaxHeight="360"
+                                                         TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                                         VerticalContentAlignment="Top" Margin="0,8,0,0"
+                                                         AutomationProperties.Name="Anteprima messaggio alla squadra"/>
+                                            </Expander>
                                         </StackPanel>
                                     </Border>
                                     <Border Style="{StaticResource SectionStyle}" Margin="0,16,0,0">

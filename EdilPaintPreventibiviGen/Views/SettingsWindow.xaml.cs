@@ -402,7 +402,7 @@ public partial class SettingsWindow : Window
             _isSaving = true;
             IsEnabled = false;
             if (scheduleChanged && (!_scheduleSettingsCurrent || App.WorkSchedule == null))
-                throw new InvalidOperationException("Ricarica gli orari dal database prima di modificarli.");
+                throw new InvalidOperationException("Ricarica le impostazioni del calendario dal database prima di modificarle.");
             if (automaticMaterialsChanged && (!_automaticSettingsCurrent || App.AutomaticMaterials == null))
                 throw new InvalidOperationException("Ricarica le regole dei materiali dal database prima di modificarle.");
             if (employeeChanges.Count > 0)
@@ -520,7 +520,7 @@ public partial class SettingsWindow : Window
         {
             MessageBox.Show(
                 (employeesSaved || calendarSaved || automaticMaterialsSaved
-                    ? $"Salvati nel database: {string.Join(" e ", new[] { employeesSaved ? "dipendenti" : null, calendarSaved ? "orari del calendario" : null, automaticMaterialsSaved ? "regole materiali automatici" : null }.Where(x => x != null))}. Non è stato possibile completare le altre modifiche."
+                    ? $"Salvati nel database: {string.Join(" e ", new[] { employeesSaved ? "dipendenti" : null, calendarSaved ? "impostazioni del calendario" : null, automaticMaterialsSaved ? "regole materiali automatici" : null }.Where(x => x != null))}. Non è stato possibile completare le altre modifiche."
                     : "Impossibile salvare le impostazioni.") + $"\n\n{ex.Message}",
                 "Errore salvataggio",
                 MessageBoxButton.OK,
@@ -763,7 +763,8 @@ public partial class SettingsWindow : Window
             FullDayStartMinutes = Parse(TxtFullDayStart), FullDayEndMinutes = Parse(TxtFullDayEnd),
             MorningStartMinutes = Parse(TxtMorningStart), MorningEndMinutes = Parse(TxtMorningEnd),
             AfternoonStartMinutes = Parse(TxtAfternoonStart), AfternoonEndMinutes = Parse(TxtAfternoonEnd),
-            UseEmployeeAbbreviations = ChkCalendarUseAbbreviations.IsChecked == true
+            UseEmployeeAbbreviations = ChkCalendarUseAbbreviations.IsChecked == true,
+            InterventionMessageTemplate = TxtInterventionMessageTemplate.Text
         }.CreateValidatedCopy();
     }
 
@@ -771,7 +772,8 @@ public partial class SettingsWindow : Window
         first.FullDayStartMinutes == second.FullDayStartMinutes && first.FullDayEndMinutes == second.FullDayEndMinutes &&
         first.MorningStartMinutes == second.MorningStartMinutes && first.MorningEndMinutes == second.MorningEndMinutes &&
         first.AfternoonStartMinutes == second.AfternoonStartMinutes && first.AfternoonEndMinutes == second.AfternoonEndMinutes &&
-        first.UseEmployeeAbbreviations == second.UseEmployeeAbbreviations;
+        first.UseEmployeeAbbreviations == second.UseEmployeeAbbreviations &&
+        string.Equals(first.InterventionMessageTemplate, second.InterventionMessageTemplate, StringComparison.Ordinal);
 
     private bool HasScheduleSettingsChanges()
     {
@@ -792,18 +794,28 @@ public partial class SettingsWindow : Window
         TxtAfternoonStart.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.AfternoonStartMinutes);
         TxtAfternoonEnd.Text = WorkScheduleSettings.FormatTime(snapshot.Settings.AfternoonEndMinutes);
         ChkCalendarUseAbbreviations.IsChecked = snapshot.Settings.UseEmployeeAbbreviations;
+        TxtInterventionMessageTemplate.Text = _originalScheduleSettings.InterventionMessageTemplate;
         CalendarSettingsEditor.IsEnabled = snapshot.IsCurrent;
     }
+
+    private void OnInterventionMessageTemplateChanged(object sender, TextChangedEventArgs e)
+    {
+        if (TxtInterventionMessagePreview != null)
+            TxtInterventionMessagePreview.Text = SupplierOrderSummaryText.CreatePreview(TxtInterventionMessageTemplate.Text);
+    }
+
+    private void OnResetInterventionMessageClick(object sender, RoutedEventArgs e)
+        => TxtInterventionMessageTemplate.Text = WorkScheduleSettings.DefaultInterventionMessageTemplate;
 
     private async Task RefreshScheduleSettingsAsync(bool automatic, CancellationToken token)
     {
         bool modified = HasScheduleSettingsChanges();
         if (string.IsNullOrWhiteSpace(TxtCalendarSyncStatus.Text))
-            TxtCalendarSyncStatus.Text = "Caricamento degli orari dal database...";
+            TxtCalendarSyncStatus.Text = "Caricamento delle impostazioni calendario dal database...";
         if (!automatic)
         {
             CalendarSettingsEditor.IsEnabled = false;
-            TxtCalendarSyncStatus.Text = "Caricamento degli orari dal database...";
+            TxtCalendarSyncStatus.Text = "Caricamento delle impostazioni calendario dal database...";
         }
         try
         {
@@ -824,12 +836,12 @@ public partial class SettingsWindow : Window
             _scheduleSettingsCurrent = snapshot.IsCurrent;
             CalendarSettingsEditor.IsEnabled = snapshot.IsCurrent;
             TxtCalendarSyncStatus.Text = !snapshot.IsCurrent
-                ? "Database non disponibile: gli ultimi orari scaricati sono consultabili. Le modifiche richiedono la connessione."
+                ? "Database non disponibile: le ultime impostazioni calendario scaricate sono consultabili. Le modifiche richiedono la connessione."
                 : modified && automatic && remoteChanged
-                    ? "Gli orari sono cambiati su un altro PC. Le tue modifiche non salvate sono conservate; ricarica per vedere gli aggiornamenti."
+                    ? "Le impostazioni calendario sono cambiate su un altro PC. Le tue modifiche non salvate sono conservate; ricarica per vedere gli aggiornamenti."
                     : modified && automatic
-                        ? "Modifiche non ancora salvate. Gli orari condivisi vengono controllati automaticamente."
-                        : $"Orari aggiornati dal database{(snapshot.UpdatedAtUtc is { } updated ? $" alle {updated.ToLocalTime():HH:mm:ss}" : string.Empty)}. Aggiornamento automatico ogni 10 secondi.";
+                        ? "Modifiche non ancora salvate. Le impostazioni calendario condivise vengono controllate automaticamente."
+                        : $"Impostazioni calendario aggiornate dal database{(snapshot.UpdatedAtUtc is { } updated ? $" alle {updated.ToLocalTime():HH:mm:ss}" : string.Empty)}. Aggiornamento automatico ogni 10 secondi.";
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -844,8 +856,8 @@ public partial class SettingsWindow : Window
     {
         if (_isRefreshingShared || _isSaving) return;
         if (HasScheduleSettingsChanges() && MessageBox.Show(this,
-                "Ricaricare gli orari e scartare le modifiche al calendario non ancora salvate?",
-                "Ricarica orari", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                "Ricaricare le impostazioni calendario e scartare le modifiche non ancora salvate?",
+                "Ricarica impostazioni calendario", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         if (_isRefreshingShared || _isSaving || _employeeLoadCts.IsCancellationRequested) return;
         // Explicit reload of one tab must preserve unsaved edits in the other tab.
         await StartSharedTabRefreshAsync(TabCalendarSettings, automatic: false);
