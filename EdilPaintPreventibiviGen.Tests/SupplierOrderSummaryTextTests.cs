@@ -75,6 +75,43 @@ public sealed class SupplierOrderSummaryTextTests
             """.ReplaceLineEndings(), SupplierOrderSummaryText.Format(order, quote, customers));
     }
 
+    [Fact]
+    public void CalendarSummaryAddsTheAssignedCrewScheduleAndInterventionNotes()
+    {
+        var intervention = new WorkScheduleEntry
+        {
+            Date = new DateTime(2026, 11, 9), StartMinutes = 8 * 60, EndMinutes = 12 * 60 + 30,
+            Employees = [new() { FirstName = "Anna", LastName = "Verdi", Abbreviation = "AV" }, new() { FirstName = "Luca" }],
+            Notes = "Accesso dal retro"
+        };
+        var quote = new QuoteHistoryEntry
+        {
+            CustomerName = "Impresa Rossi", SiteName = "Via Roma 12", MaterialStatus = "Da ritirare",
+            Materials = [new Item { Name = "Finestra", Quantity = 2 }],
+            Notes = "Verificare la consegna"
+        };
+
+        Assert.Equal("""
+            Cliente: Impresa Rossi
+            Indirizzo cantiere: Via Roma 12
+            Telefono cliente: 030 123456
+
+            Intervento: lunedì 09/11/2026 · 08:00–12:30
+            Squadra: Anna Verdi, Luca
+
+            Stato materiale: Da ritirare
+            Materiali:
+            2 pz — Finestra
+
+            Note interne:
+            Verificare la consegna
+
+            Note intervento:
+            Accesso dal retro
+            """.ReplaceLineEndings(), SupplierOrderSummaryText.Format(intervention, quote,
+                [new Customer { BusinessName = "Impresa Rossi", Phone = "030 123456" }]));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

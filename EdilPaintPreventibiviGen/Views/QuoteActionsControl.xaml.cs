@@ -43,16 +43,23 @@ public partial class QuoteActionsControl : UserControl
     }
 
     private static void OnQuoteChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
-        => ((QuoteActionsControl)sender).UpdateButtons();
+    {
+        var control = (QuoteActionsControl)sender;
+        if (control.BtnCopySummary != null && (e.Property == QuoteNumberProperty || e.Property == ScheduleEntryProperty))
+            control.BtnCopySummary.Content = "Copia riepilogo";
+        control.UpdateButtons();
+    }
 
     private void UpdateButtons()
     {
-        if (BtnPdf == null || BtnActions == null || BtnComplete == null) return;
+        if (BtnPdf == null || BtnActions == null || BtnComplete == null || BtnCopySummary == null) return;
         BtnPdf.IsEnabled = BtnActions.IsEnabled = !IsBusy && !string.IsNullOrWhiteSpace(QuoteNumber);
         bool savedJob = ScheduleEntry is { Kind: WorkScheduleEntryKind.Job, Revision: > 0 };
         BtnComplete.Visibility = savedJob ? Visibility.Visible : Visibility.Collapsed;
         BtnComplete.IsEnabled = savedJob && CanComplete && !IsBusy;
         BtnComplete.Content = ScheduleEntry?.Status == WorkScheduleEntryStatus.Completed ? "PDF costi" : "Finito e costi";
+        BtnCopySummary.Visibility = savedJob && !string.IsNullOrWhiteSpace(QuoteNumber) ? Visibility.Visible : Visibility.Collapsed;
+        BtnCopySummary.IsEnabled = !IsBusy && ScheduleEntry?.IsOrderDeleted == false;
     }
 
     private async void OnCompleteClick(object sender, RoutedEventArgs e)
@@ -79,6 +86,17 @@ public partial class QuoteActionsControl : UserControl
         e.Handled = true;
         string number = QuoteNumber;
         await ExecuteAsync((owner, token) => QuoteDocumentActions.OpenPdfAsync(number, owner, token));
+    }
+
+    private async void OnCopySummaryClick(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (ScheduleEntry is not { Kind: WorkScheduleEntryKind.Job, Revision: > 0, IsOrderDeleted: false } entry) return;
+        await ExecuteAsync(async (_, token) =>
+        {
+            await WorkScheduleActions.CopySummaryAsync(entry.CreateValidatedCopy(), token);
+            if (ScheduleEntry?.Id == entry.Id) BtnCopySummary.Content = "Riepilogo copiato";
+        });
     }
 
     private void OnActionsClick(object sender, RoutedEventArgs e)

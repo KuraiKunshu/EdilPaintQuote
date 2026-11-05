@@ -40,9 +40,11 @@ public partial class WorkScheduleEditorWindow : Window
     private bool _closed;
     private bool _applyingPreset;
     public bool HasChangesSaved { get; private set; }
+    internal WorkScheduleEntry? FollowUpFrom { get; private set; }
 
     public WorkScheduleEditorWindow(WorkScheduleSnapshot snapshot, WorkScheduleOrder? order = null,
-        WorkScheduleEntry? entry = null, bool absence = false, DateTime? date = null)
+        WorkScheduleEntry? entry = null, bool absence = false, DateTime? date = null,
+        IReadOnlyList<Guid>? crew = null, WorkScheduleSlotKind initialSlot = WorkScheduleSlotKind.FullDay)
     {
         _settings = snapshot.Settings.CreateValidatedCopy();
         _original = entry?.CreateValidatedCopy();
@@ -69,6 +71,7 @@ public partial class WorkScheduleEditorWindow : Window
             ? "Consulta l’intervento e i documenti salvati. Connettiti al database per modificare il calendario."
             : _absence ? "Indica il motivo, il periodo e le persone assenti. La disponibilità si aggiorna per tutti i PC."
             : entry != null ? "Aggiorna giorno, orario e squadra. Le modifiche saranno visibili su tutti i PC."
+            : crew is { Count: > 0 } ? "Scegli il cantiere e verifica giorno, orario e squadra già proposta."
             : "Scegli il cantiere, il giorno e le persone. Tutti i PC vedranno la stessa programmazione.";
         OrderPanel.Visibility = _absence ? Visibility.Collapsed : Visibility.Visible;
         OrderSearchPanel.Visibility = entry == null ? Visibility.Visible : Visibility.Collapsed;
@@ -81,7 +84,7 @@ public partial class WorkScheduleEditorWindow : Window
         EndDate.SelectedDate = StartDate.SelectedDate;
         DataObject.AddPastingHandler(StartDate, (_, _) => MarkDateInputPending(StartDate));
         DataObject.AddPastingHandler(EndDate, (_, _) => MarkDateInputPending(EndDate));
-        CmbSlot.SelectedIndex = (int)(entry?.SlotKind ?? WorkScheduleSlotKind.FullDay);
+        CmbSlot.SelectedIndex = (int)(entry?.SlotKind ?? initialSlot);
         SetSlotLabels();
         CmbStatus.SelectedIndex = entry?.Status == WorkScheduleEntryStatus.Completed ? 1 : 0;
         TxtAbsenceReason.Text = entry?.AbsenceReason ?? "Indisponibilità";
@@ -113,9 +116,10 @@ public partial class WorkScheduleEditorWindow : Window
         var directory = snapshot.Employees.ToDictionary(employee => employee.Id);
         // Historical people stay visible when consulting an intervention after a directory removal.
         foreach (var employee in entry?.Employees ?? []) directory.TryAdd(employee.Id, employee);
+        var assigned = (entry?.EmployeeIds ?? crew)?.ToHashSet();
         _employees.AddRange(directory.Values.Select(employee => new WorkScheduleEmployeeChoice
         {
-            Employee = employee.CreateValidatedCopy(), IsSelected = entry?.EmployeeIds.Contains(employee.Id) == true,
+            Employee = employee.CreateValidatedCopy(), IsSelected = assigned?.Contains(employee.Id) == true,
             DisplayName = $"{employee.FirstName} {employee.LastName}".Trim()
         }).OrderBy(employee => employee.DisplayName, StringComparer.CurrentCultureIgnoreCase));
         _employeeView = CollectionViewSource.GetDefaultView(_employees);
@@ -142,6 +146,7 @@ public partial class WorkScheduleEditorWindow : Window
         BtnDelete.Visibility = entry == null ? Visibility.Collapsed : Visibility.Visible;
         BtnDelete.IsEnabled = _canEdit;
         BtnSave.IsEnabled = _canEdit;
+        BtnSaveAndContinue.Visibility = _canEdit && entry == null && !_absence ? Visibility.Visible : Visibility.Collapsed;
         EditableFields.IsEnabled = _canEdit;
         ReadOnlyNotice.Visibility = _canEdit ? Visibility.Collapsed : Visibility.Visible;
         if (!_canEdit) BtnCancel.Content = "Chiudi";
@@ -149,6 +154,8 @@ public partial class WorkScheduleEditorWindow : Window
         else if (entry != null) BtnSave.Content = "Salva modifiche";
         _initializing = false;
         UpdateAvailability();
+        if (crew != null && crew.Any(id => !directory.ContainsKey(id)))
+            ShowError("Alcune persone della squadra non sono più in anagrafica. Verifica chi è assegnato prima di salvare.");
     }
 
     private WorkScheduleSlotKind SelectedSlot => (WorkScheduleSlotKind)Math.Max(0, CmbSlot.SelectedIndex);
@@ -349,6 +356,7 @@ public partial class WorkScheduleEditorWindow : Window
         if (_employeeView == null) return;
         if (refreshFilter) _employeeView.Refresh();
         var selected = _employees.Where(employee => employee.IsSelected).ToList();
+        BtnSaveAndContinue.IsEnabled = CanSaveAndContinue;
         TxtSelectedCount.Text = $"{selected.Count} {(selected.Count == 1 ? "persona" : "persone")}";
         TxtSelectedNames.Text = selected.Count == 0 ? (_absence ? "Seleziona almeno una persona per registrare l’assenza." : "Squadra da assegnare: puoi programmarla anche in seguito.") :
             string.Join(" · ", selected.Select(employee => employee.DisplayName));
@@ -455,12 +463,15 @@ public partial class WorkScheduleEditorWindow : Window
     private async void OnSaveClick(object sender, RoutedEventArgs e)
     {
         if (_busy || CommonQuoteActions.IsBusy || !_canEdit || App.WorkSchedule == null) return;
+        bool continuePlanning = ReferenceEquals(sender, BtnSaveAndContinue);
+        if (continuePlanning && !CanSaveAndContinue) return;
         try
         {
             var entries = BuildEntries();
             SetBusy(true, entries.Count == 1 ? "Salvataggio…" : $"Salvataggio di {entries.Count} interventi…");
-            await App.WorkSchedule.SaveEntriesAsync(entries, _lifetime.Token);
+            var saved = await App.WorkSchedule.SaveEntriesAsync(entries, _lifetime.Token);
             HasChangesSaved = true;
+            if (continuePlanning) FollowUpFrom = saved.MaxBy(entry => entry.Date);
             SetBusy(false);
             DialogResult = true;
         }
@@ -468,6 +479,9 @@ public partial class WorkScheduleEditorWindow : Window
         catch (Exception ex) { ShowError(ex.Message); }
         finally { if (!_closed) SetBusy(false); }
     }
+
+    private bool CanSaveAndContinue => _canEdit && !_absence && _original == null && !_busy &&
+        !CommonQuoteActions.IsBusy && _employees.Any(employee => employee.IsSelected);
 
     private async void OnDeleteClick(object sender, RoutedEventArgs e)
     {
@@ -493,6 +507,7 @@ public partial class WorkScheduleEditorWindow : Window
         bool interactionBusy = busy || CommonQuoteActions.IsBusy;
         EditableFields.IsEnabled = !interactionBusy && _canEdit;
         BtnSave.IsEnabled = !interactionBusy && _canEdit;
+        BtnSaveAndContinue.IsEnabled = CanSaveAndContinue;
         BtnDelete.IsEnabled = !interactionBusy && _canEdit;
         BtnCancel.IsEnabled = !interactionBusy;
         CommonQuoteActions.IsEnabled = !busy;

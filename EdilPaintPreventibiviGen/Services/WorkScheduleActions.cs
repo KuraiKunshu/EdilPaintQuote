@@ -87,6 +87,15 @@ public static class WorkScheduleActions
         AdditionalNotes = entry.Notes
     };
 
+    internal static async Task CopySummaryAsync(WorkScheduleEntry intervention, CancellationToken token)
+    {
+        var quote = await App.DataService.GetQuoteByNumberAsync(intervention.QuoteNumber, token, includeAttachments: false)
+            ?? throw new InvalidOperationException("Ordine non trovato nello storico.");
+        var customers = await App.DataService.GetCustomersAsync(token);
+        token.ThrowIfCancellationRequested();
+        Clipboard.SetDataObject(SupplierOrderSummaryText.Format(intervention, quote, customers), copy: true);
+    }
+
     public static async Task GenerateWorkSheetAsync(WorkScheduleEntry selectedEntry, Window owner, CancellationToken token = default)
     {
         if (selectedEntry.Kind != WorkScheduleEntryKind.Job)

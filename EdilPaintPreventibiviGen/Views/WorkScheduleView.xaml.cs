@@ -161,26 +161,59 @@ public partial class WorkScheduleView : UserControl, IDisposable
         CalendarFiltersExpander.Header = filtered ? "Filtri calendario · attivi" : "Cerca e filtra interventi";
         if (!string.IsNullOrWhiteSpace(search) || employeeId.HasValue || filter != WorkScheduleViewFilterKind.All)
             TxtCalendarSummary.Text = $"Risultati dei filtri: {visibleEntries.Count} attività · " + TxtCalendarSummary.Text;
-        var days = Enumerable.Range(0, 7).Select(offset =>
+        var cards = visibleEntries.OrderBy(entry => entry.StartMinutes)
+            .ThenBy(entry => entry.Title, StringComparer.CurrentCultureIgnoreCase)
+            .Select(entry => new WorkScheduleCard(entry, snapshot.Settings.UseEmployeeAbbreviations, this,
+                conflictsByEntry.GetValueOrDefault(entry.Id, string.Empty), snapshot.IsCurrent, entry.QuoteNumber == _selectedQuoteNumber))
+            .ToList();
+        var days = BuildDays(cards);
+        ItemsAgenda.ItemsSource = days;
+
+        if (ChkGroupByCrew.IsChecked == true && cards.Count > 0)
         {
-            var date = _weekStart.AddDays(offset);
-            var entries = visibleEntries.Where(entry => entry.Date.Date == date)
-                .OrderBy(entry => entry.StartMinutes).ThenBy(entry => entry.Title, StringComparer.CurrentCultureIgnoreCase)
-                .Select(entry => new WorkScheduleCard(entry, snapshot.Settings.UseEmployeeAbbreviations, this,
-                    conflictsByEntry.GetValueOrDefault(entry.Id, string.Empty), snapshot.IsCurrent, entry.QuoteNumber == _selectedQuoteNumber)).ToList();
-            return new WorkScheduleDay
+            var cardsById = cards.ToDictionary(card => card.Entry.Id);
+            var groups = WorkScheduleCrewGrouping.Group(cards.Select(card => card.Entry))
+                .Select(group =>
+                {
+                    var first = group.First();
+                    var crew = first.EmployeeIds.ToArray();
+                    string title = crew.Length == 0 ? "Squadra da assegnare" : $"Squadra · {cardsById[first.Id].Crew}";
+                    return new WorkScheduleWeekGroup(title, BuildDays(group.Select(entry => cardsById[entry.Id]).ToList(), crew), crew.Length == 0);
+                })
+                .OrderBy(group => group.IsUnassigned)
+                .ThenBy(group => group.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
+            var absencesInWeek = cards.Where(card => card.Entry.Kind == WorkScheduleEntryKind.Absence).ToList();
+            if (absencesInWeek.Count > 0)
+                groups.Add(new WorkScheduleWeekGroup("Assenze e indisponibilità", BuildDays(absencesInWeek, showAdd: false)));
+            ItemsDays.ItemsSource = groups;
+        }
+        else
+            ItemsDays.ItemsSource = new[] { new WorkScheduleWeekGroup(string.Empty, days) };
+
+        IReadOnlyList<WorkScheduleDay> BuildDays(IReadOnlyList<WorkScheduleCard> source, IReadOnlyList<Guid>? crew = null, bool showAdd = true)
+        {
+            return Enumerable.Range(0, 7).Select(offset =>
             {
-                Date = date,
-                WeekDay = CultureInfo.GetCultureInfo("it-IT").TextInfo.ToTitleCase(date.ToString("dddd", CultureInfo.GetCultureInfo("it-IT"))),
-                DayLabel = date.ToString("dd MMM", CultureInfo.GetCultureInfo("it-IT")),
-                Entries = entries,
-                CountLabel = DayCountLabel(entries),
-                Background = (Brush)FindResource(date == DateTime.Today ? "SelectedTabBrush" : "SectionPanelBackgroundBrush"),
-                CanEdit = snapshot.IsCurrent,
-                EmptyVisibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed
-            };
-        }).ToList();
-        ItemsDays.ItemsSource = ItemsAgenda.ItemsSource = days;
+                var date = _weekStart.AddDays(offset);
+                var entries = source.Where(card => card.Entry.Date.Date == date).ToList();
+                var culture = CultureInfo.GetCultureInfo("it-IT");
+                return new WorkScheduleDay
+                {
+                    Date = date,
+                    WeekDay = culture.TextInfo.ToTitleCase(date.ToString("dddd", culture)),
+                    DayLabel = date.ToString("dd MMM", culture),
+                    Entries = entries,
+                    CrewIds = crew,
+                    CountLabel = DayCountLabel(entries),
+                    Background = (Brush)FindResource(date == DateTime.Today ? "SelectedTabBrush" : "SectionPanelBackgroundBrush"),
+                    CanEdit = snapshot.IsCurrent,
+                    AddVisibility = showAdd ? Visibility.Visible : Visibility.Collapsed,
+                    CardCrewVisibility = crew == null ? Visibility.Visible : Visibility.Collapsed,
+                    EmptyVisibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed
+                };
+            }).ToList();
+        }
+
         RefreshOrders();
         BtnAbsence.IsEnabled = snapshot.IsCurrent;
         ConnectionNotice.Visibility = snapshot.IsCurrent ? Visibility.Collapsed : Visibility.Visible;
@@ -257,10 +290,11 @@ public partial class WorkScheduleView : UserControl, IDisposable
         bool agenda = BtnAgendaView.IsChecked == true;
         AgendaScroll.Visibility = agenda ? Visibility.Visible : Visibility.Collapsed;
         WeekScroll.Visibility = agenda ? Visibility.Collapsed : Visibility.Visible;
+        ChkGroupByCrew.Visibility = agenda ? Visibility.Collapsed : Visibility.Visible;
     }
     private void OnCalendarFilterChanged(object sender, RoutedEventArgs e)
     {
-        if (!_applyingView && ItemsDays != null && TxtCalendarSearch != null && CmbEmployeeFilter != null && CmbActivityFilter != null && ChkShowInactive != null)
+        if (!_applyingView && ItemsAgenda != null && ItemsDays != null && TxtCalendarSearch != null && CmbEmployeeFilter != null && CmbActivityFilter != null && ChkShowInactive != null)
             ApplySnapshot(_snapshot);
     }
     private void OnClearCalendarFiltersClick(object sender, RoutedEventArgs e)
@@ -333,7 +367,7 @@ public partial class WorkScheduleView : UserControl, IDisposable
         if (_selectedQuoteNumber == number) return;
         _selectedQuoteNumber = number;
         ItemsOrders.SelectedItem = _snapshot.Orders.FirstOrDefault(order => order.QuoteNumber == number);
-        if (ItemsDays.ItemsSource is IEnumerable<WorkScheduleDay> days)
+        if (ItemsAgenda.ItemsSource is IEnumerable<WorkScheduleDay> days)
             foreach (var card in days.SelectMany(day => day.Entries)) card.SetSelected(number.Length > 0 && card.Entry.QuoteNumber == number);
     }
     public Task EditEntryAsync(WorkScheduleEntry entry) => OpenEditorAsync(entry: entry);
@@ -395,7 +429,7 @@ public partial class WorkScheduleView : UserControl, IDisposable
     private async void OnAbsenceClick(object sender, RoutedEventArgs e) => await OpenEditorAsync(absence: true);
     private async void OnAddForDayClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: DateTime date }) await OpenEditorAsync(date: date);
+        if (sender is Button { Tag: WorkScheduleDay day }) await OpenEditorAsync(date: day.Date, crew: day.CrewIds);
     }
     private async void OnEntryClick(object sender, RoutedEventArgs e)
     {
@@ -408,10 +442,11 @@ public partial class WorkScheduleView : UserControl, IDisposable
         if (_embedded && sender is Button { Tag: WorkScheduleEntry entry }) { e.Handled = true; await OpenEditorAsync(entry: entry); }
     }
 
-    private async Task OpenEditorAsync(WorkScheduleEntry? entry = null, bool absence = false, DateTime? date = null)
+    private async Task OpenEditorAsync(WorkScheduleEntry? entry = null, bool absence = false, DateTime? date = null,
+        IReadOnlyList<Guid>? crew = null)
     {
         if (_editorOpen || DocumentsBusy || _closed || AppShutdownManager.IsShutdownRequested || (entry == null && !_snapshot.IsCurrent)) return;
-        var order = ItemsOrders.SelectedItem as WorkScheduleOrder;
+        var order = crew == null ? ItemsOrders.SelectedItem as WorkScheduleOrder : null;
         if (entry == null && !absence && order == null && _snapshot.Orders.Count == 0)
         {
             MessageBox.Show(HostWindow, "Non ci sono ordini attivi da programmare. Il calendario usa i lavori presenti nell’elenco Ordini.",
@@ -422,9 +457,43 @@ public partial class WorkScheduleView : UserControl, IDisposable
         try
         {
             var initialDate = date ?? (DateTime.Today >= _weekStart && DateTime.Today < _weekStart.AddDays(7) ? DateTime.Today : _weekStart);
-            var editor = new WorkScheduleEditorWindow(_snapshot, order, entry, absence, initialDate) { Owner = HostWindow };
-            editor.ShowDialog();
-            if (editor.HasChangesSaved) await RefreshAsync();
+            var initialSlot = WorkScheduleSlotKind.FullDay;
+            var snapshot = _snapshot;
+            while (!_closed && !DocumentsBusy && !AppShutdownManager.IsShutdownRequested)
+            {
+                var editor = new WorkScheduleEditorWindow(snapshot, order, entry, absence, initialDate, crew, initialSlot) { Owner = HostWindow };
+                editor.ShowDialog();
+                if (editor.FollowUpFrom is not { } previous)
+                {
+                    if (editor.HasChangesSaved) await RefreshAsync();
+                    break;
+                }
+
+                bool useAfternoon = previous.SlotKind == WorkScheduleSlotKind.Morning;
+                initialDate = useAfternoon || previous.Date == DateTime.MaxValue.Date ? previous.Date : previous.Date.AddDays(1);
+                initialSlot = useAfternoon ? WorkScheduleSlotKind.Afternoon : WorkScheduleSlotKind.FullDay;
+                var week = StartOfWeek(initialDate);
+                var service = App.WorkSchedule;
+                var updated = service == null ? null : await service.GetLatestAsync(week, week.AddDays(7), _lifetime.Token);
+                if (_closed || AppShutdownManager.IsShutdownRequested) break;
+                if (updated is not { IsCurrent: true } || updated.Orders.Count == 0)
+                {
+                    await RefreshAsync();
+                    if (!_closed)
+                        MessageBox.Show(HostWindow, "L’intervento è stato salvato. Per aggiungerne un altro serve un elenco aggiornato di ordini attivi.",
+                            "Programmazione lavori", MessageBoxButton.OK, MessageBoxImage.Information);
+                    break;
+                }
+
+                _weekStart = week;
+                UpdateWeekLabel();
+                ApplySnapshot(updated);
+                SnapshotChanged?.Invoke(this, EventArgs.Empty);
+                snapshot = updated;
+                crew = previous.EmployeeIds;
+                order = null;
+                entry = null;
+            }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
         catch (Exception ex)
@@ -478,6 +547,7 @@ public partial class WorkScheduleView : UserControl, IDisposable
         BtnClearFilters.IsEnabled = !busy;
         CalendarFiltersExpander.IsEnabled = !busy;
         BtnAgendaView.IsEnabled = BtnWeekView.IsEnabled = !busy;
+        ChkGroupByCrew.IsEnabled = !busy;
         UpdateNewButton();
         if (!busy)
         {
@@ -517,9 +587,17 @@ public partial class WorkScheduleView : UserControl, IDisposable
         public string DayLabel { get; init; } = string.Empty;
         public string CountLabel { get; init; } = string.Empty;
         public List<WorkScheduleCard> Entries { get; init; } = [];
+        public IReadOnlyList<Guid>? CrewIds { get; init; }
         public Brush Background { get; init; } = Brushes.White;
         public bool CanEdit { get; init; }
+        public Visibility AddVisibility { get; init; }
+        public Visibility CardCrewVisibility { get; init; }
         public Visibility EmptyVisibility { get; init; }
+    }
+
+    private sealed record WorkScheduleWeekGroup(string Title, IReadOnlyList<WorkScheduleDay> Days, bool IsUnassigned = false)
+    {
+        public Visibility TitleVisibility => Title.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private sealed record EmployeeFilterOption(Guid? Id, string Label);

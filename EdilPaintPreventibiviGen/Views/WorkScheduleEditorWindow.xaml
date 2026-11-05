@@ -296,6 +296,9 @@
                         <TextBlock x:Name="TxtBusy" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,12,0" TextWrapping="Wrap"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button x:Name="BtnCancel" Content="Annulla" Click="OnCancelClick" Margin="0,0,10,0"/>
+                            <Button x:Name="BtnSaveAndContinue" Content="Salva e programma un altro" Click="OnSaveClick"
+                                    Margin="0,0,10,0" Visibility="Collapsed" ToolTipService.ShowOnDisabled="True"
+                                    ToolTip="Salva questo lavoro e apri un nuovo intervento con la stessa squadra."/>
                             <Button x:Name="BtnSave" Content="Salva intervento" Click="OnSaveClick" Background="{StaticResource ModalPrimaryActionBrush}" Foreground="{StaticResource WhiteBrush}"/>
                         </StackPanel>
                     </Grid>

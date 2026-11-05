@@ -1,3 +1,4 @@
+using System.Globalization;
 using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
@@ -8,7 +9,18 @@ internal static class SupplierOrderSummaryText
         .Where(material => !string.IsNullOrWhiteSpace(material.Name))
         .OrderBy(material => material.SortOrder);
 
-    public static string Format(QuoteHistorySummary order, QuoteHistoryEntry quote, IEnumerable<Customer> customers)
+    public static string Format(WorkScheduleEntry intervention, QuoteHistoryEntry quote, IEnumerable<Customer> customers) =>
+        Format(new QuoteHistorySummary
+        {
+            CustomerName = intervention.CustomerName,
+            ReferenceName = intervention.ReferenceName,
+            Status = quote.Status,
+            MaterialStatus = quote.MaterialStatus,
+            MaterialsOrderedByCustomer = quote.MaterialsOrderedByCustomer
+        }, quote, customers, intervention);
+
+    public static string Format(QuoteHistorySummary order, QuoteHistoryEntry quote, IEnumerable<Customer> customers,
+        WorkScheduleEntry? intervention = null)
     {
         string customerName = string.IsNullOrWhiteSpace(quote.CustomerName) ? order.CustomerName : quote.CustomerName;
         string referenceName = string.IsNullOrWhiteSpace(quote.ReferenceName) ? order.ReferenceName : quote.ReferenceName;
@@ -26,6 +38,16 @@ internal static class SupplierOrderSummaryText
         if (!string.IsNullOrWhiteSpace(customer?.Phone))
             lines.Add($"Telefono cliente: {customer.Phone.Trim()}");
 
+        if (intervention != null)
+        {
+            string date = intervention.Date.ToString("dddd dd/MM/yyyy", CultureInfo.GetCultureInfo("it-IT"));
+            var crew = intervention.Employees.Select(employee => $"{employee.FirstName} {employee.LastName}".Trim())
+                .Where(name => name.Length > 0);
+            lines.Add("");
+            lines.Add($"Intervento: {date} · {intervention.TimeDisplay}");
+            lines.Add($"Squadra: {string.Join(", ", crew.DefaultIfEmpty("Da assegnare"))}");
+        }
+
         string status = SupplierOrderQueue.StatusDisplay(order);
         var materials = GetMaterials(quote)
             .Select(material => $"{material.QuantityDisplay} — {material.Name.Trim()}");
@@ -36,6 +58,7 @@ internal static class SupplierOrderSummaryText
 
         AddNotes("Note:", quote.CustomerNotes);
         AddNotes("Note interne:", quote.Notes);
+        AddNotes("Note intervento:", intervention?.Notes);
         return string.Join(Environment.NewLine, lines);
 
         void AddNotes(string heading, string? notes)
