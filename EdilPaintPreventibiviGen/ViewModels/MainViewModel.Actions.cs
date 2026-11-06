@@ -60,12 +60,12 @@ public partial class MainViewModel
         }
     }
 
-    private async Task<bool> HandleVeluxLogin()
+    private async Task<bool> HandleVeluxLogin(VeluxSettingsModel settings)
     {
         if (!App.AppSettings.App.UseVeluxLogin) return false;
         return await Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            var win = new VeluxLoginWindow { Owner = Application.Current.MainWindow };
+            var win = new VeluxLoginWindow(settings) { Owner = Application.Current.MainWindow };
             return win.ShowDialog() == true;
         });
     }

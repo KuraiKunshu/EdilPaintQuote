@@ -396,7 +396,7 @@
                                     <TextBlock Text="Funzioni per serramenti" FontWeight="SemiBold"/>
                                     <CheckBox x:Name="ChkWindowAutomations" Margin="0,12,0,12"><TextBlock Text="Aggiungi automaticamente i materiali per finestra nel calcolo del guadagno" TextWrapping="Wrap"/></CheckBox>
                                     <CheckBox x:Name="ChkInstallationCertificate" Content="Mostra il certificato di corretta posa nello storico" Margin="0,0,0,12"/>
-                                    <TextBlock Text="L'accesso al catalogo Velux si abilita separatamente nella scheda Generali. Con l'accesso disattivato puoi usare i tuoi materiali e le tue lavorazioni." TextWrapping="Wrap"/>
+                                    <TextBlock Text="L'accesso al catalogo VELUX si abilita nella scheda VELUX. Con l'accesso disattivato puoi usare i tuoi materiali e le tue lavorazioni." TextWrapping="Wrap"/>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>
@@ -912,21 +912,44 @@
                                             <CheckBox x:Name="ChkCalendarUseAbbreviations" Content="Mostra le sigle dei dipendenti nel calendario" Margin="0,16,0,8"/>
                                             <TextBlock Text="Se una persona non ha una sigla, viene mostrato il suo nome." TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                                             <TextBlock Text="Riepilogo da copiare per la squadra" Style="{StaticResource SectionTitleStyle}" Margin="0,24,0,8"/>
-                                            <TextBlock Text="Personalizza il messaggio copiato dagli interventi del calendario. Sposta i segnaposto per cambiare l’ordine delle informazioni oppure aggiungi il testo che usi abitualmente."
+                                            <TextBlock Text="Scrivi i titoli e il testo che preferisci, scegli i dati da mostrare e imposta il formato di ogni riga di materiali, lavorazioni e squadra. L’anteprima si aggiorna mentre scrivi."
                                                        TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10"/>
-                                            <TextBox x:Name="TxtInterventionMessageTemplate" MinHeight="190" MaxHeight="340"
+                                            <WrapPanel Margin="0,0,0,10">
+                                                <ComboBox x:Name="CmbInterventionMessageField" Width="330" MinHeight="36" Margin="0,0,8,6"
+                                                          DisplayMemberPath="Label" AutomationProperties.Name="Campo o elenco da inserire nel messaggio"/>
+                                                <Button Content="Inserisci nel testo" Margin="0,0,0,6" Style="{StaticResource SecondaryActionButtonStyle}"
+                                                        Click="OnInsertInterventionMessageFieldClick" ToolTip="Inserisce il campo nel punto selezionato del fac-simile"/>
+                                            </WrapPanel>
+                                            <TextBox x:Name="TxtInterventionMessageTemplate" MinHeight="240" MaxHeight="480"
                                                      MaxLength="{x:Static models:WorkScheduleSettings.MaxInterventionMessageTemplateLength}"
                                                      AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"
                                                      VerticalScrollBarVisibility="Auto" TextChanged="OnInterventionMessageTemplateChanged"
                                                      AutomationProperties.Name="Fac-simile messaggio alla squadra"/>
+                                            <TextBlock x:Name="TxtInterventionMessageError" Visibility="Collapsed" Margin="0,8,0,0"
+                                                       TextWrapping="Wrap" Foreground="{StaticResource DangerRedBrush}"/>
                                             <TextBlock Style="{StaticResource HintStyle}"
                                                        Text="Blocchi completi: {ContactDetails}, {InterventionDetails}, {MaterialDetails}, {LaborDetails}, {Notes}, {InternalNotes}, {InterventionNotes}. I blocchi comprendono titoli e dati."/>
-                                            <Expander Header="Segnaposto per i singoli dati" Margin="0,10,0,0" HorizontalContentAlignment="Stretch">
-                                                <TextBlock Text="{}{CustomerName}, {ReferenceName}, {Address}, {Phone}, {InterventionDate}, {InterventionTime}, {Crew}, {MaterialStatus}, {Materials}, {Labors}, {QuoteNumber}, {CustomerNotes}, {InternalNotesText}, {InterventionNotesText}."
-                                                           TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0"/>
+                                            <Expander Header="Campi facoltativi e formato degli elenchi" Margin="0,10,0,0" HorizontalContentAlignment="Stretch">
+                                                <StackPanel Margin="0,8,0,0">
+                                                    <TextBlock Text="Dal menu puoi inserire nomi, recapiti, indirizzi separati, data, orari e note. Puoi scrivere liberamente il testo intorno ai campi."
+                                                               TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                                    <TextBlock Text="Una sezione facoltativa compare solo quando il suo dato è presente. Per esempio" Margin="0,10,0,4"
+                                                               TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                                    <TextBlock Text="{}{#ReferenceName}Riferimento: {ReferenceName}{/ReferenceName}" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="Gli elenchi ripetono il testo per ciascuna voce. Modifica quantità, nome, unità, descrizione e separatori all’interno della sezione inserita dal menu. Per esempio" Margin="0,10,0,4"
+                                                               TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                                    <TextBlock Text="{}{#Materials}{Quantity} {Unit} - {Name}&#10;{/Materials}" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="Per la squadra puoi usare nome, cognome, nome completo o sigla di ogni persona. Per lavorazioni e materiali puoi aggiungere la descrizione soltanto dove serve." Margin="0,10,0,0"
+                                                               TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                                </StackPanel>
                                             </Expander>
-                                            <Button Content="Ripristina fac-simile" HorizontalAlignment="Left" Margin="0,12,0,0"
-                                                    Style="{StaticResource SecondaryActionButtonStyle}" Click="OnResetInterventionMessageClick"/>
+                                            <WrapPanel Margin="0,12,0,0">
+                                                <Button Content="Espandi blocchi" Margin="0,0,8,6" Style="{StaticResource SecondaryActionButtonStyle}"
+                                                        Click="OnExpandInterventionMessageBlocksClick"
+                                                        ToolTip="Trasforma i blocchi del fac-simile in titoli, campi e righe modificabili. Puoi annullare con Ctrl+Z."/>
+                                                <Button Content="Ripristina fac-simile" Margin="0,0,0,6"
+                                                        Style="{StaticResource SecondaryActionButtonStyle}" Click="OnResetInterventionMessageClick"/>
+                                            </WrapPanel>
                                             <Expander Header="Anteprima con dati di esempio" IsExpanded="True" Margin="0,16,0,0" HorizontalContentAlignment="Stretch">
                                                 <TextBox x:Name="TxtInterventionMessagePreview" IsReadOnly="True" MinHeight="160" MaxHeight="360"
                                                          TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
@@ -943,16 +966,16 @@
                             </ScrollViewer>
                         </TabItem>
 
-                        <TabItem x:Name="TabDatabaseSettings" Header="_Database e integrazioni">
+                        <TabItem x:Name="TabDatabaseSettings" Header="_Database">
                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled"
                                           HorizontalContentAlignment="Stretch"
                                           Focusable="False">
                                 <StackPanel Margin="18,16,18,6" HorizontalAlignment="Stretch">
                                     <StackPanel Margin="2,0,0,14">
-                                        <TextBlock Text="Database e integrazioni"
+                                        <TextBlock Text="Database condiviso"
                                                    Style="{StaticResource PageTitleStyle}"/>
-                                        <TextBlock Text="Connessione ai dati condivisi e servizi esterni utilizzati dall'app."
+                                        <TextBlock Text="Connessione all’archivio condiviso utilizzato dal programma."
                                                    Style="{StaticResource PageSubtitleStyle}"/>
                                     </StackPanel>
 
@@ -1014,27 +1037,86 @@
                                         </StackPanel>
                                     </Border>
 
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem x:Name="TabVeluxSettings" Header="_VELUX">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalContentAlignment="Stretch" Focusable="False">
+                                <StackPanel Margin="18,16,18,6" HorizontalAlignment="Stretch">
+                                    <StackPanel Margin="2,0,0,14">
+                                        <TextBlock Text="Collegamento VELUX" Style="{StaticResource PageTitleStyle}"/>
+                                        <TextBlock Text="Aggiorna il dominio e i percorsi quando VELUX comunica un nuovo indirizzo. Le impostazioni e la sessione sono salvate su questo PC."
+                                                   Style="{StaticResource PageSubtitleStyle}"/>
+                                    </StackPanel>
                                     <Border Style="{StaticResource SectionStyle}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Text="Integrazione Velux"
-                                                           Style="{StaticResource SectionTitleStyle}"/>
-                                                <CheckBox x:Name="ChkUseVeluxLogin"
-                                                          Content="Cerca anche nel catalogo Velux durante la ricerca materiali"/>
-                                                <TextBlock Style="{StaticResource HintStyle}"
-                                                           Text="Il login avviene nel browser integrato e la sessione resta salvata solo su questo PC."/>
-                                            </StackPanel>
-                                            <Button Grid.Column="1"
-                                                    Content="Rimuovi sessione"
-                                                    Margin="16,0,0,0"
-                                                    VerticalAlignment="Center"
-                                                    Style="{StaticResource DangerCompactButtonStyle}"
-                                                    Click="OnClearVeluxSessionClick"/>
-                                        </Grid>
+                                        <StackPanel>
+                                            <TextBlock Text="Accesso e sito" Style="{StaticResource SectionTitleStyle}"/>
+                                            <CheckBox x:Name="ChkUseVeluxLogin" Margin="0,0,0,14"
+                                                      Content="Cerca anche nel catalogo VELUX durante la ricerca materiali"/>
+                                            <TextBlock Text="Dominio del sito" Style="{StaticResource LabelStyle}"/>
+                                            <TextBox x:Name="TxtVeluxBaseUrl" TextChanged="OnVeluxSettingsChanged"
+                                                     AutomationProperties.Name="Dominio del sito VELUX"/>
+                                            <TextBlock Text="Esempio: https://appvelux.devdemo.it. Inserisci il dominio senza il percorso della pagina."
+                                                       Style="{StaticResource HintStyle}"/>
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="150"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="Percorso pagina di login" Style="{StaticResource LabelStyle}"/>
+                                                    <TextBox x:Name="TxtVeluxLoginPath" TextChanged="OnVeluxSettingsChanged"
+                                                             AutomationProperties.Name="Percorso login VELUX"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Attesa massima (s)" Style="{StaticResource LabelStyle}"/>
+                                                    <TextBox x:Name="TxtVeluxTimeout" TextChanged="OnVeluxSettingsChanged"
+                                                             AutomationProperties.Name="Tempo massimo richieste VELUX in secondi"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock Text="Il login usa le consuete credenziali nel browser integrato. Salvando un nuovo dominio verrà richiesta una nuova autenticazione."
+                                                       Style="{StaticResource HintStyle}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SectionStyle}" Margin="0,16,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Percorsi del catalogo" Style="{StaticResource SectionTitleStyle}"/>
+                                            <TextBlock Text="Se cambia solo il dominio, puoi mantenere questi percorsi. Modificali quando VELUX comunica anche un cambiamento del catalogo."
+                                                       Style="{StaticResource HintStyle}" Margin="0,0,0,12"/>
+                                            <TextBlock Text="Percorso base del catalogo" Style="{StaticResource LabelStyle}"/>
+                                            <TextBox x:Name="TxtVeluxCatalogPath" TextChanged="OnVeluxSettingsChanged"
+                                                     AutomationProperties.Name="Percorso base catalogo VELUX"/>
+                                            <TextBlock Text="Ricerca prodotti" Style="{StaticResource LabelStyle}" Margin="0,12,0,6"/>
+                                            <TextBox x:Name="TxtVeluxSearchPath" TextChanged="OnVeluxSettingsChanged"
+                                                     AutomationProperties.Name="Percorso ricerca prodotti VELUX"/>
+                                            <TextBlock Text="Il percorso di ricerca deve contenere {term}, sostituito con il testo cercato."
+                                                       Style="{StaticResource HintStyle}"/>
+                                            <TextBlock Text="Dettagli prodotto" Style="{StaticResource LabelStyle}" Margin="0,12,0,6"/>
+                                            <TextBox x:Name="TxtVeluxProductDetailsPath" TextChanged="OnVeluxSettingsChanged"
+                                                     AutomationProperties.Name="Percorso dettagli prodotto VELUX"/>
+                                            <TextBlock Text="Il percorso dei dettagli deve contenere {id}, sostituito con l’identificativo del prodotto. Entrambi i percorsi sono relativi alla base del catalogo."
+                                                       Style="{StaticResource HintStyle}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SectionStyle}" Margin="0,16,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Indirizzi risultanti" Style="{StaticResource SectionTitleStyle}"/>
+                                            <TextBlock x:Name="TxtVeluxSettingsError" TextWrapping="Wrap" Visibility="Collapsed"
+                                                       Foreground="{StaticResource DangerRedBrush}" Margin="0,0,0,10"/>
+                                            <TextBlock Text="Login" Style="{StaticResource LabelStyle}"/>
+                                            <TextBox x:Name="TxtVeluxResolvedLogin" IsReadOnly="True" TextWrapping="Wrap"/>
+                                            <TextBlock Text="Catalogo" Style="{StaticResource LabelStyle}" Margin="0,12,0,6"/>
+                                            <TextBox x:Name="TxtVeluxResolvedCatalog" IsReadOnly="True" TextWrapping="Wrap"/>
+                                            <WrapPanel Margin="0,16,0,0">
+                                                <Button Content="Ripristina indirizzi predefiniti" Margin="0,0,12,6"
+                                                        Style="{StaticResource SecondaryActionButtonStyle}" Click="OnResetVeluxSettingsClick"/>
+                                                <Button Content="Rimuovi sessione salvata" Margin="0,0,0,6"
+                                                        Style="{StaticResource DangerCompactButtonStyle}" Click="OnClearVeluxSessionClick"/>
+                                            </WrapPanel>
+                                            <TextBlock Text="La rimozione della sessione salvata richiederà l’accesso alla prossima ricerca. Per applicare dominio e percorsi premi Salva."
+                                                       Style="{StaticResource HintStyle}"/>
+                                        </StackPanel>
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>

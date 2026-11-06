@@ -165,6 +165,92 @@ public sealed class SupplierOrderSummaryTextTests
             """.ReplaceLineEndings(), message);
     }
 
+    [Fact]
+    public void RepeatedRowsAllowCustomOrderAndOptionalDescriptionsWithoutExpandingInsertedText()
+    {
+        var quote = new QuoteHistoryEntry
+        {
+            CustomerName = "Impresa Rossi",
+            Materials =
+            [
+                new Item { Name = "Profilo", Quantity = 10000.5m, UnitOfMeasure = "m", SortOrder = 2 },
+                new Item { Name = "Finestra {CustomerName}", Quantity = 2, Description = "Piano terra", SortOrder = 1 }
+            ],
+            Labors = [new Item { Name = "Posa", Quantity = 2, Description = "Verificare {#Materials}" }]
+        };
+
+        string message = SupplierOrderSummaryText.Format(new WorkScheduleEntry(), quote, [], """
+            Destinazione: {CustomerName}
+            {#ReferenceName}Rif. {ReferenceName}{/ReferenceName}
+            {#Materials}{RowNumber}) {Quantity} {Unit} | {Name}{#Description} ({Description}){/Description}
+            {/Materials}
+            {#Labors}- {Name}: {Description}
+            {/Labors}
+            """);
+
+        Assert.DoesNotContain("Rif.", message);
+        Assert.Contains("1) 2 pz | Finestra {CustomerName} (Piano terra)", message);
+        Assert.Contains("2) 10000,5 m | Profilo", message);
+        Assert.Contains("- Posa: Verificare {#Materials}", message);
+    }
+
+    [Fact]
+    public void SeparateDateCrewAndContactFieldsAreAvailableInTheCustomMessage()
+    {
+        var customerId = Guid.NewGuid();
+        var referenceId = Guid.NewGuid();
+        var quote = new QuoteHistoryEntry
+        {
+            CustomerName = "Cliente A", CustomerSyncId = customerId,
+            ReferenceName = "Riferimento B", ReferenceCustomerSyncId = referenceId,
+            SiteName = "Via Cantiere 1"
+        };
+        var entry = new WorkScheduleEntry
+        {
+            Date = new DateTime(2026, 11, 9), StartMinutes = 9 * 60, EndMinutes = 11 * 60 + 30,
+            Employees = [new() { FirstName = "Anna", LastName = "Verdi", Abbreviation = "AV" }, new() { FirstName = "Luca" }]
+        };
+        Customer[] customers =
+        [
+            new() { SyncId = customerId, Address = "Via Cliente 2", Phone = "030 111111" },
+            new() { SyncId = referenceId, Address = "Via Riferimento 3", Phone = "333 222222" }
+        ];
+
+        string message = SupplierOrderSummaryText.Format(entry, quote, customers, """
+            {InterventionWeekday} {InterventionDateShort} dalle {StartTime} alle {EndTime}
+            {SiteAddress} / {CustomerAddress} / {ReferenceAddress}
+            {Phone} / {ReferencePhone}
+            {CrewAbbreviations}
+            {#CrewMembers}{RowNumber}. {FullName}{#Abbreviation} ({Abbreviation}){/Abbreviation}
+            {/CrewMembers}
+            """);
+
+        Assert.Equal("""
+            lunedì 09/11/2026 dalle 09:00 alle 11:30
+            Via Cantiere 1 / Via Cliente 2 / Via Riferimento 3
+            030 111111 / 333 222222
+            AV, Luca
+            1. Anna Verdi (AV)
+            2. Luca
+            """.ReplaceLineEndings(), message);
+    }
+
+    [Fact]
+    public void ExpandingTheDefaultBlocksPreservesTheMessageAndMakesItsHeadingsEditable()
+    {
+        string expanded = SupplierOrderSummaryText.ExpandBlocks(WorkScheduleSettings.DefaultInterventionMessageTemplate);
+
+        Assert.Contains("Cliente: {CustomerName}", expanded);
+        Assert.Contains("{#Materials}", expanded);
+        Assert.Contains("{#Labors}", expanded);
+        Assert.Equal(SupplierOrderSummaryText.CreatePreview(null), SupplierOrderSummaryText.CreatePreview(expanded));
+        Assert.Contains("Il tuo contatto:", SupplierOrderSummaryText.CreatePreview(expanded.Replace("Cliente:", "Il tuo contatto:")));
+
+        var quote = new QuoteHistoryEntry { CustomerName = "Cliente A" };
+        var entry = new WorkScheduleEntry();
+        Assert.Equal(SupplierOrderSummaryText.Format(entry, quote, []), SupplierOrderSummaryText.Format(entry, quote, [], expanded));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

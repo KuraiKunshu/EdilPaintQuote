@@ -21,37 +21,47 @@ public class VeluxResult
 
 public class VeluxService : IDisposable
 {
-    private HttpClient _httpClient = null!;
-    private CookieContainer _cookieContainer = null!;
-    private readonly SemaphoreSlim _loginLock = new(1, 1);
+    private HttpClient? _httpClient;
+    private readonly SemaphoreSlim _requestLock = new(1, 1);
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly Func<VeluxSettingsModel> _getSettings;
+    private readonly Func<CookieContainer, HttpMessageHandler> _createHandler;
+    private readonly Func<string?> _loadSession;
+    private readonly Func<long> _getSessionVersion;
+    private VeluxSettingsModel? _settings;
+    private long _sessionVersion = -1;
     private bool _loginPromptShown;
-    public event Func<Task<bool>>? OnLoginRequired;
+    private bool _disposed;
+    public event Func<VeluxSettingsModel, Task<bool>>? OnLoginRequired;
 
-    public VeluxService() => InitializeClient();
-
-    private void InitializeClient()
+    public VeluxService() : this(VeluxEndpoints.GetSettings,
+        cookies => new HttpClientHandler { CookieContainer = cookies, AllowAutoRedirect = true },
+        VeluxSessionStorage.Load, () => VeluxSessionStorage.SessionVersion)
     {
-        _httpClient?.Dispose();
-        _cookieContainer = new CookieContainer();
-        var handler = new HttpClientHandler { CookieContainer = _cookieContainer, AllowAutoRedirect = true };
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(8) };
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-        LoadSessionCookies();
     }
 
-    private void LoadSessionCookies()
+    internal VeluxService(Func<VeluxSettingsModel> getSettings, Func<CookieContainer, HttpMessageHandler> createHandler,
+        Func<string?> loadSession, Func<long> getSessionVersion)
     {
+        _getSettings = getSettings;
+        _createHandler = createHandler;
+        _loadSession = loadSession;
+        _getSessionVersion = getSessionVersion;
+    }
+
+    private void InitializeClient(VeluxSettingsModel settings)
+    {
+        _httpClient?.Dispose();
+        var cookies = new CookieContainer();
         try {
-            var json = VeluxSessionStorage.Load();
-            if (string.IsNullOrWhiteSpace(json)) return;
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("cookies", out var cookies)) {
-                foreach (var c in cookies.EnumerateArray()) {
-                    string domain = c.GetProperty("domain").GetString()!.TrimStart('.');
-                    _cookieContainer.Add(new Uri("https://app.velux.it"), new Cookie(c.GetProperty("name").GetString()!, c.GetProperty("value").GetString()!, "/", domain));
-                }
-            }
+            var json = _loadSession();
+            if (!string.IsNullOrWhiteSpace(json))
+                VeluxSessionStorage.RestoreCookies(cookies, json, settings.BaseUri);
         } catch { }
+        _httpClient = new HttpClient(_createHandler(cookies)) { Timeout = TimeSpan.FromSeconds(settings.RequestTimeoutSeconds) };
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+        _settings = settings;
+        _sessionVersion = _getSessionVersion();
     }
 
     public async Task<List<VeluxResult>> SearchProductsAsync(
@@ -59,25 +69,9 @@ public class VeluxService : IDisposable
         CancellationToken cancellationToken = default)
     {
         try {
-            if (AppShutdownManager.IsShutdownRequested)
-                return new List<VeluxResult>();
-
-            var url = $"https://app.velux.it/preventivi/it/backoffice/line_items/autocomplete_product_code?term={Uri.EscapeDataString(term)}";
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-            
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            if (content.Contains("<form", StringComparison.OrdinalIgnoreCase) &&
-                content.Contains("login", StringComparison.OrdinalIgnoreCase)) {
-                if (await TryLoginOnceAsync(cancellationToken)) {
-                    InitializeClient(); 
-                    return await SearchProductsAsync(term, cancellationToken);
-                }
-                return new List<VeluxResult>();
-            }
-            return JsonSerializer.Deserialize<List<VeluxResult>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+            var content = await GetCatalogResponseAsync(settings => settings.SearchProductsUri(term), cancellationToken);
+            return content == null ? [] : JsonSerializer.Deserialize<List<VeluxResult>>(content,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
         } catch (OperationCanceledException) {
             throw;
         } catch (Exception ex) {
@@ -86,23 +80,43 @@ public class VeluxService : IDisposable
         }
     }
 
-    private async Task<bool> TryLoginOnceAsync(CancellationToken cancellationToken)
+    private async Task<string?> GetCatalogResponseAsync(Func<VeluxSettingsModel, Uri> requestUri, CancellationToken cancellationToken)
     {
-        if (AppShutdownManager.IsShutdownRequested)
-            return false;
-
-        await _loginLock.WaitAsync(cancellationToken);
+        if (_disposed || AppShutdownManager.IsShutdownRequested) return null;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        var token = linked.Token;
+        await _requestLock.WaitAsync(token);
         try
         {
-            if (_loginPromptShown || OnLoginRequired == null)
-                return false;
-
-            _loginPromptShown = true;
-            return await OnLoginRequired.Invoke();
+            var settings = _getSettings().CreateValidatedCopy();
+            if (_settings != settings || _sessionVersion != _getSessionVersion())
+            {
+                InitializeClient(settings);
+                _loginPromptShown = false;
+            }
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                token.ThrowIfCancellationRequested();
+                using var request = new HttpRequestMessage(HttpMethod.Get, requestUri(settings));
+                request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+                using var response = await _httpClient!.SendAsync(request, token);
+                var content = await response.Content.ReadAsStringAsync(token);
+                if (!IsLoginResponse(response, content, settings))
+                {
+                    response.EnsureSuccessStatusCode();
+                    return content;
+                }
+                if (_loginPromptShown || OnLoginRequired == null) return null;
+                _loginPromptShown = true;
+                if (!await OnLoginRequired.Invoke(settings)) return null;
+                token.ThrowIfCancellationRequested();
+                InitializeClient(settings);
+            }
+            return null;
         }
         finally
         {
-            _loginLock.Release();
+            _requestLock.Release();
         }
     }
 
@@ -111,33 +125,8 @@ public class VeluxService : IDisposable
         CancellationToken cancellationToken = default)
     {
         try {
-            if (AppShutdownManager.IsShutdownRequested)
-                return null;
-
-            var url = $"https://app.velux.it/preventivi/it/backoffice/product_data?id={uuid}&description_type=false&description_change=false";
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-            
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            // "Simuliamo" il parser jQuery estraendo tutte le coppie ID/Valore in un dizionario
-            var dataMap = ParseJQueryAssignments(content);
-
-            var item = new Item { Quantity = 1 };
-
-            // Ora preleviamo i dati dal dizionario usando le chiavi che abbiamo visto nel debug
-            item.Name = dataMap.GetValueOrDefault("line_item_name", "Prodotto Velux");
-            item.Description = dataMap.GetValueOrDefault("line_item_description", "");
-            
-            if (dataMap.TryGetValue("line_item_price_cents", out string? priceCents) && 
-                double.TryParse(priceCents, out double cents))
-            {
-                item.UnitPrice = cents / 100;
-            }
-
-            Debug.WriteLine($"[VELUX] Product details parsed: {item.Name}");
-            return item;
+            var content = await GetCatalogResponseAsync(settings => settings.ProductDetailsUri(uuid), cancellationToken);
+            return content == null ? null : ParseProductDetails(content);
         } catch (OperationCanceledException) {
             throw;
         } catch (Exception ex) {
@@ -146,11 +135,28 @@ public class VeluxService : IDisposable
         }
     }
 
+    private static bool IsLoginResponse(HttpResponseMessage response, string content, VeluxSettingsModel settings) =>
+        response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden ||
+        string.Equals(response.RequestMessage?.RequestUri?.AbsolutePath.TrimEnd('/'), settings.LoginUri.AbsolutePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase) ||
+        (content.Contains("<form", StringComparison.OrdinalIgnoreCase) && content.Contains("login", StringComparison.OrdinalIgnoreCase));
+
+    internal static Item? ParseProductDetails(string content)
+    {
+        var data = ParseJQueryAssignments(content);
+        if (!data.TryGetValue("line_item_name", out string? name) || string.IsNullOrWhiteSpace(name))
+            return null;
+
+        var item = new Item { Quantity = 1, Name = name, Description = data.GetValueOrDefault("line_item_description", "") };
+        if (data.TryGetValue("line_item_price_cents", out string? priceCents) && double.TryParse(priceCents, out double cents))
+            item.UnitPrice = cents / 100;
+        return item;
+    }
+
     /// <summary>
     /// Metodo che "pulisce" l'output jQuery ed estrae i valori.
     /// Cerca pattern come: $('#id').val('valore');
     /// </summary>
-    private Dictionary<string, string> ParseJQueryAssignments(string script)
+    private static Dictionary<string, string> ParseJQueryAssignments(string script)
     {
         var dict = new Dictionary<string, string>();
         
@@ -172,15 +178,11 @@ public class VeluxService : IDisposable
 
     public void Dispose()
     {
-        try
-        {
-            _httpClient.CancelPendingRequests();
-        }
-        catch
-        {
-        }
-
-        _httpClient.Dispose();
-        _loginLock.Dispose();
+        if (_disposed) return;
+        _disposed = true;
+        _lifetime.Cancel();
+        _httpClient?.Dispose();
+        _lifetime.Dispose();
+        // Queued requests release the semaphore after cancellation, so it must remain usable until they finish.
     }
 }

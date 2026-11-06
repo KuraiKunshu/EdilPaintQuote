@@ -4,8 +4,62 @@ using EdilPaintPreventibiviGen.Models;
 
 namespace EdilPaintPreventibiviGen.Services;
 
+internal sealed record InterventionMessageField(string Label, string Text);
+
 internal static class SupplierOrderSummaryText
 {
+    private const string MaterialRowsTemplate = "{#Materials}{QuantityDisplay} — {Name}\n{/Materials}";
+    private const string LaborRowsTemplate = "{#Labors}{QuantityDisplay} — {Name}\n{#Description}  {DescriptionIndented}\n{/Description}{/Labors}";
+
+    private static readonly IReadOnlyDictionary<string, string> ExpandedBlocks = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["ContactDetails"] = "Cliente: {CustomerName}\n{#ReferenceName}Riferimento: {ReferenceName}\n{/ReferenceName}" +
+            "{#Address}{AddressLabel}: {Address}\n{/Address}{#Phone}Telefono cliente: {Phone}{/Phone}",
+        ["InterventionDetails"] = "Intervento: {InterventionWeekday} {InterventionDateShort} · {StartTime}–{EndTime}\nSquadra: {Crew}",
+        ["MaterialDetails"] = "Stato materiale: {MaterialStatus}\nMateriali:\n" + MaterialRowsTemplate +
+            "{#NoMaterials}Nessun materiale nel preventivo.{/NoMaterials}",
+        ["LaborDetails"] = "{#HasLabors}Lavorazioni:\n" + LaborRowsTemplate + "{/HasLabors}",
+        ["Notes"] = "{#CustomerNotes}Note:\n{CustomerNotes}{/CustomerNotes}",
+        ["InternalNotes"] = "{#InternalNotesText}Note interne:\n{InternalNotesText}{/InternalNotesText}",
+        ["InterventionNotes"] = "{#InterventionNotesText}Note intervento:\n{InterventionNotesText}{/InterventionNotesText}",
+        ["Materials"] = MaterialRowsTemplate + "{#NoMaterials}Nessun materiale nel preventivo.{/NoMaterials}",
+        ["Labors"] = LaborRowsTemplate
+    };
+
+    internal static IReadOnlyList<InterventionMessageField> TemplateFields { get; } =
+    [
+        new("Cliente · Nome", "{CustomerName}"),
+        new("Riferimento · Nome", "{ReferenceName}"),
+        new("Indirizzo · Cantiere o cliente", "{Address}"),
+        new("Indirizzo · Solo cantiere", "{SiteAddress}"),
+        new("Indirizzo · Solo cliente", "{CustomerAddress}"),
+        new("Indirizzo · Riferimento", "{ReferenceAddress}"),
+        new("Telefono · Cliente", "{Phone}"),
+        new("Telefono · Riferimento", "{ReferencePhone}"),
+        new("Intervento · Data completa", "{InterventionDate}"),
+        new("Intervento · Data breve", "{InterventionDateShort}"),
+        new("Intervento · Giorno della settimana", "{InterventionWeekday}"),
+        new("Intervento · Ora iniziale", "{StartTime}"),
+        new("Intervento · Ora finale", "{EndTime}"),
+        new("Intervento · Fascia oraria", "{Slot}"),
+        new("Squadra · Nomi separati da virgole", "{Crew}"),
+        new("Squadra · Sigle", "{CrewAbbreviations}"),
+        new("Squadra · Una persona per riga", "{#CrewMembers}{FullName}\n{/CrewMembers}"),
+        new("Materiali · Stato", "{MaterialStatus}"),
+        new("Materiali · Righe modificabili", MaterialRowsTemplate),
+        new("Lavorazioni · Righe modificabili", LaborRowsTemplate.Replace("DescriptionIndented", "Description")),
+        new("Preventivo · Numero", "{QuoteNumber}"),
+        new("Note · Solo testo", "{CustomerNotes}"),
+        new("Note interne · Solo testo", "{InternalNotesText}"),
+        new("Note intervento · Solo testo", "{InterventionNotesText}"),
+        new("Sezione facoltativa · Riferimento", "{#ReferenceName}Riferimento: {ReferenceName}\n{/ReferenceName}"),
+        new("Sezione facoltativa · Note intervento", "{#InterventionNotesText}Note intervento:\n{InterventionNotesText}\n{/InterventionNotesText}")
+    ];
+
+    internal static string ExpandBlocks(string? template) => Regex.Replace(
+        string.IsNullOrWhiteSpace(template) ? WorkScheduleSettings.DefaultInterventionMessageTemplate : template,
+        @"\{([A-Za-z]+)\}", match => ExpandedBlocks.GetValueOrDefault(match.Groups[1].Value, match.Value));
+
     public static IEnumerable<Item> GetMaterials(QuoteHistoryEntry quote) => quote.Materials
         .Where(material => !string.IsNullOrWhiteSpace(material.Name))
         .OrderBy(material => material.SortOrder);
@@ -21,20 +75,43 @@ internal static class SupplierOrderSummaryText
             MaterialStatus = quote.MaterialStatus,
             MaterialsOrderedByCustomer = quote.MaterialsOrderedByCustomer
         }, quote, customers);
-        fields["InterventionDate"] = intervention.Date.ToString("dddd dd/MM/yyyy", CultureInfo.GetCultureInfo("it-IT"));
+        var culture = CultureInfo.GetCultureInfo("it-IT");
+        fields["InterventionDate"] = intervention.Date.ToString("dddd dd/MM/yyyy", culture);
+        fields["InterventionDateShort"] = intervention.Date.ToString("dd/MM/yyyy", culture);
+        fields["InterventionWeekday"] = intervention.Date.ToString("dddd", culture);
         fields["InterventionTime"] = intervention.TimeDisplay;
+        fields["StartTime"] = WorkScheduleSettings.FormatTime(intervention.StartMinutes);
+        fields["EndTime"] = WorkScheduleSettings.FormatTime(intervention.EndMinutes);
+        fields["Slot"] = intervention.SlotDisplay;
         var crew = intervention.Employees.Select(employee => $"{employee.FirstName} {employee.LastName}".Trim())
             .Where(name => name.Length > 0);
         fields["Crew"] = string.Join(", ", crew.DefaultIfEmpty("Da assegnare"));
+        fields["CrewAbbreviations"] = string.Join(", ", intervention.Employees.Select(employee =>
+            string.IsNullOrWhiteSpace(employee.Abbreviation) ? $"{employee.FirstName} {employee.LastName}".Trim() : employee.Abbreviation.Trim())
+            .Where(name => name.Length > 0));
         fields["InterventionDetails"] = $"Intervento: {fields["InterventionDate"]} · {fields["InterventionTime"]}" +
             Environment.NewLine + $"Squadra: {fields["Crew"]}";
         fields["InterventionNotesText"] = intervention.Notes?.Trim() ?? "";
         fields["InterventionNotes"] = NotesBlock("Note intervento:", intervention.Notes);
 
+        var rows = new Dictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Materials"] = CreateItemRows(GetMaterials(quote)),
+            ["Labors"] = CreateItemRows(quote.Labors.Where(labor => !string.IsNullOrWhiteSpace(labor.Name)).OrderBy(labor => labor.SortOrder)),
+            ["CrewMembers"] = intervention.Employees.Select((employee, index) =>
+                (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["FullName"] = $"{employee.FirstName} {employee.LastName}".Trim(),
+                    ["FirstName"] = employee.FirstName?.Trim() ?? "",
+                    ["LastName"] = employee.LastName?.Trim() ?? "",
+                    ["Abbreviation"] = employee.Abbreviation?.Trim() ?? "",
+                    ["RowNumber"] = (index + 1).ToString(culture)
+                }).ToList()
+        };
+        fields["NoMaterials"] = rows["Materials"].Count == 0 ? "1" : "";
+        fields["HasLabors"] = rows["Labors"].Count > 0 ? "1" : "";
         template = string.IsNullOrWhiteSpace(template) ? WorkScheduleSettings.DefaultInterventionMessageTemplate : template;
-        // Replace once so braces inside customer data or notes remain literal text.
-        string message = Regex.Replace(template, @"\{([A-Za-z]+)\}", match =>
-            fields.GetValueOrDefault(match.Groups[1].Value, match.Value));
+        string message = InterventionMessageTemplate.Render(template, fields, rows);
         message = Regex.Replace(message.ReplaceLineEndings("\n"), @"\n(?:[ \t]*\n){2,}", "\n\n");
         return message.Trim().ReplaceLineEndings();
     }
@@ -53,6 +130,7 @@ internal static class SupplierOrderSummaryText
         string customerName = string.IsNullOrWhiteSpace(quote.CustomerName) ? order.CustomerName : quote.CustomerName;
         string referenceName = string.IsNullOrWhiteSpace(quote.ReferenceName) ? order.ReferenceName : quote.ReferenceName;
         Customer? customer = FindCustomer(quote.CustomerSyncId, customerName, customers);
+        Customer? reference = FindCustomer(quote.ReferenceCustomerSyncId, referenceName, customers);
         var lines = new List<string>
         {
             $"Cliente: {(string.IsNullOrWhiteSpace(customerName) ? "Non indicato" : customerName.Trim())}"
@@ -81,7 +159,12 @@ internal static class SupplierOrderSummaryText
             ["CustomerName"] = string.IsNullOrWhiteSpace(customerName) ? "Non indicato" : customerName.Trim(),
             ["ReferenceName"] = referenceName?.Trim() ?? "",
             ["Address"] = string.IsNullOrWhiteSpace(quote.SiteName) ? customer?.Address?.Trim() ?? "" : quote.SiteName.Trim(),
+            ["AddressLabel"] = string.IsNullOrWhiteSpace(quote.SiteName) ? "Indirizzo cliente" : "Indirizzo cantiere",
+            ["SiteAddress"] = quote.SiteName?.Trim() ?? "",
+            ["CustomerAddress"] = customer?.Address?.Trim() ?? "",
+            ["ReferenceAddress"] = reference?.Address?.Trim() ?? "",
             ["Phone"] = customer?.Phone?.Trim() ?? "",
+            ["ReferencePhone"] = reference?.Phone?.Trim() ?? "",
             ["ContactDetails"] = string.Join(Environment.NewLine, lines),
             ["MaterialStatus"] = status,
             ["Materials"] = materials,
@@ -94,6 +177,18 @@ internal static class SupplierOrderSummaryText
             ["InternalNotes"] = NotesBlock("Note interne:", quote.Notes)
         };
     }
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, string>> CreateItemRows(IEnumerable<Item> items) => items
+        .Select((item, index) => (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["RowNumber"] = (index + 1).ToString(CultureInfo.GetCultureInfo("it-IT")),
+            ["Quantity"] = QuantityValue.Format(item.Quantity),
+            ["Unit"] = QuantityValue.NormalizeUnit(item.UnitOfMeasure),
+            ["QuantityDisplay"] = item.QuantityDisplay,
+            ["Name"] = item.Name.Trim(),
+            ["Description"] = item.Description?.Trim().ReplaceLineEndings() ?? "",
+            ["DescriptionIndented"] = item.Description?.Trim().ReplaceLineEndings(Environment.NewLine + "  ") ?? ""
+        }).ToList();
 
     private static string FormatLabor(Item labor)
     {

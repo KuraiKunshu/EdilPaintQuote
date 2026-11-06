@@ -60,6 +60,8 @@ public partial class SettingsWindow : Window
         CmbDatabaseProvider.ItemsSource = DatabaseSettingsModel.AvailableProviders;
         CmbPdfTemplate.ItemsSource = PdfTemplateSettingsModel.AvailableTemplates;
         CmbWorkSheetPhotosPerPage.ItemsSource = new[] { 1, 2 };
+        CmbInterventionMessageField.ItemsSource = SupplierOrderSummaryText.TemplateFields;
+        CmbInterventionMessageField.SelectedIndex = 0;
         ItemsWindowMaterialRules.ItemsSource = _windowMaterialRuleEditors;
         ItemsEmployees.ItemsSource = _employees;
         TxtNoCompanyMaterials.Visibility = CompanyMaterialCatalog.Count == 0
@@ -123,6 +125,7 @@ public partial class SettingsWindow : Window
         ChkDatabaseCostSavingMode.IsChecked = app.DatabaseCostSavingMode;
         ChkSilentStartup.IsChecked = app.IsSilentStartup;
         ChkUseVeluxLogin.IsChecked = app.UseVeluxLogin;
+        SetVeluxSettings(App.AppSettings.Velux);
         TxtHistoryResultLimit.Text = app.NumberOfQuote.ToString(CultureInfo.InvariantCulture);
         TxtTempPath.Text = app.TempPath;
         TxtDeviceName.Text = app.GetEffectiveDeviceName();
@@ -218,7 +221,15 @@ public partial class SettingsWindow : Window
         try { scheduleSettings = ReadScheduleSettings(); }
         catch (InvalidOperationException ex)
         {
-            ShowValidationError(TabCalendarSettings, TxtFullDayStart, ex.Message);
+            ShowValidationError(TabCalendarSettings,
+                ex is InvalidInterventionMessageException ? TxtInterventionMessageTemplate : TxtFullDayStart, ex.Message);
+            return;
+        }
+        VeluxSettingsModel veluxSettings;
+        try { veluxSettings = ReadVeluxSettings(); }
+        catch (InvalidOperationException ex)
+        {
+            ShowValidationError(TabVeluxSettings, TxtVeluxBaseUrl, ex.Message);
             return;
         }
         bool scheduleChanged = !ScheduleSettingsEqual(_originalScheduleSettings, scheduleSettings);
@@ -475,6 +486,13 @@ public partial class SettingsWindow : Window
             app.DatabaseCostSavingMode = ChkDatabaseCostSavingMode.IsChecked == true;
             app.IsSilentStartup = ChkSilentStartup.IsChecked == true;
             app.UseVeluxLogin = ChkUseVeluxLogin.IsChecked == true;
+            var velux = App.AppSettings.Velux;
+            velux.BaseUrl = veluxSettings.BaseUrl;
+            velux.LoginPath = veluxSettings.LoginPath;
+            velux.CatalogPath = veluxSettings.CatalogPath;
+            velux.SearchPath = veluxSettings.SearchPath;
+            velux.ProductDetailsPath = veluxSettings.ProductDetailsPath;
+            velux.RequestTimeoutSeconds = veluxSettings.RequestTimeoutSeconds;
             app.NumberOfQuote = historyResultLimit;
             app.TempPath = TxtTempPath.Text.Trim();
             app.DeviceName = string.IsNullOrWhiteSpace(TxtDeviceName.Text)
@@ -757,7 +775,7 @@ public partial class SettingsWindow : Window
                 throw new InvalidOperationException("Inserisci gli orari del calendario nel formato HH:mm, per esempio 08:00.");
             return minutes;
         }
-        return new WorkScheduleSettings
+        var settings = new WorkScheduleSettings
         {
             Revision = _originalScheduleSettings.Revision,
             FullDayStartMinutes = Parse(TxtFullDayStart), FullDayEndMinutes = Parse(TxtFullDayEnd),
@@ -766,6 +784,13 @@ public partial class SettingsWindow : Window
             UseEmployeeAbbreviations = ChkCalendarUseAbbreviations.IsChecked == true,
             InterventionMessageTemplate = TxtInterventionMessageTemplate.Text
         }.CreateValidatedCopy();
+        try { _ = SupplierOrderSummaryText.CreatePreview(settings.InterventionMessageTemplate); }
+        catch (InvalidOperationException ex) { throw new InvalidInterventionMessageException(ex.Message, ex); }
+        return settings;
+    }
+
+    private sealed class InvalidInterventionMessageException(string message, Exception inner) : InvalidOperationException(message, inner)
+    {
     }
 
     private static bool ScheduleSettingsEqual(WorkScheduleSettings first, WorkScheduleSettings second) =>
@@ -800,8 +825,49 @@ public partial class SettingsWindow : Window
 
     private void OnInterventionMessageTemplateChanged(object sender, TextChangedEventArgs e)
     {
-        if (TxtInterventionMessagePreview != null)
+        if (TxtInterventionMessagePreview == null || TxtInterventionMessageError == null) return;
+        try
+        {
             TxtInterventionMessagePreview.Text = SupplierOrderSummaryText.CreatePreview(TxtInterventionMessageTemplate.Text);
+            TxtInterventionMessageError.Visibility = Visibility.Collapsed;
+        }
+        catch (InvalidOperationException ex)
+        {
+            TxtInterventionMessagePreview.Clear();
+            TxtInterventionMessageError.Text = ex.Message;
+            TxtInterventionMessageError.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void OnInsertInterventionMessageFieldClick(object sender, RoutedEventArgs e)
+    {
+        if (CmbInterventionMessageField.SelectedItem is not InterventionMessageField field) return;
+        ReplaceInterventionMessageSelection(field.Text);
+    }
+
+    private void OnExpandInterventionMessageBlocksClick(object sender, RoutedEventArgs e)
+    {
+        string expanded = SupplierOrderSummaryText.ExpandBlocks(TxtInterventionMessageTemplate.Text);
+        if (string.Equals(expanded, TxtInterventionMessageTemplate.Text, StringComparison.Ordinal)) return;
+        TxtInterventionMessageTemplate.SelectAll();
+        ReplaceInterventionMessageSelection(expanded);
+    }
+
+    private void ReplaceInterventionMessageSelection(string text)
+    {
+        int start = TxtInterventionMessageTemplate.SelectionStart;
+        if (TxtInterventionMessageTemplate.Text.Length - TxtInterventionMessageTemplate.SelectionLength + text.Length >
+            WorkScheduleSettings.MaxInterventionMessageTemplateLength)
+        {
+            ShowValidationError(TabCalendarSettings, TxtInterventionMessageTemplate,
+                "Il fac-simile del riepilogo intervento può contenere al massimo 20.000 caratteri.");
+            return;
+        }
+        TxtInterventionMessageTemplate.BeginChange();
+        try { TxtInterventionMessageTemplate.SelectedText = text; }
+        finally { TxtInterventionMessageTemplate.EndChange(); }
+        TxtInterventionMessageTemplate.CaretIndex = start + text.Length;
+        TxtInterventionMessageTemplate.Focus();
     }
 
     private void OnResetInterventionMessageClick(object sender, RoutedEventArgs e)
@@ -1068,13 +1134,61 @@ public partial class SettingsWindow : Window
             target.Text = dialog.FolderName;
     }
 
+    private VeluxSettingsModel ReadVeluxSettings()
+    {
+        if (!int.TryParse(TxtVeluxTimeout.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int timeout))
+            throw new InvalidOperationException("L’attesa massima delle richieste VELUX deve essere un numero intero tra 1 e 120 secondi.");
+        return new VeluxSettingsModel
+        {
+            BaseUrl = TxtVeluxBaseUrl.Text,
+            LoginPath = TxtVeluxLoginPath.Text,
+            CatalogPath = TxtVeluxCatalogPath.Text,
+            SearchPath = TxtVeluxSearchPath.Text,
+            ProductDetailsPath = TxtVeluxProductDetailsPath.Text,
+            RequestTimeoutSeconds = timeout
+        }.CreateValidatedCopy();
+    }
+
+    private void SetVeluxSettings(VeluxSettingsModel settings)
+    {
+        TxtVeluxBaseUrl.Text = settings.BaseUrl;
+        TxtVeluxLoginPath.Text = settings.LoginPath;
+        TxtVeluxCatalogPath.Text = settings.CatalogPath;
+        TxtVeluxSearchPath.Text = settings.SearchPath;
+        TxtVeluxProductDetailsPath.Text = settings.ProductDetailsPath;
+        TxtVeluxTimeout.Text = settings.RequestTimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private void OnVeluxSettingsChanged(object sender, TextChangedEventArgs e)
+    {
+        if (TxtVeluxBaseUrl == null || TxtVeluxLoginPath == null || TxtVeluxCatalogPath == null ||
+            TxtVeluxSearchPath == null || TxtVeluxProductDetailsPath == null || TxtVeluxTimeout == null ||
+            TxtVeluxSettingsError == null || TxtVeluxResolvedLogin == null || TxtVeluxResolvedCatalog == null) return;
+        try
+        {
+            var settings = ReadVeluxSettings();
+            TxtVeluxResolvedLogin.Text = settings.LoginUri.AbsoluteUri;
+            TxtVeluxResolvedCatalog.Text = settings.CatalogUri.AbsoluteUri;
+            TxtVeluxSettingsError.Visibility = Visibility.Collapsed;
+        }
+        catch (InvalidOperationException ex)
+        {
+            TxtVeluxResolvedLogin.Clear();
+            TxtVeluxResolvedCatalog.Clear();
+            TxtVeluxSettingsError.Text = ex.Message;
+            TxtVeluxSettingsError.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void OnResetVeluxSettingsClick(object sender, RoutedEventArgs e) => SetVeluxSettings(new VeluxSettingsModel());
+
     private void OnClearVeluxSessionClick(object sender, RoutedEventArgs e)
     {
         try
         {
             VeluxSessionStorage.Clear();
             MessageBox.Show(
-                "Sessione Velux rimossa. Il login verra richiesto alla prossima ricerca dopo il riavvio dell'app.",
+                "Sessione VELUX salvata rimossa. L’accesso verrà richiesto alla prossima ricerca.",
                 "Sessione Velux",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

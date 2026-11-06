@@ -5,14 +5,20 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using EdilPaintPreventibiviGen.Services;
+using EdilPaintPreventibiviGen.Models;
 using Microsoft.Web.WebView2.Core;
 
 namespace EdilPaintPreventibiviGen.Views;
 
 public partial class VeluxLoginWindow : Window
 {
-    public VeluxLoginWindow()
+    private readonly VeluxSettingsModel _settings;
+
+    public VeluxLoginWindow() : this(VeluxEndpoints.GetSettings()) { }
+
+    public VeluxLoginWindow(VeluxSettingsModel settings)
     {
+        _settings = settings.CreateValidatedCopy();
         InitializeComponent();
         Loaded += OnBrowserLoaded;
     }
@@ -27,7 +33,7 @@ public partial class VeluxLoginWindow : Window
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
             if (!IsVisible) return;
             await WebView.EnsureCoreWebView2Async(environment);
-            if (IsVisible) WebView.Source = new Uri("https://app.velux.it/cas/login");
+            if (IsVisible) WebView.Source = _settings.LoginUri;
         }
         catch (Exception ex)
         {
@@ -59,18 +65,30 @@ public partial class VeluxLoginWindow : Window
                 MessageBox.Show("Il browser non è ancora pronto.");
                 return;
             }
+            if (WebView.Source == null ||
+                !string.Equals(WebView.Source.Host, _settings.BaseUri.Host, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(WebView.Source.AbsolutePath.TrimEnd('/'), _settings.LoginUri.AbsolutePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(this, "Completa l’accesso sul sito VELUX prima di confermare.",
+                    "Accesso VELUX", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
             var cookieManager = WebView.CoreWebView2.CookieManager;
-            var cookies = await cookieManager.GetCookiesAsync("https://app.velux.it");
+            var cookies = await cookieManager.GetCookiesAsync(_settings.CatalogUri.AbsoluteUri);
+            var loginCookies = await cookieManager.GetCookiesAsync(_settings.LoginUri.AbsoluteUri);
+            if (!IsVisible) return;
             
             var cookieList = new List<object>();
-            foreach (var cookie in cookies)
+            foreach (var cookie in cookies.Concat(loginCookies).GroupBy(cookie => (cookie.Name, cookie.Domain, cookie.Path)).Select(group => group.First()))
             {
                 cookieList.Add(new {
                     name = cookie.Name,
                     value = cookie.Value,
                     domain = cookie.Domain,
-                    path = cookie.Path
+                    path = cookie.Path,
+                    secure = cookie.IsSecure,
+                    httpOnly = cookie.IsHttpOnly
                 });
             }
 

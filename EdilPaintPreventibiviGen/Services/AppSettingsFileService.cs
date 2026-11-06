@@ -137,6 +137,7 @@ public static class AppSettingsFileService
                 ShowTemplateName = false
             },
             WorkSheet = new WorkSheetSettingsModel(),
+            Velux = new VeluxSettingsModel(),
             Mail = new
             {
                 Enabled = false,

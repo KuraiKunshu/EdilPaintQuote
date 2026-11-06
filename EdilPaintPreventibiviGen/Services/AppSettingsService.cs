@@ -19,6 +19,7 @@ public sealed class AppSettingsService
 	public WorkSheetSettingsModel WorkSheet { get; }
 	public DatabaseSettingsModel Database { get; }
 	public MailSettingsModel Mail { get; }
+	public VeluxSettingsModel Velux { get; }
 	public BusinessSettingsModel Business { get; }
 	// Legacy local list, retained only for automatic import into the shared database.
 	// New edits are handled by EmployeeDirectoryService, never by local settings.
@@ -26,9 +27,13 @@ public sealed class AppSettingsService
 	public string EmployeesDatabaseIdentity { get; set; } = string.Empty;
 	public string SettingsPath { get; }
 
-	public AppSettingsService(IConfiguration configuration)
+	public AppSettingsService(IConfiguration configuration) : this(configuration, AppSettingsFileService.EnsureExists())
 	{
-		SettingsPath = AppSettingsFileService.EnsureExists();
+	}
+
+	internal AppSettingsService(IConfiguration configuration, string settingsPath)
+	{
+		SettingsPath = settingsPath;
 		App = configuration.GetSection("App").Get<AppSettingsServiceModel>() ?? new AppSettingsServiceModel();
 		RealProfit = configuration.GetSection("RealProfit").Get<RealProfitSettingsModel>() ?? new RealProfitSettingsModel();
 		RealProfit.Normalize();
@@ -39,6 +44,7 @@ public sealed class AppSettingsService
 		WorkSheet.Normalize();
 		Database = LoadDatabaseSettings(configuration);
 		Mail = LoadMailSettings(configuration);
+		Velux = LoadVeluxSettings(configuration);
 		Business = configuration.GetSection("Business").Get<BusinessSettingsModel>() ?? new();
 		Employees = configuration.GetSection("Employees").Get<List<EmployeeSettingsModel>>() ?? [];
 		EmployeesDatabaseIdentity = configuration["EmployeesDatabaseIdentity"] ?? string.Empty;
@@ -46,6 +52,7 @@ public sealed class AppSettingsService
 
 	public void Save()
 	{
+		var velux = Velux.CreateValidatedCopy();
 		var employees = Employees.Select(employee => employee.CreateValidatedCopy()).ToList();
 		var root = File.Exists(SettingsPath)
 			? JsonNode.Parse(File.ReadAllText(SettingsPath)) as JsonObject ?? new JsonObject()
@@ -65,6 +72,7 @@ public sealed class AppSettingsService
 		};
 		root["App"] = JsonSerializer.SerializeToNode(App, jsonOptions);
 		root["Business"] = JsonSerializer.SerializeToNode(Business, jsonOptions);
+		root["Velux"] = JsonSerializer.SerializeToNode(velux, jsonOptions);
 		root["Employees"] = JsonSerializer.SerializeToNode(employees, jsonOptions);
 		root["EmployeesDatabaseIdentity"] = EmployeesDatabaseIdentity;
 		root["RealProfit"] = JsonSerializer.SerializeToNode(RealProfit, jsonOptions);
@@ -196,6 +204,12 @@ public sealed class AppSettingsService
 
 		settings.Normalize();
 		return settings;
+	}
+
+	private static VeluxSettingsModel LoadVeluxSettings(IConfiguration configuration)
+	{
+		try { return configuration.GetSection("Velux").Get<VeluxSettingsModel>() ?? new(); }
+		catch (InvalidOperationException) { return new(); }
 	}
 
 	private static int? TryReadPort(string? value)
