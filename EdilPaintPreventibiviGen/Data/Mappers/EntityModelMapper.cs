@@ -195,6 +195,7 @@ public static class EntityModelMapper
             MaterialOrderDate = entity.MaterialOrderDate,
             ExpectedDeliveryDate = entity.ExpectedDeliveryDate,
             MaterialStatus = entity.MaterialStatus,
+            MaterialOrderNotes = entity.MaterialOrderNotes,
             RealProfit = realProfit,
             IsJointVenture = entity.IsJointVenture,
             PartnerCompanyName = entity.PartnerCompanyName,

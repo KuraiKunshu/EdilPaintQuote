@@ -163,6 +163,7 @@ public partial class SqlDataService
         await EnsureColumnAsync(db, "Quotes", "MaterialOrderDate", "DATETIME2 NULL", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "ExpectedDeliveryDate", "DATETIME2 NULL", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "MaterialStatus", "NVARCHAR(120) NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(db, "Quotes", "MaterialOrderNotes", "NVARCHAR(MAX) NOT NULL DEFAULT N''", cancellationToken);
         await EnsureColumnAsync(db, "Quotes", "RealProfitJson", "NVARCHAR(MAX) NOT NULL DEFAULT ''", cancellationToken);
 
         await EnsureQuoteNumberColumnDefinitionAsync(db, cancellationToken);
@@ -231,6 +232,7 @@ public partial class SqlDataService
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialOrderDate" timestamp with time zone NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "ExpectedDeliveryDate" timestamp with time zone NULL;
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialStatus" character varying(120) NOT NULL DEFAULT '';
+        ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "MaterialOrderNotes" text NOT NULL DEFAULT '';
         ALTER TABLE "Quotes" ADD COLUMN IF NOT EXISTS "RealProfitJson" text NOT NULL DEFAULT '';
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "IsSupplier" boolean NOT NULL DEFAULT FALSE;
         ALTER TABLE "Customers" ADD COLUMN IF NOT EXISTS "PreferredVatType" varchar(50) NOT NULL DEFAULT '';

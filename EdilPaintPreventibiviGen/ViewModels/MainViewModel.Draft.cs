@@ -570,6 +570,7 @@ public partial class MainViewModel
             draft.MaterialOrderDate = existing.MaterialOrderDate;
             draft.ExpectedDeliveryDate = existing.ExpectedDeliveryDate;
             draft.MaterialStatus = existing.MaterialStatus;
+            draft.MaterialOrderNotes = existing.MaterialOrderNotes;
             draft.MaterialsOrderedByCustomer = existing.MaterialsOrderedByCustomer;
             draft.RealProfit = existing.RealProfit;
 

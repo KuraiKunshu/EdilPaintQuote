@@ -117,24 +117,24 @@ internal static class SqlServerToPostgresMigrator
             throw new InvalidOperationException("Il database PostgreSQL target contiene gia' dati. Riesegui con --overwrite-target solo se vuoi cancellarli.");
         }
 
-        if (!await SourceHasCustomerNotesColumnAsync(source))
+        if (!await SourceHasQuoteNotesColumnsAsync(source))
         {
             throw new InvalidOperationException(
-                "Il database SQL Server sorgente non contiene ancora la colonna CustomerNotes. " +
+                "Nel database SQL Server sorgente manca la colonna CustomerNotes o MaterialOrderNotes. " +
                 "Avvia una volta l'app desktop aggiornata con credenziali abilitate all'aggiornamento schema, poi riesegui la migrazione.");
         }
 
         Console.WriteLine("Controllo coerenza dati sorgente...");
         await ValidateSourceAsync(source);
 
+        Console.WriteLine("Allineo schema delle note sul target...");
+        await EnsureQuoteNotesColumnsAsync(target);
+
         if (targetHasData)
         {
             Console.WriteLine("Target non vuoto: cancello dati esistenti...");
             await TruncateTargetAsync(target);
         }
-
-        Console.WriteLine("Allineo schema note cliente sul target...");
-        await EnsureCustomerNotesColumnAsync(target);
 
         Console.WriteLine("Copio dati...");
         var counts = new List<(string Name, int Source, int Target)>();
@@ -239,7 +239,7 @@ internal static class SqlServerToPostgresMigrator
         return new AppDbContext(options);
     }
 
-    private static async Task EnsureCustomerNotesColumnAsync(AppDbContext db)
+    private static async Task EnsureQuoteNotesColumnsAsync(AppDbContext db)
     {
         if (db.Database.IsSqlServer())
         {
@@ -248,6 +248,11 @@ internal static class SqlServerToPostgresMigrator
                 BEGIN
                     ALTER TABLE [dbo].[Quotes]
                     ADD [CustomerNotes] NVARCHAR(MAX) NOT NULL DEFAULT N'';
+                END
+                IF COL_LENGTH(N'[dbo].[Quotes]', N'MaterialOrderNotes') IS NULL
+                BEGIN
+                    ALTER TABLE [dbo].[Quotes]
+                    ADD [MaterialOrderNotes] NVARCHAR(MAX) NOT NULL DEFAULT N'';
                 END
                 """);
 
@@ -267,6 +272,8 @@ internal static class SqlServerToPostgresMigrator
             await db.Database.ExecuteSqlRawAsync("""
                 ALTER TABLE "Quotes"
                 ADD COLUMN IF NOT EXISTS "CustomerNotes" text NOT NULL DEFAULT '';
+                ALTER TABLE "Quotes"
+                ADD COLUMN IF NOT EXISTS "MaterialOrderNotes" text NOT NULL DEFAULT '';
                 """);
 
             await db.Database.ExecuteSqlRawAsync("""
@@ -281,15 +288,16 @@ internal static class SqlServerToPostgresMigrator
             return;
         }
 
-        throw new NotSupportedException("Provider database non supportato per l'allineamento di CustomerNotes.");
+        throw new NotSupportedException("Provider database non supportato per l'allineamento delle note.");
     }
 
-    private static async Task<bool> SourceHasCustomerNotesColumnAsync(AppDbContext source)
+    private static async Task<bool> SourceHasQuoteNotesColumnsAsync(AppDbContext source)
     {
         int result = await source.Database
             .SqlQueryRaw<int>("""
                 SELECT CASE
-                    WHEN COL_LENGTH(N'[dbo].[Quotes]', N'CustomerNotes') IS NULL THEN 0
+                    WHEN COL_LENGTH(N'[dbo].[Quotes]', N'CustomerNotes') IS NULL
+                      OR COL_LENGTH(N'[dbo].[Quotes]', N'MaterialOrderNotes') IS NULL THEN 0
                     ELSE 1
                 END AS [Value]
                 """)

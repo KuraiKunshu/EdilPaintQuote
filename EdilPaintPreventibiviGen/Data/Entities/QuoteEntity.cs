@@ -48,6 +48,7 @@ public class QuoteEntity
 	public DateTime? MaterialOrderDate { get; set; }
 	public DateTime? ExpectedDeliveryDate { get; set; }
 	public string MaterialStatus { get; set; } = string.Empty;
+	public string MaterialOrderNotes { get; set; } = string.Empty;
 	/// <summary>
 	/// Snapshot JSON riservato dell'ultimo calcolo del guadagno reale.
 	/// </summary>

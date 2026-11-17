@@ -417,13 +417,21 @@ public partial class LocalJsonStoreService
                 ? DeviceNameService.GetCurrentDeviceName()
                 : supplierInfo.DeviceName.Trim();
 
-            quote.SupplierName = supplierInfo.SupplierName?.Trim() ?? string.Empty;
-            quote.MaterialsOrderedByCustomer = supplierInfo.MaterialsOrderedByCustomer;
-            quote.MaterialOrderDate = supplierInfo.MaterialOrderDate;
-            quote.ExpectedDeliveryDate = supplierInfo.ExpectedDeliveryDate;
-            quote.MaterialStatus = supplierInfo.MaterialStatus?.Trim() ?? string.Empty;
+            if (supplierInfo.UpdateSupplierFields)
+            {
+                quote.SupplierName = supplierInfo.SupplierName?.Trim() ?? string.Empty;
+                quote.MaterialsOrderedByCustomer = supplierInfo.MaterialsOrderedByCustomer;
+                quote.MaterialOrderDate = supplierInfo.MaterialOrderDate;
+                quote.ExpectedDeliveryDate = supplierInfo.ExpectedDeliveryDate;
+                quote.MaterialStatus = supplierInfo.MaterialStatus?.Trim() ?? string.Empty;
+            }
+            if (supplierInfo.MaterialOrderNotes != null)
+                quote.MaterialOrderNotes = supplierInfo.MaterialOrderNotes.Trim();
             quote.LastModifiedByDevice = deviceName;
-            AddEvent(quote, "fornitori", "Dati fornitori aggiornati", deviceName);
+            string description = "Dati fornitori aggiornati";
+            if (!supplierInfo.UpdateSupplierFields)
+                description = quote.MaterialOrderNotes.Length == 0 ? "Note ordine svuotate" : "Note ordine aggiornate";
+            AddEvent(quote, "fornitori", description, deviceName);
         });
 
     public Task<QuoteHistoryEntry?> UpdateQuoteRealProfitAsync(
@@ -993,6 +1001,7 @@ public partial class LocalJsonStoreService
             MaterialOrderDate = entry.MaterialOrderDate,
             ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
             MaterialStatus = entry.MaterialStatus,
+            MaterialOrderNotes = entry.MaterialOrderNotes,
             MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
             RealProfit = entry.RealProfit,
             IsJointVenture = entry.IsJointVenture,

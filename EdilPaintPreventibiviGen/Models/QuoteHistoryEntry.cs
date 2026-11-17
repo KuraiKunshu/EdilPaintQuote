@@ -41,11 +41,14 @@ public sealed class QuoteReminderInfo
 
 public sealed class QuoteSupplierInfo
 {
+	public bool UpdateSupplierFields { get; set; } = true;
 	public string SupplierName { get; set; } = string.Empty;
 	public bool MaterialsOrderedByCustomer { get; set; }
 	public DateTime? MaterialOrderDate { get; set; }
 	public DateTime? ExpectedDeliveryDate { get; set; }
 	public string MaterialStatus { get; set; } = string.Empty;
+	// Null leaves the saved note untouched. An empty string clears it.
+	public string? MaterialOrderNotes { get; set; }
 	public string DeviceName { get; set; } = string.Empty;
 }
 
@@ -94,6 +97,7 @@ public class QuoteHistoryEntry
 	public DateTime? MaterialOrderDate { get; set; }
 	public DateTime? ExpectedDeliveryDate { get; set; }
 	public string MaterialStatus { get; set; } = string.Empty;
+	public string MaterialOrderNotes { get; set; } = string.Empty;
 	[JsonPropertyName("realProfit")]
 	public RealProfitSnapshot? RealProfit { get; set; }
 

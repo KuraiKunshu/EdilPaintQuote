@@ -76,6 +76,57 @@ public sealed class SupplierOrderSummaryTextTests
     }
 
     [Fact]
+    public void SummaryUsesTheReferenceAddressWhenNoSiteIsSet()
+    {
+        var referenceId = Guid.NewGuid();
+        var quote = new QuoteHistoryEntry
+        {
+            CustomerName = "Impresa Rossi", ReferenceName = "Condominio Verdi",
+            ReferenceCustomerSyncId = referenceId, SiteName = " "
+        };
+        Customer[] customers =
+        [
+            new() { BusinessName = "Impresa Rossi", Address = "Via Cliente 1" },
+            new() { BusinessName = "Verdi aggiornato", SyncId = referenceId, Address = " Via Riferimento 2 " }
+        ];
+        var intervention = new WorkScheduleEntry { SiteName = "Vecchio cantiere" };
+        string expanded = SupplierOrderSummaryText.ExpandBlocks(WorkScheduleSettings.DefaultInterventionMessageTemplate);
+
+        Assert.All(new[]
+        {
+            SupplierOrderSummaryText.Format(new QuoteHistorySummary(), quote, customers),
+            SupplierOrderSummaryText.Format(intervention, quote, customers),
+            SupplierOrderSummaryText.Format(intervention, quote, customers, expanded)
+        }, message =>
+        {
+            Assert.Contains("Indirizzo riferimento: Via Riferimento 2", message);
+            Assert.DoesNotContain("Via Cliente 1", message);
+            Assert.DoesNotContain("Vecchio cantiere", message);
+        });
+    }
+
+    [Theory]
+    [InlineData("Via Cantiere 3", "Via Riferimento 2", "Indirizzo cantiere: Via Cantiere 3")]
+    [InlineData("", "Via Riferimento 2", "Indirizzo riferimento: Via Riferimento 2")]
+    [InlineData("", " ", "Indirizzo cliente: Via Cliente 1")]
+    public void AutomaticAddressUsesSiteThenLegacyReferenceThenCustomer(string site, string referenceAddress, string expected)
+    {
+        var quote = new QuoteHistoryEntry
+        {
+            CustomerName = "Impresa Rossi", ReferenceName = "Condominio Verdi", SiteName = site
+        };
+        Customer[] customers =
+        [
+            new() { BusinessName = "Impresa Rossi", Address = "Via Cliente 1" },
+            new() { BusinessName = " condominio verdi ", Address = referenceAddress }
+        ];
+
+        Assert.Equal(expected, SupplierOrderSummaryText.Format(new WorkScheduleEntry(), quote, customers,
+            "{AddressLabel}: {Address}"));
+        Assert.Contains(expected, SupplierOrderSummaryText.Format(new QuoteHistorySummary(), quote, customers));
+    }
+
+    [Fact]
     public void CalendarSummaryAddsTheAssignedCrewScheduleAndInterventionNotes()
     {
         var intervention = new WorkScheduleEntry
@@ -266,5 +317,22 @@ public sealed class SupplierOrderSummaryTextTests
 
         Assert.DoesNotContain("Indirizzo cliente:", message);
         Assert.DoesNotContain("Telefono cliente:", message);
+    }
+
+    [Fact]
+    public void AllAddressesFieldShowsOnlyAvailableAddressesWithTheirLabels()
+    {
+        string template = SupplierOrderSummaryText.TemplateFields
+            .Single(field => field.Label == "Indirizzi · Tutti quelli disponibili").Text;
+        Assert.Equal("""
+            Indirizzo cantiere: Via Roma 12, Brescia
+            Indirizzo riferimento: Via Dante 5, Brescia
+            Indirizzo cliente: Via Milano 8, Brescia
+            """.ReplaceLineEndings(), SupplierOrderSummaryText.CreatePreview(template));
+
+        var quote = new QuoteHistoryEntry { CustomerName = "Impresa Rossi", ReferenceName = "Condominio Verdi" };
+        Customer[] customers = [new() { BusinessName = "Impresa Rossi", Address = "Via Milano 8" }];
+        Assert.Equal("Indirizzo cliente: Via Milano 8",
+            SupplierOrderSummaryText.Format(new WorkScheduleEntry(), quote, customers, template));
     }
 }

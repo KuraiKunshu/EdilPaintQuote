@@ -865,6 +865,42 @@ public sealed class RegressionTests
     }
 
     [Fact]
+    public async Task SupplierPatchPreservesPendingOrderNotesAndKeepsANewerNoteDuringReplay()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            const string number = "PREV/ORDER-PATCH";
+            var service = new LocalQuotePatchOutboxService(temporaryPath);
+            await service.StoreSupplierInfoAsync(number, new QuoteSupplierInfo
+            {
+                UpdateSupplierFields = false,
+                MaterialOrderNotes = "Manca raccordo destro"
+            });
+            await service.StoreSupplierInfoAsync(number, new QuoteSupplierInfo { MaterialStatus = "Ordinato" });
+
+            var applied = Assert.Single(await service.LoadAllAsync()).SupplierInfo!;
+            Assert.True(applied.UpdateSupplierFields);
+            Assert.Equal("Ordinato", applied.MaterialStatus);
+            Assert.Equal("Manca raccordo destro", applied.MaterialOrderNotes);
+
+            await service.StoreSupplierInfoAsync(number, new QuoteSupplierInfo
+            {
+                UpdateSupplierFields = false,
+                MaterialOrderNotes = string.Empty
+            });
+            await service.RemoveSupplierInfoIfMatchesAsync(number, applied);
+            var pending = Assert.Single(await service.LoadAllAsync()).SupplierInfo!;
+            Assert.False(pending.UpdateSupplierFields);
+            Assert.Equal(string.Empty, pending.MaterialOrderNotes);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
     public async Task DraftKeepsExistingQuoteConcurrencyMetadata()
     {
         string temporaryPath = CreateTemporaryTestPath();
@@ -883,6 +919,7 @@ public sealed class RegressionTests
                 HasPendingDatabaseWrite = true,
                 IsEditingExistingQuoteDraft = true,
                 MaterialsOrderedByCustomer = true,
+                MaterialOrderNotes = "Manca raccordo destro",
                 RealProfit = new RealProfitSnapshot
                 {
                     CalculatedAtUtc = DateTime.UtcNow.AddMinutes(-1),
@@ -901,6 +938,7 @@ public sealed class RegressionTests
             Assert.Equal(7, restored.BaseRevision);
             Assert.True(restored.HasPendingDatabaseWrite);
             Assert.True(restored.MaterialsOrderedByCustomer);
+            Assert.Equal("Manca raccordo destro", restored.MaterialOrderNotes);
             Assert.NotNull(restored.RealProfit);
             Assert.Equal(1800, restored.RealProfit.Input.QuoteRevenue);
             Assert.Equal(640, restored.RealProfit.Result.Profit);
@@ -980,6 +1018,41 @@ public sealed class RegressionTests
             Assert.True(restored.MaterialsOrderedByCustomer);
             Assert.Equal("Cliente diretto", restored.SupplierName);
             Assert.Equal("Da ordinare", restored.MaterialStatus);
+        }
+        finally
+        {
+            DeleteTemporaryTestPath(temporaryPath);
+        }
+    }
+
+    [Fact]
+    public async Task LocalQuoteStorePreservesOrderNotesWhenTheSupplierPatchOmitsThem()
+    {
+        string temporaryPath = CreateTemporaryTestPath();
+        try
+        {
+            const string number = "PREV/ORDER-NOTES";
+            const string notes = "Manca raccordo destro\nUsate due scossaline";
+            var store = new LocalJsonStoreService(temporaryPath);
+            var quote = new QuoteHistoryEntry { QuoteNumber = number, Notes = "Nota del preventivo" };
+            string originalHash = QuoteSyncHashService.Compute(quote);
+            quote.MaterialOrderNotes = notes;
+            Assert.NotEqual(originalHash, QuoteSyncHashService.Compute(quote));
+            await store.BulkUpdateQuotesAsync([quote]);
+
+            await store.UpdateQuoteSupplierInfoAsync(number, new QuoteSupplierInfo { MaterialStatus = "In magazzino" });
+            var stored = Assert.Single(await store.LoadHistoryAsync());
+            Assert.Equal(notes, stored.MaterialOrderNotes);
+            Assert.Equal("Nota del preventivo", stored.Notes);
+
+            await store.UpdateQuoteSupplierInfoAsync(number, new QuoteSupplierInfo
+            {
+                UpdateSupplierFields = false,
+                MaterialOrderNotes = string.Empty
+            });
+            stored = Assert.Single(await store.LoadHistoryAsync());
+            Assert.Empty(stored.MaterialOrderNotes);
+            Assert.Equal("In magazzino", stored.MaterialStatus);
         }
         finally
         {

@@ -930,6 +930,7 @@ public partial class FallbackDataService : IDataService
             MaterialOrderDate = entry.MaterialOrderDate,
             ExpectedDeliveryDate = entry.ExpectedDeliveryDate,
             MaterialStatus = entry.MaterialStatus,
+            MaterialOrderNotes = entry.MaterialOrderNotes,
             MaterialsOrderedByCustomer = entry.MaterialsOrderedByCustomer,
             RealProfit = entry.RealProfit,
             LastModifiedUtc = entry.LastModifiedUtc,

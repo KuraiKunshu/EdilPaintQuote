@@ -66,6 +66,16 @@ GRANT UPDATE (
     "RealProfitJson", "IsJointVenture", "PartnerCompanyName", "CostAllocationsJson", "IsDeleted"
 ) ON TABLE "Quotes" TO edilpaint_mobile;
 
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_attribute
+               WHERE attrelid = 'public."Quotes"'::regclass
+                 AND attname = 'MaterialOrderNotes' AND NOT attisdropped) THEN
+        GRANT UPDATE ("MaterialOrderNotes") ON TABLE "Quotes" TO edilpaint_mobile;
+    END IF;
+END
+$$;
+
 GRANT INSERT (
     "QuoteId", "CatalogItemId", "Name", "Description", "UnitPrice",
     "Quantity", "Discount", "IsSignificant", "SortOrder"

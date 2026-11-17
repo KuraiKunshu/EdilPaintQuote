@@ -31,7 +31,21 @@ public sealed class LocalQuotePatchOutboxService
         UpdateAsync(quoteNumber, patch => patch.ReminderInfo = reminderInfo, cancellationToken);
 
     public Task StoreSupplierInfoAsync(string quoteNumber, QuoteSupplierInfo supplierInfo, CancellationToken cancellationToken = default) =>
-        UpdateAsync(quoteNumber, patch => patch.SupplierInfo = supplierInfo, cancellationToken);
+        UpdateAsync(quoteNumber, patch =>
+        {
+            var fields = supplierInfo.UpdateSupplierFields ? supplierInfo : patch.SupplierInfo ?? supplierInfo;
+            patch.SupplierInfo = new QuoteSupplierInfo
+            {
+                UpdateSupplierFields = fields.UpdateSupplierFields,
+                SupplierName = fields.SupplierName,
+                MaterialsOrderedByCustomer = fields.MaterialsOrderedByCustomer,
+                MaterialOrderDate = fields.MaterialOrderDate,
+                ExpectedDeliveryDate = fields.ExpectedDeliveryDate,
+                MaterialStatus = fields.MaterialStatus,
+                MaterialOrderNotes = supplierInfo.MaterialOrderNotes ?? patch.SupplierInfo?.MaterialOrderNotes,
+                DeviceName = fields.UpdateSupplierFields ? fields.DeviceName : supplierInfo.DeviceName
+            };
+        }, cancellationToken);
 
     public async Task<List<PendingQuotePatch>> LoadAllAsync(CancellationToken cancellationToken = default)
     {
@@ -151,10 +165,22 @@ public sealed class LocalQuotePatchOutboxService
             quoteNumber,
             patch =>
             {
-                if (!SupplierInfoEquals(patch.SupplierInfo, appliedSupplierInfo))
+                var current = patch.SupplierInfo;
+                if (current == null)
                     return false;
 
-                patch.SupplierInfo = null;
+                bool fieldsApplied = SupplierFieldsEqual(current, appliedSupplierInfo);
+                bool notesApplied = current.MaterialOrderNotes != null &&
+                    string.Equals(current.MaterialOrderNotes, appliedSupplierInfo.MaterialOrderNotes, StringComparison.Ordinal);
+                if (!fieldsApplied && !notesApplied)
+                    return false;
+
+                if (fieldsApplied)
+                    current.UpdateSupplierFields = false;
+                if (notesApplied)
+                    current.MaterialOrderNotes = null;
+                if (!current.UpdateSupplierFields && current.MaterialOrderNotes == null)
+                    patch.SupplierInfo = null;
                 return true;
             },
             cancellationToken);
@@ -239,8 +265,8 @@ public sealed class LocalQuotePatchOutboxService
         current.ReminderAtUtc == applied.ReminderAtUtc &&
         string.Equals(current.DeviceName, applied.DeviceName, StringComparison.Ordinal);
 
-    private static bool SupplierInfoEquals(QuoteSupplierInfo? current, QuoteSupplierInfo applied) =>
-        current != null &&
+    private static bool SupplierFieldsEqual(QuoteSupplierInfo current, QuoteSupplierInfo applied) =>
+        current.UpdateSupplierFields && applied.UpdateSupplierFields &&
         string.Equals(current.SupplierName, applied.SupplierName, StringComparison.Ordinal) &&
         current.MaterialsOrderedByCustomer == applied.MaterialsOrderedByCustomer &&
         current.MaterialOrderDate == applied.MaterialOrderDate &&

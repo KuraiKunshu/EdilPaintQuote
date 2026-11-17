@@ -30,15 +30,21 @@ internal static class SupplierOrderSummaryText
     [
         new("Cliente · Nome", "{CustomerName}"),
         new("Riferimento · Nome", "{ReferenceName}"),
-        new("Indirizzo · Cantiere o cliente", "{Address}"),
+        new("Indirizzo · Automatico", "{Address}"),
+        new("Indirizzo · Titolo automatico", "{AddressLabel}"),
         new("Indirizzo · Solo cantiere", "{SiteAddress}"),
-        new("Indirizzo · Solo cliente", "{CustomerAddress}"),
         new("Indirizzo · Riferimento", "{ReferenceAddress}"),
+        new("Indirizzo · Solo cliente", "{CustomerAddress}"),
+        new("Indirizzi · Tutti quelli disponibili",
+            "{#SiteAddress}Indirizzo cantiere: {SiteAddress}\n{/SiteAddress}" +
+            "{#ReferenceAddress}Indirizzo riferimento: {ReferenceAddress}\n{/ReferenceAddress}" +
+            "{#CustomerAddress}Indirizzo cliente: {CustomerAddress}\n{/CustomerAddress}"),
         new("Telefono · Cliente", "{Phone}"),
         new("Telefono · Riferimento", "{ReferencePhone}"),
         new("Intervento · Data completa", "{InterventionDate}"),
         new("Intervento · Data breve", "{InterventionDateShort}"),
         new("Intervento · Giorno della settimana", "{InterventionWeekday}"),
+        new("Intervento · Orario completo", "{InterventionTime}"),
         new("Intervento · Ora iniziale", "{StartTime}"),
         new("Intervento · Ora finale", "{EndTime}"),
         new("Intervento · Fascia oraria", "{Slot}"),
@@ -131,16 +137,24 @@ internal static class SupplierOrderSummaryText
         string referenceName = string.IsNullOrWhiteSpace(quote.ReferenceName) ? order.ReferenceName : quote.ReferenceName;
         Customer? customer = FindCustomer(quote.CustomerSyncId, customerName, customers);
         Customer? reference = FindCustomer(quote.ReferenceCustomerSyncId, referenceName, customers);
+        string siteAddress = quote.SiteName?.Trim() ?? "";
+        string referenceAddress = reference?.Address?.Trim() ?? "";
+        string customerAddress = customer?.Address?.Trim() ?? "";
+        string address = customerAddress;
+        string addressLabel = "Indirizzo cliente";
+        if (siteAddress.Length > 0)
+            (address, addressLabel) = (siteAddress, "Indirizzo cantiere");
+        else if (referenceAddress.Length > 0)
+            (address, addressLabel) = (referenceAddress, "Indirizzo riferimento");
+
         var lines = new List<string>
         {
             $"Cliente: {(string.IsNullOrWhiteSpace(customerName) ? "Non indicato" : customerName.Trim())}"
         };
         if (!string.IsNullOrWhiteSpace(referenceName))
             lines.Add($"Riferimento: {referenceName.Trim()}");
-        if (!string.IsNullOrWhiteSpace(quote.SiteName))
-            lines.Add($"Indirizzo cantiere: {quote.SiteName.Trim()}");
-        else if (!string.IsNullOrWhiteSpace(customer?.Address))
-            lines.Add($"Indirizzo cliente: {customer.Address.Trim()}");
+        if (address.Length > 0)
+            lines.Add($"{addressLabel}: {address}");
         if (!string.IsNullOrWhiteSpace(customer?.Phone))
             lines.Add($"Telefono cliente: {customer.Phone.Trim()}");
 
@@ -158,11 +172,11 @@ internal static class SupplierOrderSummaryText
             ["QuoteNumber"] = quote.QuoteNumber,
             ["CustomerName"] = string.IsNullOrWhiteSpace(customerName) ? "Non indicato" : customerName.Trim(),
             ["ReferenceName"] = referenceName?.Trim() ?? "",
-            ["Address"] = string.IsNullOrWhiteSpace(quote.SiteName) ? customer?.Address?.Trim() ?? "" : quote.SiteName.Trim(),
-            ["AddressLabel"] = string.IsNullOrWhiteSpace(quote.SiteName) ? "Indirizzo cliente" : "Indirizzo cantiere",
-            ["SiteAddress"] = quote.SiteName?.Trim() ?? "",
-            ["CustomerAddress"] = customer?.Address?.Trim() ?? "",
-            ["ReferenceAddress"] = reference?.Address?.Trim() ?? "",
+            ["Address"] = address,
+            ["AddressLabel"] = addressLabel,
+            ["SiteAddress"] = siteAddress,
+            ["CustomerAddress"] = customerAddress,
+            ["ReferenceAddress"] = referenceAddress,
             ["Phone"] = customer?.Phone?.Trim() ?? "",
             ["ReferencePhone"] = reference?.Phone?.Trim() ?? "",
             ["ContactDetails"] = string.Join(Environment.NewLine, lines),
@@ -213,7 +227,11 @@ internal static class SupplierOrderSummaryText
         Materials = [new Item { Name = "Finestra", Quantity = 2 }],
         Labors = [new Item { Name = "Posa finestre", Quantity = 2, Description = "Rimozione esistente e sigillatura" }],
         CustomerNotes = "Avvisare prima dell’arrivo", Notes = "Verificare la consegna dei materiali"
-    }, [new Customer { BusinessName = "Impresa Rossi", Phone = "030 123456" }], template);
+    },
+    [
+        new Customer { BusinessName = "Impresa Rossi", Address = "Via Milano 8, Brescia", Phone = "030 123456" },
+        new Customer { BusinessName = "Condominio Verdi", Address = "Via Dante 5, Brescia", Phone = "030 654321" }
+    ], template);
 
     private static Customer? FindCustomer(Guid syncId, string name, IEnumerable<Customer> customers)
     {

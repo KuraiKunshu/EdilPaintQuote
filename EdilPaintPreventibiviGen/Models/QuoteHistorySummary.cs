@@ -36,6 +36,7 @@ public class QuoteHistorySummary : INotifyPropertyChanged
     private DateTime? _materialOrderDate;
     private DateTime? _expectedDeliveryDate;
     private string _materialStatus = string.Empty;
+    private string _materialOrderNotes = string.Empty;
 
     public string QuoteNumber
     {
@@ -363,6 +364,12 @@ public class QuoteHistorySummary : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(MaterialStatusDisplay));
         }
+    }
+
+    public string MaterialOrderNotes
+    {
+        get => _materialOrderNotes;
+        set { _materialOrderNotes = value; OnPropertyChanged(); }
     }
 
     public bool IsSent => SentAtUtc.HasValue;

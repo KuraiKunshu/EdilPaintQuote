@@ -159,6 +159,21 @@ public class MobileOperationsTests
     }
 
     [Fact]
+    public void EditingNotesDoesNotCountAsChangingUndatedOrderFields()
+    {
+        var quote = new QuoteDetail { SupplierName = "Fornitore", MaterialStatus = "Ordinato" };
+        var update = new SupplierOrderUpdate
+        {
+            SupplierName = " Fornitore ", MaterialStatus = "ORDINATO", MaterialOrderNotes = "Manca raccordo destro"
+        };
+
+        Assert.False(update.ChangesSupplierFields(quote));
+
+        update.MaterialOrderDate = new DateTime(2026, 11, 17);
+        Assert.True(update.ChangesSupplierFields(quote));
+    }
+
+    [Fact]
     public void EditingCopiesLinesAndCollaborationCosts()
     {
         var original = new QuoteDetail { Revision = 8, IsJointVenture = true,

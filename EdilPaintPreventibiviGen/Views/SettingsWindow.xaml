@@ -914,6 +914,8 @@
                                             <TextBlock Text="Riepilogo da copiare per la squadra" Style="{StaticResource SectionTitleStyle}" Margin="0,24,0,8"/>
                                             <TextBlock Text="Scrivi i titoli e il testo che preferisci, scegli i dati da mostrare e imposta il formato di ogni riga di materiali, lavorazioni e squadra. L’anteprima si aggiorna mentre scrivi."
                                                        TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10"/>
+                                            <TextBlock Text="L’indirizzo automatico usa il primo disponibile tra cantiere, riferimento e cliente. Dal menu puoi inserire anche i singoli indirizzi o tutti quelli disponibili."
+                                                       TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10"/>
                                             <WrapPanel Margin="0,0,0,10">
                                                 <ComboBox x:Name="CmbInterventionMessageField" Width="330" MinHeight="36" Margin="0,0,8,6"
                                                           DisplayMemberPath="Label" AutomationProperties.Name="Campo o elenco da inserire nel messaggio"/>

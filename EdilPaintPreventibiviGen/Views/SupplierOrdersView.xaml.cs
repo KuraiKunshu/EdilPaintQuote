@@ -254,24 +254,42 @@ public partial class SupplierOrdersView : UserControl, IDisposable
             Cursor = Cursors.Wait;
 
             string deviceName = DeviceNameService.GetCurrentDeviceName();
+            string orderNotes = summary.MaterialOrderNotes.Trim().ReplaceLineEndings("\n");
             if (summary.MaterialsOrderedByCustomer)
                 SupplierOrderAssignmentService.ApplyCustomerOrderChoice(summary, orderedByCustomer: true);
+
+            bool notesChanged = orderNotes != original.MaterialOrderNotes.Trim().ReplaceLineEndings("\n");
+            bool supplierFieldsChanged = summary.MaterialsOrderedByCustomer != original.MaterialsOrderedByCustomer ||
+                (!summary.MaterialsOrderedByCustomer && summary.SupplierName != original.SupplierName) ||
+                summary.MaterialOrderDate?.Date != original.MaterialOrderDate?.Date ||
+                summary.ExpectedDeliveryDate?.Date != original.ExpectedDeliveryDate?.Date ||
+                summary.MaterialStatus != original.MaterialStatus;
+            if (!notesChanged && !supplierFieldsChanged)
+                return true;
+
             await _historyService.UpdateSupplierInfoAsync(summary.QuoteNumber, new QuoteSupplierInfo
             {
+                UpdateSupplierFields = supplierFieldsChanged,
                 SupplierName = summary.SupplierName,
                 MaterialsOrderedByCustomer = summary.MaterialsOrderedByCustomer,
                 MaterialOrderDate = summary.MaterialOrderDate,
                 ExpectedDeliveryDate = summary.ExpectedDeliveryDate,
                 MaterialStatus = summary.MaterialStatus,
+                MaterialOrderNotes = notesChanged ? orderNotes : null,
                 DeviceName = deviceName
             });
 
             summary.LastModifiedByDevice = deviceName;
-            original.SupplierName = summary.SupplierName;
-            original.MaterialsOrderedByCustomer = summary.MaterialsOrderedByCustomer;
-            original.MaterialOrderDate = summary.MaterialOrderDate;
-            original.ExpectedDeliveryDate = summary.ExpectedDeliveryDate;
-            original.MaterialStatus = summary.MaterialStatus;
+            if (supplierFieldsChanged)
+            {
+                original.SupplierName = summary.SupplierName;
+                original.MaterialsOrderedByCustomer = summary.MaterialsOrderedByCustomer;
+                original.MaterialOrderDate = summary.MaterialOrderDate;
+                original.ExpectedDeliveryDate = summary.ExpectedDeliveryDate;
+                original.MaterialStatus = summary.MaterialStatus;
+            }
+            if (notesChanged)
+                original.MaterialOrderNotes = summary.MaterialOrderNotes = orderNotes;
             original.LastModifiedByDevice = deviceName;
             TxtFooterStatus.Text = $"Ordine del preventivo {summary.QuoteNumber} salvato";
             ApplyOrderView();

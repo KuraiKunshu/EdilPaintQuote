@@ -83,7 +83,8 @@ public partial class SupplierOrderDetailsWindow : Window
         MaterialsOrderedByCustomer = original.MaterialsOrderedByCustomer,
         MaterialOrderDate = original.MaterialOrderDate,
         ExpectedDeliveryDate = original.ExpectedDeliveryDate,
-        MaterialStatus = original.MaterialStatus
+        MaterialStatus = original.MaterialStatus,
+        MaterialOrderNotes = original.MaterialOrderNotes
     };
 
     private bool CommitPendingEdits()

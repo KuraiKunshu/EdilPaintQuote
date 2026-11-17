@@ -211,6 +211,8 @@ public sealed partial class MobileDatabaseService
         CancellationToken cancellationToken = default)
     {
         string status = SupplierOrderStatusOptions.Normalize(update.MaterialStatus);
+        string? notes = update.MaterialOrderNotes?.Trim();
+        string notesAssignment = notes is null ? "" : ", \"MaterialOrderNotes\" = @materialOrderNotes";
         DateTime? orderDate = update.MaterialOrderDate;
         if (status != "DA ORDINARE" && !orderDate.HasValue)
             orderDate = DateTime.Today;
@@ -219,12 +221,12 @@ public sealed partial class MobileDatabaseService
             connectionString,
             update.QuoteNumber,
             update.ExpectedRevision,
-            """
+            $"""
             "SupplierName" = @supplierName,
             "MaterialsOrderedByCustomer" = @orderedByCustomer,
             "MaterialOrderDate" = @orderDate,
             "ExpectedDeliveryDate" = @deliveryDate,
-            "MaterialStatus" = @materialStatus
+            "MaterialStatus" = @materialStatus{notesAssignment}
             """,
             command =>
             {
@@ -233,11 +235,24 @@ public sealed partial class MobileDatabaseService
                 AddNullableDateTime(command, "orderDate", orderDate);
                 AddNullableDateTime(command, "deliveryDate", update.ExpectedDeliveryDate);
                 command.Parameters.AddWithValue("materialStatus", status);
+                if (notes is not null)
+                    command.Parameters.AddWithValue("materialOrderNotes", notes);
             },
             "fornitori",
             $"Dati ordine aggiornati: {status}",
             cancellationToken);
     }
+
+    internal Task<long> UpdateSupplierOrderNotesAsync(
+        string connectionString,
+        string quoteNumber,
+        long expectedRevision,
+        string notes,
+        CancellationToken cancellationToken = default) =>
+        UpdateQuoteOperationalAsync(connectionString, quoteNumber, expectedRevision,
+            "\"MaterialOrderNotes\" = @materialOrderNotes",
+            command => command.Parameters.AddWithValue("materialOrderNotes", notes.Trim()),
+            "fornitori", "Note ordine aggiornate", cancellationToken);
 
     public Task<long> UpdateQuoteStatusAsync(
         string connectionString,

@@ -163,7 +163,11 @@ public sealed partial class MobileDatabaseService
                     coalesce(r."Email", ''),
                     coalesce(b."Email", ''),
                     coalesce(c."Address", ''),
-                    coalesce(r."Address", '')
+                    coalesce(r."Address", ''),
+                    to_jsonb(q) ->> 'MaterialOrderNotes',
+                    exists (select 1 from pg_attribute a
+                            where a.attrelid = q.tableoid and a.attname = 'MaterialOrderNotes' and not a.attisdropped
+                              and has_column_privilege(a.attrelid, a.attnum, 'UPDATE'))
                 from "Quotes" q
                 left join "Customers" c on c."Id" = q."CustomerId"
                 left join "Customers" r on r."Id" = q."ReferenceCustomerId"
@@ -228,7 +232,9 @@ public sealed partial class MobileDatabaseService
                 ReferenceEmail = reader.GetString(44),
                 BillingCustomerEmail = reader.GetString(45),
                 CustomerAddress = reader.GetString(46),
-                ReferenceAddress = reader.GetString(47)
+                ReferenceAddress = reader.GetString(47),
+                MaterialOrderNotes = reader.IsDBNull(48) ? null : reader.GetString(48),
+                CanEditMaterialOrderNotes = reader.GetBoolean(49)
             };
         }
 

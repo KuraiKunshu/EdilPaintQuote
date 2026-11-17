@@ -116,7 +116,15 @@ public sealed class SupplierOrderUpdate
     public DateTime? MaterialOrderDate { get; set; }
     public DateTime? ExpectedDeliveryDate { get; set; }
     public string MaterialStatus { get; set; } = string.Empty;
+    public string? MaterialOrderNotes { get; set; }
     public long ExpectedRevision { get; set; }
+
+    internal bool ChangesSupplierFields(QuoteDetail original) =>
+        MaterialsOrderedByCustomer != original.MaterialsOrderedByCustomer ||
+        (!MaterialsOrderedByCustomer && SupplierName.Trim() != original.SupplierName.Trim()) ||
+        MaterialOrderDate?.Date != original.MaterialOrderDate?.ToLocalTime().Date ||
+        ExpectedDeliveryDate?.Date != original.ExpectedDeliveryDate?.ToLocalTime().Date ||
+        MaterialStatus != SupplierOrderStatusOptions.Normalize(original.MaterialStatus);
 }
 
 public static class SupplierOrderStatusOptions

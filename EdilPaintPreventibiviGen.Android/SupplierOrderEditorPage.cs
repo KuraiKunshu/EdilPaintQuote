@@ -15,6 +15,12 @@ public sealed class SupplierOrderEditorPage : OperationPage
     private readonly DatePicker _date = new() { Format = "dd/MM/yyyy" };
     private readonly DatePicker _delivery = new() { Format = "dd/MM/yyyy" };
     private readonly Picker _status = new() { ItemsSource = SupplierOrderStatusOptions.All.ToList() };
+    private readonly Editor _notes = new()
+    {
+        MinimumHeightRequest = 100, AutoSize = EditorAutoSizeOption.TextChanges,
+        BackgroundColor = Colors.White, TextColor = Color.FromArgb("#202124"), IsReadOnly = true
+    };
+    private readonly Label _notesAvailability = new() { FontSize = 12, TextColor = Color.FromArgb("#616166"), IsVisible = false };
     private readonly Label _title = Heading("");
     private bool _loaded;
 
@@ -33,6 +39,9 @@ public sealed class SupplierOrderEditorPage : OperationPage
         Form.Add(Toggle("Consegna prevista presente", _hasDelivery));
         Form.Add(_delivery);
         Form.Add(Field("Stato", _status));
+        SemanticProperties.SetDescription(_notes, "Note ordine");
+        Form.Add(Field("Note ordine", _notes));
+        Form.Add(_notesAvailability);
         _suppliers.SelectedIndexChanged += (_, _) =>
         {
             if (_suppliers.SelectedItem is SupplierRecord supplier) _supplier.Text = supplier.BusinessName;
@@ -67,15 +76,7 @@ public sealed class SupplierOrderEditorPage : OperationPage
             _quote = await Database.GetQuoteAsync(ConnectionString, _quoteNumber);
             _title.Text = $"{_quote.CustomerName}\nPreventivo {_quote.QuoteNumber}";
             _suppliers.ItemsSource = (await Database.GetSuppliersAsync(ConnectionString)).ToList();
-            _supplier.Text = _quote.SupplierName;
-            _customerOrder.IsToggled = _quote.MaterialsOrderedByCustomer;
-            _hasDate.IsToggled = _quote.MaterialOrderDate.HasValue;
-            _date.Date = _quote.MaterialOrderDate?.ToLocalTime().Date ?? DateTime.Today;
-            _date.IsVisible = _hasDate.IsToggled;
-            _hasDelivery.IsToggled = _quote.ExpectedDeliveryDate.HasValue;
-            _delivery.Date = _quote.ExpectedDeliveryDate?.ToLocalTime().Date ?? DateTime.Today;
-            _delivery.IsVisible = _hasDelivery.IsToggled;
-            _status.SelectedItem = SupplierOrderStatusOptions.Normalize(_quote.MaterialStatus);
+            LoadOrderFields(_quote);
             _loaded = true;
         });
     }
@@ -83,15 +84,43 @@ public sealed class SupplierOrderEditorPage : OperationPage
     private async Task SaveAsync()
     {
         if (!_loaded || _quote == null) throw new InvalidOperationException("Caricamento non completato. Riapri l'ordine prima di salvarlo.");
-        await Database.UpdateSupplierOrderAsync(ConnectionString, new SupplierOrderUpdate
+        string notes = (_notes.Text ?? "").Trim().ReplaceLineEndings("\n");
+        string? previousNotes = _quote.MaterialOrderNotes?.Trim().ReplaceLineEndings("\n");
+        var update = new SupplierOrderUpdate
         {
             QuoteNumber = _quoteNumber, ExpectedRevision = _quote.Revision,
             SupplierName = _customerOrder.IsToggled ? _quote.CustomerName : _supplier.Text ?? "",
             MaterialsOrderedByCustomer = _customerOrder.IsToggled,
             MaterialOrderDate = _hasDate.IsToggled ? _date.Date : null,
             ExpectedDeliveryDate = _hasDelivery.IsToggled ? _delivery.Date : null,
-            MaterialStatus = _status.SelectedItem as string ?? "DA ORDINARE"
-        });
+            MaterialStatus = _status.SelectedItem as string ?? "DA ORDINARE",
+            MaterialOrderNotes = _quote.CanEditMaterialOrderNotes && notes != previousNotes ? notes : null
+        };
+        if (update.MaterialOrderNotes is { } orderNotes && !update.ChangesSupplierFields(_quote))
+            await Database.UpdateSupplierOrderNotesAsync(ConnectionString, _quoteNumber, _quote.Revision, orderNotes);
+        else
+            await Database.UpdateSupplierOrderAsync(ConnectionString, update);
         _quote = await Database.GetQuoteAsync(ConnectionString, _quoteNumber);
+        LoadOrderFields(_quote);
+    }
+
+    private void LoadOrderFields(QuoteDetail quote)
+    {
+        _customerOrder.IsToggled = quote.MaterialsOrderedByCustomer;
+        _supplier.Text = quote.MaterialsOrderedByCustomer ? quote.CustomerName : quote.SupplierName;
+        _hasDate.IsToggled = quote.MaterialOrderDate.HasValue;
+        _date.Date = quote.MaterialOrderDate?.ToLocalTime().Date ?? DateTime.Today;
+        _date.IsVisible = _hasDate.IsToggled;
+        _hasDelivery.IsToggled = quote.ExpectedDeliveryDate.HasValue;
+        _delivery.Date = quote.ExpectedDeliveryDate?.ToLocalTime().Date ?? DateTime.Today;
+        _delivery.IsVisible = _hasDelivery.IsToggled;
+        _status.SelectedItem = SupplierOrderStatusOptions.Normalize(quote.MaterialStatus);
+        _notes.Text = quote.MaterialOrderNotes ?? "";
+        _notes.IsReadOnly = !quote.CanEditMaterialOrderNotes;
+        _notes.Placeholder = quote.CanEditMaterialOrderNotes ? "Es. manca raccordo destro" : "";
+        _notesAvailability.IsVisible = !quote.CanEditMaterialOrderNotes;
+        _notesAvailability.Text = quote.MaterialOrderNotes is null
+            ? "Disponibili dopo l’aggiornamento del database."
+            : "Per modificarle, serve il permesso di scrittura delle note ordine su Android.";
     }
 }

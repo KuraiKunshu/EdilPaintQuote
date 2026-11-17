@@ -47,6 +47,8 @@ public sealed class QuoteDetail
     public DateTime? MaterialOrderDate { get; init; }
     public DateTime? ExpectedDeliveryDate { get; init; }
     public string MaterialStatus { get; init; } = string.Empty;
+    public string? MaterialOrderNotes { get; init; }
+    public bool CanEditMaterialOrderNotes { get; init; }
     public RealProfitSnapshot? RealProfit { get; init; }
     public bool IsJointVenture { get; init; }
     public string PartnerCompanyName { get; init; } = string.Empty;

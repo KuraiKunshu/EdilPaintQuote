@@ -96,6 +96,9 @@ internal static class QuoteSyncHashService
             (!string.IsNullOrEmpty(entry.TrelloCardId) || !string.IsNullOrEmpty(entry.TrelloCardSnapshotJson)))
             data += "|trello-manual-v1:" + JsonSerializer.Serialize(new[] { entry.TrelloCardId, entry.TrelloCardSnapshotJson });
 
+        if (includeCustomerIdentity && !string.IsNullOrEmpty(entry.MaterialOrderNotes))
+            data += "|material-order-notes-v1:" + JsonSerializer.Serialize(entry.MaterialOrderNotes);
+
         var bytes = Encoding.UTF8.GetBytes(data);
         var hash = SHA256.HashData(bytes);
         return Convert.ToBase64String(hash);
